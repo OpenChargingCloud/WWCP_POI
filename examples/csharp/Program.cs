@@ -3,6 +3,12 @@
 // Each check reads only what is published, as a charging station operator or an app would.
 
 
+// What the last run wrote is removed first: its keys, what it published and its history would not fit the new keys.
+foreach (var directory in new[] { "AlphaOrg", "BetaOrg", "GammaOrg", "DE-GEF", "published", "trusted", "driver", "poi" })
+    if (Directory.Exists(directory))
+        Directory.Delete(directory, recursive: true);
+
+
 // The roaming network is created and the organizations behind it sign the quorum.
 using var a1 = ExampleA1.Run();
 
@@ -109,3 +115,15 @@ Console.WriteLine();
 ExampleA10.Run(a1, a2, a6);
 
 ExampleA10.Validate();
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// Cryptography ages: QA moves into epoch 2, of SHA-512 and ML-DSA. The new keys first, next to the old ones; the final
+// checkpoint 6 closes epoch 1; the first commit of epoch 2 takes the old keys out, its first checkpoint is signed with
+// both, so a verifier trusting only the old ones follows. Epoch 1 stays readable.
+using var a11 = ExampleA11.Run(a1, a2, a6);
+
+ExampleA11.Validate();

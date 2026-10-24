@@ -214,3 +214,9 @@ Checkpoint 5 without its witnesses: witnessed by 0 of 2
 - The energy charged is the one of the signed meter values of the session, checked with the public key of the energy
   meter the station proof gives; the meter values, and the transparency software checking them, are not part of this
   example. `QA` names no transparency software for its meters yet (`transparencySoftwareStatus`).
+
+
+## Next
+
+- When cryptography ages: `QA` moves into an epoch of SHA-512 identifications and ML-DSA signatures, and this evidence,
+  of epoch 1, proves what it proved: [example A11](exampleA11.md).

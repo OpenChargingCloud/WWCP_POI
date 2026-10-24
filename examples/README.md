@@ -1,11 +1,11 @@
 # Examples
 
-Ten examples, each going on from the one before: a roaming network whose operator three organizations hold, a charging
-station operator asking to be added to it with the manufacturers of its stations and meters, its pools, their templates
-and their groups, checkpoints of the history, with a correction between two of them, witnesses signing them, the history
-compacted after them with an archive, price statements named by checkpoints, witnesses checking them, and what a
-driver's app keeps as evidence of the price that applied. They are C# with POI 3 alone, without a hub, in one console
-project, [csharp/](csharp/); A2 and A3 also show the same with the
+Eleven examples, each going on from the one before: a roaming network whose operator three organizations hold, a
+charging station operator asking to be added to it with the manufacturers of its stations and meters, its pools, their
+templates and their groups, checkpoints of the history, with a correction between two of them, witnesses signing them,
+the history compacted after them with an archive, price statements named by checkpoints, witnesses checking them, what a
+driver's app keeps as evidence of the price that applied, and a new epoch of post-quantum signatures. They are C# with
+POI 3 alone, without a hub, in one console project, [csharp/](csharp/); A2 and A3 also show the same with the
 [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI): at its prompt or over SSH, in its web interface and
 over HTTP.
 
@@ -21,16 +21,17 @@ over HTTP.
 | [Example A8](exampleA8.md) | **Price statements, named by checkpoints.** `DE*GEF` adds an AC and a DC charging tariff, its EVSE templates name them, `OCC` makes checkpoint 3; `DE*GEF` states ad hoc prices of its DC EVSEs, signed price statements chained per EVSE, then raises its AC tariff by a commit, and checkpoint 4 names the statements. They are checked against the keys of `DE*GEF` and the tree of checkpoint 4; a proof shows one was made between the two checkpoints; a split view and a statement signed by the infrastructure key are refused. | 10 to 12; checkpoints 3, 4 | `DE*GEF`, its `tariffs` and `infrastructure` keys |
 | [Example A9](exampleA9.md) | **Witnesses check the price statements.** The witnesses of A6 go on with their copies of the history: they take the commits of A8 and the checkpoints 3 and 4, and sign checkpoint 4 only after they checked the price statements it names; without them, with one missing or one changed, they refuse. Then the proof of a price statement is witnessed evidence. | checkpoints 3, 4 | the witnesses |
 | [Example A10](exampleA10.md) | **What a driver's app keeps as evidence.** Before charging at `DE*GEF*E1*1`, the app gets the proof of its charging station, attested by the holders of `OCC`, and the price statement of the EVSE, and checks both offline against the trust anchor; after checkpoint 5 it adds the proof of the station's version in checkpoint 4, of the statement in checkpoint 5, and both checkpoints, signed by the witnesses. Months later, when the attestations have ended, the evidence still shows the tariff and the price that applied when charging began; another price, another time, another station and a checkpoint without witnesses are refused. | 13; checkpoint 5 | `DE*GEF`, its `tariffs` key; the witnesses |
+| [Example A11](exampleA11.md) | **New locks, same house: epoch 2.** The holders of `OCC`, `DE*GEF` and the witnesses make ML-DSA keys, `OCC` states them next to its old ones, signed by the old quorum, and `DE*GEF` replaces its keys; the final checkpoint 6 closes epoch 1 and names epoch 2, of SHA-512 and ML-DSA only, whose genesis is its version. The first commit of epoch 2 takes the old keys out, and its first checkpoint is signed with the old and the new keys: a verifier trusting only the trust anchor and the witnesses of epoch 1 follows, one trusting only the new ones joins from it. Old keys, a commit of epoch 1 and a genesis of another version are refused; epoch 1 stays readable. | 14, 15; checkpoint 6, final; epoch 2: 0 to 2, checkpoint 0 | the quorum of `OCC`, old and new keys; `DE*GEF`; the witnesses, old and new keys |
 
 What each way needs:
 
-| Way | Example A1 | Example A2 | Example A3 | Examples A4 to A10 |
+| Way | Example A1 | Example A2 | Example A3 | Examples A4 to A11 |
 |---|---|---|---|---|
-| C#, POI 3 alone ([csharp/](csharp/)) | `RoamingNetworkKeyStatement.Create`, `RoamingNetworkSigningKeyCertificate.Create`, `RoamingNetworkHistory.Start` | `CreateChangeSet([ Add(operator) ])`, signed by `DE*GEF`'s identity keys and two holders of `OCC` | `history.Commit`, signed by `DE*GEF`'s `infrastructure` key | `history.TryMakeCheckpoint`, `TryGetCommitProof`, `RoamingNetworkHistory.TryFromCheckpointSnapshot`, `TryWitness`, `TryAddCheckpointSignatures`, `history.Compact` with an archive, `RoamingNetworkPriceStatement.Create`, `TryAddPriceStatement`, `TryAddCheckpointPriceStatements`, `TryAttest`, `TryGetChargingStationProof`, `TryGetPriceStatementProof` |
+| C#, POI 3 alone ([csharp/](csharp/)) | `RoamingNetworkKeyStatement.Create`, `RoamingNetworkSigningKeyCertificate.Create`, `RoamingNetworkHistory.Start` | `CreateChangeSet([ Add(operator) ])`, signed by `DE*GEF`'s identity keys and two holders of `OCC` | `history.Commit`, signed by `DE*GEF`'s `infrastructure` key | `history.TryMakeCheckpoint`, `TryGetCommitProof`, `RoamingNetworkHistory.TryFromCheckpointSnapshot`, `TryWitness`, `TryAddCheckpointSignatures`, `history.Compact` with an archive, `RoamingNetworkPriceStatement.Create`, `TryAddPriceStatement`, `TryAddCheckpointPriceStatements`, `TryAttest`, `TryGetChargingStationProof`, `TryGetPriceStatementProof`, `TryCloseEpoch`, `TryStartNextEpoch` |
 | prompt, SSH | `roamingNetworks add QA …` | `roamingNetworks QA add chargingStationOperator …` | shows: `roamingNetworks QA` | - |
 | web interface | **New roaming network** | **New party of a roaming network** | shows: **Points of interest** | - |
 | HTTP, as an administrator | `POST /api/v1/poi/RNs`, with an API key | `POST /api/v1/poi/RNs/QA/CSOs`, `202` | - | - |
-| HTTP, by anybody | - | `POST /poi/RNs/QA/history/changeSets/pending/{id}/signatures`, the signatures of `DE*GEF`'s identity keys | `COMMIT /poi/RNs/QA/history/changeSets`, a change set `DE*GEF` signs | reads: `GET /poi/RNs/QA/history/checkpoints`, their snapshots and proofs; witnesses: `POST …/checkpoints/{checkpointId}/signatures`; `GET /poi/RNs/QA/history/archive`; `POST /poi/RNs/QA/history/priceStatements`; the app: `GET /poi/RNs/QA/EVSEs/{EVSE_Id}/proof` and `…/priceStatements`; the hub makes no checkpoints yet |
+| HTTP, by anybody | - | `POST /poi/RNs/QA/history/changeSets/pending/{id}/signatures`, the signatures of `DE*GEF`'s identity keys | `COMMIT /poi/RNs/QA/history/changeSets`, a change set `DE*GEF` signs | reads: `GET /poi/RNs/QA/history/checkpoints`, their snapshots and proofs; witnesses: `POST …/checkpoints/{checkpointId}/signatures`; `GET /poi/RNs/QA/history/archive`; `POST /poi/RNs/QA/history/priceStatements`; the app: `GET /poi/RNs/QA/EVSEs/{EVSE_Id}/proof` and `…/priceStatements`; `GET /poi/RNs/QA/history/epoch` and `…/epochs`; the hub makes no checkpoints yet |
 
 Run the examples in [csharp/](csharp/), where their output stays:
 
@@ -38,6 +39,8 @@ Run the examples in [csharp/](csharp/), where their output stays:
 dotnet run
 ```
 
-A run writes the private keys of the organizations and of `DE*GEF` into directories of their own, what is published into
-`published/`, the keys of the witnesses a verifier trusts into `trusted/`, what the driver's app keeps into `driver/`, and the history of `QA` into `poi/QA/`, all
-ignored by git. What POI 3 is, its entities and its change sets, is in [docs/](../docs/README.md) and the [README](../README.md) of WWCP_POI.
+A run first removes what the last one wrote, then writes the private keys of the organizations and of `DE*GEF` into
+directories of their own, what is published into `published/`, the keys of the witnesses a verifier trusts into
+`trusted/`, what the driver's app keeps into `driver/`, and the history of `QA` into `poi/QA/`, of its epoch 2 into
+`poi/QA-epoch-2/`, all ignored by git. What POI 3 is, its entities and its change sets, is in [docs/](../docs/README.md)
+and the [README](../README.md) of WWCP_POI.
