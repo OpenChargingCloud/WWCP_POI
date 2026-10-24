@@ -94,7 +94,7 @@ holds it (SPECIFICATION.md, section 4.1).
 | Who | JSON key | Rule |
 |---|---|---|
 | [ChargingStation](ChargingStation.md) | `manufacturerId`, `modelId` | `manufacturerId` must name a manufacturer of the network; `modelId` (`ChargingStationModel_Id`) is free text. |
-| transparency software certificate ([RoamingNetwork](RoamingNetwork.md#transparencysoftwarecertificates)) | `chargingStationManufacturerId` | must name a manufacturer of the network. |
+| transparency software certificate ([ConformityAssessmentBody](ConformityAssessmentBody.md#transparencysoftwarecertificates)) | `chargingStationManufacturerId` | must name a manufacturer of the network. |
 
 The references are checked after every change set: a manufacturer still named can not be removed, and a station
 or certificate can not name an unknown one.

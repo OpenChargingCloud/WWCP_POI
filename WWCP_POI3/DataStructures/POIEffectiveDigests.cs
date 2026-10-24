@@ -99,7 +99,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 { RoamingNetwork.PropertyKeys.ChargingStationManufacturers,      [ .. RoamingNetwork.ChargingStationManufacturers.    Select(value => LeafNode(RoamingNetwork.PropertyKeys.ChargingStationManufacturers,     value, value.ToJSON(Embedded: true), HashAlgorithm)) ] },
                                 { RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,          [ .. RoamingNetwork.EnergyMeterManufacturers.        Select(value => LeafNode(RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,         value, value.ToJSON(Embedded: true), HashAlgorithm)) ] },
                                 { RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers, [ .. RoamingNetwork.TransparencySoftwareManufacturers.Select(party => NodeOf(party, HashAlgorithm)) ] },
-                                { RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates,  [ .. RoamingNetwork.TransparencySoftwareCertificates.Select(value => LeafNode(RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates, value, value.ToJSON(Embedded: true), HashAlgorithm)) ] }
+                                { RoamingNetwork.PropertyKeys.ConformityAssessmentBodies,        [ .. RoamingNetwork.ConformityAssessmentBodies.      Select(party => NodeOf(party, HashAlgorithm)) ] }
                             };
 
             return root with {
@@ -144,7 +144,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                      (RoamingNetwork.PropertyKeys.ParkingOperators,                  [ .. RoamingNetwork.ParkingOperators.                Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
                      (RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,          Leaves(RoamingNetwork.EnergyMeterManufacturers,         value => value.ToJSON(Embedded: true), HashAlgorithm)),
                      (RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers, [ .. RoamingNetwork.TransparencySoftwareManufacturers.Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
-                     (RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates,  Leaves(RoamingNetwork.TransparencySoftwareCertificates,  value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
+                     (RoamingNetwork.PropertyKeys.ConformityAssessmentBodies,        [ .. RoamingNetwork.ConformityAssessmentBodies.      Select(party => NodeOf(party, HashAlgorithm).Digest) ]) ],
 
                    HashAlgorithm));
 
@@ -252,6 +252,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    TransparencySoftwareManufacturer.ToJSON(Embedded: true, IncludeChildArrays: false),
 
                    [ (TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware,  Leaves(TransparencySoftwareManufacturer.TransparencySoftware,  value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
+
+                   HashAlgorithm));
+
+        #endregion
+
+        #region (private) NodeOf(ConformityAssessmentBody, HashAlgorithm)
+
+        private static POITreeNode NodeOf(ConformityAssessmentBody  ConformityAssessmentBody,
+                                          ETagHashAlgorithm         HashAlgorithm)
+
+            => Kept(ConformityAssessmentBody, HashAlgorithm, () => Node(
+
+                   RoamingNetwork.PropertyKeys.ConformityAssessmentBodies,
+
+                   ConformityAssessmentBody.ToJSON(Embedded: true, IncludeChildArrays: false),
+
+                   [ (ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates,  Leaves(ConformityAssessmentBody.TransparencySoftwareCertificates,  value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
 
                    HashAlgorithm));
 

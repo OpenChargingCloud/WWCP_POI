@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      gridOperators,
                                      parkingOperators,
                                      transparencySoftwareManufacturers,
-                                     transparencySoftwareCertificates,
+                                     conformityAssessmentBodies,
                                      energyMeterManufacturers,
                                      Operator,
                                      GivenTreeHashAlgorithms
@@ -569,7 +569,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var gridOps               = new Dictionary<GridOperator_Id, GridOperator>(gridOperators.Index);
             var parkingOps            = new Dictionary<ParkingOperator_Id, ParkingOperator>(parkingOperators.Index);
             var softwareManufacturers = new Dictionary<TransparencySoftwareManufacturer_Id, TransparencySoftwareManufacturer>(transparencySoftwareManufacturers.Index);
-            var certificates          = new Dictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(transparencySoftwareCertificates.Index);
+            var bodies                = new Dictionary<ConformityAssessmentBody_Id, ConformityAssessmentBody>(conformityAssessmentBodies.Index);
             var meterManufacturers    = new Dictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>(energyMeterManufacturers.Index);
             var changesWithOldValues  = ImmutableArray.CreateBuilder<RoamingNetworkChange>(ChangeSet.Changes.Length);
 
@@ -1049,9 +1049,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                 }
 
+                else if (change.EntityType == nameof(ConformityAssessmentBody))
+                {
+                    if (!TryApplyRegistryChange(ConformityAssessmentBodyRegistry, change, index, ChangeSet.CreatedAt, bodies, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
                 else if (change.EntityType == nameof(TransparencySoftwareCertificate))
                 {
-                    if (!TryApplyRegistryChange(TransparencySoftwareCertificateRegistry, change, index, ChangeSet.CreatedAt, certificates, out currentValue, out ErrorResponse))
+                    if (!TryApplyTransparencySoftwareCertificateChange(change, index, ChangeSet.CreatedAt, bodies, out currentValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1114,6 +1120,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var allEnergyMeterGroups    = AllEnergyMeterGroups   (operators.Values, gridOps.Values).ToArray();
             var allEnergyMeterTemplates = AllEnergyMeterTemplates(operators.Values, gridOps.Values).ToArray();
             var softwares               = TransparencySoftwareOf (softwareManufacturers.Values);
+            var certificates            = TransparencySoftwareCertificatesOf(bodies.Values);
 
             if ((networkOperators.Values.SingleOrDefault()?.KeyStatementError(Id) ??
                  UnknownManufacturer (operators.Values, manufacturers) ??
@@ -1125,6 +1132,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  UnknownChargingStation(parkingOps.Values, operators)  ??
                  UnknownParkingSpace(operators.Values, parkingOps.Values) ??
                  DuplicateTransparencySoftware(softwareManufacturers.Values) ??
+                 DuplicateTransparencySoftwareCertificate(bodies.Values) ??
                  UnknownTransparencyReference(allEnergyMeters, softwares, certificates, manufacturers) ??
                  UnknownEnergyMeterManufacturer(allEnergyMeters, meterManufacturers) ??
                  DuplicateEnergyMeterGroup(allEnergyMeterGroups)       ??
@@ -1158,7 +1166,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  gridOps.Values,
                                  parkingOps.Values,
                                  softwareManufacturers.Values,
-                                 certificates.Values,
+                                 bodies.Values,
                                  meterManufacturers.Values,
                                  networkOperators.Values.SingleOrDefault(),
                                  treeHashAlgorithms

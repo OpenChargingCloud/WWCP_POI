@@ -1,11 +1,12 @@
 # Examples
 
-Twelve examples, each going on from the one before: a roaming network whose operator three organizations hold, a
+Thirteen examples, each going on from the one before: a roaming network whose operator three organizations hold, a
 charging station operator asking to be added to it with the manufacturers of its stations and meters, its pools, their
 templates and their groups, checkpoints of the history, with a correction between two of them, witnesses signing them,
 the history compacted after them with an archive, price statements named by checkpoints, witnesses checking them, what a
-driver's app keeps as evidence of the price that applied, a new epoch of post-quantum signatures, and the status of an
-EVSE pushed live over the WebSocket of the history. They are C# with POI 3 alone, without a hub, in one console project,
+driver's app keeps as evidence of the price that applied, a new epoch of post-quantum signatures, the status of an
+EVSE pushed live over the WebSocket of the history, and who checks the meter: a transparency software and its
+certificate, each signed by who states it. They are C# with POI 3 alone, without a hub, in one console project,
 [csharp/](csharp/); A2 and A3 also show the same with the
 [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI): at its prompt or over SSH, in its web interface and
 over HTTP.
@@ -24,16 +25,17 @@ over HTTP.
 | [Example A10](exampleA10.md) | **What a driver's app keeps as evidence.** Before charging at `DE*GEF*E1*1`, the app gets the proof of its charging station, attested by the holders of `OCC`, and the price statement of the EVSE, and checks both offline against the trust anchor; after checkpoint 5 it adds the proof of the station's version in checkpoint 4, of the statement in checkpoint 5, and both checkpoints, signed by the witnesses. Months later, when the attestations have ended, the evidence still shows the tariff and the price that applied when charging began; another price, another time, another station and a checkpoint without witnesses are refused. | 13; checkpoint 5 | `DE*GEF`, its `tariffs` key; the witnesses |
 | [Example A11](exampleA11.md) | **New locks, same house: epoch 2.** The holders of `OCC`, `DE*GEF` and the witnesses make ML-DSA keys, `OCC` states them next to its old ones, signed by the old quorum, and `DE*GEF` replaces its keys; the final checkpoint 6 closes epoch 1 and names epoch 2, of SHA-512 and ML-DSA only, whose genesis is its version. The first commit of epoch 2 takes the old keys out, and its first checkpoint is signed with the old and the new keys: a verifier trusting only the trust anchor and the witnesses of epoch 1 follows, one trusting only the new ones joins from it. Old keys, a commit of epoch 1 and a genesis of another version are refused; epoch 1 stays readable. | 14, 15; checkpoint 6, final; epoch 2: 0 to 2, checkpoint 0 | the quorum of `OCC`, old and new keys; `DE*GEF`; the witnesses, old and new keys |
 | [Example A12](exampleA12.md) | **The atlas and the traffic report, live.** `OCC` serves `QA` of epoch 2 with `POI_API`, a mirror follows it with a `RoamingNetworkPeer`, trusting the trust anchor of epoch 2, and serves its copy; a driver's app subscribes there. `DE*GEF` sets the status, the energy status and the price status of `DE*GEF*E1*1` at the server of `OCC`, with its token, and every change is pushed to the app at once; a late report, the app setting a status and another token are refused, and the head stays the same commit. Then `DE*GEF` lowers its DC tariff over the same WebSocket, and the commit is pushed as well, signed and checked against the trust anchor. Subscriptions end with the connection. | epoch 2: 3 | `DE*GEF`, its ML-DSA `tariffs` key; `OCC` |
+| [Example A13](exampleA13.md) | **Who checks the meter.** `OCC` adds the transparency software manufacturer `GraphDefined`, the PTB, notified body `0102` for the `MID`, both with their keys, and the BSI, for the `CRA`, without keys: it does not take part yet. `GraphDefined` states its release of Chargy with the end of its support period, its declaration of conformity and its bill of materials, signed by its `software` key; the PTB certifies it for the station model `GD-DC300` under the `MID`, signed by its `certificates` key; signed by `OCC`, a release is refused, and so is a certificate of the PTB under the `CRA`. `DE*GEF` names both for its DC energy meters; the station proof of `DE*GEF*E1*1` gives the release and the certificate in the skeletons of their manufacturer and body. | epoch 2: 4 to 7 | the quorum of `OCC`; `GraphDefined`; the PTB; `DE*GEF` |
 
 What each way needs:
 
-| Way | Example A1 | Example A2 | Example A3 | Examples A4 to A12 |
+| Way | Example A1 | Example A2 | Example A3 | Examples A4 to A13 |
 |---|---|---|---|---|
-| C#, POI 3 alone ([csharp/](csharp/)) | `RoamingNetworkKeyStatement.Create`, `RoamingNetworkSigningKeyCertificate.Create`, `RoamingNetworkHistory.Start` | `CreateChangeSet([ Add(operator) ])`, signed by `DE*GEF`'s identity keys and two holders of `OCC` | `history.Commit`, signed by `DE*GEF`'s `infrastructure` key | `history.TryMakeCheckpoint`, `TryGetCommitProof`, `RoamingNetworkHistory.TryFromCheckpointSnapshot`, `TryWitness`, `TryAddCheckpointSignatures`, `history.Compact` with an archive, `RoamingNetworkPriceStatement.Create`, `TryAddPriceStatement`, `TryAddCheckpointPriceStatements`, `TryAttest`, `TryGetChargingStationProof`, `TryGetPriceStatementProof`, `TryCloseEpoch`, `TryStartNextEpoch`, `POI_API.AddRoamingNetworkHistory`, `RoamingNetworkPeer`; over the WebSocket `subscribe`, `runtimeStatus`, `setStatus`, `commitChangeSet` |
+| C#, POI 3 alone ([csharp/](csharp/)) | `RoamingNetworkKeyStatement.Create`, `RoamingNetworkSigningKeyCertificate.Create`, `RoamingNetworkHistory.Start` | `CreateChangeSet([ Add(operator) ])`, signed by `DE*GEF`'s identity keys and two holders of `OCC` | `history.Commit`, signed by `DE*GEF`'s `infrastructure` key | `history.TryMakeCheckpoint`, `TryGetCommitProof`, `RoamingNetworkHistory.TryFromCheckpointSnapshot`, `TryWitness`, `TryAddCheckpointSignatures`, `history.Compact` with an archive, `RoamingNetworkPriceStatement.Create`, `TryAddPriceStatement`, `TryAddCheckpointPriceStatements`, `TryAttest`, `TryGetChargingStationProof`, `TryGetPriceStatementProof`, `TryCloseEpoch`, `TryStartNextEpoch`, `POI_API.AddRoamingNetworkHistory`, `RoamingNetworkPeer`; over the WebSocket `subscribe`, `runtimeStatus`, `setStatus`, `commitChangeSet`; `Add(TransparencySoftwareManufacturer)`, `Add(release, manufacturerId)`, `Add(ConformityAssessmentBody)`, `Add(certificate, bodyId)` |
 | prompt, SSH | `roamingNetworks add QA …` | `roamingNetworks QA add chargingStationOperator …` | shows: `roamingNetworks QA` | - |
 | web interface | **New roaming network** | **New party of a roaming network** | shows: **Points of interest** | - |
 | HTTP, as an administrator | `POST /api/v1/poi/RNs`, with an API key | `POST /api/v1/poi/RNs/QA/CSOs`, `202` | - | - |
-| HTTP, by anybody | - | `POST /poi/RNs/QA/history/changeSets/pending/{id}/signatures`, the signatures of `DE*GEF`'s identity keys | `COMMIT /poi/RNs/QA/history/changeSets`, a change set `DE*GEF` signs | reads: `GET /poi/RNs/QA/history/checkpoints`, their snapshots and proofs; witnesses: `POST …/checkpoints/{checkpointId}/signatures`; `GET /poi/RNs/QA/history/archive`; `POST /poi/RNs/QA/history/priceStatements`; the app: `GET /poi/RNs/QA/EVSEs/{EVSE_Id}/proof` and `…/priceStatements`; `GET /poi/RNs/QA/history/epoch` and `…/epochs`; the WebSocket `/poi/RNs/QA/history/ws`, without `setStatus`; the hub makes no checkpoints yet |
+| HTTP, by anybody | - | `POST /poi/RNs/QA/history/changeSets/pending/{id}/signatures`, the signatures of `DE*GEF`'s identity keys | `COMMIT /poi/RNs/QA/history/changeSets`, a change set `DE*GEF` signs | reads: `GET /poi/RNs/QA/history/checkpoints`, their snapshots and proofs; witnesses: `POST …/checkpoints/{checkpointId}/signatures`; `GET /poi/RNs/QA/history/archive`; `POST /poi/RNs/QA/history/priceStatements`; the app: `GET /poi/RNs/QA/EVSEs/{EVSE_Id}/proof` and `…/priceStatements`; `GET /poi/RNs/QA/history/epoch` and `…/epochs`; the WebSocket `/poi/RNs/QA/history/ws`, without `setStatus`; `GET /poi/RNs/QA/TSMs` and `…/CABs`; the hub makes no checkpoints yet |
 
 Run the examples in [csharp/](csharp/), where their output stays:
 
@@ -41,7 +43,8 @@ Run the examples in [csharp/](csharp/), where their output stays:
 dotnet run
 ```
 
-A run first removes what the last one wrote, then writes the private keys of the organizations and of `DE*GEF` into
+A run first removes what the last one wrote, then writes the private keys of the organizations, of `DE*GEF`, of
+`GraphDefined` and of the PTB into
 directories of their own, what is published into `published/`, the keys of the witnesses a verifier trusts into
 `trusted/`, what the driver's app keeps into `driver/`, and the history of `QA` into `poi/QA/`, of its epoch 2 into
 `poi/QA-epoch-2/`, all ignored by git. What POI 3 is, its entities and its change sets, is in [docs/](../docs/README.md)

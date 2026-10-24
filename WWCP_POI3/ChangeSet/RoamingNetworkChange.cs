@@ -1259,17 +1259,66 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Add                   (TransparencySoftwareCertificate)
+        #region Add                   (ConformityAssessmentBody)
+
+        /// <summary>
+        /// Add the given conformity assessment body to its roaming network, with its keys, if it takes part, and without its
+        /// certificates.
+        /// </summary>
+        /// <param name="ConformityAssessmentBody">The new conformity assessment body.</param>
+        public static RoamingNetworkChange Add(ConformityAssessmentBody ConformityAssessmentBody)
+
+            => Add(nameof(POI.ConformityAssessmentBody),
+                   ConformityAssessmentBody.Id.ToString(),
+                   ConformityAssessmentBody.ToJSON(Embedded: true));
+
+        /// <summary>
+        /// Remove the given conformity assessment body, with its certificates, optionally checking its complete previous
+        /// JSON representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ConformityAssessmentBody_Id  ConformityAssessmentBodyId,
+                                                  JToken?                      OldValue                     = null)
+
+            => Remove(nameof(POI.ConformityAssessmentBody),
+                      ConformityAssessmentBodyId.ToString(),
+                      OldValue);
+
+        /// <summary>
+        /// Update one property of the given conformity assessment body, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ConformityAssessmentBody  ConformityAssessmentBody,
+                                                          String                    PropertyName,
+                                                          JToken?                   OldValue,
+                                                          JToken                    NewValue)
+
+            => UpdateProperty(nameof(POI.ConformityAssessmentBody), ConformityAssessmentBody.Id.ToString(), PropertyName, OldValue, NewValue);
+
+        /// <summary>
+        /// Remove one property of the given conformity assessment body, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ConformityAssessmentBody  ConformityAssessmentBody,
+                                                          String                    PropertyName,
+                                                          JToken?                   OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ConformityAssessmentBody), ConformityAssessmentBody.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (TransparencySoftwareCertificate, ConformityAssessmentBodyId)
 
         /// <summary>
         /// Add the given transparency software certificate to its roaming network.
         /// </summary>
         /// <param name="TransparencySoftwareCertificate">The new transparency software certificate.</param>
-        public static RoamingNetworkChange Add(TransparencySoftwareCertificate TransparencySoftwareCertificate)
+        /// <param name="ConformityAssessmentBodyId">The identification of the conformity assessment body issuing it.</param>
+        public static RoamingNetworkChange Add(TransparencySoftwareCertificate  TransparencySoftwareCertificate,
+                                               ConformityAssessmentBody_Id      ConformityAssessmentBodyId)
 
             => Add(nameof(POI.TransparencySoftwareCertificate),
                    TransparencySoftwareCertificate.Id.ToString(),
-                   TransparencySoftwareCertificate.ToJSON(Embedded: true));
+                   TransparencySoftwareCertificate.ToJSON(Embedded: true),
+                   nameof(POI.ConformityAssessmentBody),
+                   ConformityAssessmentBodyId.ToString());
 
         /// <summary>
         /// Remove the given transparency software certificate, optionally checking its complete previous JSON representation.

@@ -70,6 +70,7 @@ flowchart TD
 | [ChargingStationManufacturer](ChargingStationManufacturer.md) | roaming network, `chargingStationManufacturers` | RNO | A maker of charging stations, named by stations' `manufacturerId`. |
 | [EnergyMeterManufacturer](EnergyMeterManufacturer.md) | roaming network, `energyMeterManufacturers` | RNO | A maker of energy meters, named by meters and their templates (`manufacturerId`). |
 | [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md) | roaming network, `transparencySoftwareManufacturers` | the manufacturer; added and removed by the RNO | A maker of transparency software with its releases, and what the EU Cyber Resilience Act asks of it. |
+| [ConformityAssessmentBody](ConformityAssessmentBody.md) | roaming network, `conformityAssessmentBodies` | the body, or the RNO while it has no keys; added and removed by the RNO | E.g. a metrology institute, notified for legislations such as MID or CRA, with the transparency software certificates it issued. |
 | [EMobilityProvider](EMobilityProvider.md) | roaming network, `eMobilityProviders` | the provider; added and removed by the RNO | An EMSP, with its keys, groups and offers. |
 | [GridOperator](GridOperator.md) | roaming network, `gridOperators` | the grid operator, or the RNO while it has no keys; added and removed by the RNO | A DSO with its grid connection points, each signed by its maintainer. |
 | [ParkingOperator](ParkingOperator.md) | roaming network, `parkingOperators` | the parking operator; added and removed by the RNO | Runs garages, spaces and sensors and offers parking products. |
@@ -85,9 +86,9 @@ status; brands, embedded on several levels, have a file of their own:
 | Substructure | Documented in |
 |---|---|
 | Brands, of operators, pools, stations, EVSEs and RFID authentication modes | [Brand](Brand.md) |
-| Transparency software certificates | [RoamingNetwork](RoamingNetwork.md) |
+| Transparency software certificates | [ConformityAssessmentBody](ConformityAssessmentBody.md) |
 | Transparency software releases | [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md) |
-| Signing and identity keys | [RoamingNetworkOperator](RoamingNetworkOperator.md#keys), and each party: [ChargingStationOperator](ChargingStationOperator.md), [EMobilityProvider](EMobilityProvider.md), [GridOperator](GridOperator.md), [ParkingOperator](ParkingOperator.md), [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md) |
+| Signing and identity keys | [RoamingNetworkOperator](RoamingNetworkOperator.md#keys), and each party: [ChargingStationOperator](ChargingStationOperator.md), [EMobilityProvider](EMobilityProvider.md), [GridOperator](GridOperator.md), [ParkingOperator](ParkingOperator.md), [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md), [ConformityAssessmentBody](ConformityAssessmentBody.md) |
 | Data licenses | [RoamingNetwork](RoamingNetwork.md), [ChargingStationOperator](ChargingStationOperator.md), [ChargingPool](ChargingPool.md) |
 | Logos, contact data | [ChargingStationOperator](ChargingStationOperator.md) |
 | Grid connection points and their maintainers | [GridOperator](GridOperator.md) |

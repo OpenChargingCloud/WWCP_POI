@@ -248,7 +248,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 var manufacturer      = RoamingNetwork.TransparencySoftwareManufacturers[manufacturerIndex];
-                var releaseIndices    = Enumerable.Range(0, manufacturer.TransparencySoftware.Length).
+                var releaseIndices    = Enumerable.Range(0, manufacturer.TransparencySoftware.Count).
                                                    Where (index => releaseIds.Contains(manufacturer.TransparencySoftware[index].Id)).
                                                    ToArray();
 
@@ -273,10 +273,43 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            SetPartialOfNetwork(networkJSON,
-                                POI.RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates,
-                                RoamingNetwork.TransparencySoftwareCertificates.Ids,
-                                energyMeters.SelectMany(energyMeter => energyMeter.TransparencySoftwareStatus).Select(assignment => assignment.CertificateId).OfType<TransparencySoftwareCertificate_Id>());
+            #region The transparency software certificates its energy meters name, in the bodies issuing them
+
+            var certificateIds  = energyMeters.SelectMany(energyMeter => energyMeter.TransparencySoftwareStatus).
+                                               Select  (assignment  => assignment.CertificateId).
+                                               OfType<TransparencySoftwareCertificate_Id>().
+                                               ToHashSet();
+
+            var bodies          = new List<(Int32, JObject)>();
+
+            for (var bodyIndex = 0; bodyIndex < RoamingNetwork.ConformityAssessmentBodies.Count; bodyIndex++)
+            {
+
+                var body                = RoamingNetwork.ConformityAssessmentBodies[bodyIndex];
+                var certificateIndices  = Enumerable.Range(0, body.TransparencySoftwareCertificates.Count).
+                                                     Where (index => certificateIds.Contains(body.TransparencySoftwareCertificates[index].Id)).
+                                                     ToArray();
+
+                if (certificateIndices.Length == 0)
+                    continue;
+
+                var bodyNode  = Root.Arrays[POI.RoamingNetwork.PropertyKeys.ConformityAssessmentBodies].Children![bodyIndex];
+                var bodyJSON  = (JObject) bodyNode.Skeleton.DeepClone();
+
+                SetPartial(bodyJSON,
+                           bodyNode,
+                           ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates,
+                           certificateIndices.Select(index => (index, body.TransparencySoftwareCertificates[index].ToJSON(Embedded: true))));
+
+                bodies.Add((bodyIndex, bodyJSON));
+
+            }
+
+            if (bodies.Count > 0)
+                networkJSON[POI.RoamingNetwork.PropertyKeys.ConformityAssessmentBodies] = Partial(Root.Arrays[POI.RoamingNetwork.PropertyKeys.ConformityAssessmentBodies],
+                                                                                                  bodies);
+
+            #endregion
 
             #region The grid connection point of the charging pool
 

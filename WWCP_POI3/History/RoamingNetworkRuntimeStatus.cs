@@ -392,6 +392,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     Authoritative, at, out normalized, out oldTimestamp, out oldValue);
                     break;
 
+                case nameof(ConformityAssessmentBody):
+
+                    if (!ConformityAssessmentBody_Id.TryParse(EntityId, out var bodyId) ||
+                        !network.TryGetConformityAssessmentBodyById(bodyId, out var body))
+                    {
+                        return Unknown(EntityType, EntityId, out ErrorResponse);
+                    }
+
+                    result = Kind == POIRuntimeStatusKind.AdminStatus
+
+                                 ? Set<ConformityAssessmentBodyAdminStatusType>(Value, ConformityAssessmentBodyAdminStatusType.TryParse,
+                                                    () => body.CurrentAdminStatus,
+                                                    (status, timestamp) => body.SetAdminStatus(status, timestamp, context),
+                                                    (status, timestamp) => body.SetAdminStatus([ new Timestamped<ConformityAssessmentBodyAdminStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue)
+
+                                 : Set<ConformityAssessmentBodyStatusType>(Value, ConformityAssessmentBodyStatusType.TryParse,
+                                                    () => body.CurrentStatus,
+                                                    (status, timestamp) => body.SetStatus(status, timestamp, context),
+                                                    (status, timestamp) => body.SetStatus([ new Timestamped<ConformityAssessmentBodyStatusType>(timestamp, status) ], ChangeMethods.Insert, context),
+                                                    Authoritative, at, out normalized, out oldTimestamp, out oldValue);
+                    break;
+
                 case nameof(TransparencySoftwareManufacturer):
 
                     if (!TransparencySoftwareManufacturer_Id.TryParse(EntityId, out var softwareManufacturerId) ||
@@ -1149,6 +1172,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     Add(statuses, POIRuntimeStatusKind.Status,      nameof(TransparencySoftwareManufacturer), manufacturer.Id.ToString(), manufacturer.CurrentStatus);
                 }
 
+                foreach (var body in network.ConformityAssessmentBodies)
+                {
+                    Add(statuses, POIRuntimeStatusKind.AdminStatus, nameof(ConformityAssessmentBody), body.Id.ToString(), body.CurrentAdminStatus);
+                    Add(statuses, POIRuntimeStatusKind.Status,      nameof(ConformityAssessmentBody), body.Id.ToString(), body.CurrentStatus);
+                }
+
                 foreach (var chargingStationOperator in network.ChargingStationOperators)
                 {
 
@@ -1312,6 +1341,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 entities.UnionWith(RoamingNetwork.ChargingStationManufacturers);
                 entities.UnionWith(RoamingNetwork.EnergyMeterManufacturers);
                 entities.UnionWith(RoamingNetwork.TransparencySoftwareManufacturers);
+                entities.UnionWith(RoamingNetwork.ConformityAssessmentBodies);
                 entities.UnionWith(RoamingNetwork.EVSEGroups);
                 entities.UnionWith(RoamingNetwork.ChargingStationGroups);
                 entities.UnionWith(RoamingNetwork.ChargingPoolGroups);
@@ -1364,6 +1394,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             ChargingStationManufacturer  manufacturer             => ListenTo(manufacturer),
                                             EnergyMeterManufacturer      meterManufacturer        => ListenTo(meterManufacturer),
                                             TransparencySoftwareManufacturer  softwareManufacturer  => ListenTo(softwareManufacturer),
+                                            ConformityAssessmentBody     conformityAssessmentBody  => ListenTo(conformityAssessmentBody),
                                             ChargingStationOperator      chargingStationOperator  => ListenTo(chargingStationOperator),
                                             _                                                     => throw new InvalidOperationException($"No status events of a {entity.GetType().Name}!")
                                         };
@@ -1427,6 +1458,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             OnChargingStationManufacturerStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
                 Raise(POIRuntimeStatusKind.Status, nameof(ChargingStationManufacturer), entity.Id.ToString(), newStatus, oldStatus, dataSource);
+                return Task.CompletedTask;
+            };
+
+            Entity.OnAdminStatusChanged  += onAdminStatusChanged;
+            Entity.OnStatusChanged       += onStatusChanged;
+
+            return () => {
+                Entity.OnAdminStatusChanged  -= onAdminStatusChanged;
+                Entity.OnStatusChanged       -= onStatusChanged;
+            };
+
+        }
+
+        #endregion
+
+        #region (private) ListenTo(ConformityAssessmentBody)
+
+        private Action ListenTo(ConformityAssessmentBody Entity)
+        {
+
+            OnConformityAssessmentBodyAdminStatusChangedDelegate onAdminStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.AdminStatus, nameof(ConformityAssessmentBody), entity.Id.ToString(), newStatus, oldStatus, dataSource);
+                return Task.CompletedTask;
+            };
+
+            OnConformityAssessmentBodyStatusChangedDelegate onStatusChanged = (timestamp, eventTrackingId, entity, oldStatus, newStatus, dataSource) => {
+                Raise(POIRuntimeStatusKind.Status, nameof(ConformityAssessmentBody), entity.Id.ToString(), newStatus, oldStatus, dataSource);
                 return Task.CompletedTask;
             };
 
@@ -2266,7 +2324,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    Concat(RoamingNetwork.EnergyMeterGroups).
                                    Concat(RoamingNetwork.ChargingStationManufacturers).
                                    Concat(RoamingNetwork.EnergyMeterManufacturers).
-                                   Concat(RoamingNetwork.TransparencySoftwareManufacturers))
+                                   Concat(RoamingNetwork.TransparencySoftwareManufacturers).
+                                   Concat(RoamingNetwork.ConformityAssessmentBodies))
             {
                 yield return entity;
             }
@@ -2308,6 +2367,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    ChargingStationManufacturer  manufacturer          => [ manufacturer.         NextAdminStatus?.Timestamp, manufacturer.         NextStatus?.Timestamp ],
                    EnergyMeterManufacturer      meterManufacturer     => [ meterManufacturer.    NextAdminStatus?.Timestamp, meterManufacturer.    NextStatus?.Timestamp ],
                    TransparencySoftwareManufacturer  softwareManufacturer  => [ softwareManufacturer.NextAdminStatus?.Timestamp, softwareManufacturer.NextStatus?.Timestamp ],
+                   ConformityAssessmentBody     conformityAssessmentBody  => [ conformityAssessmentBody.NextAdminStatus?.Timestamp, conformityAssessmentBody.NextStatus?.Timestamp ],
                    _                                                  => []
                };
 
@@ -2486,6 +2546,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
                     _ = manufacturer.AdminStatus;
                     _ = manufacturer.Status;
+                }
+
+                foreach (var body in network.ConformityAssessmentBodies)
+                {
+                    _ = body.AdminStatus;
+                    _ = body.Status;
                 }
 
                 foreach (var chargingStationOperator in network.ChargingStationOperators)

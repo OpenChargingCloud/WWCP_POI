@@ -39,7 +39,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// The legal status of a transparency software release for an energy meter,
-    /// with an optional approval or compatibility document covering the release.
+    /// with an optional approval or compatibility document covering the release; resolved, with the names of the
+    /// manufacturer of the release and of the body that issued the document, as other protocols name them, e.g. OCPI.
     /// </summary>
     public sealed partial class TransparencySoftwareStatus : IEquatable<TransparencySoftwareStatus>,
                                                              IComparable<TransparencySoftwareStatus>,
@@ -108,6 +109,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public TransparencySoftwareCertificate?     Certificate               { get; }
 
         /// <summary>
+        /// The optional name of the manufacturer of the software release, which embeds it, e.g. the vendor OCPI names.
+        /// Not serialized: the release names it by where it is embedded.
+        /// </summary>
+        [Optional]
+        public String?                              Vendor                    { get; }
+
+        /// <summary>
+        /// The optional name of the conformity assessment body that issued the document, e.g. the certificate issuer OCPI
+        /// names. Not serialized: the document names it by where it is embedded.
+        /// </summary>
+        [Optional]
+        public String?                              CertificateIssuer         { get; }
+
+        /// <summary>
         /// The identification of the software release.
         /// </summary>
         public TransparencySoftware_Id              TransparencySoftwareId
@@ -129,9 +144,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="TransparencySoftware">The transparency software release.</param>
         /// <param name="LegalStatus">The legal status of the use of the software release.</param>
         /// <param name="Certificate">An optional document, which must cover the software release.</param>
+        /// <param name="Vendor">The optional name of the manufacturer of the software release.</param>
+        /// <param name="CertificateIssuer">The optional name of the body that issued the document.</param>
         public TransparencySoftwareStatus(TransparencySoftware              TransparencySoftware,
                                           LegalStatus                       LegalStatus,
-                                          TransparencySoftwareCertificate?  Certificate   = null)
+                                          TransparencySoftwareCertificate?  Certificate         = null,
+                                          String?                           Vendor              = null,
+                                          String?                           CertificateIssuer   = null)
         {
 
             ArgumentNullException.ThrowIfNull(TransparencySoftware);
@@ -145,6 +164,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.TransparencySoftware  = TransparencySoftware;
             this.LegalStatus           = LegalStatus;
             this.Certificate           = Certificate;
+            this.Vendor                = Vendor;
+            this.CertificateIssuer     = CertificateIssuer;
 
         }
 
@@ -202,7 +223,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     CertificateId is { } certificateId
                         ? CertificateLookup(certificateId) ??
                               throw new ArgumentException($"Unresolved certificate reference '{certificateId}' in the target network.")
-                        : null);
+                        : null,
+                    Vendor,
+                    CertificateIssuer);
 
         #endregion
 

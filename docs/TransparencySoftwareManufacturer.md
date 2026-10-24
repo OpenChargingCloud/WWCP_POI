@@ -3,7 +3,8 @@
 A transparency software manufacturer makes transparency software, e.g. the software with which a driver checks the
 signed meter values of a charging session under the German calibration law. In POI 3 it is a **party**: the roaming
 network operator (RNO) adds and removes it, with its keys; it changes its own properties and its **releases**, one
-per version of a software, with its own keys. Energy meters and transparency software certificates name its releases
+per version of a software, with its own keys. Energy meters and the transparency software certificates of
+[ConformityAssessmentBody](ConformityAssessmentBody.md)s name its releases
 by their identifications.
 
 It is the one the EU Cyber Resilience Act (CRA, Regulation (EU) 2024/2847) holds responsible for its software: it
@@ -24,7 +25,7 @@ case-insensitively, e.g. `OpenChargingCloud`. It is unique within the roaming ne
 | Embedded in | [RoamingNetwork](RoamingNetwork.md) as `transparencySoftwareManufacturers` |
 | Owner | itself (signing key); its signing keys: a signing or an identity key; its identity keys: an identity key; or, for recovery, an identity key of the RNO; added and removed by the RNO |
 | Embeds | its releases, `transparencySoftware` |
-| HTTP | `GET ~/RNs/{RN_Id}/TSMs/{TSM_Id}`, with its releases, listed by `GET ~/RNs/{RN_Id}/TSMs` |
+| HTTP | `GET ~/RNs/{RN_Id}/TSMs/{TSM_Id}`, with its releases (`?without=transparencySoftware` leaves them out), listed by `GET ~/RNs/{RN_Id}/TSMs`; its releases `GET ~/RNs/{RN_Id}/TSMs/{TSM_Id}/TSs[/{TS_Id}]` |
 
 
 ## Common properties

@@ -163,6 +163,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    GridOperator             gridOperator             => Of(gridOperator,             Format),
                    ParkingOperator          parkingOperator          => Of(parkingOperator,          Format),
                    TransparencySoftwareManufacturer  transparencySoftwareManufacturer  => Of(transparencySoftwareManufacturer, Format),
+                   ConformityAssessmentBody          conformityAssessmentBody          => Of(conformityAssessmentBody,         Format),
                    ChargingPool             chargingPool             => Of(chargingPool,             Format),
                    ChargingStation          chargingStation          => Of(chargingStation,          Format),
                    _                                                 => null
@@ -200,7 +201,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                      Array(RoamingNetwork.PropertyKeys.ParkingOperators,                  RoamingNetwork.ParkingOperators,                 party => () => Of(party, Format)),
                      Array(RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,          RoamingNetwork.EnergyMeterManufacturers,         value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)),
                      Array(RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers, RoamingNetwork.TransparencySoftwareManufacturers, party => () => Of(party, Format)),
-                     Array(RoamingNetwork.PropertyKeys.TransparencySoftwareCertificates,  RoamingNetwork.TransparencySoftwareCertificates,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)) ],
+                     Array(RoamingNetwork.PropertyKeys.ConformityAssessmentBodies,        RoamingNetwork.ConformityAssessmentBodies,       party => () => Of(party, Format)) ],
 
                    Format));
 
@@ -287,6 +288,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    TransparencySoftwareManufacturer.ToJSON(Embedded: true, IncludeChildArrays: false),
 
                    [ Array(TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware,  TransparencySoftwareManufacturer.TransparencySoftware,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)) ],
+
+                   Format));
+
+        #endregion
+
+        #region (private) Of(ConformityAssessmentBody, Format)
+
+        private static Representation Of(ConformityAssessmentBody  ConformityAssessmentBody,
+                                         ETagFormat                Format)
+
+            => Kept(ConformityAssessmentBody, Format, () => Compose(
+
+                   ConformityAssessmentBody.ToJSON(Embedded: true, IncludeChildArrays: false),
+
+                   [ Array(ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates,  ConformityAssessmentBody.TransparencySoftwareCertificates,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)) ],
 
                    Format));
 

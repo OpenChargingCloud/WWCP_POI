@@ -1,5 +1,10 @@
 # WWCP Point-of-Interest
 
+> **Not built any more, its tests:** this earlier implementation shares the transparency software of WWCP_POI2,
+> whose releases name no `vendor` and whose certificates no `issuer` any more: they are embedded in their manufacturer
+> and their conformity assessment body, see [docs/TransparencySoftwareManufacturer.md](../docs/TransparencySoftwareManufacturer.md).
+> Its tests and interoperability vectors expect both, so `WWCP_POI_Tests` is no part of the solution since 2026-10-24.
+
 WWCP POI models static charging-infrastructure data as an immutable, versioned dataset.
 Current statuses, measurements and forecasts remain mutable runtime data within the entities.
 It is a spin-off from **WWCP-Core** and a .NET 10 library for applications that import,

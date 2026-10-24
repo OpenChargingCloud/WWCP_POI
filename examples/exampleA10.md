@@ -213,7 +213,8 @@ Checkpoint 5 without its witnesses: witnessed by 0 of 2
   is open, as the trust lists of operators and their identity keys section 8.8 leaves open.
 - The energy charged is the one of the signed meter values of the session, checked with the public key of the energy
   meter the station proof gives; the meter values, and the transparency software checking them, are not part of this
-  example. `QA` names no transparency software for its meters yet (`transparencySoftwareStatus`).
+  example. `QA` names no transparency software for its meters yet (`transparencySoftwareStatus`); its DC meters do
+  from [example A13](exampleA13.md) on.
 
 
 ## Next

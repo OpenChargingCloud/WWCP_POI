@@ -32,7 +32,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// An approval or compatibility document for a charging station model/version
-    /// and the transparency software releases it names.
+    /// and the transparency software releases it names, embedded in the conformity assessment body issuing it,
+    /// e.g. under the legislation it is a notified body for.
     /// This is a domain document, not a cryptographic certificate.
     /// </summary>
     public sealed class TransparencySoftwareCertificate
@@ -43,7 +44,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp+json/transparencySoftwareCertificate";
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/transparencySoftwareCertificate/v1";
 
         #endregion
 
@@ -68,9 +69,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  Context                             = "@context";
 
             /// <summary>
-            /// The property of its issuer.
+            /// The property of the legislation it is issued under, e.g. MID.
             /// </summary>
-            public const String  Issuer                              = "issuer";
+            public const String  Legislation                         = "legislation";
 
             /// <summary>
             /// The property of its charging station model.
@@ -128,10 +129,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public TransparencySoftwareCertificate_Id       Id                                   { get; }
 
         /// <summary>
-        /// The issuing organization.
+        /// The optional legislation it is issued under, e.g. MID or CRA: one its conformity assessment body is notified for.
         /// </summary>
-        [Mandatory]
-        public String                                   Issuer                               { get; }
+        [Optional]
+        public String?                                  Legislation                          { get; }
 
         /// <summary>
         /// The charging station model to which this document applies,
@@ -196,7 +197,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Create a new approval or compatibility document for a charging station model/version.
         /// </summary>
         /// <param name="Id">The stable identity of this document.</param>
-        /// <param name="Issuer">The issuing organization.</param>
         /// <param name="ChargingStationModel">The charging station model to which this document applies.</param>
         /// <param name="ChargingStationModelVersion">The charging station model version to which this document applies.</param>
         /// <param name="VerifiedTransparencySoftwareIds">The transparency software releases officially checked with this model/version.</param>
@@ -206,8 +206,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="DocumentURL">The optional location of the document.</param>
         /// <param name="NotBefore">The optional start of the validity of this document.</param>
         /// <param name="NotAfter">The optional end of the validity of this document.</param>
+        /// <param name="Legislation">The optional legislation it is issued under, e.g. MID.</param>
         public TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id     Id,
-                                               String                                 Issuer,
                                                ChargingStationModel_Id                ChargingStationModel,
                                                String                                 ChargingStationModelVersion,
                                                IEnumerable<TransparencySoftware_Id>?  VerifiedTransparencySoftwareIds     = null,
@@ -216,13 +216,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                String?                                DocumentNumber                      = null,
                                                URL?                                   DocumentURL                         = null,
                                                DateTimeOffset?                        NotBefore                           = null,
-                                               DateTimeOffset?                        NotAfter                            = null)
+                                               DateTimeOffset?                        NotAfter                            = null,
+                                               String?                                Legislation                         = null)
         {
 
             if (Id.IsNullOrEmpty)
                 throw new ArgumentException("A certificate document identifier is required.", nameof(Id));
 
-            ArgumentException.ThrowIfNullOrWhiteSpace(Issuer);
             if (ChargingStationModel.IsNullOrEmpty)
                 throw new ArgumentException("A charging station model is required.", nameof(ChargingStationModel));
 
@@ -233,6 +233,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (DocumentURL is { } documentURL && !Uri.TryCreate(documentURL.ToString(), UriKind.Absolute, out _))
                 throw new ArgumentException("documentURL must be absolute.", nameof(DocumentURL));
+
+            if (Legislation is not null && String.IsNullOrWhiteSpace(Legislation))
+                throw new ArgumentException("A legislation must not be empty.", nameof(Legislation));
 
             if (NotBefore > NotAfter)
                 throw new ArgumentException("notBefore must not exceed notAfter.", nameof(NotBefore));
@@ -247,7 +250,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("A release cannot be both verified and merely compatible in the same document.");
 
             this.Id                                 = Id;
-            this.Issuer                             = Issuer;
+            this.Legislation                        = Legislation;
             this.ChargingStationModel               = ChargingStationModel;
             this.ChargingStationModelVersion        = ChargingStationModelVersion;
             this.VerifiedTransparencySoftwareIds    = verifiedIds;
@@ -301,7 +304,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                StrictJSON.OnlyProperties(JSON, PropertyKeys.Id, PropertyKeys.Context, PropertyKeys.Issuer, PropertyKeys.ChargingStationModel,
+                StrictJSON.OnlyProperties(JSON, PropertyKeys.Id, PropertyKeys.Context, PropertyKeys.Legislation, PropertyKeys.ChargingStationModel,
                                                 PropertyKeys.ChargingStationModelVersion, PropertyKeys.ChargingStationManufacturerId,
                                                 PropertyKeys.DocumentNumber, PropertyKeys.DocumentURL,
                                                 PropertyKeys.VerifiedTransparencySoftwareIds, PropertyKeys.CompatibleTransparencySoftwareIds,
@@ -315,7 +318,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Certificate = new TransparencySoftwareCertificate(
                                   Id:                                 TransparencySoftwareCertificate_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.Id)),
-                                  Issuer:                             StrictJSON.RequiredText(JSON, PropertyKeys.Issuer),
                                   ChargingStationModel:               ChargingStationModel_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.ChargingStationModel)),
                                   ChargingStationModelVersion:        StrictJSON.RequiredText(JSON, PropertyKeys.ChargingStationModelVersion),
                                   VerifiedTransparencySoftwareIds:    StrictJSON.Array(JSON, PropertyKeys.VerifiedTransparencySoftwareIds,
@@ -328,7 +330,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   DocumentNumber:                     StrictJSON.Text(JSON, PropertyKeys.DocumentNumber),
                                   DocumentURL:                        StrictJSON.Link(JSON, PropertyKeys.DocumentURL),
                                   NotBefore:                          StrictJSON.Date(JSON, PropertyKeys.NotBefore),
-                                  NotAfter:                           StrictJSON.Date(JSON, PropertyKeys.NotAfter)
+                                  NotAfter:                           StrictJSON.Date(JSON, PropertyKeys.NotAfter),
+                                  Legislation:                        StrictJSON.Text(JSON, PropertyKeys.Legislation)
                               );
 
                 return true;
@@ -365,7 +368,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                ? new JProperty(PropertyKeys.Context,                             JSONLDContext)
                                : null,
 
-                                 new JProperty(PropertyKeys.Issuer,                              Issuer),
                                  new JProperty(PropertyKeys.ChargingStationModel,                ChargingStationModel.ToString()),
                                  new JProperty(PropertyKeys.ChargingStationModelVersion,         ChargingStationModelVersion),
                                  new JProperty(PropertyKeys.VerifiedTransparencySoftwareIds,     new JArray(VerifiedTransparencySoftwareIds.  Select(id => id.ToString()).Order(StringComparer.Ordinal))),
@@ -389,6 +391,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                            NotAfter.HasValue
                                ? new JProperty(PropertyKeys.NotAfter,                            NotAfter. Value.ToISO8601())
+                               : null,
+
+                           Legislation is not null
+                               ? new JProperty(PropertyKeys.Legislation,                         Legislation)
                                : null
 
                        );
@@ -440,7 +446,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => $"{Id}: {Issuer}, {ChargingStationModel} {ChargingStationModelVersion}";
+            => $"{Id}: {ChargingStationModel} {ChargingStationModelVersion}";
 
         #endregion
 

@@ -1,16 +1,16 @@
 # RoamingNetwork
 
 A roaming network is the root of all POI data: one shared data set of charging station operators,
-e-mobility providers, grid operators, parking operators and transparency software manufacturers (the *parties*),
-together with the registries they share, e.g. charging station and energy meter manufacturers and transparency
-software certificates.
+e-mobility providers, grid operators, parking operators, transparency software manufacturers and conformity
+assessment bodies (the *parties*), together with the registries they share, charging station and energy meter
+manufacturers.
 A version of a roaming network with everything it embeds is one immutable data set, named by its
 [ETags](README.md#etags); a change set leads to the next version.
 
 The roaming network is owned by its **roaming network operator (RNO)**, the
 [RoamingNetworkOperator](RoamingNetworkOperator.md) it embeds as `operator`, with its keys: the
 network has none of its own. The RNO signs changes of the network's own properties, adds and removes parties, and
-owns the registries (manufacturers, energy meter manufacturers, transparency software certificates).
+owns the registries (manufacturers, energy meter manufacturers).
 Each party owns its own properties and data. There is no registry of brands: every charging station operator, pool,
 station, EVSE and RFID authentication mode embeds its own, see [Brand](Brand.md).
 
@@ -62,12 +62,12 @@ See [README.md](README.md#common-properties).
 | `parkingOperators` | `ParkingOperators` | [ParkingOperator](ParkingOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `energyMeterManufacturers` | `EnergyMeterManufacturers` | [EnergyMeterManufacturer](EnergyMeterManufacturer.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `transparencySoftwareManufacturers` | `TransparencySoftwareManufacturers` | [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md)[] | add/remove | Parties, each with its releases, one per version of a software; ordered by `@id` (ordinal). `TransparencySoftware` gives the releases of all of them by their identifications, unique within the network. |
-| `transparencySoftwareCertificates` | `TransparencySoftwareCertificates` | [TransparencySoftwareCertificate](#transparencysoftwarecertificates)[] | add/remove | Ordered by `@id` (ordinal). |
+| `conformityAssessmentBodies` | `ConformityAssessmentBodies` | [ConformityAssessmentBody](ConformityAssessmentBody.md)[] | add/remove | Parties, each with the transparency software certificates it issued; ordered by `@id` (ordinal). `TransparencySoftwareCertificates` gives the certificates of all of them by their identifications, unique within the network. |
 
 Every collection is omitted when empty. Children are never written or read by their identifications alone:
 `TryParse` refuses `chargingStationOperatorIds`, `chargingStationManufacturerIds`, `eMobilityProviderIds`,
 `gridOperatorIds`, `parkingOperatorIds`, `energyMeterManufacturerIds`, `transparencySoftwareManufacturerIds`
-and `transparencySoftwareCertificateIds`. The network has no `brands`: brands are embedded in what they are a brand
+and `conformityAssessmentBodyIds`. The network has no `brands`: brands are embedded in what they are a brand
 of ([Brand](Brand.md)).
 
 **Views.** `ToJSON(…)` has view options: `Embedded: true` drops `@context`; `ExpandChargingStationOperatorIds`
@@ -87,7 +87,7 @@ with the default view options ([SPECIFICATION.md](../SPECIFICATION.md#2-the-cont
 - Lookups: `TryGetChargingStationOperatorById`, `TryGetEMobilityProviderById`, `TryGetGridOperatorById`,
   `TryGetParkingOperatorById`, `TryGetChargingStationManufacturerById`, `TryGetEnergyMeterManufacturerById`,
   `TryGetTransparencySoftwareManufacturerById`, `TryGetTransparencySoftwareById`, `TransparencySoftwareManufacturerOf`,
-  `TryGetTransparencySoftwareCertificateById`, ….
+  `TryGetConformityAssessmentBodyById`, `TryGetTransparencySoftwareCertificateById`, `ConformityAssessmentBodyOf`, ….
 
 
 ## @context
@@ -180,32 +180,14 @@ within the network, whichever manufacturer embeds them. A manufacturer whose rel
 removed.
 
 
-## transparencySoftwareCertificates
+## conformityAssessmentBodies
 
-Approval or compatibility documents for a charging station model and version, naming the transparency software
-releases they verify or find compatible (`TransparencySoftwareCertificate`,
-[source](../WWCP_POI2/RoamingNetwork/TransparencySoftware/TransparencySoftwareCertificate.cs)). A domain document,
-not a cryptographic certificate. Without runtime status, timestamps and custom data. Read strictly: an unknown property
-is an error.
-
-| JSON key | Type | Change set | Description |
-|---|---|---|---|
-| `@id` | string | — | `TransparencySoftwareCertificate_Id`: any text, compared case-insensitively, surrounding whitespace trimmed. |
-| `issuer` | string | update | Mandatory: the issuing organization. |
-| `chargingStationModel` | string | update | Mandatory: a `ChargingStationModel_Id`, as charging stations name their model by `modelId`, compared case-insensitively. |
-| `chargingStationModelVersion` | string | update | Mandatory. |
-| `verifiedTransparencySoftwareIds` | string[] | update/remove | Releases officially checked with this model/version; always written, ordered (ordinal). |
-| `compatibleTransparencySoftwareIds` | string[] | update/remove | Further compatible releases, without a claim of verification; always written, ordered (ordinal). |
-| `chargingStationManufacturerId` | string | update/remove | Optional; a [ChargingStationManufacturer](ChargingStationManufacturer.md) of the network. |
-| `documentNumber` | string | update/remove | The issuer's number, if it differs from `@id`. |
-| `documentURL` | URL | update/remove | Absolute. |
-| `notBefore` | timestamp | update/remove | Start of validity, in UTC to the millisecond like every timestamp of the content, e.g. `2026-01-01T00:00:00.000Z`. |
-| `notAfter` | timestamp | update/remove | End of validity; not before `notBefore`. |
-
-- At least one release in both lists together; a release not in both, not twice, not empty.
-- Every release named is one of `transparencySoftware`. An energy meter's `certificateId` must be one of these and cover
-  (verify or find compatible) the release it is given for.
-- `RoamingNetworkChange.Add(certificate)`, `Remove(certificateId)`, `UpdateProperty(…)`/`RemoveProperty(…)`, signed by the RNO.
+The [ConformityAssessmentBody](ConformityAssessmentBody.md)s, e.g. national metrology institutes, parties as the
+operators are: the RNO adds and removes them, with their keys or, while one does not take part, without; each changes
+its own properties and the transparency software certificates it issued, embedded in it as
+`transparencySoftwareCertificates`, the RNO in the place of one without keys. Certificates are named by the
+`transparencySoftwareStatus` of [EnergyMeter](EnergyMeter.md)s by their identifications alone: these are unique within
+the network, whichever body embeds them. A body whose certificate is still named can not be removed.
 
 
 ## Change sets of the RNO
@@ -221,8 +203,9 @@ A change set must be signed by the owner of each of its changes ([../README.md](
 | `UpdateProperty` of the RNO's `identityKeys` | identity key |
 | `Add`/`Remove` of a charging station operator, e-mobility provider, grid operator or parking operator | signing key |
 | `UpdateProperty` of the `signingKeys`/`identityKeys` of such a party (recovery; the party's own keys also count, see its file) | identity key |
-| every change of charging station manufacturers, energy meter manufacturers and transparency software certificates | signing key |
-| `Add`/`Remove` of a transparency software manufacturer, its releases with it | signing key |
+| every change of charging station manufacturers and energy meter manufacturers | signing key |
+| `Add`/`Remove` of a transparency software manufacturer or a conformity assessment body, its releases or certificates with it | signing key |
+| every change of a conformity assessment body without keys and of its certificates, in its place | signing key |
 
 - A party is added with at least one `signingKeys` and one `identityKeys` entry, and without embedded children
   (`chargingPools`, `chargingTariffs`, the four group arrays; `parkingGarages`, `parkingSpaces`, `parkingSensors`,
@@ -252,7 +235,7 @@ var cs = rn1.CreateChangeSet([
 
 Admin status and status are kept in the status schedules shared by all versions, see
 [README.md](README.md#runtime-status); in a history as `entityType` `RoamingNetwork`. No energy status.
-The registries (energy meter manufacturers, transparency software and certificates) have no runtime status.
+Transparency software releases and certificates have no runtime status; their manufacturers and bodies have, see their files.
 
 | | Type | Predefined values | Initially |
 |---|---|---|---|
@@ -327,24 +310,43 @@ Checked when a change set is applied:
       "created":    "2026-01-01T00:00:00.000Z",
       "lastChange": "2026-01-01T00:00:00.000Z" }
   ],
-  "transparencySoftware": [
-    { "@id": "chargy-desktop-1.4.0",
-      "name": { "en": "Chargy Transparency Software Desktop" },
-      "version": "1.4.0",
-      "openSourceLicenses": [
-        { "@id": "AGPL-3.0", "URLs": [ "https://www.gnu.org/licenses/agpl-3.0.html" ] }
+  "transparencySoftwareManufacturers": [
+    { "@id": "GraphDefined",
+      "name": { "en": "GraphDefined GmbH" },
+      "craRole": "manufacturer",
+      "vulnerabilityContact": "security@graphdefined.com",
+      "transparencySoftware": [
+        { "@id": "chargy-desktop-1.4.0",
+          "name": { "en": "Chargy Transparency Software Desktop" },
+          "version": "1.4.0",
+          "openSourceLicenses": [
+            { "@id": "AGPL-3.0", "URLs": [ "https://www.gnu.org/licenses/agpl-3.0.html" ] }
+          ],
+          "sourceCodeRepository": "https://github.com/OpenChargingCloud/ChargyDesktopApp",
+          "supportUntil": "2031-12-31T23:59:59.999Z" }
       ],
-      "vendor": "GraphDefined GmbH",
-      "sourceCodeRepository": "https://github.com/OpenChargingCloud/ChargyDesktopApp" }
+      "signingKeys":  [ { "@id": "71aa…", "key": "pQECIAEh…" } ],
+      "identityKeys": [ { "@id": "0d3e…", "key": "pQECIAMh…" } ],
+      "created":    "2026-01-01T00:00:00.000Z",
+      "lastChange": "2026-01-01T00:00:00.000Z" }
   ],
-  "transparencySoftwareCertificates": [
-    { "@id": "PTB-2026-0042",
-      "issuer": "Physikalisch-Technische Bundesanstalt",
-      "chargingStationModel": "Wallbox 22",
-      "chargingStationModelVersion": "2.1",
-      "verifiedTransparencySoftwareIds":   [ "chargy-desktop-1.4.0" ],
-      "compatibleTransparencySoftwareIds": [],
-      "notBefore": "2026-01-01T00:00:00.000Z" }
+  "conformityAssessmentBodies": [
+    { "@id": "PTB",
+      "name": { "de": "Physikalisch-Technische Bundesanstalt" },
+      "notifiedBodyNumber": "0102",
+      "notifiedFor": [ "MID" ],
+      "transparencySoftwareCertificates": [
+        { "@id": "PTB-2026-0042",
+          "chargingStationModel": "Wallbox 22",
+          "chargingStationModelVersion": "2.1",
+          "verifiedTransparencySoftwareIds":   [ "chargy-desktop-1.4.0" ],
+          "compatibleTransparencySoftwareIds": [],
+          "notBefore": "2026-01-01T00:00:00.000Z" }
+      ],
+      "signingKeys":  [ { "@id": "e5c0…", "key": "pQECIAEh…" } ],
+      "identityKeys": [ { "@id": "9b72…", "key": "pQECIAMh…" } ],
+      "created":    "2026-01-01T00:00:00.000Z",
+      "lastChange": "2026-01-01T00:00:00.000Z" }
   ],
   "signingKeys":  [ { "@id": "5b9e…", "key": "pQECIAEh…" } ],
   "identityKeys": [ { "@id": "c2f4…", "key": "pQECIAMh…", "notAfter": "2036-01-01T00:00:00.000Z" } ],

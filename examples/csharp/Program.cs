@@ -4,7 +4,7 @@
 
 
 // What the last run wrote is removed first: its keys, what it published and its history would not fit the new keys.
-foreach (var directory in new[] { "AlphaOrg", "BetaOrg", "GammaOrg", "DE-GEF", "published", "trusted", "driver", "poi" })
+foreach (var directory in new[] { "AlphaOrg", "BetaOrg", "GammaOrg", "DE-GEF", "GraphDefined", "PTB", "published", "trusted", "driver", "poi" })
     if (Directory.Exists(directory))
         Directory.Delete(directory, recursive: true);
 
@@ -139,3 +139,15 @@ Console.WriteLine();
 await ExampleA12.Run(a11);
 
 ExampleA12.Validate();
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// Who checks the meter: the transparency software manufacturer GraphDefined states its release of Chargy, the PTB, notified
+// body for the MID, certifies it for a station model, each signing itself; the BSI, for the CRA, does not take part yet.
+// DE*GEF names both for the energy meters of its DC stations, and the station proof gives them.
+ExampleA13.Run(a11);
+
+ExampleA13.Validate();

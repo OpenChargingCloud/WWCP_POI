@@ -88,7 +88,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="GridOperators">The grid operators linked to the roaming network.</param>
         /// <param name="ParkingOperators">The parking operators linked to the roaming network.</param>
         /// <param name="TransparencySoftwareManufacturers">The transparency software manufacturers of the roaming network, with their releases.</param>
-        /// <param name="TransparencySoftwareCertificates">The transparency software certificates linked to the roaming network.</param>
+        /// <param name="ConformityAssessmentBodies">The conformity assessment bodies of the roaming network, with their certificates.</param>
         /// <param name="EnergyMeterManufacturers">The energy meter manufacturers linked to the roaming network.</param>
         /// 
         /// <param name="TreeHashAlgorithms">The hash algorithms used for tree hash calculations.</param>
@@ -116,7 +116,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           IEnumerable<GridOperator>?                     GridOperators                      = null,
                                                           IEnumerable<ParkingOperator>?                  ParkingOperators                   = null,
                                                           IEnumerable<TransparencySoftwareManufacturer>? TransparencySoftwareManufacturers  = null,
-                                                          IEnumerable<TransparencySoftwareCertificate>?  TransparencySoftwareCertificates   = null,
+                                                          IEnumerable<ConformityAssessmentBody>?         ConformityAssessmentBodies         = null,
                                                           IEnumerable<EnergyMeterManufacturer>?          EnergyMeterManufacturers           = null,
 
                                                           IEnumerable<ETagHashAlgorithm>?                TreeHashAlgorithms                 = null)
@@ -144,7 +144,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     GridOperators,
                     ParkingOperators,
                     TransparencySoftwareManufacturers,
-                    TransparencySoftwareCertificates,
+                    ConformityAssessmentBodies,
                     EnergyMeterManufacturers,
                     RoamingNetworkOperator,
                     TreeHashAlgorithms);

@@ -239,14 +239,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  TransparencySoftwareManufacturerIds = "transparencySoftwareManufacturerIds";
 
             /// <summary>
-            /// The property of its transparency software certificates.
+            /// The property of its conformity assessment bodies, with the transparency software certificates they issued.
             /// </summary>
-            public const String  TransparencySoftwareCertificates    = "transparencySoftwareCertificates";
+            public const String  ConformityAssessmentBodies          = "conformityAssessmentBodies";
 
             /// <summary>
-            /// The property of the identifications of its transparency software certificates.
+            /// The property of the identifications of its conformity assessment bodies.
             /// </summary>
-            public const String  TransparencySoftwareCertificateIds  = "transparencySoftwareCertificateIds";
+            public const String  ConformityAssessmentBodyIds         = "conformityAssessmentBodyIds";
 
             /// <summary>
             /// The property of the hash algorithms of its effective tree (SPECIFICATION.md, section 8.3).
@@ -334,7 +334,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               IEnumerable<GridOperator>?                     GridOperators                      = null,
                               IEnumerable<ParkingOperator>?                  ParkingOperators                   = null,
                               IEnumerable<TransparencySoftwareManufacturer>? TransparencySoftwareManufacturers  = null,
-                              IEnumerable<TransparencySoftwareCertificate>?  TransparencySoftwareCertificates   = null,
+                              IEnumerable<ConformityAssessmentBody>?         ConformityAssessmentBodies         = null,
                               IEnumerable<EnergyMeterManufacturer>?          EnergyMeterManufacturers           = null,
                               RoamingNetworkOperator?                        Operator                           = null,
                               IEnumerable<ETagHashAlgorithm>?                TreeHashAlgorithms                 = null)
@@ -450,17 +450,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.transparencySoftware = TransparencySoftwareOf(transparencySoftwareManufacturers);
 
-            this.transparencySoftwareCertificates = new (TransparencySoftwareCertificates, entity => entity.Id, "transparency software certificate");
+            this.conformityAssessmentBodies = new (ConformityAssessmentBodies, entity => entity.Id, "conformity assessment body");
+
+            // Certificates are embedded in the bodies issuing them, and unique within the network: energy meters name them
+            // by their identifications alone.
+            if (DuplicateTransparencySoftwareCertificate(conformityAssessmentBodies) is String duplicateCertificate)
+                throw new ArgumentException(duplicateCertificate, nameof(ConformityAssessmentBodies));
+
+            this.transparencySoftwareCertificates = TransparencySoftwareCertificatesOf(conformityAssessmentBodies);
 
             // Certificates name releases and manufacturers of this network; energy meters name releases and certificates.
-            if (UnknownTransparencyReference(AllEnergyMeters(chargingStationOperators, gridOperators), transparencySoftware, transparencySoftwareCertificates.Index, chargingStationManufacturers.Index) is String transparencyError)
+            if (UnknownTransparencyReference(AllEnergyMeters(chargingStationOperators, gridOperators), transparencySoftware, transparencySoftwareCertificates, chargingStationManufacturers.Index) is String transparencyError)
                 throw new ArgumentException(transparencyError, nameof(TransparencySoftwareManufacturers));
 
             // Energy meter templates and groups are unique within the network; templates name manufacturers, releases and
             // certificates of it.
             if ((DuplicateEnergyMeterGroup          (AllEnergyMeterGroups   (chargingStationOperators, gridOperators)) ??
                  DuplicateEnergyMeterTemplate       (AllEnergyMeterTemplates(chargingStationOperators, gridOperators)) ??
-                 UnknownEnergyMeterTemplateReference(AllEnergyMeterTemplates(chargingStationOperators, gridOperators), energyMeterManufacturers.Index, transparencySoftware, transparencySoftwareCertificates.Index)) is String energyMeterGroupError)
+                 UnknownEnergyMeterTemplateReference(AllEnergyMeterTemplates(chargingStationOperators, gridOperators), energyMeterManufacturers.Index, transparencySoftware, transparencySoftwareCertificates)) is String energyMeterGroupError)
             {
                 throw new ArgumentException(energyMeterGroupError, nameof(ChargingStationOperators));
             }
@@ -835,12 +842,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                  out var transparencySoftwareManufacturers,
                                                                  out ErrorResponse) ||
 
-                    !POIJSON.TryParseChildren<TransparencySoftwareCertificate>(JSON,
-                                                                 PropertyKeys.TransparencySoftwareCertificates,
-                                                                 PropertyKeys.TransparencySoftwareCertificateIds,
-                                                                 "transparency software certificates",
-                                                                 TransparencySoftwareCertificate.TryParse,
-                                                                 out var transparencySoftwareCertificates,
+                    !POIJSON.TryParseChildren<ConformityAssessmentBody>(JSON,
+                                                                 PropertyKeys.ConformityAssessmentBodies,
+                                                                 PropertyKeys.ConformityAssessmentBodyIds,
+                                                                 "conformity assessment bodies",
+                                                                 ConformityAssessmentBody.TryParse,
+                                                                 out var conformityAssessmentBodies,
                                                                  out ErrorResponse) ||
 
                     !POIJSON.TryParseChildren<EnergyMeterManufacturer>(JSON,
@@ -917,7 +924,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      GridOperators:                      gridOperators,
                                      ParkingOperators:                   parkingOperators,
                                      TransparencySoftwareManufacturers:  transparencySoftwareManufacturers,
-                                     TransparencySoftwareCertificates:   transparencySoftwareCertificates,
+                                     ConformityAssessmentBodies:         conformityAssessmentBodies,
                                      EnergyMeterManufacturers:           energyMeterManufacturers,
                                      Operator:                           roamingNetworkOperator,
                                      TreeHashAlgorithms:                 treeHashAlgorithms
@@ -1188,8 +1195,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (IncludeChildArrays && !transparencySoftwareManufacturers.IsEmpty)
                 json.Add(PropertyKeys.TransparencySoftwareManufacturers, new JArray(transparencySoftwareManufacturers.Select(manufacturer => manufacturer.ToJSON(Embedded: true))));
 
-            if (IncludeChildArrays && !transparencySoftwareCertificates.IsEmpty)
-                json.Add(PropertyKeys.TransparencySoftwareCertificates,  new JArray(transparencySoftwareCertificates.Select(certificate => certificate.ToJSON(Embedded: true))));
+            if (IncludeChildArrays && !conformityAssessmentBodies.IsEmpty)
+                json.Add(PropertyKeys.ConformityAssessmentBodies,        new JArray(conformityAssessmentBodies.Select(body => body.ToJSON(Embedded: true))));
 
             if (GivenTreeHashAlgorithms.HasValue)
                 json.Add(PropertyKeys.TreeHashAlgorithms,                POITreeHashAlgorithms.ToJSON(GivenTreeHashAlgorithms.Value));
@@ -1448,12 +1455,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                        out var transparencySoftwareManufacturers,
                                                                        out ErrorResponse) ||
 
-                    !TryParseCBORChildren<TransparencySoftwareCertificate>(CBOR,
-                                                                       PropertyKeys.TransparencySoftwareCertificates,
-                                                                       PropertyKeys.TransparencySoftwareCertificateIds,
-                                                                       "transparency software certificates",
-                                                                       TransparencySoftwareCertificate.TryParse,
-                                                                       out var transparencySoftwareCertificates,
+                    !TryParseCBORChildren<ConformityAssessmentBody>   (CBOR,
+                                                                       PropertyKeys.ConformityAssessmentBodies,
+                                                                       PropertyKeys.ConformityAssessmentBodyIds,
+                                                                       "conformity assessment bodies",
+                                                                       ConformityAssessmentBody.TryParse,
+                                                                       out var conformityAssessmentBodies,
                                                                        out ErrorResponse) ||
 
                     !TryParseCBORChildren<EnergyMeterManufacturer>    (CBOR,
@@ -1523,7 +1530,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      GridOperators:             gridOperators,
                                      ParkingOperators:          parkingOperators,
                                      TransparencySoftwareManufacturers:  transparencySoftwareManufacturers,
-                                     TransparencySoftwareCertificates:  transparencySoftwareCertificates,
+                                     ConformityAssessmentBodies:  conformityAssessmentBodies,
                                      EnergyMeterManufacturers:  energyMeterManufacturers,
                                      Operator:                  roamingNetworkOperator,
                                      TreeHashAlgorithms:        treeHashAlgorithms
@@ -1632,13 +1639,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          CBORValue.FromArray(transparencySoftwareManufacturers.
                                                  Select(manufacturer => manufacturer.ToCBOR(Embedded: true))));
 
-            // Transparency software certificates have no CBOR representation of their own: theirs are the keys and values
-            // of their JSON representation.
-
-            if (!transparencySoftwareCertificates.IsEmpty)
-                cbor.Add(CBORValue.FromText(PropertyKeys.TransparencySoftwareCertificates),
-                         CBORValue.FromArray(transparencySoftwareCertificates.
-                                                 Select(certificate => CBORJSON.ToCBOR(certificate.ToJSON(Embedded: true)))));
+            if (!conformityAssessmentBodies.IsEmpty)
+                cbor.Add(CBORValue.FromText(PropertyKeys.ConformityAssessmentBodies),
+                         CBORValue.FromArray(conformityAssessmentBodies.
+                                                 Select(body => body.ToCBOR(Embedded: true))));
 
             if (GivenTreeHashAlgorithms.HasValue)
                 cbor.Add(CBORValue.FromText(PropertyKeys.TreeHashAlgorithms),  POITreeHashAlgorithms.ToCBOR(GivenTreeHashAlgorithms.Value));
@@ -2189,11 +2193,74 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region Transparency software manufacturers, their releases, and certificates
+        #region Transparency software manufacturers and their releases, conformity assessment bodies and their certificates
 
         private readonly POICollection<TransparencySoftwareManufacturer_Id, TransparencySoftwareManufacturer>  transparencySoftwareManufacturers;
         private readonly IReadOnlyDictionary<TransparencySoftware_Id, TransparencySoftware>                    transparencySoftware;
-        private readonly POICollection<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>    transparencySoftwareCertificates;
+        private readonly POICollection<ConformityAssessmentBody_Id, ConformityAssessmentBody>                  conformityAssessmentBodies;
+        private readonly IReadOnlyDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  transparencySoftwareCertificates;
+
+        /// <summary>
+        /// The conformity assessment bodies in this immutable network version, with the certificates they issued.
+        /// </summary>
+        public POICollection<ConformityAssessmentBody_Id, ConformityAssessmentBody>  ConformityAssessmentBodies
+            => conformityAssessmentBodies;
+
+        /// <summary>
+        /// Try to get the conformity assessment body having the given identification.
+        /// </summary>
+        public Boolean TryGetConformityAssessmentBodyById(ConformityAssessmentBody_Id                        BodyId,
+                                                          [NotNullWhen(true)] out ConformityAssessmentBody?  Body)
+
+            => conformityAssessmentBodies.TryGet(BodyId, out Body);
+
+        /// <summary>
+        /// The conformity assessment body that issued the certificate having the given identification, if it is one of this network.
+        /// </summary>
+        public ConformityAssessmentBody? ConformityAssessmentBodyOf(TransparencySoftwareCertificate_Id CertificateId)
+
+            => ConformityAssessmentBodyOf(conformityAssessmentBodies, CertificateId);
+
+        /// <summary>
+        /// The conformity assessment body of the given certificate among the given bodies.
+        /// </summary>
+        internal static ConformityAssessmentBody? ConformityAssessmentBodyOf(IEnumerable<ConformityAssessmentBody>  Bodies,
+                                                                            TransparencySoftwareCertificate_Id     CertificateId)
+
+            => Bodies.FirstOrDefault(body => body.TryGetTransparencySoftwareCertificate(CertificateId, out _));
+
+        /// <summary>
+        /// The certificates of the given conformity assessment bodies, by their identifications.
+        /// </summary>
+        internal static IReadOnlyDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate> TransparencySoftwareCertificatesOf(IEnumerable<ConformityAssessmentBody> Bodies)
+        {
+
+            var certificates = new Dictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>();
+
+            foreach (var body in Bodies)
+                foreach (var certificate in body.TransparencySoftwareCertificates)
+                    certificates.TryAdd(certificate.Id, certificate);
+
+            return certificates;
+
+        }
+
+        /// <summary>
+        /// The error, when two of the given conformity assessment bodies have a certificate of the same identification.
+        /// </summary>
+        internal static String? DuplicateTransparencySoftwareCertificate(IEnumerable<ConformityAssessmentBody> Bodies)
+        {
+
+            var seen = new Dictionary<TransparencySoftwareCertificate_Id, ConformityAssessmentBody_Id>();
+
+            foreach (var body in Bodies)
+                foreach (var certificate in body.TransparencySoftwareCertificates)
+                    if (!seen.TryAdd(certificate.Id, body.Id))
+                        return $"The transparency software certificate '{certificate.Id}' of the conformity assessment body '{body.Id}' is one of the conformity assessment body '{seen[certificate.Id]}' already!";
+
+            return null;
+
+        }
 
         /// <summary>
         /// The transparency software manufacturers in this immutable network version, with their releases.
@@ -2265,9 +2332,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The certificates of transparency software releases in this immutable network version.
+        /// The certificates of transparency software releases of all conformity assessment bodies in this immutable network
+        /// version, unique within the network.
         /// </summary>
-        public POICollection<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  TransparencySoftwareCertificates
+        public IReadOnlyDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  TransparencySoftwareCertificates
             => transparencySoftwareCertificates;
 
         /// <summary>
@@ -2284,7 +2352,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Boolean TryGetTransparencySoftwareCertificateById(TransparencySoftwareCertificate_Id                        CertificateId,
                                                                  [NotNullWhen(true)] out TransparencySoftwareCertificate?  Certificate)
 
-            => transparencySoftwareCertificates.TryGet(CertificateId, out Certificate);
+            => transparencySoftwareCertificates.TryGetValue(CertificateId, out Certificate);
 
         /// <summary>
         /// The error, when a certificate names an unknown release or manufacturer,

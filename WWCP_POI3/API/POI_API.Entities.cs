@@ -118,7 +118,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/EMMs                                                     its energy meter manufacturers, in short
     /// GET ~/RNs/{RN_Id}/EMMs/{EMM_Id}                                            an energy meter manufacturer
     /// GET ~/RNs/{RN_Id}/TSMs                                                     its transparency software manufacturers, in short
-    /// GET ~/RNs/{RN_Id}/TSMs/{TSM_Id}                                            a transparency software manufacturer, with its releases
+    /// GET ~/RNs/{RN_Id}/TSMs/{TSM_Id}                                            a transparency software manufacturer, with its releases;
+    ///     ?without=transparencySoftware leaves them out, which ~/RNs/{RN_Id}/TSMs/{TSM_Id}/TSs lists
+    /// GET ~/RNs/{RN_Id}/TSMs/{TSM_Id}/TSs/{TS_Id}                                a transparency software release of the manufacturer
+    /// GET ~/RNs/{RN_Id}/CABs                                                     its conformity assessment bodies, in short
+    /// GET ~/RNs/{RN_Id}/CABs/{CAB_Id}                                            a conformity assessment body, with its certificates;
+    ///     ?without=transparencySoftwareCertificates leaves them out, which ~/RNs/{RN_Id}/CABs/{CAB_Id}/TSCs lists
+    /// GET ~/RNs/{RN_Id}/CABs/{CAB_Id}/TSCs/{TSC_Id}                              a transparency software certificate of the body
     /// GET ~/RNs/{RN_Id}/POs                                                      its parking operators, in short
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}                                              a parking operator;
     ///     ?without=parkingGarages,parkingSpaces,parkingSpaceTemplates,parkingSpaceGroups,parkingSensors,parkingProducts,
@@ -272,7 +278,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region ~/RNs/{RN_Id}/CSOs, GOs, EMPs, CSMs, EMMs, TSMs, POs
+            #region ~/RNs/{RN_Id}/CSOs, GOs, EMPs, CSMs, EMMs, TSMs, CABs, POs
 
             AddListHandlers(roamingNetworkPath, "CSOs",  roamingNetwork => roamingNetwork.ChargingStationOperators,      EntitySummaries);
             AddListHandlers(roamingNetworkPath, "GOs",   roamingNetwork => roamingNetwork.GridOperators,                 EntitySummaries);
@@ -280,6 +286,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             AddListHandlers(roamingNetworkPath, "CSMs",  roamingNetwork => roamingNetwork.ChargingStationManufacturers,  EntitySummaries);
             AddListHandlers(roamingNetworkPath, "EMMs",  roamingNetwork => roamingNetwork.EnergyMeterManufacturers,      EntitySummaries);
             AddListHandlers(roamingNetworkPath, "TSMs",  roamingNetwork => roamingNetwork.TransparencySoftwareManufacturers, EntitySummaries);
+            AddListHandlers(roamingNetworkPath, "CABs",  roamingNetwork => roamingNetwork.ConformityAssessmentBodies,    EntitySummaries);
             AddListHandlers(roamingNetworkPath, "POs",   roamingNetwork => roamingNetwork.ParkingOperators,              EntitySummaries);
 
             #endregion
@@ -1059,6 +1066,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region ~/RNs/{RN_Id}/CABs/{CAB_Id}
+
+            AddEntityHandlers(roamingNetworkPath + "/CABs/{conformityAssessmentBodyId}",
+                              request => {
+
+                                  if (!TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse))
+                                      return errorResponse;
+
+                                  if (!ConformityAssessmentBody_Id.TryParse(request.ParsedURLParameters[1], out var conformityAssessmentBodyId))
+                                      return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid conformity assessment body identification!");
+
+                                  return roamingNetwork.TryGetConformityAssessmentBodyById(conformityAssessmentBodyId, out var conformityAssessmentBody)
+                                             ? CachedEntityResponseWithout(request,
+                                                                           conformityAssessmentBody,
+                                                                           () => conformityAssessmentBody.ToJSON(Embedded: true),
+                                                                           [ ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates ],
+                                                                           "a conformity assessment body")
+                                             : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The conformity assessment body '{conformityAssessmentBodyId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
+
+                              });
+
+            #endregion
+
+            #region ~/RNs/{RN_Id}/CABs/{CAB_Id}/TSCs[/{TSC_Id}]
+
+            AddEmbeddedListHandlers<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(
+                roamingNetworkPath + "/CABs/{conformityAssessmentBodyId}/TSCs",
+                RequestedCertificatesOfConformityAssessmentBody,
+                certificate => certificate.ToJSON(Embedded: true));
+
+            AddEmbeddedEntityHandlers<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(
+                roamingNetworkPath + "/CABs/{conformityAssessmentBodyId}/TSCs/{certificateId}",
+                RequestedCertificatesOfConformityAssessmentBody,
+                TransparencySoftwareCertificate_Id.TryParse,
+                "transparency software certificate",
+                certificate => certificate.ToJSON(Embedded: true));
+
+            #endregion
+
             #region ~/RNs/{RN_Id}/TSMs/{TSM_Id}
 
             AddEntityHandlers(roamingNetworkPath + "/TSMs/{transparencySoftwareManufacturerId}",
@@ -1071,10 +1117,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid transparency software manufacturer identification!");
 
                                   return roamingNetwork.TryGetTransparencySoftwareManufacturerById(transparencySoftwareManufacturerId, out var transparencySoftwareManufacturer)
-                                             ? CachedEntityResponse(request, transparencySoftwareManufacturer, () => transparencySoftwareManufacturer.ToJSON(Embedded: true))
+                                             ? CachedEntityResponseWithout(request,
+                                                                           transparencySoftwareManufacturer,
+                                                                           () => transparencySoftwareManufacturer.ToJSON(Embedded: true),
+                                                                           [ TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware ],
+                                                                           "a transparency software manufacturer")
                                              : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The transparency software manufacturer '{transparencySoftwareManufacturerId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
 
                               });
+
+            #endregion
+
+            #region ~/RNs/{RN_Id}/TSMs/{TSM_Id}/TSs[/{TS_Id}]
+
+            AddEmbeddedListHandlers<TransparencySoftware_Id, TransparencySoftware>(
+                roamingNetworkPath + "/TSMs/{transparencySoftwareManufacturerId}/TSs",
+                RequestedReleasesOfTransparencySoftwareManufacturer,
+                release => release.ToJSON(Embedded: true));
+
+            AddEmbeddedEntityHandlers<TransparencySoftware_Id, TransparencySoftware>(
+                roamingNetworkPath + "/TSMs/{transparencySoftwareManufacturerId}/TSs/{transparencySoftwareId}",
+                RequestedReleasesOfTransparencySoftwareManufacturer,
+                TransparencySoftware_Id.TryParse,
+                "transparency software release",
+                release => release.ToJSON(Embedded: true));
 
             #endregion
 
@@ -2154,6 +2220,50 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   representationCache.GetValue(Version, _ => new Representations()).
                                                       GetOrAdd(View, format, () => POIRepresentation.Of(JSON(), format)),
                                   StoredETag: StoredETag);
+
+        }
+
+        #endregion
+
+        #region (private)        RequestedReleasesOfTransparencySoftwareManufacturer(Request)
+
+        /// <summary>
+        /// The releases of the transparency software manufacturer of the given request, ~/RNs/{RN_Id}/TSMs/{TSM_Id}/...
+        /// </summary>
+        private (POICollection<TransparencySoftware_Id, TransparencySoftware>? Collection, HTTPResponse? ErrorResponse) RequestedReleasesOfTransparencySoftwareManufacturer(HTTPRequest Request)
+        {
+
+            if (!TryGetRequestedRoamingNetwork(Request, out var roamingNetwork, out var errorResponse))
+                return (null, errorResponse);
+
+            if (!TransparencySoftwareManufacturer_Id.TryParse(Request.ParsedURLParameters[1], out var manufacturerId))
+                return (null, EntityErrorResponse(Request, HTTPStatusCode.BadRequest, "Invalid transparency software manufacturer identification!"));
+
+            return roamingNetwork.TryGetTransparencySoftwareManufacturerById(manufacturerId, out var manufacturer)
+                       ? (manufacturer.TransparencySoftware, null)
+                       : (null, EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The transparency software manufacturer '{manufacturerId}' is unknown in the roaming network '{roamingNetwork.Id}'!"));
+
+        }
+
+        #endregion
+
+        #region (private)        RequestedCertificatesOfConformityAssessmentBody(Request)
+
+        /// <summary>
+        /// The certificates of the conformity assessment body of the given request, ~/RNs/{RN_Id}/CABs/{CAB_Id}/...
+        /// </summary>
+        private (POICollection<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>? Collection, HTTPResponse? ErrorResponse) RequestedCertificatesOfConformityAssessmentBody(HTTPRequest Request)
+        {
+
+            if (!TryGetRequestedRoamingNetwork(Request, out var roamingNetwork, out var errorResponse))
+                return (null, errorResponse);
+
+            if (!ConformityAssessmentBody_Id.TryParse(Request.ParsedURLParameters[1], out var bodyId))
+                return (null, EntityErrorResponse(Request, HTTPStatusCode.BadRequest, "Invalid conformity assessment body identification!"));
+
+            return roamingNetwork.TryGetConformityAssessmentBodyById(bodyId, out var body)
+                       ? (body.TransparencySoftwareCertificates, null)
+                       : (null, EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The conformity assessment body '{bodyId}' is unknown in the roaming network '{roamingNetwork.Id}'!"));
 
         }
 

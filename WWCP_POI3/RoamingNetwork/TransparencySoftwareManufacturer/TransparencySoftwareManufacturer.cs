@@ -292,7 +292,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Its transparency software releases, ordered by their identifications.
         /// </summary>
-        public ImmutableArray<TransparencySoftware>  TransparencySoftware           { get; }
+        public POICollection<TransparencySoftware_Id, TransparencySoftware>  TransparencySoftware  { get; }
 
         /// <summary>
         /// Its signing keys: it signs its own properties and its releases with them.
@@ -395,15 +395,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.VulnerabilityDisclosurePolicy  = VulnerabilityDisclosurePolicy;
             this.SecurityAdvisories             = SecurityAdvisories;
 
-            var releases = (TransparencySoftware ?? []).ToArray();
-
-            if (releases.Any(release => release is null))
-                throw new ArgumentException($"The transparency software of the manufacturer '{Id}' must not contain null entries!", nameof(TransparencySoftware));
-
-            if (releases.Select(release => release.Id).Distinct().Count() != releases.Length)
-                throw new ArgumentException($"A transparency software release of the manufacturer '{Id}' must not be given twice!", nameof(TransparencySoftware));
-
-            this.TransparencySoftware           = [ .. releases.OrderBy(release => release.Id.ToString(), StringComparer.Ordinal) ];
+            this.TransparencySoftware           = new (TransparencySoftware, release => release.Id, "transparency software release", $"the transparency software manufacturer '{Id}'");
 
             (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the transparency software manufacturer '{Id}'");
 
@@ -419,13 +411,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public Boolean TryGetTransparencySoftware(TransparencySoftware_Id                        TransparencySoftwareId,
                                                   [NotNullWhen(true)] out TransparencySoftware?  TransparencySoftware)
-        {
 
-            TransparencySoftware = this.TransparencySoftware.FirstOrDefault(release => release.Id == TransparencySoftwareId);
-
-            return TransparencySoftware is not null;
-
-        }
+            => this.TransparencySoftware.TryGet(TransparencySoftwareId, out TransparencySoftware);
 
         #endregion
 
@@ -739,7 +726,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (SecurityAdvisories.HasValue)
                 json.Add(PropertyKeys.SecurityAdvisories,            SecurityAdvisories.Value.ToString());
 
-            if (IncludeChildArrays && TransparencySoftware.Length > 0)
+            if (IncludeChildArrays && !TransparencySoftware.IsEmpty)
                 json.Add(PropertyKeys.TransparencySoftware,          new JArray(TransparencySoftware.Select(release => release.ToJSON(Embedded: true))));
 
             if (SigningKeys.Length > 0)
@@ -1018,7 +1005,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (SecurityAdvisories.HasValue)
                 cbor.Add(CBORValue.FromText(PropertyKeys.SecurityAdvisories),            CBORValue.FromText(SecurityAdvisories.Value.ToString()));
 
-            if (TransparencySoftware.Length > 0)
+            if (!TransparencySoftware.IsEmpty)
                 cbor.Add(CBORValue.FromText(PropertyKeys.TransparencySoftware),
                          CBORValue.FromArray(TransparencySoftware.Select(release => CBORJSON.ToCBOR(release.ToJSON(Embedded: true)))));
 

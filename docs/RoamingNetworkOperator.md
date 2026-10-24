@@ -10,8 +10,8 @@ verified from its own history alone. A roaming network without an operator can n
 operator may change it: nobody can sign for it.
 
 It owns its own properties, the roaming network itself, the registries (charging station manufacturers, energy
-meter manufacturers, transparency software releases and certificates), and adds and removes the other parties. It
-signs in the place of a grid operator without keys, and its identity keys recover the keys of every other party.
+meter manufacturers), and adds and removes the other parties. It signs in the place of a grid operator or a
+conformity assessment body without keys, and its identity keys recover the keys of every other party.
 It never changes the data of another party. Its identification is any nonempty text without surrounding
 whitespace, compared case-insensitively, e.g. `GraphDefined`.
 

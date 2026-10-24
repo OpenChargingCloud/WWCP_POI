@@ -54,6 +54,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const String Software         = "software";
 
         /// <summary>
+        /// The certificates of a conformity assessment body.
+        /// </summary>
+        public const String Certificates     = "certificates";
+
+        /// <summary>
         /// The party itself: its own properties and, by a signing key, its signing keys; of the roaming network operator
         /// also the roaming network, its registries, who is a member, commits and attestations.
         /// </summary>
@@ -67,6 +72,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                        Tariffs,
                                                                                        PriceStatements,
                                                                                        Software,
+                                                                                       Certificates,
                                                                                        Party);
 
         #region (internal) Of(Change)
@@ -103,6 +109,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    nameof(ParkingSpaceGroup)       => Infrastructure,
 
                    nameof(TransparencySoftware)    => Software,
+
+                   nameof(TransparencySoftwareCertificate) => Certificates,
 
                    _                               => Party
 

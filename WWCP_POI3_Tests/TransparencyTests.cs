@@ -51,6 +51,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly TransparencySoftware_Id              Chargy10    = TransparencySoftware_Id.            Parse("chargy-1.0");
         private static readonly TransparencySoftware_Id              Chargy11    = TransparencySoftware_Id.            Parse("chargy-1.1");
         private static readonly TransparencySoftwareCertificate_Id   Cert1       = TransparencySoftwareCertificate_Id. Parse("cert-1");
+        private static readonly ConformityAssessmentBody_Id          PTB         = ConformityAssessmentBody_Id.        Parse("PTB");
+        private static readonly ConformityAssessmentBody_Id          BSI         = ConformityAssessmentBody_Id.        Parse("BSI");
         private static readonly EnergyMeter_Id                       Meter1      = EnergyMeter_Id.                     Parse("meter-1");
 
         #endregion
@@ -95,14 +97,29 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                       TransparencySoftware_Id[]           Compatible)
 
             => new (Id,
-                    "PTB",
                     ChargingStationModel_Id.Parse("Wallbox-22"),
                     "1.0",
                     Verified,
                     Compatible,
                     ChargingStationManufacturerId:  ACME,
                     DocumentNumber:                 "DE-123",
-                    NotBefore:                      Created);
+                    NotBefore:                      Created,
+                    Legislation:                    ConformityAssessmentBody.Legislations.MID);
+
+        #endregion
+
+        #region NewBody(Id, NotifiedFor, Certificates)
+
+        private static ConformityAssessmentBody NewBody(ConformityAssessmentBody_Id                Id,
+                                                        String[]                                   NotifiedFor,
+                                                        params TransparencySoftwareCertificate[]   Certificates)
+
+            => new (Id,
+                    I18NString.Create(Languages.en, Id.ToString()),
+                    NotifiedBodyNumber:                Id == PTB ? "0102" : null,
+                    NotifiedFor:                       NotifiedFor,
+                    TransparencySoftwareCertificates:  Certificates,
+                    Created:                           Created);
 
         #endregion
 
@@ -114,7 +131,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                     Created:                           Created,
                     ChargingStationManufacturers:      [ new ChargingStationManufacturer(ACME, Created: Created) ],
                     TransparencySoftwareManufacturers: [ NewManufacturer(OCC, NewRelease(Chargy10, "1.0"), NewRelease(Chargy11, "1.1")) ],
-                    TransparencySoftwareCertificates:  [ NewCertificate(Cert1, [ Chargy10 ], [ Chargy11 ]) ],
+                    ConformityAssessmentBodies:        [ NewBody(PTB, [ ConformityAssessmentBody.Legislations.MID ], NewCertificate(Cert1, [ Chargy10 ], [ Chargy11 ])) ],
                     ChargingStationOperators:          [ new ChargingStationOperator(GEF,
                                                                                      Created:        Created,
                                                                                      ChargingPools:  [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
@@ -129,6 +146,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                                                                                     ],
                                                                                                                                                                                                                     Created:                     Created),
                                                                                                                                                                                       Created:      Created) ]) ]) ]) ]).WithKeys();
+
+        #endregion
+
+        #region Certificate(Network)
+
+        private static JObject Certificate(JObject Network)
+            => (JObject) Network["conformityAssessmentBodies"]![0]!["transparencySoftwareCertificates"]![0]!;
 
         #endregion
 
@@ -186,8 +210,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(manufacturer["transparencySoftware"]![0]!["vendor"],                    Is.Null);
                 Assert.That(manufacturer["transparencySoftware"]![0]!["supportUntil"]!.ToString(),  Is.EqualTo("2031-12-31T23:59:59.999Z"));
                 Assert.That(manufacturer["transparencySoftware"]![0]!["softwareBillOfMaterials"]!.ToString(),  Is.EqualTo("https://open.charging.cloud/chargy/1.0/sbom.cdx.json"));
-                Assert.That(json["transparencySoftwareCertificates"]![0]!["@id"]!.ToString(),       Is.EqualTo("cert-1"));
-                Assert.That(json["transparencySoftwareCertificates"]![0]!["notBefore"]!.ToString(), Is.EqualTo("2026-01-01T00:00:00.000Z"));
+                Assert.That(json["transparencySoftwareCertificates"],                               Is.Null);
+                Assert.That(json["conformityAssessmentBodies"]![0]!["notifiedBodyNumber"]!.ToString(),  Is.EqualTo("0102"));
+                Assert.That(json["conformityAssessmentBodies"]![0]!["notifiedFor"]![0]!.ToString(),     Is.EqualTo("MID"));
+                Assert.That(Certificate(json)["@id"]!.ToString(),                                   Is.EqualTo("cert-1"));
+                Assert.That(Certificate(json)["issuer"],                                            Is.Null);
+                Assert.That(Certificate(json)["legislation"]!.ToString(),                           Is.EqualTo("MID"));
+                Assert.That(Certificate(json)["notBefore"]!.ToString(),                             Is.EqualTo("2026-01-01T00:00:00.000Z"));
+                Assert.That(fromCBOR.ConformityAssessmentBodyOf(Cert1)?.Id,                         Is.EqualTo(PTB));
                 Assert.That(meter["transparencySoftwareStatus"]![0]!["certificateId"]!.ToString(),  Is.EqualTo("cert-1"));
                 Assert.That(meter["transparencySoftwareStatus"]![0]!["legalStatus"]!.ToString(),    Is.EqualTo(LegalStatus.GermanCalibrationLaw.ToString()));
 
@@ -216,7 +246,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         {
 
             var certificate  = new TransparencySoftwareCertificate(Cert1,
-                                                                   "PTB",
                                                                    ChargingStationModel_Id.Parse("Wallbox-22"),
                                                                    "1.0",
                                                                    [ Chargy10 ],
@@ -260,8 +289,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             JArray Releases(JObject Network)
                 => (JArray) Network["transparencySoftwareManufacturers"]![0]!["transparencySoftware"]!;
 
-            var unknownRelease      = Changed(network => network["transparencySoftwareCertificates"]![0]!["compatibleTransparencySoftwareIds"] = new JArray("chargy-9.9"));
-            var unknownManufacturer = Changed(network => network["transparencySoftwareCertificates"]![0]!["chargingStationManufacturerId"] = "NOBODY");
+            var unknownRelease      = Changed(network => Certificate(network)["compatibleTransparencySoftwareIds"] = new JArray("chargy-9.9"));
+            var unknownManufacturer = Changed(network => Certificate(network)["chargingStationManufacturerId"] = "NOBODY");
+            var issuer              = Changed(network => Certificate(network)["issuer"] = "PTB");
+            var notNotified         = Changed(network => Certificate(network)["legislation"] = "CRA");
+            var bodyNumber          = Changed(network => network["conformityAssessmentBodies"]![0]!["notifiedBodyNumber"] = "102");
             var meterRelease        = Changed(network => Releases(network).RemoveAt(1));
             var meterCertificate    = Changed(network => Meter(network)["transparencySoftwareStatus"]![0]!["certificateId"] = "cert-9");
             var twice               = Changed(network => Meter(network)["transparencySoftwareStatus"]![1]!["transparencySoftwareId"] = "chargy-1.0");
@@ -295,12 +327,18 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(error9,                                                                Does.Contain("'importer'"));
                 Assert.That(RoamingNetwork.TryParse(otherManufacturer,    out _, out var error10), Is.False);
                 Assert.That(error10,                                                               Does.Contain("release 'chargy-1.0' of the manufacturer 'Other' is one of the manufacturer 'OpenChargingCloud' already"));
+                Assert.That(RoamingNetwork.TryParse(issuer,               out _, out var error11), Is.False);
+                Assert.That(error11,                                                               Does.Contain("issuer"));
+                Assert.That(RoamingNetwork.TryParse(notNotified,          out _, out var error12), Is.False);
+                Assert.That(error12,                                                               Does.Contain("legislation 'CRA', which the conformity assessment body 'PTB' is not notified for"));
+                Assert.That(RoamingNetwork.TryParse(bodyNumber,           out _, out var error13), Is.False);
+                Assert.That(error13,                                                               Does.Contain("must be four digits"));
                 Assert.That(RoamingNetwork.TryParse(covered,              out _, out var error5),  Is.True, error5);
             }
 
             // Not covered: the certificate verifies and makes compatible other releases only.
             var other = NewNetwork().ToJSON();
-            ((JObject) other["transparencySoftwareCertificates"]![0]!)["compatibleTransparencySoftwareIds"] = new JArray();
+            Certificate(other)["compatibleTransparencySoftwareIds"] = new JArray();
             Meter(other)["transparencySoftwareStatus"]![1]!["certificateId"] = "cert-1";
 
             Assert.That(RoamingNetwork.TryParse(other, out _, out var error7),  Is.False);
@@ -318,7 +356,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var rn1      = NewNetwork();
             var chargy20 = TransparencySoftware_Id.Parse("chargy-2.0");
-            var cert1    = rn1.TransparencySoftwareCertificates.Single();
+            var cert1    = rn1.TransparencySoftwareCertificates.Values.Single();
             rn1.TryGetTransparencySoftwareById(Chargy11, out var chargy11);
 
             var rn2      = Apply(rn1,
@@ -424,6 +462,68 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(withOther.TryApplyChangeSet(SignedBy(withOther, other, addRelease),  out _, out var error6),     Is.False, "a release of another manufacturer");
                 Assert.That(withOther.TryApplyChangeSet(SignedBy(withOther, other, RoamingNetworkChange.UpdateProperty(NewRelease(Chargy11, "1.1"), "supportUntil", null, "2027-12-31T23:59:59.000Z")),
                                                         out _, out var error7),                                               Is.False, "a release of another manufacturer");
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_conformity_assessment_body_signs_its_certificates_itself()
+
+        /// <summary>
+        /// A conformity assessment body is a party: the roaming network operator adds and removes it; it changes its
+        /// certificates with its own keys. One not taking part is added without keys: then the roaming network operator
+        /// signs in its place.
+        /// </summary>
+        [Test]
+        public void A_conformity_assessment_body_signs_its_certificates_itself()
+        {
+
+            var rn1           = NewNetwork();
+            var ptb           = TestParties.Party(PTB);
+            var rno           = TestParties.Party(rn1);
+            var cert2         = TransparencySoftwareCertificate_Id.Parse("cert-2");
+            var addCert2      = RoamingNetworkChange.Add(NewCertificate(cert2, [ Chargy11 ], []), PTB);
+
+            // The BSI, for the CRA, not taking part yet: added without keys.
+            var withBSI       = Apply(rn1, RoamingNetworkChange.Add(NewBody(BSI, [ ConformityAssessmentBody.Legislations.CRA ])));
+            var craCert       = new TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id.Parse("cra-1"),
+                                                                    ChargingStationModel_Id.Parse("Wallbox-22"),
+                                                                    "1.0",
+                                                                    [ Chargy11 ],
+                                                                    [],
+                                                                    Legislation: ConformityAssessmentBody.Legislations.CRA);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, ptb, addCert2),  out var withCert2, out var error1),  Is.True,  error1);
+                Assert.That(withCert2!.ConformityAssessmentBodyOf(cert2)?.Id,                                    Is.EqualTo(PTB));
+
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, rno, addCert2),  out _, out var error2),         Is.False, "a certificate of the PTB signed by the roaming network operator");
+                Assert.That(error2,                                                                               Does.Contain("needs a signature by a signing key of the ConformityAssessmentBody 'PTB'"));
+
+                // Not notified for the CRA: the PTB can not issue under it.
+                Assert.That(() => SignedBy(rn1, ptb, RoamingNetworkChange.Add(craCert, PTB)),
+                            Throws.ArgumentException.With.Message.Contains("legislation 'CRA', which the conformity assessment body 'PTB' is not notified for"));
+
+                // The BSI without keys: the roaming network operator signs its certificates in its place, the BSI can not.
+                Assert.That(withBSI.TryGetConformityAssessmentBodyById(BSI, out var bsi),                       Is.True);
+                Assert.That(bsi!.SigningKeys,                                                                     Is.Empty);
+                Assert.That(withBSI.TryApplyChangeSet(SignedBy(withBSI, rno, RoamingNetworkChange.Add(craCert, BSI)),  out _, out var error4),  Is.True, error4);
+
+                // A certificate to add needs its body.
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.Add("TransparencySoftwareCertificate", "cert-3", NewCertificate(TransparencySoftwareCertificate_Id.Parse("cert-3"), [ Chargy10 ], []).ToJSON(Embedded: true))),
+                            Throws.ArgumentException.With.Message.Contains("needs its ConformityAssessmentBody"));
+
+                // Added with its certificates, a body is refused: they are its own to add.
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.Add(NewBody(BSI, [ ConformityAssessmentBody.Legislations.CRA ], craCert))),
+                            Throws.ArgumentException.With.Message.Contains("must be added without its transparencySoftwareCertificates"));
+
+                // A body whose certificate an energy meter names can not be removed.
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.Remove(PTB)),
+                            Throws.ArgumentException.With.Message.Contains("certificate 'cert-1' of the energy meter 'meter-1'"));
 
             }
 

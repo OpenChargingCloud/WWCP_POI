@@ -105,15 +105,19 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                    TransparencySoftwareManufacturers: [ new TransparencySoftwareManufacturer(TransparencySoftwareManufacturer_Id.Parse("OpenChargingCloud"),
                                                                                              TransparencySoftware:  [ NewRelease(Chargy10, "1.0"), NewRelease(Chargy11, "1.1") ],
                                                                                              Created:               Created) ],
-                   TransparencySoftwareCertificates:  [ new TransparencySoftwareCertificate(Cert1,
-                                                                                            "PTB",
-                                                                                            ChargingStationModel_Id.Parse("Wallbox-22"),
-                                                                                            "1.0",
-                                                                                            [ Chargy10 ],
-                                                                                            [ Chargy11 ],
-                                                                                            ChargingStationManufacturerId:  ACME,
-                                                                                            DocumentNumber:                 "DE-123",
-                                                                                            NotBefore:                      Created) ],
+                   ConformityAssessmentBodies:        [ new ConformityAssessmentBody(ConformityAssessmentBody_Id.Parse("PTB"),
+                                                                                     NotifiedBodyNumber:                "0102",
+                                                                                     NotifiedFor:                       [ ConformityAssessmentBody.Legislations.MID ],
+                                                                                     TransparencySoftwareCertificates:  [ new TransparencySoftwareCertificate(Cert1,
+                                                                                                                                                              ChargingStationModel_Id.Parse("Wallbox-22"),
+                                                                                                                                                              "1.0",
+                                                                                                                                                              [ Chargy10 ],
+                                                                                                                                                              [ Chargy11 ],
+                                                                                                                                                              ChargingStationManufacturerId:  ACME,
+                                                                                                                                                              DocumentNumber:                 "DE-123",
+                                                                                                                                                              NotBefore:                      Created,
+                                                                                                                                                              Legislation:                    ConformityAssessmentBody.Legislations.MID) ],
+                                                                                     Created:                           Created) ],
                    GridOperators:                     [ new GridOperator(NET,
                                                                          GridConnectionPoints:  [ new GridConnectionPoint(GCP1, VoltageLevel: GridVoltageLevel.LowVoltage),
                                                                                                   new GridConnectionPoint(GridConnectionPoint_Id.Parse("gcp-2"), VoltageLevel: GridVoltageLevel.MediumVoltage) ],
@@ -318,7 +322,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(Ids(proof.Given("energyMeterManufacturers")),                             Is.EqualTo(new[] { "METERS" }));
                 Assert.That(Ids(proof.Given("transparencySoftwareManufacturers")),                    Is.EqualTo(new[] { "OpenChargingCloud" }));
                 Assert.That(Ids(proof.Given("transparencySoftwareManufacturers", "transparencySoftware")), Is.EqualTo(new[] { "chargy-1.0" }));
-                Assert.That(Ids(proof.Given("transparencySoftwareCertificates")),                     Is.EqualTo(new[] { "cert-1" }));
+                Assert.That(Ids(proof.Given("conformityAssessmentBodies")),                           Is.EqualTo(new[] { "PTB" }));
+                Assert.That(Ids(proof.Given("conformityAssessmentBodies", "transparencySoftwareCertificates")), Is.EqualTo(new[] { "cert-1" }));
                 Assert.That(Ids(proof.Given("parkingOperators", "parkingSpaces")),                    Is.EqualTo(new[] { "space-1" }));
                 Assert.That(proof.Given("parkingOperators", "parkingSpaces").Single()["roofed"]?.Value<Boolean>(), Is.True, "the effective parking space");
                 Assert.That(Ids(proof.Given("gridOperators", "gridConnectionPoints")),                Is.EqualTo(new[] { "gcp-1" }));

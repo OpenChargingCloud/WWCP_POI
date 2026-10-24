@@ -223,26 +223,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
             (changed, previous) => changed.ShareRuntimeOf(previous)
         );
 
-        private static readonly Registry<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate> TransparencySoftwareCertificateRegistry = new (
-            "transparency software certificate",
+        /// <summary>
+        /// The properties of a conformity assessment body: those of a charging station manufacturer, its number as a
+        /// notified body and the legislations it is notified for. Its certificates are changed on their own.
+        /// </summary>
+        private static readonly ImmutableHashSet<String> ChangeableConformityAssessmentBodyProperties = ChangeableManufacturerProperties.Union([
+            ConformityAssessmentBody.PropertyKeys.NotifiedBodyNumber,
+            ConformityAssessmentBody.PropertyKeys.NotifiedFor
+        ]);
+
+        private static readonly Registry<ConformityAssessmentBody_Id, ConformityAssessmentBody> ConformityAssessmentBodyRegistry = new (
+            "conformity assessment body",
             "a",
-            [ TransparencySoftwareCertificate.PropertyKeys.Issuer,
-              TransparencySoftwareCertificate.PropertyKeys.ChargingStationModel,
-              TransparencySoftwareCertificate.PropertyKeys.ChargingStationModelVersion,
-              TransparencySoftwareCertificate.PropertyKeys.ChargingStationManufacturerId,
-              TransparencySoftwareCertificate.PropertyKeys.DocumentNumber,
-              TransparencySoftwareCertificate.PropertyKeys.DocumentURL,
-              TransparencySoftwareCertificate.PropertyKeys.VerifiedTransparencySoftwareIds,
-              TransparencySoftwareCertificate.PropertyKeys.CompatibleTransparencySoftwareIds,
-              TransparencySoftwareCertificate.PropertyKeys.NotBefore,
-              TransparencySoftwareCertificate.PropertyKeys.NotAfter ],
-            TransparencySoftwareCertificate_Id.TryParse,
-            TransparencySoftwareCertificate.TryParse,
-            certificate => certificate.Id,
-            certificate => certificate.ToJSON(Embedded: true),
-            // Certificates have no runtime status and no timestamps.
-            (changed, previous) => { },
-            Timestamps: false
+            ChangeableConformityAssessmentBodyProperties,
+            ConformityAssessmentBody_Id.TryParse,
+            ConformityAssessmentBody.TryParse,
+            body                => body.Id,
+            body                => body.ToJSON(Embedded: true),
+            // Its certificates have no runtime status.
+            (changed, previous) => changed.ShareRuntimeOf(previous)
         );
 
         #endregion

@@ -98,6 +98,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public static POIPartyId Party(TransparencySoftwareManufacturer_Id ManufacturerId)
             => new (nameof(TransparencySoftwareManufacturer), ManufacturerId.ToString());
 
+        /// <summary>
+        /// A conformity assessment body.
+        /// </summary>
+        public static POIPartyId Party(ConformityAssessmentBody_Id BodyId)
+            => new (nameof(ConformityAssessmentBody), BodyId.ToString());
+
         #endregion
 
         #region Key(Party, Kind)
@@ -191,7 +197,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                   ("eMobilityProviders",       nameof(EMobilityProvider)),
                                                   ("gridOperators",            nameof(GridOperator)),
                                                   ("parkingOperators",         nameof(ParkingOperator)),
-                                                  ("transparencySoftwareManufacturers", nameof(TransparencySoftwareManufacturer)) })
+                                                  ("transparencySoftwareManufacturers", nameof(TransparencySoftwareManufacturer)),
+                                                  ("conformityAssessmentBodies",        nameof(ConformityAssessmentBody)) })
                 foreach (var party in (json[array] as JArray ?? []).OfType<JObject>())
                     WithKeys(party, new POIPartyId(type, party["@id"]!.Value<String>()!));
 
@@ -248,6 +255,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public static TransparencySoftwareManufacturer WithKeys(this TransparencySoftwareManufacturer Manufacturer)
 
             => TransparencySoftwareManufacturer.TryParse(WithKeys(Manufacturer.ToJSON(), Party(Manufacturer.Id)), out var withKeys, out var error)
+                   ? withKeys
+                   : throw new ArgumentException(error);
+
+        /// <summary>
+        /// The given conformity assessment body with its test keys.
+        /// </summary>
+        public static ConformityAssessmentBody WithKeys(this ConformityAssessmentBody Body)
+
+            => ConformityAssessmentBody.TryParse(WithKeys(Body.ToJSON(), Party(Body.Id)), out var withKeys, out var error)
                    ? withKeys
                    : throw new ArgumentException(error);
 

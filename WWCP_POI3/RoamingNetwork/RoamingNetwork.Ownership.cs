@@ -187,18 +187,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// a signing key for data and for the signing keys of a party, an identity key for its identity keys.
     /// <list type="bullet">
     ///   <item>The roaming network operator (the RoamingNetworkOperator it embeds) owns itself, the roaming network itself,
-    ///         manufacturers, energy meter manufacturers and transparency software certificates, and adds and removes parties:
+    ///         manufacturers and energy meter manufacturers, and adds and removes parties:
     ///         it decides who is a member, so removing a party removes all its data with it, without its signature.</item>
-    ///   <item>A charging station operator, e-mobility provider, grid operator, parking operator or transparency software
-    ///         manufacturer owns its own properties, a charging station operator its brands, pools, stations, EVSEs, tariffs
-    ///         and groups, a parking operator its parking data, a transparency software manufacturer its releases.
+    ///   <item>A charging station operator, e-mobility provider, grid operator, parking operator, transparency software
+    ///         manufacturer or conformity assessment body owns its own properties, a charging station operator its brands,
+    ///         pools, stations, EVSEs, tariffs and groups, a parking operator its parking data, a transparency software
+    ///         manufacturer its releases, a conformity assessment body the certificates it issued.
     ///         Brands are embedded in what they are a brand of, and so owned by its owner.</item>
     ///   <item>A grid connection point is owned by its maintainer: its grid operator, or the charging station operator or
     ///         parking operator its maintainedBy names. One of them adds it, with the maintainer it names, or its grid operator.
     ///         Its maintainedBy is changed by its grid operator, taking it over or handing it on, by its maintainer,
     ///         handing it on, or by an identity key of the roaming network operator.</item>
-    ///   <item>A grid operator may be added without keys: it does not take part. Then the roaming network operator signs
-    ///         in its place, until it gets keys from an identity key of the roaming network operator.</item>
+    ///   <item>A grid operator or a conformity assessment body may be added without keys: it does not take part. Then the
+    ///         roaming network operator signs in its place, until it gets keys from an identity key of the roaming network
+    ///         operator.</item>
     ///   <item>The signing keys of a party are changed with one of its current signing keys, or with one of its identity
     ///         keys when none of them can sign any more; its identity keys only with one of its identity keys.
     ///         For recovery, an identity key of the roaming network operator changes both kinds of keys of every other party.
@@ -219,7 +221,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             nameof(EMobilityProvider),
             nameof(GridOperator),
             nameof(ParkingOperator),
-            nameof(TransparencySoftwareManufacturer)
+            nameof(TransparencySoftwareManufacturer),
+            nameof(ConformityAssessmentBody)
         ];
 
         /// <summary>
@@ -254,7 +257,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  ParkingOperator.PropertyKeys.ParkingSpaceGroups,
                                                  ParkingOperator.PropertyKeys.ParkingProducts ] },
             { nameof(TransparencySoftwareManufacturer),
-                                               [ TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware ] }
+                                               [ TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware ] },
+            { nameof(ConformityAssessmentBody),
+                                               [ ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates ] }
         };
 
         #endregion
@@ -296,6 +301,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  => TransparencySoftwareManufacturer_Id.TryParse(PartyId.EntityId, out var softwareManufacturerId) &&
                                                     transparencySoftwareManufacturers.TryGet(softwareManufacturerId, out var softwareManufacturer)
                                                         ? softwareManufacturer : null,
+
+                nameof(ConformityAssessmentBody) => ConformityAssessmentBody_Id.TryParse(PartyId.EntityId, out var bodyId) &&
+                                                    conformityAssessmentBodies.TryGet(bodyId, out var body)
+                                                        ? body : null,
 
                 _                                => null
 
@@ -358,6 +367,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 foreach (var softwareManufacturer in transparencySoftwareManufacturers)
                     yield return (new POIPartyId(nameof(TransparencySoftwareManufacturer), softwareManufacturer.Id.ToString()), softwareManufacturer);
+
+                foreach (var body in conformityAssessmentBodies)
+                    yield return (new POIPartyId(nameof(ConformityAssessmentBody),         body.                Id.ToString()), body);
 
             }
         }
@@ -965,8 +977,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             #region Registries of the roaming network operator
 
             if (Change.EntityType is nameof(ChargingStationManufacturer)
-                                  or nameof(EnergyMeterManufacturer)
-                                  or nameof(TransparencySoftwareCertificate))
+                                  or nameof(EnergyMeterManufacturer))
             {
                 Owners = [ (roamingNetworkOperator, POIKeyKind.Signing) ];
                 return true;
@@ -1010,6 +1021,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 Owners = [ SignerOf(softwareManufacturer.Value) ];
+                return true;
+
+            }
+
+            #endregion
+
+            #region The transparency software certificates of a conformity assessment body: added to it, or found in it
+
+            if (Change.EntityType == nameof(TransparencySoftwareCertificate))
+            {
+
+                if (!TransparencySoftwareCertificate_Id.TryParse(Change.EntityId, out var certificateId))
+                {
+                    ErrorResponse = $"invalid {Change.EntityType} identification '{Change.EntityId}'!";
+                    return false;
+                }
+
+                POIPartyId? issuer = null;
+
+                if (Change.Kind == RoamingNetworkChangeKind.Add)
+                {
+
+                    if (Change.ParentEntityType != nameof(ConformityAssessmentBody) || Change.ParentEntityId is null)
+                    {
+                        ErrorResponse = $"adding the {Change.EntityType} '{Change.EntityId}' needs its ConformityAssessmentBody as its parent!";
+                        return false;
+                    }
+
+                    issuer = PartyIdOf(new POIPartyId(Change.ParentEntityType, Change.ParentEntityId));
+
+                }
+
+                else if (ConformityAssessmentBodyOf(certificateId) is ConformityAssessmentBody owner)
+                    issuer = PartyIdOf(new POIPartyId(nameof(ConformityAssessmentBody), owner.Id.ToString()));
+
+                if (issuer is null)
+                {
+                    ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' is unknown!";
+                    return false;
+                }
+
+                // The roaming network operator in the place of a body not taking part.
+                Owners = [ SignerOf(issuer.Value) ];
                 return true;
 
             }
@@ -1381,8 +1435,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Change.NewValue is not JObject newParty)
                     return true;
 
-                // A grid operator not taking part is added without any keys.
-                var withoutKeys = Change.EntityType == nameof(GridOperator) &&
+                // A grid operator or a conformity assessment body not taking part is added without any keys.
+                var withoutKeys = Change.EntityType is nameof(GridOperator) or nameof(ConformityAssessmentBody) &&
                                   newParty[POIPartyKeys.SigningKeysProperty]  is null &&
                                   newParty[POIPartyKeys.IdentityKeysProperty] is null;
 

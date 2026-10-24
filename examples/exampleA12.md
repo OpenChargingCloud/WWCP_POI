@@ -221,3 +221,9 @@ Checkpoint 0 of epoch 2 holds runtime status: False
 - The hub serves its roaming networks by the same `POI_API`, with their WebSockets; it lets nobody set a status over
   them yet (`AuthorizeStatusUpdate`), and this example uses `POI_API` without a hub.
 
+
+## Next
+
+- Who checks the meter: a transparency software manufacturer and a conformity assessment body, each signing what it
+  states, and the energy meters of `DE*GEF` naming them: [example A13](exampleA13.md).
+
