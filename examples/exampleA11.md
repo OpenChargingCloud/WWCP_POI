@@ -237,3 +237,9 @@ The driver's evidence of example A10, revision 12 in checkpoint 4 of epoch 1: va
 - The witnesses are trusted by configuration, their new keys as well; a signed list of them is open, as in
   [example A10](exampleA10.md).
 - The hub makes no checkpoints yet, and so closes no epoch.
+
+
+## Next
+
+- The atlas and the traffic report: `QA` of epoch 2 served over its WebSocket, a mirror following it, a driver's app
+  told live of the status of `DE*GEF*E1*1`, and of a commit: [example A12](exampleA12.md).

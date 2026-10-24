@@ -127,3 +127,15 @@ Console.WriteLine();
 using var a11 = ExampleA11.Run(a1, a2, a6);
 
 ExampleA11.Validate();
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// The atlas and the traffic report: OCC serves QA, a mirror follows it, a driver's app subscribes there; DE*GEF reports the
+// status, the energy status and the price of an EVSE live, pushed within moments and kept in no commit; its next change of
+// a tariff is pushed as a signed commit.
+await ExampleA12.Run(a11);
+
+ExampleA12.Validate();
