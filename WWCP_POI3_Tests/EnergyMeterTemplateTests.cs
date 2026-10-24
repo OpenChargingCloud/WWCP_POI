@@ -109,7 +109,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                    Created:                   Created,
-                   EnergyMeterManufacturers:  [ new EnergyMeterManufacturer(ACME, Created: Created),
+                   EnergyMeterManufacturers:  [ new EnergyMeterManufacturer(ACME,
+                                                                            Models:   [ new EnergyMeterModel(ACME1000),
+                                                                                        new EnergyMeterModel(ACME3000),
+                                                                                        new EnergyMeterModel(EnergyMeterModel_Id.Parse("ACME-4000")),
+                                                                                        new EnergyMeterModel(EnergyMeterModel_Id.Parse("ACME-5000")) ],
+                                                                            Created:  Created),
                                                 new EnergyMeterManufacturer(ZAP,  Created: Created) ],
                    GridOperators:             [ new GridOperator(NET,
                                                                  GridConnectionPoints:  [ new GridConnectionPoint(GCP,
@@ -317,6 +322,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             EnergyMeterTemplate Template(String Id, EnergyMeterModel_Id ModelId, SignatureMethod SignatureMethod)
 
                 => new (EnergyMeterTemplate_Id.Parse(Id),
+                        ManufacturerId:    ACME,
                         ModelId:           ModelId,
                         SignatureMethods:  [ SignatureMethod ],
                         Created:           Created);

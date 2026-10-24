@@ -9,7 +9,7 @@ public static class ExampleA7
 {
 
     // The roaming network operator compacts the history of QA twice, after its checkpoints: first to the commit of
-    // checkpoint 0, revision 6, then to the one of checkpoint 1, revision 8. A history with checkpoints drops older commits
+    // checkpoint 0, revision 7, then to the one of checkpoint 1, revision 9. A history with checkpoints drops older commits
     // only before the commit of one of them, and keeps all checkpoints. It archives what it drops, one segment per
     // compaction, so that the checkpoints still prove what someone can show: the commits stay available, and so do their
     // proofs.
@@ -59,19 +59,19 @@ public static class ExampleA7
 
         Console.WriteLine($"Commits since the genesis: {(A1.History.TryGetCommitsSince(genesis.Root.Id, out _, out error) ? "given" : error)}");
 
-        // b) A dropped commit from the archive, and its proof: the proof of revision 3 is the one of example A4.
-        if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-3.json"), out var proof3, out error))
+        // b) A dropped commit from the archive, and its proof: the proof of revision 4 is the one of example A4.
+        if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-4.json"), out var proof4, out error))
             Helpers.Fail(error);
 
-        if (!A1.History.TryGetArchivedCommit(proof3.CommitId, out var archived))
-            Helpers.Fail("the commit of revision 3 is not in the archive");
+        if (!A1.History.TryGetArchivedCommit(proof4.CommitId, out var archived))
+            Helpers.Fail("the commit of revision 4 is not in the archive");
 
         if (!A1.History.TryGetCommitProof(archived.Id, out var proof, out error))
             Helpers.Fail(error);
 
-        File.WriteAllText("published/QA-proof-revision-3-archived.json", proof.ToJSON().ToString());
+        File.WriteAllText("published/QA-proof-revision-4-archived.json", proof.ToJSON().ToString());
 
-        Console.WriteLine($"The commit of revision {archived.Revision} from the archive: {archived.ChangeSet?.Description.FirstText()}; its proof, as before the compaction: {(proof.ToJSON().ToString() == proof3.ToJSON().ToString() ? "the same" : "another")}");
+        Console.WriteLine($"The commit of revision {archived.Revision} from the archive: {archived.ChangeSet?.Description.FirstText()}; its proof, as before the compaction: {(proof.ToJSON().ToString() == proof4.ToJSON().ToString() ? "the same" : "another")}");
 
         // c) After a restart: the store holds the snapshot of the new root as its base and the commits since, the
         //    checkpoints all; the archive the rest. Here copies of both are loaded, beside the store and the archive
@@ -85,10 +85,10 @@ public static class ExampleA7
         if (!RoamingNetworkHistory.TryLoad(restartedStore, out var restarted, out error, Archive: restartedArchive))
             Helpers.Fail(error);
 
-        if (!restarted.TryGetCommitProof(proof3.CommitId, out var restartedProof, out error))
+        if (!restarted.TryGetCommitProof(proof4.CommitId, out var restartedProof, out error))
             Helpers.Fail(error);
 
-        Console.WriteLine($"Restarted: root revision {restarted.Root.Revision}, head revision {restarted.Head.Commit.Revision}, {restarted.Checkpoints.Count} checkpoints, the proof of revision 3 {(restartedProof.ToJSON().ToString() == proof3.ToJSON().ToString() ? "the same" : "another")}");
+        Console.WriteLine($"Restarted: root revision {restarted.Root.Revision}, head revision {restarted.Head.Commit.Revision}, {restarted.Checkpoints.Count} checkpoints, the proof of revision 4 {(restartedProof.ToJSON().ToString() == proof4.ToJSON().ToString() ? "the same" : "another")}");
         Console.WriteLine();
 
         #endregion
@@ -203,8 +203,8 @@ public static class ExampleA7
 
         #region 7. Proofs after the compaction, and what is refused
 
-        // a) The proof of revision 3, given from the archive: valid in checkpoint 0.
-        if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-3-archived.json"), out var proof, out error))
+        // a) The proof of revision 4, given from the archive: valid in checkpoint 0.
+        if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-4-archived.json"), out var proof, out error))
             Helpers.Fail(error);
 
         Console.WriteLine($"The proof of revision {proof.Revision}, from the archive, in checkpoint 0: {(proof.Verify(checkpoints[0], out error) ? "valid" : error)}");

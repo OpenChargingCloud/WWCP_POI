@@ -1,16 +1,14 @@
 # RoamingNetwork
 
 A roaming network is the root of all POI data: one shared data set of charging station operators,
-e-mobility providers, grid operators, parking operators, transparency software manufacturers and conformity
-assessment bodies (the *parties*), together with the registries they share, charging station and energy meter
-manufacturers.
+e-mobility providers, grid operators, parking operators, charging station and energy meter manufacturers,
+transparency software manufacturers and conformity assessment bodies (the *parties*).
 A version of a roaming network with everything it embeds is one immutable data set, named by its
 [ETags](README.md#etags); a change set leads to the next version.
 
 The roaming network is owned by its **roaming network operator (RNO)**, the
 [RoamingNetworkOperator](RoamingNetworkOperator.md) it embeds as `operator`, with its keys: the
-network has none of its own. The RNO signs changes of the network's own properties, adds and removes parties, and
-owns the registries (manufacturers, energy meter manufacturers).
+network has none of its own. The RNO signs changes of the network's own properties, and adds and removes parties.
 Each party owns its own properties and data. There is no registry of brands: every charging station operator, pool,
 station, EVSE and RFID authentication mode embeds its own, see [Brand](Brand.md).
 
@@ -56,11 +54,11 @@ See [README.md](README.md#common-properties).
 | `dataLicenses` | `DataLicenses` | [DataLicense](#datalicenses)[] | update/remove | The licenses of the data, ordered by `@id` (ordinal); omitted when empty. |
 | `operator` | `Operator` | [RoamingNetworkOperator](RoamingNetworkOperator.md)? | its properties: update/remove | Its operator, with the keys of the network; omitted for a network without one, which nobody can change where only the RNO may. Neither added nor removed. |
 | `chargingStationOperators` | `ChargingStationOperators` | [ChargingStationOperator](ChargingStationOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
-| `chargingStationManufacturers` | `ChargingStationManufacturers` | [ChargingStationManufacturer](ChargingStationManufacturer.md)[] | add/remove | Ordered by `@id` (ordinal). |
+| `chargingStationManufacturers` | `ChargingStationManufacturers` | [ChargingStationManufacturer](ChargingStationManufacturer.md)[] | add/remove | Parties, each with its models; ordered by `@id` (ordinal). |
 | `eMobilityProviders` | `EMobilityProviders` | [EMobilityProvider](EMobilityProvider.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `gridOperators` | `GridOperators` | [GridOperator](GridOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `parkingOperators` | `ParkingOperators` | [ParkingOperator](ParkingOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
-| `energyMeterManufacturers` | `EnergyMeterManufacturers` | [EnergyMeterManufacturer](EnergyMeterManufacturer.md)[] | add/remove | Ordered by `@id` (ordinal). |
+| `energyMeterManufacturers` | `EnergyMeterManufacturers` | [EnergyMeterManufacturer](EnergyMeterManufacturer.md)[] | add/remove | Parties, each with its models; ordered by `@id` (ordinal). |
 | `transparencySoftwareManufacturers` | `TransparencySoftwareManufacturers` | [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md)[] | add/remove | Parties, each with its releases, one per version of a software; ordered by `@id` (ordinal). `TransparencySoftware` gives the releases of all of them by their identifications, unique within the network. |
 | `conformityAssessmentBodies` | `ConformityAssessmentBodies` | [ConformityAssessmentBody](ConformityAssessmentBody.md)[] | add/remove | Parties, each with the transparency software certificates it issued; ordered by `@id` (ordinal). `TransparencySoftwareCertificates` gives the certificates of all of them by their identifications, unique within the network. |
 
@@ -85,7 +83,8 @@ with the default view options ([SPECIFICATION.md](../SPECIFICATION.md#2-the-cont
 - `Parties` — the RNO (`OperatorParty`, `POIPartyId("RoamingNetworkOperator", id)`) and every operator and provider, with their keys; `TryGetParty`.
 - `Revision` — a local counter, one more per applied change set; not content.
 - Lookups: `TryGetChargingStationOperatorById`, `TryGetEMobilityProviderById`, `TryGetGridOperatorById`,
-  `TryGetParkingOperatorById`, `TryGetChargingStationManufacturerById`, `TryGetEnergyMeterManufacturerById`,
+  `TryGetParkingOperatorById`, `TryGetChargingStationManufacturerById`, `TryGetEnergyMeterManufacturerById` (and
+  `TryGetModel` of a manufacturer),
   `TryGetTransparencySoftwareManufacturerById`, `TryGetTransparencySoftwareById`, `TransparencySoftwareManufacturerOf`,
   `TryGetConformityAssessmentBodyById`, `TryGetTransparencySoftwareCertificateById`, `ConformityAssessmentBodyOf`, ….
 
@@ -134,10 +133,11 @@ adds its children itself, e.g. with `RoamingNetworkChange.AddChildren(chargingSt
 
 ## chargingStationManufacturers
 
-The [ChargingStationManufacturer](ChargingStationManufacturer.md)s, named by the `manufacturerId` of charging
-stations and the `chargingStationManufacturerId` of certificates, under `chargingStationManufacturers`, ordered by
-`@id` (ordinal). Owned by the RNO: `RoamingNetworkChange.Add(manufacturer)`, `Remove(manufacturerId)`,
-`UpdateProperty(manufacturer, …)`.
+The [ChargingStationManufacturer](ChargingStationManufacturer.md)s, parties with their models, named by the
+`manufacturerId` and `modelId` of charging stations and their templates and the `chargingStationManufacturerId` and
+`chargingStationModel` of certificates, under `chargingStationManufacturers`, ordered by `@id` (ordinal). Added and
+removed by the RNO: `RoamingNetworkChange.Add(manufacturer)` (with its keys, without its models), `Remove(manufacturerId)`;
+its models it adds itself: `Add(model, manufacturerId)`. One or a model still named can not be removed.
 
 
 ## eMobilityProviders
@@ -163,11 +163,12 @@ products, under `parkingOperators`, ordered by `@id` (ordinal). Added and remove
 
 ## energyMeterManufacturers
 
-The [EnergyMeterManufacturer](EnergyMeterManufacturer.md)s, named by the `manufacturerId` of energy meters and their
-templates, under `energyMeterManufacturers`, ordered by `@id` (ordinal), with a runtime status as the charging
-station manufacturers. Owned by the RNO: `RoamingNetworkChange.Add(energyMeterManufacturer)`,
-`Remove(energyMeterManufacturerId)`, `UpdateProperty(energyMeterManufacturer, …)`. One still named can not be
-removed.
+The [EnergyMeterManufacturer](EnergyMeterManufacturer.md)s, parties with their models, named by the `manufacturerId` and
+`modelId` of energy meters and their templates, under `energyMeterManufacturers`, ordered by `@id` (ordinal), with a
+runtime status as the charging station manufacturers. Added and removed by the RNO:
+`RoamingNetworkChange.Add(energyMeterManufacturer)` (with its keys, without its models),
+`Remove(energyMeterManufacturerId)`; its models it adds itself: `Add(model, manufacturerId)`. One or a model still
+named can not be removed.
 
 
 ## transparencySoftwareManufacturers
@@ -201,33 +202,31 @@ A change set must be signed by the owner of each of its changes ([../README.md](
 | `UpdateProperty`/`RemoveProperty` of the RNO's own properties | signing key |
 | `UpdateProperty` of the RNO's `signingKeys` | signing key or identity key |
 | `UpdateProperty` of the RNO's `identityKeys` | identity key |
-| `Add`/`Remove` of a charging station operator, e-mobility provider, grid operator or parking operator | signing key |
+| `Add`/`Remove` of a charging station operator, e-mobility provider, grid operator, parking operator, charging station manufacturer or energy meter manufacturer | signing key |
 | `UpdateProperty` of the `signingKeys`/`identityKeys` of such a party (recovery; the party's own keys also count, see its file) | identity key |
-| every change of charging station manufacturers and energy meter manufacturers | signing key |
 | `Add`/`Remove` of a transparency software manufacturer or a conformity assessment body, its releases or certificates with it | signing key |
 | every change of a conformity assessment body without keys and of its certificates, in its place | signing key |
 
 - A party is added with at least one `signingKeys` and one `identityKeys` entry, and without embedded children
   (`chargingPools`, `chargingTariffs`, the four group arrays; `parkingGarages`, `parkingSpaces`, `parkingSensors`,
-  `parkingSpaceGroups`, `parkingProducts`): they are its own to add. Its other properties it changes itself. Each
+  `parkingSpaceGroups`, `parkingProducts`; `chargingStationModels`, `energyMeterModels`): they are its own to add. Its other properties it changes itself. Each
   identity key it is added with signs the change set as well, as does every new identity key of a party later: the
   proof that the party holds it (SPECIFICATION.md, section 4.1).
 - Removing a party removes it with everything it embeds, unless something remaining still names part of it. This
   is intended: the RNO decides who is a member of the roaming network, also without the party's consent, e.g. when
   its contract ended; its data goes with it. The history keeps the versions before.
-- A change of the network itself names `entityType` `RoamingNetwork` and its `@id`, without a parent; a registry
-  entry or party may name the network as its parent, no other one.
+- A change of the network itself names `entityType` `RoamingNetwork` and its `@id`, without a parent; a party may
+  name the network as its parent, no other one.
 - `Add` sets `created` (unless given) and `lastChange` to the change set's `createdAt` for entities with timestamps;
   every change sets the network's `lastChange` to it.
 
 ```csharp
 var cs = rn1.CreateChangeSet([
              RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "v2"),
-             RoamingNetworkChange.Add           (new EnergyMeterManufacturer(EnergyMeterManufacturer_Id.Parse("EMH"),
-                                                                             new ImmutableI18NString(I18NString.Create(Languages.en, "EMH metering")))),
              RoamingNetworkChange.Add           (newOperator)                       // with its keys, without children
          ]).
-         Sign(rnoSigningKey, POIPublicKey.From(rnoSigningKey).Id, COSEAlgorithm.ES256);  // a signing key of rn1.Operator
+         Sign(rnoSigningKey,     POIPublicKey.From(rnoSigningKey).    Id, COSEAlgorithm.ES256).   // a signing key of rn1.Operator
+         Sign(newOperatorIdentity, POIPublicKey.From(newOperatorIdentity).Id, COSEAlgorithm.ES512);  // the proof that it holds it
 ```
 
 
@@ -235,7 +234,8 @@ var cs = rn1.CreateChangeSet([
 
 Admin status and status are kept in the status schedules shared by all versions, see
 [README.md](README.md#runtime-status); in a history as `entityType` `RoamingNetwork`. No energy status.
-Transparency software releases and certificates have no runtime status; their manufacturers and bodies have, see their files.
+Charging station and energy meter models, transparency software releases and certificates have no runtime status;
+their manufacturers and bodies have, see their files.
 
 | | Type | Predefined values | Initially |
 |---|---|---|---|

@@ -9,7 +9,7 @@ both witnesses, and a proof of a commit becomes evidence of a history the witnes
 
 | Revision | Signed by | |
 |---|---|---|
-| 0 to 9 | see [example A1](exampleA1.md) to [example A5](exampleA5.md) | no new commit |
+| 0 to 10 | see [example A1](exampleA1.md) to [example A5](exampleA5.md) | no new commit |
 | checkpoints 0, 1, 2 | `OCC`, its three holders, and now **both witnesses** | the same checkpoints, the same `@id`s |
 
 Why witnesses (SPECIFICATION.md, section 10.2): a checkpoint signed by the roaming network operator alone proves what
@@ -97,11 +97,11 @@ foreach (var checkpoint in history.Checkpoints)
 ```
 
 ```
-calibration.example: the genesis and 9 commits checked, 3 checkpoints taken
+calibration.example: the genesis and 10 commits checked, 3 checkpoints taken
 calibration.example signs checkpoint 0
 calibration.example signs checkpoint 1
 calibration.example signs checkpoint 2
-association.example: the genesis and 9 commits checked, 3 checkpoints taken
+association.example: the genesis and 10 commits checked, 3 checkpoints taken
 association.example signs checkpoint 0
 association.example signs checkpoint 1
 association.example signs checkpoint 2
@@ -194,25 +194,25 @@ c) Joining from the latest checkpoint, requiring both roles, `roamingNetworkOper
 must be valid, by the verifier given, and of the roles required.
 
 ```
-Checkpoint 0 of epoch 1: revision 6, 7 commit(s) since the genesis, signed by AlphaOrg, BetaOrg, GammaOrg
+Checkpoint 0 of epoch 1: revision 7, 8 commit(s) since the genesis, signed by AlphaOrg, BetaOrg, GammaOrg
   witnessed by calibration.example, association.example
-Checkpoint 1 of epoch 1: revision 8, 2 commit(s) since checkpoint 62b7ced1…, signed by AlphaOrg, BetaOrg, GammaOrg
+Checkpoint 1 of epoch 1: revision 9, 2 commit(s) since checkpoint 62b7ced1…, signed by AlphaOrg, BetaOrg, GammaOrg
   witnessed by calibration.example, association.example
-Checkpoint 2 of epoch 1: revision 9, 1 commit(s) since checkpoint 5346668e…, signed by AlphaOrg, BetaOrg, GammaOrg
+Checkpoint 2 of epoch 1: revision 10, 1 commit(s) since checkpoint 5346668e…, signed by AlphaOrg, BetaOrg, GammaOrg
   witnessed by calibration.example, association.example
 
-Joined from checkpoint 2, signed by the roaming network operator and its witnesses: revision 9
+Joined from checkpoint 2, signed by the roaming network operator and its witnesses: revision 10
 ```
 
 
 ## 7. Evidence
 
-The proof of revision 7 of [example A5](exampleA5.md), the pool "Jena Lobeda" with its AC station as example A4 recorded
+The proof of revision 8 of [example A5](exampleA5.md), the pool "Jena Lobeda" with its AC station as example A4 recorded
 it, in checkpoint 1. Kept, e.g. by an e-mobility provider disputing an invoice of a session there, it shows without
 asking the server of `QA` that this commit is part of the history both witnesses saw:
 
 ```
-The proof of revision 7 in checkpoint 1, witnessed by calibration.example, association.example: valid
+The proof of revision 8 in checkpoint 1, witnessed by calibration.example, association.example: valid
 ```
 
 

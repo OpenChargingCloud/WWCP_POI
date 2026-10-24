@@ -31,6 +31,7 @@ Inspired by Git and Merkle-tree-based distributed systems, WWCP/POI introduces a
 flowchart TD
     RoamingNetwork --> ChargingStationOperator
     RoamingNetwork --> ChargingStationManufacturer
+    ChargingStationManufacturer --> ChargingStationModel
     RoamingNetwork --> EMobilityProvider
     RoamingNetwork --> GridOperator
     RoamingNetwork --> ParkingOperator
@@ -39,6 +40,7 @@ flowchart TD
     RoamingNetwork --> ConformityAssessmentBody
     ConformityAssessmentBody --> TransparencySoftwareCertificate
     RoamingNetwork --> EnergyMeterManufacturer
+    EnergyMeterManufacturer --> EnergyMeterModel
     ParkingOperator --> ParkingGarage
     ParkingOperator --> ParkingSpace
     ParkingOperator --> ParkingSensor
@@ -66,7 +68,7 @@ flowchart TD
     GridConnectionPoint --> EnergyMeter
     ChargingStation --> EnergyMeter
     EVSE --> EnergyMeter
-    ChargingStation -. manufacturerId .-> ChargingStationManufacturer
+    ChargingStation -. manufacturerId, modelId .-> ChargingStationModel
     ChargingPool -. gridConnectionPointId .-> GridConnectionPoint
     GridConnectionPoint -. maintainedBy .-> ChargingStationOperator
     ParkingSpace -. parkingGarageId .-> ParkingGarage
@@ -77,7 +79,8 @@ flowchart TD
     EVSE -. chargingTariffIds .-> ChargingTariff
     EVSE -. templateIds .-> Templates
     ChargingTariffOffer -. groupIds .-> Groups
-    EnergyMeter -. manufacturerId .-> EnergyMeterManufacturer
+    EnergyMeter -. manufacturerId, modelId .-> EnergyMeterModel
+    TransparencySoftwareCertificate -. manufacturer, model, version .-> ChargingStationModel
     EnergyMeter -. transparencySoftwareStatus .-> TransparencySoftware
     TransparencySoftwareCertificate -. verified/compatible .-> TransparencySoftware
     RoamingNetwork -. dataLicenses .-> DataLicense
@@ -85,8 +88,8 @@ flowchart TD
     ChargingPool -. dataLicenses .-> DataLicense
 ```
 
-Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `eMobilityProviders`,
-`gridOperators`, `parkingOperators`, `energyMeterManufacturers`, `transparencySoftwareManufacturers`, `transparencySoftware`, `conformityAssessmentBodies`, `transparencySoftwareCertificates`, `chargingTariffs`,
+Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `chargingStationModels`, `eMobilityProviders`,
+`gridOperators`, `parkingOperators`, `energyMeterManufacturers`, `energyMeterModels`, `transparencySoftwareManufacturers`, `transparencySoftware`, `conformityAssessmentBodies`, `transparencySoftwareCertificates`, `chargingTariffs`,
 `EVSETemplates`, `chargingStationTemplates`, `chargingPoolTemplates`, `chargingTariffTemplates`, `energyMeterTemplates`,
 `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `energyMeterGroups`, `chargingTariffOffers`,
 `chargingPools`, `chargingStations`, `EVSEs`, `chargingConnectors`, `energyMeters`, `gridConnectionPoints`, `parkingGarages`,
@@ -113,7 +116,7 @@ parking product ids compare case-sensitively.
   `PAS 1899:2022`), sets of names, and `assistanceServiceDetails`. The NUTS regions it is in: `nutsCodes`, e.g. `DEG`.
 - **Charging station:** `address` and `geoLocation` when they differ from its pool's, `accessibility`, `vehicleTypes`,
   `euVehicleCategories` (e.g. `M1`) and `features` (sets of names), `calibrationInfo`/`certificationInfo` (URLs), `maxPower` (W) it delivers at once, at most that of its EVSEs together,
-  `manufacturerId`/`modelId`, and the `parkingSpaceIds` of the network it charges at.
+  `manufacturerId`/`modelId`, a model of its manufacturer, and the `parkingSpaceIds` of the network it charges at.
 - **EVSE:** `currentTypes`, `chargingModes` (arrays of names), `maxVoltage` (V), `maxCurrent` (A),
   `maxPower` (W), `geoLocation` when it differs from its station's, `maxReservationDuration` (s),
   `physicalReference` and `chargingConnectors` (`{@id, type, lockable?, format?, cableLength?, cableWeight?,
@@ -132,8 +135,14 @@ parking product ids compare case-sensitively.
   measurements, `signatureMethods` (predefined the formats Chargy verifies, e.g. `OCMF`, `EDL40`), and the
   `publicKeys` it signs them with: `{@id, key, certificateChain?}`, the DER encoded SubjectPublicKeyInfo as Base64,
   identified by its SHA-256, of any curve, e.g. secp192r1 as well, with the certificates of the key.
-  Its manufacturer is an energy meter manufacturer of the network (`name`, `description`, `address`,
-  `homepage`, `hotline`, timestamps, without status).
+  Its manufacturer is an energy meter manufacturer of the network, its `modelId` one of its models.
+- **Manufacturers and models:** charging station and energy meter manufacturers are parties, as the operators are:
+  added and removed by the RNO with their keys, they state their models themselves, with a key that may sign
+  `models`. A model (`ChargingStationModel`, `EnergyMeterModel`) is unique within its manufacturer only, so every change
+  of it names its manufacturer as its parent; it names its `versions`, a product page and datasheet, images and its
+  ratings: of a charging station model `maxPower`, `currentTypes`, `connectorTypes` and `numberOfEVSEs`, of an energy
+  meter model `currentTypes`, `maxCurrent`, `accuracyClass`, `measurands` and `signatureMethods`. A station, a meter or
+  a template names a model only with its manufacturer, and only one of it.
 - **Parking:** a parking operator owns its garages, spaces and sensors directly. A space may name a
   `parkingGarageId` and `parkingSensorIds` of the same operator, and who (`parkingRestrictions`, e.g. `DISABLED`) and which
   vehicles (`euVehicleCategories`) may park there; garages, spaces and sensors may name
@@ -201,7 +210,7 @@ parking product ids compare case-sensitively.
   key that may sign `certificates`, or the RNO in its place while it has no keys; it names its `notifiedBodyNumber` and
   the legislations it is `notifiedFor`, e.g. `MID` or `CRA`, and a certificate's `legislation` must be one of them).
   Releases and certificates have no status and timestamps. A certificate names the releases it
-  verifies or finds compatible, and optionally a manufacturer. An energy meter's `transparencySoftwareStatus`
+  verifies or finds compatible, and the charging station manufacturer, model and version of the model it is for. An energy meter's `transparencySoftwareStatus`
   assigns releases with their `legalStatus`, at most one entry per release; a given `certificateId` must cover it.
 - **ETags:** SHA-256, SHA-384 or SHA-512 over canonical JSON or canonical CBOR.
   They identify a version; `CalcETags()` and `ValidateETags(…)`. Every other entity has the ETags of its content as
@@ -255,7 +264,7 @@ a change set can manage:
 | [EnergyMeter](docs/EnergyMeter.md) | A meter of a pool, grid connection point, station or EVSE, with its transparency software. |
 | [EnergyMeterTemplate](docs/EnergyMeterTemplate.md) | What a series of energy meters naming it shares, e.g. manufacturer, model and firmware. |
 | [EnergyMeterGroup](docs/EnergyMeterGroup.md) | Energy meters of one charging station operator or grid operator; a collection. |
-| [ChargingStationManufacturer](docs/ChargingStationManufacturer.md) | A maker of charging stations, named by the stations it built. |
+| [ChargingStationManufacturer](docs/ChargingStationManufacturer.md) | A maker of charging stations, a party with its models, which stations and certificates name. |
 | [EMobilityProvider](docs/EMobilityProvider.md) | An e-mobility service provider with its keys, groups and offers. |
 | [GridOperator](docs/GridOperator.md) | A distribution system operator with its grid connection points, each signed by its maintainer. |
 | [ParkingOperator](docs/ParkingOperator.md) | Runs parking garages, spaces and sensors and offers parking products. |
@@ -307,7 +316,8 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
 ```
 
 - **Changes:** `UpdateProperty`/`RemoveProperty` of every entity's own properties, not of its children;
-  `Add`/`Remove` of operators, manufacturers, energy meter manufacturers, e-mobility providers, grid operators, parking operators,
+  `Add`/`Remove` of operators, charging station and energy meter manufacturers and their models (`Add(model, manufacturerId)`),
+  e-mobility providers, grid operators, parking operators,
   transparency software manufacturers and their releases (`Add(release, manufacturerId)`), conformity assessment bodies and
   their certificates (`Add(certificate, bodyId)`), pools, tariffs, templates, groups, offers, stations
   (`Add(station, poolId)`), EVSEs (`Add(evse, stationId)`), parking garages, spaces, sensors, space templates and space groups
@@ -343,9 +353,9 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
 - **Owners:** every change set must be signed by the owner of every change it makes, with a key the owner has
   in the version it is applied to, valid at its `createdAt` (`TryCheckOwnership`); every signature must be one of
   a key of a party. Nobody else's signature counts, there is no external trust configuration.
-  - The **RNO** owns itself, the roaming network itself, manufacturers and energy meter manufacturers, and adds and
-    removes parties, also transparency software manufacturers, which own their releases, and conformity assessment
-    bodies, which own their certificates: with their keys (a grid operator or a conformity assessment body not taking part
+  - The **RNO** owns itself and the roaming network itself, and adds and removes parties, also charging station and
+    energy meter manufacturers, which own their models, transparency software manufacturers, which own their
+    releases, and conformity assessment bodies, which own their certificates: with their keys (a grid operator or a conformity assessment body not taking part
     without, then the RNO signs in its place until it gives it keys), each of their identity keys signing the change
     set as well, as the proof that the party holds it and asks to be added, without their children:
     `RoamingNetworkChange.Add(party)` leaves them out, `AddChildren(party)` gives the changes the party then
@@ -505,8 +515,8 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   of its operator are kept with everything they have, also their listeners of the runtime status.
 - **Proofs:** the roaming network pruned, every child array complete, pruned to its root, or partial with the leaves
   it gives and their audit paths. A charging station proof gives the station with its EVSEs completely, the
-  skeletons of its pool and operator, the charging tariffs its EVSEs take, the manufacturers, transparency software
-  and certificates it and its energy meters name, its parking spaces and the grid connection point of its pool, and
+  skeletons of its pool and operator, the charging tariffs its EVSEs take, the manufacturers with the models,
+  transparency software and certificates it and its energy meters name, its parking spaces and the grid connection point of its pool, and
   embeds `commitId` and `revision`, so that the proof of the commit in a checkpoint keeps it evidence for months.
 - **Attestations:** `{roamingNetworkId, commitId, revision, eTag, role, signer, signedAt, validUntil}`, signed
   (context `…/roamingNetwork/attestation/v1`). The `AttestationSigners` attest every new head, valid for
@@ -692,7 +702,8 @@ JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json
 | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/PSs[/{PS_Id}]` | the parking spaces a charging station names, or one of them: of parking operators or of its charging station operator, each as its operator embeds it |
 | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}[/CPs/{CP_Id}[/CSs/{CS_Id}[/EVSEs/{EVSE_Id}]]]/Brands[/{Brand_Id}]` | the brands of an operator, pool, station or EVSE, its own, or one of them |
 | `GET ~/RNs/{RN_Id}/GOs/{GO_Id}[/GCPs/{GCP_Id}]` | a grid operator, or one of its grid connection points |
-| `GET ~/RNs/{RN_Id}/{EMPs\|CSMs\|EMMs\|POs}/{Id}` | an e-mobility provider, charging station manufacturer, energy meter manufacturer or parking operator |
+| `GET ~/RNs/{RN_Id}/{EMPs\|CSMs\|EMMs\|POs}/{Id}` | an e-mobility provider, charging station manufacturer, energy meter manufacturer or parking operator; a manufacturer with `?without=chargingStationModels` or `energyMeterModels` without its models |
+| `GET ~/RNs/{RN_Id}/{CSMs\|EMMs}/{Id}/models[/{Model_Id}]` | the models of a charging station or energy meter manufacturer, or one of them |
 | `GET ~/RNs/{RN_Id}/{CPs\|CSs\|EVSEs}/{Id}` | `307 Temporary Redirect` to where a charging pool, station or EVSE is, below its operator, the query kept |
 | `GET ~/RNs/{RN_Id}/CTOs/{CTO_Id}` | `307 Temporary Redirect` to a charging tariff offer below its owner, a charging station operator or an e-mobility provider |
 

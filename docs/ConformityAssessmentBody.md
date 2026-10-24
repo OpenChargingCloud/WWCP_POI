@@ -83,11 +83,11 @@ of earlier versions.
 |---|---|---|---|
 | `@id` | string | — | `TransparencySoftwareCertificate_Id`: any text, compared case-insensitively, surrounding whitespace trimmed; unique within the roaming network. |
 | `legislation` | string | update/remove | The legislation it is issued under, e.g. `MID`: one its body is `notifiedFor`. |
-| `chargingStationModel` | string | update | Mandatory: a `ChargingStationModel_Id`, as charging stations name their model by `modelId`, compared case-insensitively. |
-| `chargingStationModelVersion` | string | update | Mandatory. |
+| `chargingStationManufacturerId` | string | update | Mandatory: a [ChargingStationManufacturer](ChargingStationManufacturer.md) of the network, the manufacturer of the model. |
+| `chargingStationModel` | string | update | Mandatory: a `ChargingStationModel_Id`, one of the [models](ChargingStationManufacturer.md#chargingstationmodels) of the manufacturer, as charging stations name their model by `modelId`, compared case-insensitively. |
+| `chargingStationModelVersion` | string | update | Mandatory: one of the `versions` of the model, compared ordinally. |
 | `verifiedTransparencySoftwareIds` | string[] | update/remove | Releases officially checked with this model/version; always written, ordered (ordinal). |
 | `compatibleTransparencySoftwareIds` | string[] | update/remove | Further compatible releases, without a claim of verification; always written, ordered (ordinal). |
-| `chargingStationManufacturerId` | string | update/remove | Optional; a [ChargingStationManufacturer](ChargingStationManufacturer.md) of the network. |
 | `documentNumber` | string | update/remove | The body's number of the document, if it differs from `@id`. |
 | `documentURL` | URL | update/remove | Absolute; where the body publishes the document. |
 | `notBefore` | timestamp | update/remove | Start of validity, in UTC to the millisecond like every timestamp of the content, e.g. `2026-01-01T00:00:00.000Z`. |
@@ -157,6 +157,7 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Conformi
     {
       "@id": "PTB-2026-0042",
       "legislation": "MID",
+      "chargingStationManufacturerId": "ACME",
       "chargingStationModel": "Wallbox 22",
       "chargingStationModelVersion": "2.1",
       "verifiedTransparencySoftwareIds":   [ "chargy-1.5.0" ],

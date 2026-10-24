@@ -186,13 +186,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// by a key the owner has in the version the change set is applied to, valid at its creation:
     /// a signing key for data and for the signing keys of a party, an identity key for its identity keys.
     /// <list type="bullet">
-    ///   <item>The roaming network operator (the RoamingNetworkOperator it embeds) owns itself, the roaming network itself,
-    ///         manufacturers and energy meter manufacturers, and adds and removes parties:
-    ///         it decides who is a member, so removing a party removes all its data with it, without its signature.</item>
-    ///   <item>A charging station operator, e-mobility provider, grid operator, parking operator, transparency software
-    ///         manufacturer or conformity assessment body owns its own properties, a charging station operator its brands,
-    ///         pools, stations, EVSEs, tariffs and groups, a parking operator its parking data, a transparency software
-    ///         manufacturer its releases, a conformity assessment body the certificates it issued.
+    ///   <item>The roaming network operator (the RoamingNetworkOperator it embeds) owns itself and the roaming network
+    ///         itself, and adds and removes parties: it decides who is a member, so removing a party removes all its data
+    ///         with it, without its signature.</item>
+    ///   <item>A charging station operator, e-mobility provider, grid operator, parking operator, charging station
+    ///         manufacturer, energy meter manufacturer, transparency software manufacturer or conformity assessment body
+    ///         owns its own properties, a charging station operator its brands, pools, stations, EVSEs, tariffs and groups,
+    ///         a parking operator its parking data, a charging station or energy meter manufacturer its models, a
+    ///         transparency software manufacturer its releases, a conformity assessment body the certificates it issued.
     ///         Brands are embedded in what they are a brand of, and so owned by its owner.</item>
     ///   <item>A grid connection point is owned by its maintainer: its grid operator, or the charging station operator or
     ///         parking operator its maintainedBy names. One of them adds it, with the maintainer it names, or its grid operator.
@@ -221,6 +222,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             nameof(EMobilityProvider),
             nameof(GridOperator),
             nameof(ParkingOperator),
+            nameof(ChargingStationManufacturer),
+            nameof(EnergyMeterManufacturer),
             nameof(TransparencySoftwareManufacturer),
             nameof(ConformityAssessmentBody)
         ];
@@ -256,6 +259,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  ParkingOperator.PropertyKeys.ParkingSpaceTemplates,
                                                  ParkingOperator.PropertyKeys.ParkingSpaceGroups,
                                                  ParkingOperator.PropertyKeys.ParkingProducts ] },
+            { nameof(ChargingStationManufacturer),
+                                               [ ChargingStationManufacturer.PropertyKeys.Models ] },
+            { nameof(EnergyMeterManufacturer), [ EnergyMeterManufacturer.PropertyKeys.Models ] },
             { nameof(TransparencySoftwareManufacturer),
                                                [ TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware ] },
             { nameof(ConformityAssessmentBody),
@@ -296,6 +302,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 nameof(ParkingOperator)          => ParkingOperator_Id.TryParse(PartyId.EntityId, out var parkingOperatorId) &&
                                                     parkingOperators.TryGet(parkingOperatorId, out var parkingOperator)
                                                         ? parkingOperator : null,
+
+                nameof(ChargingStationManufacturer)
+                                                 => ChargingStationManufacturer_Id.TryParse(PartyId.EntityId, out var chargingStationManufacturerId) &&
+                                                    chargingStationManufacturers.TryGet(chargingStationManufacturerId, out var chargingStationManufacturer)
+                                                        ? chargingStationManufacturer : null,
+
+                nameof(EnergyMeterManufacturer)  => EnergyMeterManufacturer_Id.TryParse(PartyId.EntityId, out var energyMeterManufacturerId) &&
+                                                    energyMeterManufacturers.TryGet(energyMeterManufacturerId, out var energyMeterManufacturer)
+                                                        ? energyMeterManufacturer : null,
 
                 nameof(TransparencySoftwareManufacturer)
                                                  => TransparencySoftwareManufacturer_Id.TryParse(PartyId.EntityId, out var softwareManufacturerId) &&
@@ -364,6 +379,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 foreach (var parkingOperator in parkingOperators)
                     yield return (new POIPartyId(nameof(ParkingOperator),         parkingOperator.        Id.ToString()), parkingOperator);
+
+                foreach (var chargingStationManufacturer in chargingStationManufacturers)
+                    yield return (new POIPartyId(nameof(ChargingStationManufacturer),      chargingStationManufacturer.Id.ToString()), chargingStationManufacturer);
+
+                foreach (var energyMeterManufacturer in energyMeterManufacturers)
+                    yield return (new POIPartyId(nameof(EnergyMeterManufacturer),          energyMeterManufacturer.    Id.ToString()), energyMeterManufacturer);
 
                 foreach (var softwareManufacturer in transparencySoftwareManufacturers)
                     yield return (new POIPartyId(nameof(TransparencySoftwareManufacturer), softwareManufacturer.Id.ToString()), softwareManufacturer);
@@ -739,23 +760,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The identity keys the given change enters anew (SPECIFICATION.md, section 4.1): those of a party it adds, or
         /// those of the new identity keys of a party, also of the roaming network operator, its party has not in this
-        /// version; and so of a charging station or energy meter manufacturer, which names keys as a party does, though no
-        /// party. Each
-        /// must sign the change set, as the proof that its party holds it: no party is added, and none gets an identity
-        /// key, by a key it does not hold.
+        /// version. Each must sign the change set, as the proof that its party holds it: no party is added, and none gets
+        /// an identity key, by a key it does not hold.
         /// </summary>
         private IEnumerable<(POIPartyId Party, POIPublicKey Key)> NewIdentityKeysOf(RoamingNetworkChange Change)
         {
 
-            var isManufacturer = Change.EntityType is nameof(ChargingStationManufacturer) or nameof(EnergyMeterManufacturer);
-
-            if (!PartyTypes.Contains(Change.EntityType) && Change.EntityType != nameof(RoamingNetworkOperator) && !isManufacturer)
+            if (!PartyTypes.Contains(Change.EntityType) && Change.EntityType != nameof(RoamingNetworkOperator))
                 return [];
 
             var partyId = PartyIdOf(new POIPartyId(Change.EntityType, Change.EntityId));
 
             // Keys it can not read are refused when it is applied.
-            if (Change.Kind == RoamingNetworkChangeKind.Add && (PartyTypes.Contains(Change.EntityType) || isManufacturer))
+            if (Change.Kind == RoamingNetworkChangeKind.Add && PartyTypes.Contains(Change.EntityType))
                 return Change.NewValue is JObject party &&
                        POIPartyKeys.TryParse(party, out _, out var identityKeys, out _)
                            ? identityKeys.Select(identityKey => (partyId, identityKey))
@@ -767,19 +784,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 POIPartyKeys.TryParse(new JObject(new JProperty(POIPartyKeys.IdentityKeysProperty, newIdentityKeys)), out _, out var keys, out _))
             {
 
-                var currentKeys = Change.EntityType == nameof(ChargingStationManufacturer)
-                                      ? ChargingStationManufacturer_Id.TryParse(Change.EntityId, out var manufacturerId) &&
-                                        TryGetChargingStationManufacturerById(manufacturerId, out var manufacturer)
-                                            ? manufacturer.IdentityKeys
-                                            : []
-                                  : Change.EntityType == nameof(EnergyMeterManufacturer)
-                                      ? EnergyMeterManufacturer_Id.TryParse(Change.EntityId, out var meterManufacturerId) &&
-                                        TryGetEnergyMeterManufacturerById(meterManufacturerId, out var meterManufacturer)
-                                            ? meterManufacturer.IdentityKeys
-                                            : []
-                                      : TryGetParty(partyId, out var knownParty)
-                                            ? knownParty.IdentityKeys
-                                            : [];
+                var currentKeys = TryGetParty(partyId, out var knownParty)
+                                      ? knownParty.IdentityKeys
+                                      : [];
 
                 var current     = currentKeys.Select(identityKey => identityKey.Id).ToHashSet(StringComparer.Ordinal);
 
@@ -974,13 +981,52 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region Registries of the roaming network operator
+            #region The charging station models of a charging station manufacturer: named with their manufacturer
 
-            if (Change.EntityType is nameof(ChargingStationManufacturer)
-                                  or nameof(EnergyMeterManufacturer))
+            if (Change.EntityType == nameof(ChargingStationModel))
             {
-                Owners = [ (roamingNetworkOperator, POIKeyKind.Signing) ];
+
+                if (!ChargingStationModel_Id.TryParse(Change.EntityId, out _))
+                {
+                    ErrorResponse = $"invalid {Change.EntityType} identification '{Change.EntityId}'!";
+                    return false;
+                }
+
+                // Its identification is unique within its manufacturer only: every change names it.
+                if (Change.ParentEntityType != nameof(ChargingStationManufacturer) || Change.ParentEntityId is null)
+                {
+                    ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' needs its ChargingStationManufacturer as its parent!";
+                    return false;
+                }
+
+                Owners = [ SignerOf(PartyIdOf(new POIPartyId(Change.ParentEntityType, Change.ParentEntityId))) ];
                 return true;
+
+            }
+
+            #endregion
+
+            #region The energy meter models of an energy meter manufacturer: named with their manufacturer
+
+            if (Change.EntityType == nameof(EnergyMeterModel))
+            {
+
+                if (!EnergyMeterModel_Id.TryParse(Change.EntityId, out _))
+                {
+                    ErrorResponse = $"invalid {Change.EntityType} identification '{Change.EntityId}'!";
+                    return false;
+                }
+
+                // Its identification is unique within its manufacturer only: every change names it.
+                if (Change.ParentEntityType != nameof(EnergyMeterManufacturer) || Change.ParentEntityId is null)
+                {
+                    ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' needs its EnergyMeterManufacturer as its parent!";
+                    return false;
+                }
+
+                Owners = [ SignerOf(PartyIdOf(new POIPartyId(Change.ParentEntityType, Change.ParentEntityId))) ];
+                return true;
+
             }
 
             #endregion

@@ -113,7 +113,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The properties of a charging station or energy meter manufacturer: those of an entity of a registry, its contact
-        /// data and data licenses, as of a charging station operator, and its keys.
+        /// data and data licenses, as of a charging station operator, and its keys. Its models are changed on their own.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableManufacturerProperties = ChangeableRegistryProperties.Union([
             ChargingStationManufacturer.BasePropertyKeys.DataLicenses,

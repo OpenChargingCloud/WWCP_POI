@@ -9,10 +9,10 @@ it proved.
 
 | Revision | Signed by | |
 |---|---|---|
-| 0 to 13 | see [example A1](exampleA1.md) to [example A10](exampleA10.md) | epoch 1, SHA-256, every signature algorithm |
-| 14 | the quorum of `OCC`: the old identity and signing keys of `AlphaOrg` and `BetaOrg`, and their new identity keys as proofs | ML-DSA identity and signing keys next to the old ones |
-| 15 | `DE*GEF`: an old identity key, and its new ones as proofs | ML-DSA keys in place of its old ones |
-| checkpoint 6, final | `OCC` with the old and the new keys, both witnesses with their old keys | of revision 15, naming epoch 2 |
+| 0 to 14 | see [example A1](exampleA1.md) to [example A10](exampleA10.md) | epoch 1, SHA-256, every signature algorithm |
+| 15 | the quorum of `OCC`: the old identity and signing keys of `AlphaOrg` and `BetaOrg`, and their new identity keys as proofs | ML-DSA identity and signing keys next to the old ones |
+| 16 | `DE*GEF`: an old identity key, and its new ones as proofs | ML-DSA keys in place of its old ones |
+| checkpoint 6, final | `OCC` with the old and the new keys, both witnesses with their old keys | of revision 16, naming epoch 2 |
 | genesis of epoch 2, revision 0 | `OCC`, its ML-DSA keys | the version of checkpoint 6, nothing applied |
 | 1 | the quorum of `OCC`: the ML-DSA identity and signing keys of `AlphaOrg` and `BetaOrg` | the old keys out |
 | 2 | `DE*GEF`, its ML-DSA `tariffs` key | the DC charging tariff lowered to 0.69 €/kWh |
@@ -43,7 +43,7 @@ usage. The witnesses make ML-DSA-65 keys, trusted by configuration as their firs
 
 ## 2. OCC states its new keys, next to the old ones
 
-Revision 14 changes three properties of `OCC`: its identity keys, the old and the new ones; its key statement, naming all
+Revision 15 changes three properties of `OCC`: its identity keys, the old and the new ones; its key statement, naming all
 five; and its certificates, of the old and the new signing keys. The key statement is signed by the **old** identity keys
 of `AlphaOrg` and `BetaOrg`: a verifier trusting the old trust anchor trusts the new keys as well (section 8.6,
 *Succession*).
@@ -73,13 +73,13 @@ A1.History.CheckpointSigners   = [ .. A1.Signers, .. signers ];
 
 ## 3. DE*GEF replaces its keys
 
-Its keys are its own: revision 15 replaces its identity keys and its signing keys, signed by one of its old identity keys
+Its keys are its own: revision 16 replaces its identity keys and its signing keys, signed by one of its old identity keys
 and by each new identity key as its proof. Epoch 1 accepts every algorithm, so its new keys sign at once; its old ones
 are not needed any more.
 
 ```
-Committed, revision 14 of epoch 1: OCC: ML-DSA keys next to the old ones
-Committed, revision 15 of epoch 1: DE*GEF: ML-DSA keys in place of its old ones
+Committed, revision 15 of epoch 1: OCC: ML-DSA keys next to the old ones
+Committed, revision 16 of epoch 1: DE*GEF: ML-DSA keys in place of its old ones
 ```
 
 
@@ -94,11 +94,11 @@ if (!A1.History.TryCloseEpoch(PostQuantum, out var final, out var error))
     Helpers.Fail(error);
 ```
 
-Epoch 1 takes no commit after it. The witnesses take revisions 14 and 15, each checked in the version before, and
+Epoch 1 takes no commit after it. The witnesses take revisions 15 and 16, each checked in the version before, and
 checkpoint 6, and sign it with their old keys, as every checkpoint of epoch 1.
 
 ```
-Checkpoint 6, final, of revision 15: 2 commit(s), names epoch 2, sha512, ML-DSA-65, ML-DSA-87
+Checkpoint 6, final, of revision 16: 2 commit(s), names epoch 2, sha512, ML-DSA-65, ML-DSA-87
 Epoch 1: Closing; a commit now: The epoch 1 of the roaming network 'QA' is closed by its final checkpoint 'ad9ede39f9de6951c5126ecc3fb20944877a0fc958e9c265af9fe51b4456d666': what follows belongs to the epoch 2!
 Checkpoint 6, ad9ede39…: 2 signatures more, 8 in all
 ```
@@ -124,7 +124,7 @@ Epoch 2, genesis 128 hexadecimal digits: 8cc0eff56abca778da1eef00f94ae525b5621b7
   revision 0, the ETags of checkpoint 6: the same; epoch 1: Closed
   calibration.example: genesis 8cc0eff5…, the same
   association.example: genesis 8cc0eff5…, the same
-Epoch 1, revision 12: proved in checkpoint 4, as the driver keeps it
+Epoch 1, revision 13: proved in checkpoint 4, as the driver keeps it
 ```
 
 
@@ -192,8 +192,8 @@ signatures, is 27 KiB as JSON; checkpoint 6, of 8 signatures, 17 KiB.
 `ExampleA11.Validate()` checks the move from what is published only. The first verifier trusts what it trusted in epoch
 1: the trust anchor `QA-trustAnchor.txt` it scanned once, and the old keys of the witnesses, `trusted/witnesses.json`.
 
-a) It holds `QA` as of checkpoint 5, joined from its snapshot. b) It takes revisions 14 and 15, each checked in the
-version before: revision 14 by the old quorum, so it trusts the new keys of `OCC` as well; and the final checkpoint 6.
+a) It holds `QA` as of checkpoint 5, joined from its snapshot. b) It takes revisions 15 and 16, each checked in the
+version before: revision 15 by the old quorum, so it trusts the new keys of `OCC` as well; and the final checkpoint 6.
 c) It starts epoch 2 itself and gets the genesis the server published. d) It takes the commits of epoch 2 and checkpoint
 0, checking the signatures it can, of `OCC` and of the witnesses it trusts; those of the new witness keys are no business
 of this verifier. With the old keys alone, checkpoint 0 is signed by the quorum of `OCC` and by both witnesses: the
@@ -202,7 +202,7 @@ the new trust anchor names the identity keys and the quorum of the key statement
 one from now on.
 
 ```
-Old trust: revision 15, checkpoint 6, final, witnessed by calibration.example, association.example; next: epoch 2, sha512, ML-DSA-65, ML-DSA-87
+Old trust: revision 16, checkpoint 6, final, witnessed by calibration.example, association.example; next: epoch 2, sha512, ML-DSA-65, ML-DSA-87
 Old trust: epoch 2 started, genesis 8cc0eff5…, the published one
 Old trust: checkpoint 0 of epoch 2, after checkpoint 6 of epoch 1: the final one it took; with the old keys signed by AlphaOrg, BetaOrg, GammaOrg, witnessed by calibration.example, association.example
 The head with the old trust anchor alone: The key statement is signed by trusted identity keys of 0 holders, not of 2!
@@ -222,7 +222,7 @@ New trust: joined epoch 2 from checkpoint 0, revision 2, 128 hexadecimal digits,
 DE*GEF*E1*1, sequence 3, 0.59 €/kWh, ML-DSA-65, after checkpoint 6 of epoch 1: the final one
 A commit of epoch 1: Commit 0: The commit 'd9debbc19995ca411f1c480d0aeb53a0b4c3b9b2ca5752bee1256968ad639a5a' is one of the epoch 1, but this history is of the epoch 2!
 A genesis of another version: Invalid roaming network of the snapshot: The ETags of the roaming network 'QA' do not match its content: The JSON ETag (SHA256) differs!
-The driver's evidence of example A10, revision 12 in checkpoint 4 of epoch 1: valid
+The driver's evidence of example A10, revision 13 in checkpoint 4 of epoch 1: valid
 ```
 
 

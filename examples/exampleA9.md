@@ -8,9 +8,9 @@ independent parties checked it.
 
 | Revision | Signed by | |
 |---|---|---|
-| 0 to 12 | see [example A1](exampleA1.md) to [example A8](exampleA8.md) | no new commit |
-| checkpoint 3 | `OCC`, and now both witnesses | of revision 11, naming no price statements |
-| checkpoint 4 | `OCC`, and now both witnesses, after they checked its 3 price statements | of revision 12 |
+| 0 to 13 | see [example A1](exampleA1.md) to [example A8](exampleA8.md) | no new commit |
+| checkpoint 3 | `OCC`, and now both witnesses | of revision 12, naming no price statements |
+| checkpoint 4 | `OCC`, and now both witnesses, after they checked its 3 price statements | of revision 13 |
 
 What a witness checks of the price statements a checkpoint names (SPECIFICATION.md, sections 10.2 and 12.3): their tree
 is the one of the checkpoint, and every one was signed before it by a signing key of its charging station operator in
@@ -33,9 +33,9 @@ output is what one run printed, `…` for elided digests.
 
 ## 1. What the roaming network operator publishes for them
 
-The witnesses hold the history up to revision 9, the commit of checkpoint 2. The roaming network operator publishes the
+The witnesses hold the history up to revision 10, the commit of checkpoint 2. The roaming network operator publishes the
 commits since, `published/QA-commits-since-checkpoint-2.json`, as `GET ~/RNs/QA/history/commits?since={commit}` gives
-them. Its history was compacted in [example A7](exampleA7.md), to revision 8: it gives commits since every commit it
+them. Its history was compacted in [example A7](exampleA7.md), to revision 9: it gives commits since every commit it
 holds. The checkpoints 3 and 4 and the price statements of checkpoint 4 are those example A8 published.
 
 ```csharp
@@ -75,12 +75,12 @@ if (!history.TryWitness(checkpoint4.Id, signer, out _, out var signature4, out e
 calibration.example, checkpoint 4 without its price statements: The price statements of the checkpoint '29f98e22…' are not checked here; a witness signs only checkpoints it checked!
 calibration.example, a price statement missing: The price statements are not those the checkpoint '29f98e22…' names!
 calibration.example, a price statement changed: The price statements are not those the checkpoint '29f98e22…' names!
-calibration.example: revision 12, signs checkpoint 3, and checkpoint 4 with its 3 price statements checked
+calibration.example: revision 13, signs checkpoint 3, and checkpoint 4 with its 3 price statements checked
 
 association.example, checkpoint 4 without its price statements: The price statements of the checkpoint '29f98e22…' are not checked here; a witness signs only checkpoints it checked!
 association.example, a price statement missing: The price statements are not those the checkpoint '29f98e22…' names!
 association.example, a price statement changed: The price statements are not those the checkpoint '29f98e22…' names!
-association.example: revision 12, signs checkpoint 3, and checkpoint 4 with its 3 price statements checked
+association.example: revision 13, signs checkpoint 3, and checkpoint 4 with its 3 price statements checked
 ```
 
 A witness could also get the statements along with the checkpoint, `TryAddCheckpoint(…, PriceStatements)`, as
@@ -106,13 +106,13 @@ published and the keys of the witnesses only. a) `QA` at its head. b) The checkp
 checkpoint. d) Joining from checkpoint 4 with its price statements, requiring both roles.
 
 ```
-Checkpoint 3 of epoch 1: revision 11, 2 commit(s) since checkpoint c0841d4d…, signed by AlphaOrg, BetaOrg, GammaOrg
+Checkpoint 3 of epoch 1: revision 12, 2 commit(s) since checkpoint c0841d4d…, signed by AlphaOrg, BetaOrg, GammaOrg
   witnessed by calibration.example, association.example
-Checkpoint 4 of epoch 1: revision 12, 1 commit(s) since checkpoint a068d94d…, signed by AlphaOrg, BetaOrg, GammaOrg
+Checkpoint 4 of epoch 1: revision 13, 1 commit(s) since checkpoint a068d94d…, signed by AlphaOrg, BetaOrg, GammaOrg
   witnessed by calibration.example, association.example, its 3 price statements checked
 
 The proof of DE*GEF*E1*1, sequence 0, 0.59 €/kWh, in checkpoint 4, witnessed by calibration.example, association.example: valid
-Joined from checkpoint 4, signed by the roaming network operator and its witnesses: revision 12, 3 price statements
+Joined from checkpoint 4, signed by the roaming network operator and its witnesses: revision 13, 3 price statements
 ```
 
 The statement was made after checkpoint 3, which it names, and before checkpoint 4, which names it, and both witnesses

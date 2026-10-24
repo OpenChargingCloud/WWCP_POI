@@ -55,9 +55,9 @@ A version of a roaming network is identified by its **content**: its JSON repres
 - **Included:** `@context`
   (`https://open.charging.cloud/contexts/wwcp/roamingNetwork/v1`), `@id`, `name`, `description`,
   `dataSource`, `dataLicenses`, its operator `operator`, every embedded entity completely (operators with their pools,
-  stations, EVSEs, connectors, energy meters, tariffs, templates, groups and offers; manufacturers;
-  e-mobility providers with their groups and offers; grid operators with their grid connection points,
-  energy meter templates and groups; parking operators; energy meter manufacturers; transparency
+  stations, EVSEs, connectors, energy meters, tariffs, templates, groups and offers; charging station manufacturers
+  with their models; e-mobility providers with their groups and offers; grid operators with their grid connection
+  points, energy meter templates and groups; parking operators; energy meter manufacturers with their models; transparency
   software manufacturers with their releases; conformity assessment bodies with their transparency software
   certificates), the brands of operators, pools,
   stations, EVSEs and RFID authentication modes, the `signingKeys` and `identityKeys` of its
@@ -225,18 +225,20 @@ and an identity key naming any:
 | `infrastructure` | charging pools, stations, EVSEs, their templates and groups, energy meter templates and groups, grid connection points, parking garages, spaces, sensors, products and their templates and groups |
 | `tariffs` | charging tariffs, their templates and groups, charging tariff offers |
 | `priceStatements` | price statements (section 12) |
+| `models` | the models of a charging station or energy meter manufacturer |
 | `software` | the transparency software releases of a transparency software manufacturer |
 | `certificates` | the transparency software certificates of a conformity assessment body |
-| `party` | everything else the party owns: its own properties, its `signingKeys` by a signing key; of the RNO also the roaming network, its registries, adding and removing parties, commits and attestations (8.5) |
+| `party` | everything else the party owns: its own properties, its `signingKeys` by a signing key; of the RNO also the roaming network, adding and removing parties, commits and attestations (8.5) |
 
 A change is signed by a signing key of its owner that may sign the usage of the entity it changes, whoever owns
 it.
 
 A reader MUST calculate the thumbprint and refuse a key whose `@id` differs, and a key with
-private parts. The roaming network operator (RNO), charging station operators,
-e-mobility providers, grid operators and parking operators each name 1..n `signingKeys`, e.g.
-secp256r1, and 1..n `identityKeys`, e.g. secp521r1; a key is not both. A grid operator not taking
-part names neither. The RNO names no `signingKeys` of its own: its signing keys are those its
+private parts. The roaming network operator (RNO) and every other party - charging station operators,
+e-mobility providers, grid operators, parking operators, charging station and energy meter manufacturers,
+transparency software manufacturers and conformity assessment bodies - each name 1..n `signingKeys`, e.g.
+secp256r1, and 1..n `identityKeys`, e.g. secp521r1; a key is not both. A grid operator or a conformity assessment
+body not taking part names neither. The RNO names no `signingKeys` of its own: its signing keys are those its
 `signingKeyCertificates` certify (8.6), and a reader MUST refuse an RNO naming `signingKeys`. The RNO is the `operator` the roaming network embeds, the party
 `{"entityType": "RoamingNetworkOperator", "entityId": its @id}`; the roaming network names no keys
 of its own, and a reader MUST refuse one that does. The `keyId` of a
@@ -246,13 +248,14 @@ Every change has exactly one **owner**:
 
 | Change | Owner |
 |---|---|
-| the RNO itself, the roaming network itself, charging station and energy meter manufacturers | the RNO |
-| `Add` and `Remove` of a charging station operator, e-mobility provider, grid operator, parking operator, transparency software manufacturer or conformity assessment body | the RNO |
+| the RNO itself, the roaming network itself | the RNO |
+| `Add` and `Remove` of a charging station operator, e-mobility provider, grid operator, parking operator, charging station manufacturer, energy meter manufacturer, transparency software manufacturer or conformity assessment body | the RNO |
 | the other properties of such a party | the party; the RNO for a party without signing keys |
 | pools, stations, EVSEs and tariffs | the charging station operator their identification names |
 | templates, groups and charging tariff offers | the party embedding them (the parent of an `Add`): a charging station operator, an e-mobility provider (its groups and offers), a grid operator (its energy meter templates and groups) or a parking operator (its parking space templates and groups) |
 | brands | the owner of what embeds them: the charging station operator |
 | parking garages, spaces, sensors and products | their parking operator (the parent of an `Add`) |
+| charging station and energy meter models | their manufacturer, the parent of every change of them: a model is unique within its manufacturer only |
 | transparency software releases | their transparency software manufacturer (the parent of an `Add`) |
 | transparency software certificates | the conformity assessment body that issued them (the parent of an `Add`); the RNO for a body without signing keys |
 | a grid connection point | its maintainer: the party its `maintainedBy` names, else its grid operator; an `Add` also its grid operator |
@@ -311,8 +314,7 @@ what the RNO owns.
 
 **Proof of possession.** Every identity key a change enters anew MUST sign its change set as well: those of a party
 it adds, and those of new `identityKeys` of a party, also of the RNO, that the party does not name in the version
-the change set is applied to; also one whose `notBefore` is still to come. The same holds for the identity keys of a
-charging station manufacturer, which names keys as a party does, though the RNO changes it. So no party is added without asking for
+the change set is applied to; also one whose `notBefore` is still to come. So no party is added without asking for
 it, and none gets an identity key it does not hold, e.g. one of another party, by mistake or on purpose. Such a
 signature proves the possession of the key only: it is no signature of an owner, and the key counts for its party
 once the change set is committed. A party asking to be added therefore makes the change set adding it, signs it
@@ -741,8 +743,8 @@ and change sets name it as a precondition (section 4).
 **Purpose.** An e-mobility driver's app that has found a charging station gets one small document:
 everything the roaming network says about this station as it is at runtime - the station with its
 EVSEs, charging connectors and energy meters with their public keys, the properties its templates give
-it, its pool, its operator, the charging tariffs its EVSEs take, the manufacturers and transparency
-software of its energy meters - and an attestation of the roaming network operator. The app checks it
+it, its pool, its operator, the charging tariffs its EVSEs take, the manufacturers and models of the station and of
+its energy meters, the transparency software of its energy meters - and an attestation of the roaming network operator. The app checks it
 offline, before charging, without the rest of the network; months later, e.g. disputing an invoice,
 with the proof of its commit in a checkpoint (10.4).
 
@@ -800,6 +802,8 @@ RFC 9162, section 2.1.1:
 | e-mobility provider | `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffOffers` |
 | grid operator | `gridConnectionPoints`, `energyMeterTemplates`, `energyMeterGroups` |
 | parking operator | `parkingGarages`, `parkingSpaces`, `parkingSensors`, `parkingSpaceTemplates`, `parkingSpaceGroups`, `parkingProducts` |
+| charging station manufacturer | `chargingStationModels` |
+| energy meter manufacturer | `energyMeterModels` |
 | transparency software manufacturer | `transparencySoftware` |
 | conformity assessment body | `transparencySoftwareCertificates` |
 
@@ -883,9 +887,10 @@ A **charging station proof** gives completely:
 - the skeletons of the station's operator and pool, and the station with its EVSEs, their energy meters with their
   `signatureMethods` and `publicKeys`;
 - the charging tariffs its effective EVSEs name, in the `chargingTariffs` of its operator;
-- the manufacturer its `manufacturerId` names, the energy meter manufacturers the energy meters of the station and
-  of its EVSEs name, and the transparency software releases and certificates their `transparencySoftwareStatus` names,
-  in the skeletons of their manufacturers and conformity assessment bodies;
+- the manufacturer its `manufacturerId` names with the model its `modelId` names, the energy meter manufacturers the
+  energy meters of the station and of its EVSEs name with the models they name, and the transparency software releases
+  and certificates their `transparencySoftwareStatus` names, in the skeletons of their manufacturers and conformity
+  assessment bodies;
 - the parking spaces it names, of its operator or of parking operators, and the grid connection point of its pool.
 
 All other child arrays are pruned. POI_API serves it as

@@ -45,7 +45,7 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 
 The properties of an energy meter it gives its members, each written and read as an
 [energy meter](EnergyMeter.md#properties) writes and reads it, and each updated or removed by a change set. Of `role`,
-`manufacturerId` (an energy meter manufacturer of the network), `modelId`, `modelURL`, `hardwareVersion` and
+`manufacturerId` (an energy meter manufacturer of the network), `modelId` (one of its models), `modelURL`, `hardwareVersion` and
 `firmwareVersion` its members take the value of the first of their templates giving one, unless they have their own.
 Of `transparencySoftwareStatus` (releases and certificates of the network) and `signatureMethods` they take those of
 all their templates besides their own; of the status of the same transparency software release their own, else the
@@ -82,7 +82,8 @@ effective ones; `?view=stored` charging pools, charging stations, EVSEs and grid
 - `@id` is mandatory, any non-empty text (trimmed); unique within the roaming network, across charging station
   operators and grid operators, compared case-insensitively.
 - The arrays of the properties of its members: none twice, at most one status per transparency software release.
-- `manufacturerId` names an energy meter manufacturer of the network; every transparency software release and
+- `manufacturerId` names an energy meter manufacturer of the network, `modelId` one of its models, and only with it;
+  every transparency software release and
   certificate it names exists in the network, and a certificate covers its release. Every effective energy meter
   naming it must be valid.
 - A template an energy meter names can not be removed: update the energy meter first, in the same change set.

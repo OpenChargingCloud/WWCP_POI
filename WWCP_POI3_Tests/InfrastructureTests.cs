@@ -47,6 +47,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly EVSE_Id                         E1        = EVSE_Id.                       Parse("DE*GEF*E1*1");
         private static readonly EVSE_Id                         E2        = EVSE_Id.                       Parse("DE*GEF*E1*2");
         private static readonly ChargingStationManufacturer_Id  ACME      = ChargingStationManufacturer_Id.Parse("ACME");
+        private static readonly ChargingStationModel            Wallbox22 = new (ChargingStationModel_Id.Parse("Wallbox-22"), Versions: [ "1.0" ]);
 
         #endregion
 
@@ -74,6 +75,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                     Created:                       Created,
                     ChargingStationManufacturers:  [ new ChargingStationManufacturer(ACME,
                                                                                      I18NString.Create(Languages.en, "ACME Chargers"),
+                                                                                     Models:  [ Wallbox22 ],
                                                                                      Created: Created) ],
                     ChargingStationOperators:      [ new ChargingStationOperator(GEF,
                                                                                  I18NString.Create(Languages.en, "GraphDefined"),
@@ -486,7 +488,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var acmeKey  = TestParties.Key(new POIPartyId(nameof(ChargingStationManufacturer), "ACME"), POIKeyKind.Identity).Public;
 
             var rn2   = Apply(rn1,
-                              RoamingNetworkChange.Add           (new ChargingStationManufacturer(ChargingStationManufacturer_Id.Parse("ZAP"))),
+                              RoamingNetworkChange.Add           (new ChargingStationManufacturer(ChargingStationManufacturer_Id.Parse("ZAP")).WithKeys()),
                               RoamingNetworkChange.UpdateProperty(acme, "homepage",      null, "https://acme.example"),
                               RoamingNetworkChange.UpdateProperty(acme, "eMailAddress",  null, "ACME Sales <sales@acme.example>"),
                               RoamingNetworkChange.UpdateProperty(acme, "logos",         null, new JArray(new JObject(new JProperty("uri", "https://acme.example/logo.png")))),

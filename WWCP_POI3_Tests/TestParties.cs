@@ -93,6 +93,18 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             => new (nameof(ParkingOperator), OperatorId.ToString());
 
         /// <summary>
+        /// A charging station manufacturer.
+        /// </summary>
+        public static POIPartyId Party(ChargingStationManufacturer_Id ManufacturerId)
+            => new (nameof(ChargingStationManufacturer), ManufacturerId.ToString());
+
+        /// <summary>
+        /// An energy meter manufacturer.
+        /// </summary>
+        public static POIPartyId Party(EnergyMeterManufacturer_Id ManufacturerId)
+            => new (nameof(EnergyMeterManufacturer), ManufacturerId.ToString());
+
+        /// <summary>
         /// A transparency software manufacturer.
         /// </summary>
         public static POIPartyId Party(TransparencySoftwareManufacturer_Id ManufacturerId)
@@ -197,6 +209,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                   ("eMobilityProviders",       nameof(EMobilityProvider)),
                                                   ("gridOperators",            nameof(GridOperator)),
                                                   ("parkingOperators",         nameof(ParkingOperator)),
+                                                  ("chargingStationManufacturers",      nameof(ChargingStationManufacturer)),
+                                                  ("energyMeterManufacturers",          nameof(EnergyMeterManufacturer)),
                                                   ("transparencySoftwareManufacturers", nameof(TransparencySoftwareManufacturer)),
                                                   ("conformityAssessmentBodies",        nameof(ConformityAssessmentBody)) })
                 foreach (var party in (json[array] as JArray ?? []).OfType<JObject>())
@@ -250,6 +264,24 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                    : throw new ArgumentException(error);
 
         /// <summary>
+        /// The given charging station manufacturer with its test keys.
+        /// </summary>
+        public static ChargingStationManufacturer WithKeys(this ChargingStationManufacturer Manufacturer)
+
+            => ChargingStationManufacturer.TryParse(WithKeys(Manufacturer.ToJSON(), Party(Manufacturer.Id)), out var withKeys, out var error)
+                   ? withKeys
+                   : throw new ArgumentException(error);
+
+        /// <summary>
+        /// The given energy meter manufacturer with its test keys.
+        /// </summary>
+        public static EnergyMeterManufacturer WithKeys(this EnergyMeterManufacturer Manufacturer)
+
+            => EnergyMeterManufacturer.TryParse(WithKeys(Manufacturer.ToJSON(), Party(Manufacturer.Id)), out var withKeys, out var error)
+                   ? withKeys
+                   : throw new ArgumentException(error);
+
+        /// <summary>
         /// The given transparency software manufacturer with its test keys.
         /// </summary>
         public static TransparencySoftwareManufacturer WithKeys(this TransparencySoftwareManufacturer Manufacturer)
@@ -295,17 +327,41 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         /// <summary>
         /// The given change set, signed with the test keys of every party of the given network
         /// holding them, signing and identity keys: whatever it changes, its owners signed it.
+        /// More than a change set may have, of a network of many parties, are left out, last first, while its owners
+        /// still signed it.
         /// </summary>
         public static RoamingNetworkChangeSet SignedByAll(this RoamingNetworkChangeSet  ChangeSet,
                                                           RoamingNetwork                Network)
         {
 
+            var signers = new List<(POIPartyId, POIKeyKind)>();
+
             foreach (var (partyId, party) in Network.Parties)
                 foreach (var kind in new[] { POIKeyKind.Signing, POIKeyKind.Identity })
                     if ((kind == POIKeyKind.Signing ? party.SigningKeys : party.IdentityKeys).Any(key => key.Id == Key(partyId, kind).Public.Id))
-                        ChangeSet = ChangeSet.SignedBy(partyId, kind);
+                        signers.Add((partyId, kind));
 
-            return ChangeSet.ProvenByNewIdentityKeys();
+            RoamingNetworkChangeSet SignedBy(IEnumerable<(POIPartyId, POIKeyKind)> Signers)
+                => Signers.Aggregate(ChangeSet, (changeSet, signer) => changeSet.SignedBy(signer.Item1, signer.Item2)).
+                           ProvenByNewIdentityKeys();
+
+            var signed = SignedBy(signers);
+
+            for (var index = signers.Count - 1; index >= 0 && signed.Signatures.Length > RoamingNetworkChangeSetLimits.Default.MaxSignatures; index--)
+            {
+
+                var fewer        = signers.Where((_, signerIndex) => signerIndex != index).ToList();
+                var signedFewer  = SignedBy(fewer);
+
+                if (Network.TryCheckOwnership(signedFewer, out _))
+                {
+                    signers  = fewer;
+                    signed   = signedFewer;
+                }
+
+            }
+
+            return signed;
 
         }
 

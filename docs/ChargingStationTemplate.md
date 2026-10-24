@@ -54,7 +54,7 @@ The properties of a charging station it gives its members, each written and read
 | `geoLocation` | `GeoLocation` | unless they have their own |
 | `hotline` | `HotlinePhoneNumber` | unless they have their own |
 | `manufacturerId` | `ManufacturerId` | unless they have their own; a manufacturer of the network |
-| `modelId` | `ModelId` | unless they have their own |
+| `modelId` | `ModelId` | unless they have their own; a model of the manufacturer, named with it |
 | `openingTimes` | `OpeningTimes` | unless they have their own |
 | `accessibility` | `Accessibility` | unless they have their own |
 | `calibrationInfo` | `CalibrationInfo` | unless they have their own |
@@ -108,7 +108,8 @@ A template a station names can not be removed: update the station first, in the 
   must not name a value twice, an image URL must not be given twice; `brandIds` are refused.
 - In its operator: the template belongs to the operator its identification names; a template must not be given
   twice; `chargingTariffId` must be a tariff of the operator; every effective charging station naming it must be valid.
-- In its roaming network: `manufacturerId` must name a manufacturer and `parkingSpaceIds` parking spaces of the network.
+- In its roaming network: `manufacturerId` must name a manufacturer, `modelId` one of its models, and `parkingSpaceIds`
+  parking spaces of the network.
 - A change set applies each change to the embedded JSON of the operator and reads the operator again, so these
   rules hold after every single change.
 - `Add(chargingStationTemplate)` refuses a parent other than the operator; the template must not exist yet. It gets

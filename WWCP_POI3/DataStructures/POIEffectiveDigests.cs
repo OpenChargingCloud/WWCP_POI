@@ -96,8 +96,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 { RoamingNetwork.PropertyKeys.EMobilityProviders,                [ .. RoamingNetwork.EMobilityProviders.              Select(party => NodeOf(party, HashAlgorithm)) ] },
                                 { RoamingNetwork.PropertyKeys.GridOperators,                     [ .. RoamingNetwork.GridOperators.                   Select(party => NodeOf(party, HashAlgorithm)) ] },
                                 { RoamingNetwork.PropertyKeys.ParkingOperators,                  [ .. RoamingNetwork.ParkingOperators.                Select(party => NodeOf(party, HashAlgorithm)) ] },
-                                { RoamingNetwork.PropertyKeys.ChargingStationManufacturers,      [ .. RoamingNetwork.ChargingStationManufacturers.    Select(value => LeafNode(RoamingNetwork.PropertyKeys.ChargingStationManufacturers,     value, value.ToJSON(Embedded: true), HashAlgorithm)) ] },
-                                { RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,          [ .. RoamingNetwork.EnergyMeterManufacturers.        Select(value => LeafNode(RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,         value, value.ToJSON(Embedded: true), HashAlgorithm)) ] },
+                                { RoamingNetwork.PropertyKeys.ChargingStationManufacturers,      [ .. RoamingNetwork.ChargingStationManufacturers.    Select(party => NodeOf(party, HashAlgorithm)) ] },
+                                { RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,          [ .. RoamingNetwork.EnergyMeterManufacturers.        Select(party => NodeOf(party, HashAlgorithm)) ] },
                                 { RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers, [ .. RoamingNetwork.TransparencySoftwareManufacturers.Select(party => NodeOf(party, HashAlgorithm)) ] },
                                 { RoamingNetwork.PropertyKeys.ConformityAssessmentBodies,        [ .. RoamingNetwork.ConformityAssessmentBodies.      Select(party => NodeOf(party, HashAlgorithm)) ] }
                             };
@@ -138,11 +138,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          IncludeChildArrays:                       false),
 
                    [ (RoamingNetwork.PropertyKeys.ChargingStationOperators,          [ .. RoamingNetwork.ChargingStationOperators.        Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
-                     (RoamingNetwork.PropertyKeys.ChargingStationManufacturers,      Leaves(RoamingNetwork.ChargingStationManufacturers,     value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                     (RoamingNetwork.PropertyKeys.ChargingStationManufacturers,      [ .. RoamingNetwork.ChargingStationManufacturers.    Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
                      (RoamingNetwork.PropertyKeys.EMobilityProviders,                [ .. RoamingNetwork.EMobilityProviders.              Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
                      (RoamingNetwork.PropertyKeys.GridOperators,                     [ .. RoamingNetwork.GridOperators.                   Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
                      (RoamingNetwork.PropertyKeys.ParkingOperators,                  [ .. RoamingNetwork.ParkingOperators.                Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
-                     (RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,          Leaves(RoamingNetwork.EnergyMeterManufacturers,         value => value.ToJSON(Embedded: true), HashAlgorithm)),
+                     (RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,          [ .. RoamingNetwork.EnergyMeterManufacturers.        Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
                      (RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers, [ .. RoamingNetwork.TransparencySoftwareManufacturers.Select(party => NodeOf(party, HashAlgorithm).Digest) ]),
                      (RoamingNetwork.PropertyKeys.ConformityAssessmentBodies,        [ .. RoamingNetwork.ConformityAssessmentBodies.      Select(party => NodeOf(party, HashAlgorithm).Digest) ]) ],
 
@@ -235,6 +235,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    [ (GridOperator.PropertyKeys.GridConnectionPoints,  Leaves(GridOperator.GridConnectionPoints.Select(GridOperator.EffectiveGridConnectionPoint), value => value.ToJSON(Embedded: true), HashAlgorithm)),
                      (GridOperator.PropertyKeys.EnergyMeterTemplates,  Leaves(GridOperator.EnergyMeterTemplates,  value => value.ToJSON(Embedded: true), HashAlgorithm)),
                      (GridOperator.PropertyKeys.EnergyMeterGroups,     Leaves(GridOperator.EnergyMeterGroups,     value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
+
+                   HashAlgorithm));
+
+        #endregion
+
+        #region (private) NodeOf(ChargingStationManufacturer, HashAlgorithm)
+
+        private static POITreeNode NodeOf(ChargingStationManufacturer       ChargingStationManufacturer,
+                                          ETagHashAlgorithm                 HashAlgorithm)
+
+            => Kept(ChargingStationManufacturer, HashAlgorithm, () => Node(
+
+                   RoamingNetwork.PropertyKeys.ChargingStationManufacturers,
+
+                   ChargingStationManufacturer.ToJSON(Embedded: true, IncludeChildArrays: false),
+
+                   [ (ChargingStationManufacturer.PropertyKeys.Models,  Leaves(ChargingStationManufacturer.Models,  value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
+
+                   HashAlgorithm));
+
+        #endregion
+
+        #region (private) NodeOf(EnergyMeterManufacturer, HashAlgorithm)
+
+        private static POITreeNode NodeOf(EnergyMeterManufacturer           EnergyMeterManufacturer,
+                                          ETagHashAlgorithm                 HashAlgorithm)
+
+            => Kept(EnergyMeterManufacturer, HashAlgorithm, () => Node(
+
+                   RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,
+
+                   EnergyMeterManufacturer.ToJSON(Embedded: true, IncludeChildArrays: false),
+
+                   [ (EnergyMeterManufacturer.PropertyKeys.Models,  Leaves(EnergyMeterManufacturer.Models,  value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
 
                    HashAlgorithm));
 

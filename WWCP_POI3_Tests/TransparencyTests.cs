@@ -46,6 +46,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static readonly ChargingStationOperator_Id           GEF         = ChargingStationOperator_Id.         Parse("DE*GEF");
         private static readonly ChargingStationManufacturer_Id       ACME        = ChargingStationManufacturer_Id.     Parse("ACME");
+        private static readonly ChargingStationModel                 Wallbox22   = new (ChargingStationModel_Id.Parse("Wallbox-22"), Versions: [ "1.0" ]);
         private static readonly TransparencySoftwareManufacturer_Id  OCC         = TransparencySoftwareManufacturer_Id.Parse("OpenChargingCloud");
         private static readonly TransparencySoftwareManufacturer_Id  Other       = TransparencySoftwareManufacturer_Id.Parse("Other");
         private static readonly TransparencySoftware_Id              Chargy10    = TransparencySoftware_Id.            Parse("chargy-1.0");
@@ -97,11 +98,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                       TransparencySoftware_Id[]           Compatible)
 
             => new (Id,
-                    ChargingStationModel_Id.Parse("Wallbox-22"),
+                    ACME,
+                    Wallbox22.Id,
                     "1.0",
                     Verified,
                     Compatible,
-                    ChargingStationManufacturerId:  ACME,
                     DocumentNumber:                 "DE-123",
                     NotBefore:                      Created,
                     Legislation:                    ConformityAssessmentBody.Legislations.MID);
@@ -129,7 +130,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                           Created,
-                    ChargingStationManufacturers:      [ new ChargingStationManufacturer(ACME, Created: Created) ],
+                    ChargingStationManufacturers:      [ new ChargingStationManufacturer(ACME, Models: [ Wallbox22 ], Created: Created) ],
                     TransparencySoftwareManufacturers: [ NewManufacturer(OCC, NewRelease(Chargy10, "1.0"), NewRelease(Chargy11, "1.1")) ],
                     ConformityAssessmentBodies:        [ NewBody(PTB, [ ConformityAssessmentBody.Legislations.MID ], NewCertificate(Cert1, [ Chargy10 ], [ Chargy11 ])) ],
                     ChargingStationOperators:          [ new ChargingStationOperator(GEF,
@@ -246,7 +247,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         {
 
             var certificate  = new TransparencySoftwareCertificate(Cert1,
-                                                                   ChargingStationModel_Id.Parse("Wallbox-22"),
+                                                                   ACME,
+                                                                   Wallbox22.Id,
                                                                    "1.0",
                                                                    [ Chargy10 ],
                                                                    [],
@@ -489,7 +491,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             // The BSI, for the CRA, not taking part yet: added without keys.
             var withBSI       = Apply(rn1, RoamingNetworkChange.Add(NewBody(BSI, [ ConformityAssessmentBody.Legislations.CRA ])));
             var craCert       = new TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id.Parse("cra-1"),
-                                                                    ChargingStationModel_Id.Parse("Wallbox-22"),
+                                                                    ACME,
+                                                                    Wallbox22.Id,
                                                                     "1.0",
                                                                     [ Chargy11 ],
                                                                     [],
@@ -524,6 +527,51 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 // A body whose certificate an energy meter names can not be removed.
                 Assert.That(() => Apply(rn1, RoamingNetworkChange.Remove(PTB)),
                             Throws.ArgumentException.With.Message.Contains("certificate 'cert-1' of the energy meter 'meter-1'"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Changes_of_releases_and_certificates_on_two_branches_merge()
+
+        [Test]
+        public void Changes_of_releases_and_certificates_on_two_branches_merge()
+        {
+
+            var rn1          = NewNetwork();
+
+            rn1.TryGetTransparencySoftwareById           (Chargy10, out var chargy10);
+            rn1.TryGetTransparencySoftwareById           (Chargy11, out var chargy11);
+            rn1.TryGetTransparencySoftwareCertificateById(Cert1,    out var cert1);
+
+            var cert2        = NewCertificate(TransparencySoftwareCertificate_Id.Parse("cert-2"), [ Chargy11 ], []);
+
+            // Two releases of one manufacturer, a certificate changed and one added to the same body: no conflict.
+            var left         = Apply(rn1, RoamingNetworkChange.UpdateProperty(chargy10!, "supportUntil",    null, "2032-12-31T23:59:59.999Z"),
+                                          RoamingNetworkChange.UpdateProperty(cert1!,    "documentNumber",  null, "DE-124"));
+            var right        = Apply(rn1, RoamingNetworkChange.UpdateProperty(chargy11!, "howToUse",        null, "https://open.charging.cloud/chargy/manual"),
+                                          RoamingNetworkChange.Add(cert2, PTB));
+            var other        = Apply(rn1, RoamingNetworkChange.UpdateProperty(chargy10!, "supportUntil",    null, "2033-12-31T23:59:59.999Z"));
+
+            var merged       = RoamingNetwork.TryMerge(rn1, left, right, ChangeSet_Id.Parse("merge-1"), out var merge, out _, out var conflicts1);
+            var conflict     = RoamingNetwork.TryMerge(rn1, left, other, ChangeSet_Id.Parse("merge-2"), out _,         out _, out var conflicts2);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(merged,                                                                          Is.True, String.Join(" ", conflicts1.Select(conflict => conflict.Description)));
+                Assert.That(merge!.TryGetTransparencySoftwareById(Chargy10, out var mergedChargy10),         Is.True);
+                Assert.That(mergedChargy10!.SupportUntil,                                                    Is.EqualTo(DateTimeOffset.Parse("2032-12-31T23:59:59.999Z")));
+                Assert.That(merge. TryGetTransparencySoftwareById(Chargy11, out var mergedChargy11),         Is.True);
+                Assert.That(mergedChargy11!.HowToUse?.ToString(),                                            Is.EqualTo("https://open.charging.cloud/chargy/manual"));
+                Assert.That(merge. TryGetTransparencySoftwareCertificateById(Cert1, out var mergedCert1),    Is.True);
+                Assert.That(mergedCert1!.DocumentNumber,                                                     Is.EqualTo("DE-124"));
+                Assert.That(merge. ConformityAssessmentBodyOf(cert2.Id)?.Id,                                 Is.EqualTo(PTB));
+
+                Assert.That(conflict,                                                                        Is.False);
+                Assert.That(conflicts2.Single().PropertyName,                                                Is.EqualTo("supportUntil"));
 
             }
 

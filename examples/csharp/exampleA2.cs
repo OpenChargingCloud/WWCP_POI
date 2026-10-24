@@ -1,4 +1,5 @@
-﻿using org.GraphDefined.Vanaheimr.Illias;
+﻿using org.GraphDefined.Vanaheimr.Aegir;
+using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 using cloud.charging.open.protocols.WWCP.POI;
@@ -7,8 +8,9 @@ using cloud.charging.open.protocols.WWCP.POI;
 public static class ExampleA2
 {
 
-    // The roaming network "QA" of example A1 gets its first party: the charging station operator "DE*GEF", and with it the
-    // manufacturers of its charging stations and of their energy meters.
+    // The roaming network "QA" of example A1 gets its first parties: the charging station operator "DE*GEF", and with it the
+    // manufacturers of its charging stations and of their energy meters, which then state the models DE*GEF's stations and
+    // meters are.
 
     public static readonly ChargingStationOperator_Id      gefId           = ChargingStationOperator_Id.Parse("DE*GEF");
     public static readonly ChargingStationManufacturer_Id  stationMakerId  = ChargingStationManufacturer_Id.Parse("GraphDefined");
@@ -23,6 +25,45 @@ public static class ExampleA2
     /// <param name="SigningKeys">The signing keys of DE*GEF, by the usage each may sign.</param>
     public sealed record Result(IReadOnlyList<COSEKeyPair>                IdentityKeys,
                                 IReadOnlyDictionary<String, COSEKeyPair>  SigningKeys);
+
+
+    /// <summary>
+    /// The keys of a manufacturer: its identity key, and its signing keys for itself and for its models.
+    /// </summary>
+    private sealed record MakerKeys(COSEKeyPair Identity, COSEKeyPair Party, COSEKeyPair Models)
+    {
+
+        /// <summary>
+        /// New keys, their private halves saved in the given folder, where nobody else may read them.
+        /// </summary>
+        public static MakerKeys New(String Folder, String Role)
+        {
+
+            var keys = new MakerKeys(COSEKeyPair.NewES512(), COSEKeyPair.NewES256(), COSEKeyPair.NewES256());
+
+            Directory.CreateDirectory(Folder);
+            Helpers.SaveKey(keys.Identity.Private, $"{Folder}/{Role}-identity-privateKey.pem");
+            Helpers.SaveKey(keys.Party.   Private, $"{Folder}/{Role}-signing-party-privateKey.pem");
+            Helpers.SaveKey(keys.Models.  Private, $"{Folder}/{Role}-signing-models-privateKey.pem");
+
+            return keys;
+
+        }
+
+        /// <summary>
+        /// The public halves of its signing keys, as POI names them.
+        /// </summary>
+        public POIPublicKey[] SigningKeys(DateTimeOffset Now)
+            => [ POIPublicKey.From(Party. Private, NotAfter: Now.AddYears(1), Usages: [ POIKeyUsages.Party  ]),
+                 POIPublicKey.From(Models.Private, NotAfter: Now.AddYears(1), Usages: [ POIKeyUsages.Models ]) ];
+
+        /// <summary>
+        /// The public half of its identity key.
+        /// </summary>
+        public POIPublicKey[] IdentityKeys
+            => [ POIPublicKey.From(Identity.Private) ];
+
+    }
 
 
     public static Result Run(ExampleA1.Result A1)
@@ -69,25 +110,35 @@ public static class ExampleA2
         File.WriteAllText("DE-GEF/operator.json", gef.ToJSON().ToString());
 
         // The manufacturers of its charging stations and of the energy meters of its EVSEs, which QA does not know yet: its
-        // stations and meters will name them. They are a registry of the roaming network operator, which decides on them
-        // together with DE*GEF.
+        // stations and meters will name them, and the models they state. Each is a party of QA of its own, with an identity
+        // key and signing keys for its own properties and for its models, which it states itself.
+        var stationMakerKeys      = MakerKeys.New("GraphDefined", "stations");
+        var acMeterMakerKeys      = MakerKeys.New("SAALE",        "meters");
+        var dcMeterMakerKeys      = MakerKeys.New("KERNBERG",     "meters");
+
         var manufacturers         = new[] {
                                         RoamingNetworkChange.Add(new ChargingStationManufacturer(
                                                                      stationMakerId,
-                                                                     Name:      I18NString.Create(Languages.en, "GraphDefined Charging Stations"),
-                                                                     Homepage:  URL.Parse("https://stations.graphdefined.example")
+                                                                     Name:          I18NString.Create(Languages.en, "GraphDefined Charging Stations"),
+                                                                     Homepage:      URL.Parse("https://stations.graphdefined.example"),
+                                                                     SigningKeys:   stationMakerKeys.SigningKeys(now),
+                                                                     IdentityKeys:  stationMakerKeys.IdentityKeys
                                                                  )),
                                         RoamingNetworkChange.Add(new EnergyMeterManufacturer(
                                                                      acMeterMakerId,
-                                                                     Name:         ImmutableI18NString.Create(Languages.en, "Saale Metering"),
-                                                                     Description:  ImmutableI18NString.Create(Languages.en, "Calibrated AC energy meters"),
-                                                                     Homepage:     URL.Parse("https://saale-metering.example")
+                                                                     Name:          ImmutableI18NString.Create(Languages.en, "Saale Metering"),
+                                                                     Description:   ImmutableI18NString.Create(Languages.en, "Calibrated AC energy meters"),
+                                                                     Homepage:      URL.Parse("https://saale-metering.example"),
+                                                                     SigningKeys:   acMeterMakerKeys.SigningKeys(now),
+                                                                     IdentityKeys:  acMeterMakerKeys.IdentityKeys
                                                                  )),
                                         RoamingNetworkChange.Add(new EnergyMeterManufacturer(
                                                                      dcMeterMakerId,
-                                                                     Name:         ImmutableI18NString.Create(Languages.en, "Kernberg DC Metering"),
-                                                                     Description:  ImmutableI18NString.Create(Languages.en, "Calibrated DC energy meters"),
-                                                                     Homepage:     URL.Parse("https://kernberg-metering.example")
+                                                                     Name:          ImmutableI18NString.Create(Languages.en, "Kernberg DC Metering"),
+                                                                     Description:   ImmutableI18NString.Create(Languages.en, "Calibrated DC energy meters"),
+                                                                     Homepage:      URL.Parse("https://kernberg-metering.example"),
+                                                                     SigningKeys:   dcMeterMakerKeys.SigningKeys(now),
+                                                                     IdentityKeys:  dcMeterMakerKeys.IdentityKeys
                                                                  ))
                                     };
 
@@ -97,7 +148,8 @@ public static class ExampleA2
 
         // DE*GEF makes the change set adding it and its manufacturers, for the version of QA it checked
         // (ExampleA1.Validate), and signs it with each of its identity keys: the proof that it holds them, and that it asks
-        // for it. Without, OCC could add DE*GEF without it knowing, or anybody the keys of another one.
+        // for it. Without, OCC could add DE*GEF without it knowing, or anybody the keys of another one. Each manufacturer
+        // signs it with its identity key as well, for the same reason.
         if (!RoamingNetwork.TryParse(Helpers.ReadJSON("published/QA.json"), out var checkedQA, out var error))
             Helpers.Fail(error);
 
@@ -106,7 +158,7 @@ public static class ExampleA2
                                         Description:  ImmutableI18NString.Create(Languages.en, "DE*GEF, GraphDefined Charging Solutions, and the manufacturers of its charging stations and energy meters")
                                     );
 
-        foreach (var identityKey in identityKeys)
+        foreach (var identityKey in identityKeys.Concat([ stationMakerKeys.Identity, acMeterMakerKeys.Identity, dcMeterMakerKeys.Identity ]))
             addGEF                = addGEF.Sign(identityKey.Private,
                                                 POIPublicKey.From(identityKey.Private).Id,
                                                 identityKey.Algorithm);
@@ -121,12 +173,11 @@ public static class ExampleA2
         if (!RoamingNetworkChangeSet.TryParse(Helpers.ReadJSON("DE-GEF/addGEF.json"), out var addGEFSent, out error))
             Helpers.Fail(error);
 
-        // Who is a member is the roaming network operator's, decided by its quorum: two of its three holders; so are its
-        // registries of manufacturers.
+        // Who is a member is the roaming network operator's, decided by its quorum: two of its three holders.
         if (!A1.RoamingNetwork.TryCheckCoSigning(addGEFSent, out var missing, out _, out error))
             Helpers.Fail(error);
 
-        Console.WriteLine($"Sent by DE*GEF, signed by its {identityKeys.Length} identity keys; missing: {String.Join(" ", missing)}");
+        Console.WriteLine($"Sent by DE*GEF, signed by its {identityKeys.Length} identity keys and the ones of its manufacturers; missing: {String.Join(" ", missing)}");
 
         // The change set signed by the signing key of the given organization.
         RoamingNetworkChangeSet SignedBy(RoamingNetworkChangeSet ChangeSet, String Organization)
@@ -151,7 +202,71 @@ public static class ExampleA2
         Console.WriteLine($"Signed by AlphaOrg and BetaOrg: {added.Status}, revision {added.Commit?.Revision}, commit {added.Commit?.Id}");
         Console.WriteLine();
 
-        // What everybody may read now: the roaming network with DE*GEF, and the commit leading to it.
+        #endregion
+
+        #region 4. The manufacturers state their models
+
+        // The models DE*GEF's stations and meters are, each stated by its manufacturer: a station or meter names a model of
+        // its manufacturer, which knows its versions and ratings; a certificate names one of its versions. One change set,
+        // signed by each manufacturer with its key for its models; the roaming network operator signs none of them.
+        var models                = new[] {
+                                        RoamingNetworkChange.Add(new ChargingStationModel(ChargingStationModel_Id.Parse("GD-DC300"),
+                                                                 ImmutableI18NString.Create(Languages.en, "GraphDefined DC 300"),
+                                                                 Versions:        [ "1.0", "1.1" ],
+                                                                 DatasheetURL:    URL.Parse("https://stations.graphdefined.example/gd-dc300/datasheet.pdf"),
+                                                                 MaxPower:        Watt.FromKW(300),
+                                                                 CurrentTypes:    CurrentTypes.DC,
+                                                                 ConnectorTypes:  [ ChargingConnectorType.IEC_62196_T2_COMBO ],
+                                                                 NumberOfEVSEs:   2),
+                                        stationMakerId),
+                                        RoamingNetworkChange.Add(new ChargingStationModel(ChargingStationModel_Id.Parse("GD-AC44"),
+                                                                 ImmutableI18NString.Create(Languages.en, "GraphDefined AC 44"),
+                                                                 Versions:        [ "1.0" ],
+                                                                 DatasheetURL:    URL.Parse("https://stations.graphdefined.example/gd-ac44/datasheet.pdf"),
+                                                                 MaxPower:        Watt.FromKW(44),
+                                                                 CurrentTypes:    CurrentTypes.AC_ThreePhases,
+                                                                 ConnectorTypes:  [ ChargingConnectorType.IEC_62196_T2 ],
+                                                                 NumberOfEVSEs:   2),
+                                        stationMakerId),
+                                        RoamingNetworkChange.Add(new EnergyMeterModel(EnergyMeterModel_Id.Parse("KDM-500"),
+                                                                 ImmutableI18NString.Create(Languages.en, "Kernberg DC meter 500 A"),
+                                                                 Versions:          [ "2.1" ],
+                                                                 CurrentTypes:      CurrentTypes.DC,
+                                                                 MaxCurrent:        Ampere.FromA(500),
+                                                                 AccuracyClass:     "B",
+                                                                 Measurands:        [ "1-0:1.8.0", "1-0:2.8.0" ],
+                                                                 SignatureMethods:  [ SignatureMethod.OCMF ]),
+                                        dcMeterMakerId),
+                                        RoamingNetworkChange.Add(new EnergyMeterModel(EnergyMeterModel_Id.Parse("SM-3"),
+                                                                 ImmutableI18NString.Create(Languages.en, "Saale three-phase meter"),
+                                                                 Versions:          [ "1.4" ],
+                                                                 CurrentTypes:      CurrentTypes.AC_ThreePhases,
+                                                                 MaxCurrent:        Ampere.FromA(63),
+                                                                 AccuracyClass:     "B",
+                                                                 Measurands:        [ "1-0:1.8.0" ],
+                                                                 SignatureMethods:  [ SignatureMethod.OCMF ]),
+                                        acMeterMakerId)
+                                    };
+
+        var addModels             = A1.History.Head.RoamingNetwork.CreateChangeSet(models, Description: ImmutableI18NString.Create(Languages.en, "The models of GraphDefined, KERNBERG and SAALE"));
+
+        // Signed by the roaming network operator: refused, the models are their manufacturers'.
+        var byOCCOnly             = A1.History.Commit(SignedBy(SignedBy(addModels, "AlphaOrg"), "BetaOrg"));
+
+        Console.WriteLine($"The models signed by the roaming network operator: {byOCCOnly.Status}, {byOCCOnly.ErrorResponse}");
+
+        foreach (var modelsKey in new[] { stationMakerKeys.Models, dcMeterMakerKeys.Models, acMeterMakerKeys.Models })
+            addModels             = addModels.Sign(modelsKey.Private, POIPublicKey.From(modelsKey.Private).Id, modelsKey.Algorithm);
+
+        var modelsAdded           = A1.History.Commit(addModels);
+
+        if (!modelsAdded.IsCommitted)
+            Helpers.Fail(modelsAdded.ErrorResponse ?? modelsAdded.Status.ToString());
+
+        Console.WriteLine($"Signed by the three manufacturers: {modelsAdded.Status}, revision {modelsAdded.Commit?.Revision}");
+        Console.WriteLine();
+
+        // What everybody may read now: the roaming network with DE*GEF and its manufacturers, and the commit leading to it.
         File.WriteAllText($"published/{A1.RoamingNetwork.Id}.json",         A1.RoamingNetwork.  ToJSON(IncludeETags: true).ToString());
         File.WriteAllText($"published/{A1.RoamingNetwork.Id}-commit.json",  A1.History.Head.Commit.ToJSON().                  ToString());
 
@@ -170,9 +285,9 @@ public static class ExampleA2
     public static void Validate()
     {
 
-        #region 4. Checking, as DE*GEF, that QA names it with its keys
+        #region 5. Checking, as DE*GEF, that QA names it with its keys
 
-        // a) QA as everybody checks it: from the QR code, the roaming network and its commit, now at revision 1.
+        // a) QA as everybody checks it: from the QR code, the roaming network and its commit, now at revision 2.
         ExampleA1.Validate();
 
         // b) DE*GEF in it, with the keys it sent, and none other.
@@ -204,14 +319,14 @@ public static class ExampleA2
         foreach (var key in gef.IdentityKeys)
             Console.WriteLine($"  identity key {key.Id}");
 
-        // c) The manufacturers its stations and meters will name.
+        // c) The manufacturers its stations and meters will name, with the models they stated.
         Console.WriteLine();
 
         foreach (var manufacturer in qa.ChargingStationManufacturers)
-            Console.WriteLine($"Charging station manufacturer {manufacturer.Id}: {manufacturer.Name.FirstText()}");
+            Console.WriteLine($"Charging station manufacturer {manufacturer.Id}: {manufacturer.Name.FirstText()}, models {String.Join(", ", manufacturer.Models.Select(model => $"{model.Id} ({model.MaxPower?.kW} kW, versions {String.Join("/", model.Versions)})"))}");
 
         foreach (var manufacturer in qa.EnergyMeterManufacturers)
-            Console.WriteLine($"Energy meter manufacturer     {manufacturer.Id}: {manufacturer.Name.FirstText()}");
+            Console.WriteLine($"Energy meter manufacturer     {manufacturer.Id}: {manufacturer.Name.FirstText()}, models {String.Join(", ", manufacturer.Models.Select(model => $"{model.Id} (class {model.AccuracyClass}, {String.Join(", ", model.SignatureMethods)})"))}");
 
         #endregion
 

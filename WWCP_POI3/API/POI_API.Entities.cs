@@ -1040,10 +1040,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid charging station manufacturer identification!");
 
                                   return roamingNetwork.TryGetChargingStationManufacturerById(chargingStationManufacturerId, out var chargingStationManufacturer)
-                                             ? CachedEntityResponse(request, chargingStationManufacturer, () => chargingStationManufacturer.ToJSON(Embedded: true))
+                                             ? CachedEntityResponseWithout(request,
+                                                                           chargingStationManufacturer,
+                                                                           () => chargingStationManufacturer.ToJSON(Embedded: true),
+                                                                           [ ChargingStationManufacturer.PropertyKeys.Models ],
+                                                                           "a charging station manufacturer")
                                              : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The charging station manufacturer '{chargingStationManufacturerId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
 
                               });
+
+            #endregion
+
+            #region ~/RNs/{RN_Id}/CSMs/{CSM_Id}/models[/{Model_Id}]
+
+            AddEmbeddedListHandlers<ChargingStationModel_Id, ChargingStationModel>(
+                roamingNetworkPath + "/CSMs/{chargingStationManufacturerId}/models",
+                RequestedModelsOfChargingStationManufacturer,
+                model => model.ToJSON(Embedded: true));
+
+            AddEmbeddedEntityHandlers<ChargingStationModel_Id, ChargingStationModel>(
+                roamingNetworkPath + "/CSMs/{chargingStationManufacturerId}/models/{modelId}",
+                RequestedModelsOfChargingStationManufacturer,
+                ChargingStationModel_Id.TryParse,
+                "charging station model",
+                model => model.ToJSON(Embedded: true));
 
             #endregion
 
@@ -1059,10 +1079,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       return EntityErrorResponse(request, HTTPStatusCode.BadRequest, "Invalid energy meter manufacturer identification!");
 
                                   return roamingNetwork.TryGetEnergyMeterManufacturerById(energyMeterManufacturerId, out var energyMeterManufacturer)
-                                             ? CachedEntityResponse(request, energyMeterManufacturer, () => energyMeterManufacturer.ToJSON(Embedded: true))
+                                             ? CachedEntityResponseWithout(request,
+                                                                           energyMeterManufacturer,
+                                                                           () => energyMeterManufacturer.ToJSON(Embedded: true),
+                                                                           [ EnergyMeterManufacturer.PropertyKeys.Models ],
+                                                                           "an energy meter manufacturer")
                                              : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The energy meter manufacturer '{energyMeterManufacturerId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
 
                               });
+
+            #endregion
+
+            #region ~/RNs/{RN_Id}/EMMs/{EMM_Id}/models[/{Model_Id}]
+
+            AddEmbeddedListHandlers<EnergyMeterModel_Id, EnergyMeterModel>(
+                roamingNetworkPath + "/EMMs/{energyMeterManufacturerId}/models",
+                RequestedModelsOfEnergyMeterManufacturer,
+                model => model.ToJSON(Embedded: true));
+
+            AddEmbeddedEntityHandlers<EnergyMeterModel_Id, EnergyMeterModel>(
+                roamingNetworkPath + "/EMMs/{energyMeterManufacturerId}/models/{modelId}",
+                RequestedModelsOfEnergyMeterManufacturer,
+                EnergyMeterModel_Id.TryParse,
+                "energy meter model",
+                model => model.ToJSON(Embedded: true));
 
             #endregion
 
@@ -2220,6 +2260,50 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   representationCache.GetValue(Version, _ => new Representations()).
                                                       GetOrAdd(View, format, () => POIRepresentation.Of(JSON(), format)),
                                   StoredETag: StoredETag);
+
+        }
+
+        #endregion
+
+        #region (private)        RequestedModelsOfChargingStationManufacturer(Request)
+
+        /// <summary>
+        /// The models of the charging station manufacturer of the given request, ~/RNs/{RN_Id}/CSMs/{CSM_Id}/...
+        /// </summary>
+        private (POICollection<ChargingStationModel_Id, ChargingStationModel>? Collection, HTTPResponse? ErrorResponse) RequestedModelsOfChargingStationManufacturer(HTTPRequest Request)
+        {
+
+            if (!TryGetRequestedRoamingNetwork(Request, out var roamingNetwork, out var errorResponse))
+                return (null, errorResponse);
+
+            if (!ChargingStationManufacturer_Id.TryParse(Request.ParsedURLParameters[1], out var manufacturerId))
+                return (null, EntityErrorResponse(Request, HTTPStatusCode.BadRequest, "Invalid charging station manufacturer identification!"));
+
+            return roamingNetwork.TryGetChargingStationManufacturerById(manufacturerId, out var manufacturer)
+                       ? (manufacturer.Models, null)
+                       : (null, EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The charging station manufacturer '{manufacturerId}' is unknown in the roaming network '{roamingNetwork.Id}'!"));
+
+        }
+
+        #endregion
+
+        #region (private)        RequestedModelsOfEnergyMeterManufacturer(Request)
+
+        /// <summary>
+        /// The models of the energy meter manufacturer of the given request, ~/RNs/{RN_Id}/EMMs/{EMM_Id}/...
+        /// </summary>
+        private (POICollection<EnergyMeterModel_Id, EnergyMeterModel>? Collection, HTTPResponse? ErrorResponse) RequestedModelsOfEnergyMeterManufacturer(HTTPRequest Request)
+        {
+
+            if (!TryGetRequestedRoamingNetwork(Request, out var roamingNetwork, out var errorResponse))
+                return (null, errorResponse);
+
+            if (!EnergyMeterManufacturer_Id.TryParse(Request.ParsedURLParameters[1], out var manufacturerId))
+                return (null, EntityErrorResponse(Request, HTTPStatusCode.BadRequest, "Invalid energy meter manufacturer identification!"));
+
+            return roamingNetwork.TryGetEnergyMeterManufacturerById(manufacturerId, out var manufacturer)
+                       ? (manufacturer.Models, null)
+                       : (null, EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The energy meter manufacturer '{manufacturerId}' is unknown in the roaming network '{roamingNetwork.Id}'!"));
 
         }
 

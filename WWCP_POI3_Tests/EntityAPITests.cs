@@ -123,10 +123,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                     Created:                   Created,
                     ChargingStationManufacturers:  [ new ChargingStationManufacturer(ChargingStationManufacturer_Id.Parse("ACME"),
                                                                                      I18NString.Create(Languages.en, "ACME Chargers"),
-                                                                                     Created: Created) ],
+                                                                                     Models:   [ new ChargingStationModel(ChargingStationModel_Id.Parse("Wallbox-22"), Versions: [ "1.0" ]),
+                                                                                                 new ChargingStationModel(ChargingStationModel_Id.Parse("Wallbox-11")) ],
+                                                                                     Created:  Created) ],
                     EnergyMeterManufacturers:  [ new EnergyMeterManufacturer(EnergyMeterManufacturer_Id.Parse("METERS"),
                                                                              ImmutableI18NString.Create(Languages.en, "Example Meters"),
-                                                                             Created: Created) ],
+                                                                             Models:   [ new EnergyMeterModel(EnergyMeterModel_Id.Parse("M-500")) ],
+                                                                             Created:  Created) ],
                     ParkingOperators:          [ new ParkingOperator(ParkingOperator_Id.Parse("DE*PAR"),
                                                                      Created:        Created,
                                                                      ParkingSpaces:  [ new ParkingSpace(ParkingSpace_Id.Parse("space-1"), Created: Created) ]) ],
@@ -586,6 +589,51 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(JArray.Parse(System.Text.Encoding.UTF8.GetString(noneContent)),                               Is.Empty);
                 Assert.That(HeaderOf(none, "X-Filtered-Count"),                        Is.EqualTo("0"));
 
+                Assert.That(nobody.StatusCode,                                         Is.EqualTo(HttpStatusCode.NotFound));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_manufacturer_leaves_out_its_models_which_are_listed()
+
+        [Test]
+        public async Task A_manufacturer_leaves_out_its_models_which_are_listed()
+        {
+
+            var (whole,    wholeContent)  = await Send(HttpMethod.Get, CM);
+            var (slim,     slimContent)   = await Send(HttpMethod.Get, CM + "?without=chargingStationModels");
+            var (unknown,  _)             = await Send(HttpMethod.Get, CM + "?without=energyMeterModels");
+            var (list,     listContent)   = await Send(HttpMethod.Get, CM + "/models");
+            var (model,    modelContent)  = await Send(HttpMethod.Get, CM + "/models/Wallbox-22");
+            var (missing,  _)             = await Send(HttpMethod.Get, CM + "/models/Wallbox-99");
+            var (meters,   metersContent) = await Send(HttpMethod.Get, MM + "/models");
+            var (nobody,   _)             = await Send(HttpMethod.Get, RN + "/CSMs/NOBODY/models");
+
+            var wholeJSON  = ParseJSON(wholeContent);
+            var slimJSON   = ParseJSON(slimContent);
+            var listJSON   = JArray.Parse(System.Text.Encoding.UTF8.GetString(listContent));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(slim.StatusCode,                                           Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(slimJSON["chargingStationModels"],                         Is.Null);
+                Assert.That(HeaderOf(slim, "ETag"),                                    Is.Not.EqualTo(HeaderOf(whole, "ETag")));
+                Assert.That(unknown.StatusCode,                                        Is.EqualTo(HttpStatusCode.BadRequest));
+
+                // The list is what the manufacturer embeds, in the order of their identifications.
+                Assert.That(JToken.DeepEquals(listJSON, wholeJSON["chargingStationModels"]),  Is.True);
+                Assert.That(listJSON.Select(entry => entry["@id"]!.Value<String>()),   Is.EqualTo(new[] { "Wallbox-11", "Wallbox-22" }));
+                Assert.That(HeaderOf(list, "X-Total-Count"),                           Is.EqualTo("2"));
+
+                Assert.That(model.StatusCode,                                          Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(ParseJSON(modelContent)["versions"]![0]!.Value<String>(), Is.EqualTo("1.0"));
+                Assert.That(missing.StatusCode,                                        Is.EqualTo(HttpStatusCode.NotFound));
+
+                Assert.That(JArray.Parse(System.Text.Encoding.UTF8.GetString(metersContent)).Single()["@id"]!.Value<String>(),  Is.EqualTo("M-500"));
                 Assert.That(nobody.StatusCode,                                         Is.EqualTo(HttpStatusCode.NotFound));
 
             }

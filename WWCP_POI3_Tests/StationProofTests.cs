@@ -62,6 +62,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
         private static readonly ChargingTariff_Id                   T3          = ChargingTariff_Id.                 Parse("DE*GEF*T3");
         private static readonly EVSETemplate_Id                     ET1         = EVSETemplate_Id.                   Parse("DE*GEF*ET1");
         private static readonly ChargingStationManufacturer_Id      ACME        = ChargingStationManufacturer_Id.    Parse("ACME");
+        private static readonly ChargingStationModel                Wallbox22   = new (ChargingStationModel_Id.Parse("Wallbox-22"), Versions: [ "1.0" ]);
+        private static readonly ChargingStationModel                Wallbox11   = new (ChargingStationModel_Id.Parse("Wallbox-11"));
+        private static readonly EnergyMeterModel                    M500        = new (EnergyMeterModel_Id.Parse("M-500"), SignatureMethods: [ SignatureMethod.OCMF ]);
+        private static readonly EnergyMeterModel                    M300        = new (EnergyMeterModel_Id.Parse("M-300"));
         private static readonly EnergyMeterManufacturer_Id          Meters      = EnergyMeterManufacturer_Id.        Parse("METERS");
         private static readonly EnergyMeterManufacturer_Id          Others      = EnergyMeterManufacturer_Id.        Parse("OTHERS");
         private static readonly TransparencySoftware_Id             Chargy10    = TransparencySoftware_Id.           Parse("chargy-1.0");
@@ -99,8 +103,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
             => new RoamingNetwork(RN,
                    Created:                           Created,
-                   ChargingStationManufacturers:      [ new ChargingStationManufacturer(ACME, Created: Created) ],
-                   EnergyMeterManufacturers:          [ new EnergyMeterManufacturer(Meters, Created: Created),
+                   ChargingStationManufacturers:      [ new ChargingStationManufacturer(ACME, Models: [ Wallbox22, Wallbox11 ], Created: Created) ],
+                   EnergyMeterManufacturers:          [ new EnergyMeterManufacturer(Meters, Models: [ M500, M300 ], Created: Created),
                                                         new EnergyMeterManufacturer(Others, Created: Created) ],
                    TransparencySoftwareManufacturers: [ new TransparencySoftwareManufacturer(TransparencySoftwareManufacturer_Id.Parse("OpenChargingCloud"),
                                                                                              TransparencySoftware:  [ NewRelease(Chargy10, "1.0"), NewRelease(Chargy11, "1.1") ],
@@ -109,11 +113,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                                                                                      NotifiedBodyNumber:                "0102",
                                                                                      NotifiedFor:                       [ ConformityAssessmentBody.Legislations.MID ],
                                                                                      TransparencySoftwareCertificates:  [ new TransparencySoftwareCertificate(Cert1,
-                                                                                                                                                              ChargingStationModel_Id.Parse("Wallbox-22"),
+                                                                                                                                                              ACME,
+                                                                                                                                                              Wallbox22.Id,
                                                                                                                                                               "1.0",
                                                                                                                                                               [ Chargy10 ],
                                                                                                                                                               [ Chargy11 ],
-                                                                                                                                                              ChargingStationManufacturerId:  ACME,
                                                                                                                                                               DocumentNumber:                 "DE-123",
                                                                                                                                                               NotBefore:                      Created,
                                                                                                                                                               Legislation:                    ConformityAssessmentBody.Legislations.MID) ],
@@ -142,12 +146,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                                                                                                  Created:                Created,
                                                                                                  ChargingStations:       [ new ChargingStation(S1,
                                                                                                                                                ManufacturerId:   ACME,
+                                                                                                                                               ModelId:          Wallbox22.Id,
                                                                                                                                                ParkingSpaceIds:  [ Space1 ],
                                                                                                                                                Created:          Created,
                                                                                                                                                EVSEs:            [ new EVSE(E11,
                                                                                                                                                                             TemplateIds:  [ ET1 ],
                                                                                                                                                                             EnergyMeter:  new EnergyMeter(EnergyMeter_Id.Parse("meter-1"),
                                                                                                                                                                                                           ManufacturerId:              Meters,
+                                                                                                                                                                                                          ModelId:                     M500.Id,
                                                                                                                                                                                                           SerialNumber:                "M-1",
                                                                                                                                                                                                           TransparencySoftwareStatus:  [ new TransparencySoftwareAssignment(Chargy10, LegalStatus.GermanCalibrationLaw, Cert1) ],
                                                                                                                                                                                                           Created:                     Created),
@@ -317,9 +323,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(Ids(proof.Given("chargingStationOperators", "chargingTariffs")),          Is.EqualTo(new[] { T1.ToString(), T2.ToString() }));
                 Assert.That(proof.Given("chargingStationOperators").Single()["EVSETemplates"]!["@merkleRoot"], Is.Not.Null, "templates are pruned");
 
-                // What the station and its energy meters name.
+                // What the station and its energy meters name: their manufacturers, with the models they name only.
                 Assert.That(Ids(proof.Given("chargingStationManufacturers")),                         Is.EqualTo(new[] { "ACME" }));
+                Assert.That(Ids(proof.Given("chargingStationManufacturers", "chargingStationModels")), Is.EqualTo(new[] { "Wallbox-22" }));
+                Assert.That(proof.Given("chargingStationManufacturers").Single()["chargingStationModels"]!["@size"]!.Value<Int32>(), Is.EqualTo(2));
                 Assert.That(Ids(proof.Given("energyMeterManufacturers")),                             Is.EqualTo(new[] { "METERS" }));
+                Assert.That(Ids(proof.Given("energyMeterManufacturers", "energyMeterModels")),        Is.EqualTo(new[] { "M-500" }));
                 Assert.That(Ids(proof.Given("transparencySoftwareManufacturers")),                    Is.EqualTo(new[] { "OpenChargingCloud" }));
                 Assert.That(Ids(proof.Given("transparencySoftwareManufacturers", "transparencySoftware")), Is.EqualTo(new[] { "chargy-1.0" }));
                 Assert.That(Ids(proof.Given("conformityAssessmentBodies")),                           Is.EqualTo(new[] { "PTB" }));

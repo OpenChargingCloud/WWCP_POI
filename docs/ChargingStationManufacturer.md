@@ -1,13 +1,11 @@
 # ChargingStationManufacturer
 
-A charging station manufacturer builds charging stations, e.g. wallboxes or DC chargers. POI keeps a registry of
-them, so that charging stations of every operator can name their manufacturer (`manufacturerId`, with a `modelId`)
-and transparency software certificates the manufacturer they were issued for. It is described by its name, its
-contact data and data licenses, as a charging station operator is, and may name keys.
-
-Manufacturers are embedded completely in the [RoamingNetwork](RoamingNetwork.md) under
-`chargingStationManufacturers`, ordered by identification. They are a registry of the roaming network operator
-(RNO): the RNO adds, changes and removes them, signed with one of the network's signing keys.
+A charging station manufacturer builds charging stations, e.g. wallboxes or DC chargers. In POI 3 it is a **party**:
+the roaming network operator (RNO) adds and removes it, with its keys; it changes its own properties and its
+**models** with its own keys. A charging station and a charging station template name their manufacturer
+(`manufacturerId`) and their model (`modelId`), a transparency software certificate the manufacturer, the model and
+the version of the model it was issued for. It is described by its name, its contact data and data licenses, as a
+charging station operator is.
 
 The identification is a `ChargingStationManufacturer_Id`, any nonempty text, trimmed, compared case-insensitively,
 e.g. `GraphDefined` or `ACME`. It is unique within the roaming network.
@@ -19,8 +17,9 @@ e.g. `GraphDefined` or `ACME`. It is unique within the roaming network.
 | Admin status | `ChargingStationManufacturerAdminStatusType`, initially `operational` |
 | Status | `ChargingStationManufacturerStatusType`, initially `available` |
 | Embedded in | [RoamingNetwork](RoamingNetwork.md) as `chargingStationManufacturers` |
-| Owner | the RNO (signing keys of the roaming network) |
-| HTTP | `GET ~/RNs/{RN_Id}/CSMs/{CSM_Id}` |
+| Owner | itself (signing key); its signing keys: a signing or an identity key; its identity keys: an identity key; or, for recovery, an identity key of the RNO; added and removed by the RNO |
+| Embeds | its models, `chargingStationModels` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSMs/{CSM_Id}`, with its models (`?without=chargingStationModels` leaves them out), listed by `GET ~/RNs/{RN_Id}/CSMs`; its models `GET ~/RNs/{RN_Id}/CSMs/{CSM_Id}/models[/{Model_Id}]` |
 
 
 ## Common properties
@@ -34,7 +33,7 @@ See [README.md](README.md#common-properties). No `eTags`.
 | `description` | update/remove | I18N text; omitted when empty |
 | `dataSource` | update/remove | |
 | `created` | — | set to the `createdAt` of the change set when added, unless given |
-| `lastChange` | — | set to the `createdAt` of the change set by every change |
+| `lastChange` | — | set to the `createdAt` of the change set by every change of it and of its models |
 | `customData` | update/remove | a JSON object; omitted when empty |
 
 
@@ -51,11 +50,12 @@ See [README.md](README.md#common-properties). No `eTags`.
 | `homepage` | `Homepage` | `URL?` | update/remove | Its homepage. |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | The telephone number of its hotline, e.g. `+49 30 1234567`. |
 | `termsAndConditions` | `TermsAndConditionsURL` | `URL?` | update/remove | The URL of its terms and conditions. |
-| `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update/remove | Its signing keys, as of a party; omitted when none. See [Keys](#keys). |
-| `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update/remove | Its identity keys, as of a party; omitted when none. See [Keys](#keys). |
+| `chargingStationModels` | `Models` | [ChargingStationModel](#chargingstationmodels)[] | add/remove, each on its own | Its models, ordered by `@id` (ordinal); omitted when none. |
+| `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update | Its signing keys, see [Keys](#keys). |
+| `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update | Its identity keys, see [Keys](#keys). |
 
-All are optional and omitted when absent. A manufacturer has no list of models: the `modelId` of a charging
-station is not checked against anything.
+All but the keys are optional and omitted when absent. `chargingStationModelIds` is refused: its models are embedded
+completely.
 
 
 ## address
@@ -80,36 +80,75 @@ Styx's `Address`, written embedded (without `@context`):
 The address is replaced or removed as a whole: `UpdateProperty(manufacturer, "address", old, newAddress)`.
 
 
+## chargingStationModels
+
+`ChargingStationModel` ([source](../WWCP_POI3/RoamingNetwork/ChargingStationManufacturer/ChargingStationModel/ChargingStationModel.cs)),
+context `https://open.charging.cloud/contexts/wwcp/roamingNetwork/chargingStationModel/v1`: a model of charging
+stations, as its manufacturer states it, e.g. `GD-DC300`. Without runtime status and timestamps; its manufacturer,
+which embeds it, names who made it, so it names none (`manufacturerId` is refused). Its technical data are the
+ratings of the model; a charging station of it may have less, its EVSEs say what they have.
+
+| JSON key | Type | Change set | Description |
+|---|---|---|---|
+| `@id` | string | — | `ChargingStationModel_Id`: any nonempty text, trimmed, compared case-insensitively; unique within its manufacturer, so that two manufacturers may have models of the same identification. |
+| `name` | I18N text | update/remove | Its name. |
+| `description` | I18N text | update/remove | |
+| `versions` | string[] | update/remove | Its versions, e.g. hardware revisions, each once, none empty or beginning or ending with whitespace, in their given order. A certificate names one of them. |
+| `productURL` | URL | update/remove | Its product page. |
+| `datasheetURL` | URL | update/remove | Its datasheet. |
+| `images` | object[] | update/remove | Images of it, as of a charging station; each URL once. |
+| `maxPower` | number | update/remove | The maximum power of a charging station of it, in W; positive. |
+| `currentTypes` | string[] | update/remove | Its current types: `AC_OnePhase`, `AC_ThreePhases`, `DC`. |
+| `connectorTypes` | string[] | update/remove | The types of its charging connectors, `ChargingConnectorType`s, e.g. `IEC_62196_T2_COMBO`; ordered by identification, each once. |
+| `numberOfEVSEs` | integer | update/remove | The number of EVSEs of a charging station of it; at least 1. |
+| `customData` | object | update/remove | |
+
+- `RoamingNetworkChange.Add(model, manufacturerId)`, `Remove(modelId, manufacturerId)`,
+  `UpdateProperty(model, manufacturerId, …)`/`RemoveProperty(model, manufacturerId, …)`: every change names its
+  manufacturer as its parent, as its identification is unique within it only; one without is refused. Signed by the
+  manufacturer, with a signing key that may sign `models`.
+- A model still named by a charging station, a charging station template or a certificate can not be removed, nor its
+  manufacturer.
+
+
 ## Keys
 
-A manufacturer may name `signingKeys` and `identityKeys`, as a party does (see
-[ChargingStationOperator](ChargingStationOperator.md#signing-and-identity-keys)), e.g. for what it signs outside
-the roaming network. It is no party: they sign no change sets, and the RNO changes them as every property of its
-registry. Every identity key a change enters anew signs the change set as well, as the proof that the manufacturer
-holds it (SPECIFICATION.md, section 4.1).
+Signing and identity keys as of every party (see [ChargingStationOperator](ChargingStationOperator.md#signing-and-identity-keys)):
+it is added with at least one of each, every new identity key signing the change set as the proof that the
+manufacturer holds it, and keeps at least one of each. A signing key naming `usages` signs its models only when it
+names `models`, its own properties only when it names `party` (SPECIFICATION.md, section 4.1).
 
 
 ## References
 
 | Who | JSON key | Rule |
 |---|---|---|
-| [ChargingStation](ChargingStation.md) | `manufacturerId`, `modelId` | `manufacturerId` must name a manufacturer of the network; `modelId` (`ChargingStationModel_Id`) is free text. |
-| transparency software certificate ([ConformityAssessmentBody](ConformityAssessmentBody.md#transparencysoftwarecertificates)) | `chargingStationManufacturerId` | must name a manufacturer of the network. |
+| [ChargingStation](ChargingStation.md) | `manufacturerId`, `modelId` | `manufacturerId` names a manufacturer of the network; `modelId` a model of it, and only with its manufacturer: as the station is at runtime, with what its templates give it. |
+| [ChargingStationTemplate](ChargingStationTemplate.md) | `manufacturerId`, `modelId` | the same, of the template. |
+| transparency software certificate ([ConformityAssessmentBody](ConformityAssessmentBody.md#transparencysoftwarecertificates)) | `chargingStationManufacturerId`, `chargingStationModel`, `chargingStationModelVersion` | the manufacturer, mandatory, names a manufacturer of the network, the model one of its models, the version one of its `versions`. |
 
-The references are checked after every change set: a manufacturer still named can not be removed, and a station
-or certificate can not name an unknown one.
+The references are checked after every change set: a manufacturer or a model still named can not be removed, and a
+station, template or certificate can not name an unknown one.
 
 
 ## Change sets
 
-- `RoamingNetworkChange.Add(manufacturer)` — its JSON; `created` and `lastChange` become the change set's `createdAt`
-  unless `created` is given.
-- `RoamingNetworkChange.Remove(manufacturerId)` — optionally with its complete previous JSON as old value.
+- `RoamingNetworkChange.Add(manufacturer)` — signed by the RNO, with its keys and without its models: they are its own
+  to add. `created` and `lastChange` become the change set's `createdAt` unless `created` is given.
+- `RoamingNetworkChange.Remove(manufacturerId)` — signed by the RNO; its models go with it.
 - `UpdateProperty(manufacturer, …)` / `RemoveProperty(manufacturer, …)` of `name`, `description`, `dataSource`,
   `dataLicenses`, `address`, `logos`, `geoLocation`, `telephone`, `eMailAddress`, `homepage`, `hotline`,
-  `termsAndConditions`, `signingKeys`, `identityKeys`, `customData`.
-- A given parent must be the roaming network itself. Signed with a signing key of the RNO.
+  `termsAndConditions`, `customData` — signed by the manufacturer; `signingKeys` and `identityKeys` as of every party.
+  `chargingStationModels` is no property: its models are added, changed and removed on their own.
+- A given parent must be the roaming network itself.
 - Admin status, status and internal data go along to the changed version.
+
+
+## Effective tree
+
+A charging station manufacturer is a node of the effective tree (SPECIFICATION.md, section 8) with the child array
+`chargingStationModels`; without models, its node is the one of its content alone. The proof of a charging station
+gives its manufacturer with the model the station names, and prunes its other models.
 
 
 ## Runtime status
@@ -120,7 +159,7 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Charging
   `operational`, `internalUse`, `outOfService`. Initially `operational` since `created`.
 - **Status** `ChargingStationManufacturerStatusType`: `unknown`, `unspecified`, `offline`, `inDeployment`,
   `available`, `error`. Initially `available` since `created`.
-- No energy status.
+- No energy status. Models have none.
 - Events: `OnAdminStatusChanged` (`OnChargingStationManufacturerAdminStatusChangedDelegate`) and `OnStatusChanged`
   (`OnChargingStationManufacturerStatusChangedDelegate`).
 
@@ -130,27 +169,33 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Charging
 - `@id` mandatory, a nonempty `ChargingStationManufacturer_Id`; unique within the roaming network.
 - `address`, when given, a JSON object with the mandatory address fields; `homepage`, `termsAndConditions` and the
   `uri` of its logo URLs; `telephone` and `hotline` phone numbers; `eMailAddress` an e-mail address; `logos` an
-  array of at most one logo; `dataLicenses` licenses given completely, none twice; keys as of a party.
-- Network level: every `manufacturerId` of a charging station and every `chargingStationManufacturerId` of a
-  certificate names a manufacturer of the network.
+  array of at most one logo; `dataLicenses` licenses given completely, none twice; keys as of a party; a model `@id`
+  only once.
+- Network level: every manufacturer and model a charging station, a charging station template or a certificate names
+  is one of the network, see [References](#references).
 
 
 ## Example
 
 ```json
 {
-  "@id": "ACME",
-  "name": { "en": "ACME Charging" },
-  "address": {
-    "street": "Musterstraße",
-    "postalCode": "07743",
-    "city": { "de": "Jena" },
-    "country": "DEU",
-    "houseNumber": "1"
-  },
-  "eMailAddress": "ACME Sales <sales@charging.example.org>",
-  "homepage": "https://charging.example.org",
-  "hotline": "+49 3641 1234567",
+  "@id": "GraphDefined",
+  "name": { "en": "GraphDefined Charging Stations" },
+  "homepage": "https://stations.graphdefined.example",
+  "chargingStationModels": [
+    {
+      "@id": "GD-DC300",
+      "name": { "en": "GraphDefined DC 300" },
+      "versions": [ "1.0", "1.1" ],
+      "datasheetURL": "https://stations.graphdefined.example/gd-dc300/datasheet.pdf",
+      "maxPower": 300000,
+      "currentTypes": [ "DC" ],
+      "connectorTypes": [ "IEC_62196_T2_COMBO" ],
+      "numberOfEVSEs": 2
+    }
+  ],
+  "signingKeys":  [ { "@id": "…", "key": "…", "usages": [ "models" ] }, { "@id": "…", "key": "…", "usages": [ "party" ] } ],
+  "identityKeys": [ { "@id": "…", "key": "…" } ],
   "created": "2026-01-01T00:00:00.000Z",
   "lastChange": "2026-01-01T00:00:00.000Z"
 }

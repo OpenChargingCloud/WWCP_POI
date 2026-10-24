@@ -15,8 +15,10 @@ flowchart TD
     RoamingNetwork --> RoamingNetworkOperator
     RoamingNetwork --> ChargingStationOperator
     RoamingNetwork --> ChargingStationManufacturer
+    ChargingStationManufacturer --> ChargingStationModel
     RoamingNetwork --> EnergyMeterManufacturer
-    EnergyMeter -. manufacturerId .-> EnergyMeterManufacturer
+    EnergyMeterManufacturer --> EnergyMeterModel
+    EnergyMeter -. manufacturerId, modelId .-> EnergyMeterModel
     RoamingNetwork --> EMobilityProvider
     RoamingNetwork --> GridOperator
     RoamingNetwork --> ParkingOperator
@@ -49,7 +51,7 @@ flowchart TD
 | Entity | Embedded in, as | Owner | What it is |
 |---|---|---|---|
 | [RoamingNetwork](RoamingNetwork.md) | — (root) | roaming network operator (RNO) | One version of a roaming network with everything it embeds; carries the ETags. |
-| [RoamingNetworkOperator](RoamingNetworkOperator.md) | roaming network, `roamingNetworkOperator` | itself; neither added nor removed | The RNO, with the keys of the network: owns it, its registries, and who is a member. One may operate many networks. |
+| [RoamingNetworkOperator](RoamingNetworkOperator.md) | roaming network, `roamingNetworkOperator` | itself; neither added nor removed | The RNO, with the keys of the network: owns it and who is a member. One may operate many networks. |
 | [ChargingStationOperator](ChargingStationOperator.md) | roaming network, `chargingStationOperators` | the operator; added and removed by the RNO | A CPO with its charging pools, tariffs, templates, groups and offers. |
 | [ChargingPool](ChargingPool.md) | operator, `chargingPools` | its operator | A charging location: address, opening times, facilities, grid connection, stations. |
 | [ChargingStation](ChargingStation.md) | charging pool, `chargingStations` | its operator | A charger with its EVSEs, manufacturer and model, energy status. |
@@ -67,8 +69,8 @@ flowchart TD
 | [EnergyMeter](EnergyMeter.md) | pool, grid connection point, station, EVSE | whoever owns or maintains what embeds it | A meter with its role, manufacturer, model, versions and transparency software. |
 | [EnergyMeterTemplate](EnergyMeterTemplate.md) | operator or grid operator, `energyMeterTemplates` | its operator or grid operator | What a series of energy meters naming it shares, e.g. manufacturer, model and firmware. |
 | [EnergyMeterGroup](EnergyMeterGroup.md) | operator or grid operator, `energyMeterGroups` | its operator or grid operator | Energy meters of the operator's pools, stations and EVSEs, or of the grid operator's grid connection points; a collection. |
-| [ChargingStationManufacturer](ChargingStationManufacturer.md) | roaming network, `chargingStationManufacturers` | RNO | A maker of charging stations, named by stations' `manufacturerId`. |
-| [EnergyMeterManufacturer](EnergyMeterManufacturer.md) | roaming network, `energyMeterManufacturers` | RNO | A maker of energy meters, named by meters and their templates (`manufacturerId`). |
+| [ChargingStationManufacturer](ChargingStationManufacturer.md) | roaming network, `chargingStationManufacturers` | the manufacturer; added and removed by the RNO | A maker of charging stations with its models, named by stations, their templates and certificates (`manufacturerId`, `modelId`). |
+| [EnergyMeterManufacturer](EnergyMeterManufacturer.md) | roaming network, `energyMeterManufacturers` | the manufacturer; added and removed by the RNO | A maker of energy meters with its models, named by meters and their templates (`manufacturerId`, `modelId`). |
 | [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md) | roaming network, `transparencySoftwareManufacturers` | the manufacturer; added and removed by the RNO | A maker of transparency software with its releases, and what the EU Cyber Resilience Act asks of it. |
 | [ConformityAssessmentBody](ConformityAssessmentBody.md) | roaming network, `conformityAssessmentBodies` | the body, or the RNO while it has no keys; added and removed by the RNO | E.g. a metrology institute, notified for legislations such as MID or CRA, with the transparency software certificates it issued. |
 | [EMobilityProvider](EMobilityProvider.md) | roaming network, `eMobilityProviders` | the provider; added and removed by the RNO | An EMSP, with its keys, groups and offers. |
@@ -86,9 +88,11 @@ status; brands, embedded on several levels, have a file of their own:
 | Substructure | Documented in |
 |---|---|
 | Brands, of operators, pools, stations, EVSEs and RFID authentication modes | [Brand](Brand.md) |
+| Charging station models | [ChargingStationManufacturer](ChargingStationManufacturer.md#chargingstationmodels) |
+| Energy meter models | [EnergyMeterManufacturer](EnergyMeterManufacturer.md#energymetermodels) |
 | Transparency software certificates | [ConformityAssessmentBody](ConformityAssessmentBody.md) |
 | Transparency software releases | [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md) |
-| Signing and identity keys | [RoamingNetworkOperator](RoamingNetworkOperator.md#keys), and each party: [ChargingStationOperator](ChargingStationOperator.md), [EMobilityProvider](EMobilityProvider.md), [GridOperator](GridOperator.md), [ParkingOperator](ParkingOperator.md), [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md), [ConformityAssessmentBody](ConformityAssessmentBody.md) |
+| Signing and identity keys | [RoamingNetworkOperator](RoamingNetworkOperator.md#keys), and each party: [ChargingStationOperator](ChargingStationOperator.md), [EMobilityProvider](EMobilityProvider.md), [GridOperator](GridOperator.md), [ParkingOperator](ParkingOperator.md), [ChargingStationManufacturer](ChargingStationManufacturer.md), [EnergyMeterManufacturer](EnergyMeterManufacturer.md), [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md), [ConformityAssessmentBody](ConformityAssessmentBody.md) |
 | Data licenses | [RoamingNetwork](RoamingNetwork.md), [ChargingStationOperator](ChargingStationOperator.md), [ChargingPool](ChargingPool.md) |
 | Logos, contact data | [ChargingStationOperator](ChargingStationOperator.md) |
 | Grid connection points and their maintainers | [GridOperator](GridOperator.md) |
@@ -454,7 +458,7 @@ RoamingNetworkChange.UpdateElementProperty("EVSE",      "DE*GEF*E1*1", [ new ("c
 
 ### Collections
 
-The children of an entity, and the parties and registries of a roaming network, are `POICollection<TId, TEntity>`
+The children of an entity, and the parties of a roaming network, are `POICollection<TId, TEntity>`
 ([source](../WWCP_POI3/DataStructures/POICollection.cs)): immutable, in the ordinal order of the texts of their
 identifications (the order of JSON and CBOR), looked up by identification with `TryGet`, `Contains` and `Get`.
 Identifications are equal as their type compares them, e.g. most without case, parking products with case; a

@@ -1,7 +1,7 @@
 # RoamingNetworkOperator
 
-The roaming network operator (RNO) runs a roaming network: it owns the network itself and its registries, and it
-decides who is a member. In POI 3 it is a party of the roaming network: embedded completely in the
+The roaming network operator (RNO) runs a roaming network: it owns the network itself, and it decides who is a
+member. In POI 3 it is a party of the roaming network: embedded completely in the
 [RoamingNetwork](RoamingNetwork.md) as `operator`, a single object, with the public halves of its
 keys. A roaming network has no keys of its own: they are the keys of its operator.
 
@@ -9,8 +9,7 @@ One operator may operate many roaming networks, e.g. `Prod` and `QA`: each of th
 verified from its own history alone. A roaming network without an operator can not be changed where only the
 operator may change it: nobody can sign for it.
 
-It owns its own properties, the roaming network itself, the registries (charging station manufacturers, energy
-meter manufacturers), and adds and removes the other parties. It signs in the place of a grid operator or a
+It owns its own properties and the roaming network itself, and adds and removes the other parties. It signs in the place of a grid operator or a
 conformity assessment body without keys, and its identity keys recover the keys of every other party.
 It never changes the data of another party. Its identification is any nonempty text without surrounding
 whitespace, compared case-insensitively, e.g. `GraphDefined`.
@@ -84,10 +83,10 @@ The public keys of the RNO (`POIPublicKey`, [source](../WWCP_POI3/DataStructures
 | `notBefore` | timestamp | Optional start of validity (UTC, to the millisecond). |
 | `notAfter` | timestamp | Optional end of validity; not before `notBefore`. |
 | `holder` | string | Optional: who holds the private key, e.g. one company of a [quorum](#quorum). No part of `@id`. |
-| `usages` | array of texts | Optional, signing keys only: what it may sign (`infrastructure`, `tariffs`, `priceStatements`, `party`); everything without. Commits and attestations of the RNO need `party`. No part of `@id`. |
+| `usages` | array of texts | Optional, signing keys only: what it may sign (`infrastructure`, `tariffs`, `priceStatements`, `models`, `software`, `certificates`, `party`); everything without. Commits and attestations of the RNO need `party`. No part of `@id`. |
 
 - **signingKeys** — short keys (e.g. secp256r1) signing change sets of RNO data: its own properties, the network's
-  properties, the registries, adding and removing parties, and the rotation of the signing keys themselves. A
+  properties, adding and removing parties, and the rotation of the signing keys themselves. A
   server operating the network signs its commits with one as well, in the role `roamingNetworkOperator`. The RNO
   names them in its `signingKeyCertificates` only, each certified by an identity key of its holder; it writes no
   `signingKeys`, and one naming them is refused. A certificate names the operator, not a network: the same keys in

@@ -257,11 +257,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                        (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Remove(ParkingOperator_Id.Parse("DE*NEW")))).
                              SetName("Who_is_a_member_needs_the_quorum(ParkingOperator)");
 
-            yield return new TestCaseData("NEWCO",     (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Add(new ChargingStationManufacturer(ChargingStationManufacturer_Id.Parse("NEWCO"), Name: I18NString.Create(Languages.en, "A new manufacturer"), Created: T0))),
+            yield return new TestCaseData("NEWCO",     (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Add(new ChargingStationManufacturer(ChargingStationManufacturer_Id.Parse("NEWCO"), Name: I18NString.Create(Languages.en, "A new manufacturer"), Created: T0).WithKeys())),
                                                        (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Remove(ChargingStationManufacturer_Id.Parse("NEWCO")))).
                              SetName("Who_is_a_member_needs_the_quorum(ChargingStationManufacturer)");
 
-            yield return new TestCaseData("NEWMETERS", (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Add(new EnergyMeterManufacturer(EnergyMeterManufacturer_Id.Parse("NEWMETERS"), Name: ImmutableI18NString.Create(Languages.en, "A new meter manufacturer"), Created: T0))),
+            yield return new TestCaseData("NEWMETERS", (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Add(new EnergyMeterManufacturer(EnergyMeterManufacturer_Id.Parse("NEWMETERS"), Name: ImmutableI18NString.Create(Languages.en, "A new meter manufacturer"), Created: T0).WithKeys())),
                                                        (Func<RoamingNetworkChange>) (() => RoamingNetworkChange.Remove(EnergyMeterManufacturer_Id.Parse("NEWMETERS")))).
                              SetName("Who_is_a_member_needs_the_quorum(EnergyMeterManufacturer)");
 

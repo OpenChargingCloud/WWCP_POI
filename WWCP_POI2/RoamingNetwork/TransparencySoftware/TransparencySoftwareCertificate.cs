@@ -135,14 +135,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public String?                                  Legislation                          { get; }
 
         /// <summary>
-        /// The charging station model to which this document applies,
+        /// The manufacturer of the charging station model, as charging stations name it by their manufacturerId.
+        /// </summary>
+        [Mandatory]
+        public ChargingStationManufacturer_Id           ChargingStationManufacturerId        { get; }
+
+        /// <summary>
+        /// The charging station model to which this document applies, one of its manufacturer,
         /// as charging stations name it by their modelId.
         /// </summary>
         [Mandatory]
         public ChargingStationModel_Id                  ChargingStationModel                 { get; }
 
         /// <summary>
-        /// The charging station model version to which this document applies.
+        /// The charging station model version to which this document applies, one of the versions of its model.
         /// </summary>
         [Mandatory]
         public String                                   ChargingStationModelVersion          { get; }
@@ -158,12 +164,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         [Mandatory]
         public ImmutableArray<TransparencySoftware_Id>  CompatibleTransparencySoftwareIds    { get; }
-
-        /// <summary>
-        /// The optional manufacturer of the charging station model.
-        /// </summary>
-        [Optional]
-        public ChargingStationManufacturer_Id?          ChargingStationManufacturerId        { get; }
 
         /// <summary>
         /// The optional document number of the issuer, if different from the identity.
@@ -197,22 +197,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Create a new approval or compatibility document for a charging station model/version.
         /// </summary>
         /// <param name="Id">The stable identity of this document.</param>
+        /// <param name="ChargingStationManufacturerId">The manufacturer of the charging station model.</param>
         /// <param name="ChargingStationModel">The charging station model to which this document applies.</param>
         /// <param name="ChargingStationModelVersion">The charging station model version to which this document applies.</param>
         /// <param name="VerifiedTransparencySoftwareIds">The transparency software releases officially checked with this model/version.</param>
         /// <param name="CompatibleTransparencySoftwareIds">Compatible additional releases, without a claim of official verification.</param>
-        /// <param name="ChargingStationManufacturerId">The optional manufacturer of the charging station model.</param>
         /// <param name="DocumentNumber">The optional document number of the issuer.</param>
         /// <param name="DocumentURL">The optional location of the document.</param>
         /// <param name="NotBefore">The optional start of the validity of this document.</param>
         /// <param name="NotAfter">The optional end of the validity of this document.</param>
         /// <param name="Legislation">The optional legislation it is issued under, e.g. MID.</param>
         public TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id     Id,
+                                               ChargingStationManufacturer_Id         ChargingStationManufacturerId,
                                                ChargingStationModel_Id                ChargingStationModel,
                                                String                                 ChargingStationModelVersion,
                                                IEnumerable<TransparencySoftware_Id>?  VerifiedTransparencySoftwareIds     = null,
                                                IEnumerable<TransparencySoftware_Id>?  CompatibleTransparencySoftwareIds   = null,
-                                               ChargingStationManufacturer_Id?        ChargingStationManufacturerId       = null,
                                                String?                                DocumentNumber                      = null,
                                                URL?                                   DocumentURL                         = null,
                                                DateTimeOffset?                        NotBefore                           = null,
@@ -228,8 +228,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             ArgumentException.ThrowIfNullOrWhiteSpace(ChargingStationModelVersion);
 
-            if (ChargingStationManufacturerId is { } manufacturerId && manufacturerId.IsNullOrEmpty)
-                throw new ArgumentException("Invalid manufacturer identifier.", nameof(ChargingStationManufacturerId));
+            if (ChargingStationManufacturerId.IsNullOrEmpty)
+                throw new ArgumentException("The manufacturer of the charging station model is required.", nameof(ChargingStationManufacturerId));
 
             if (DocumentURL is { } documentURL && !Uri.TryCreate(documentURL.ToString(), UriKind.Absolute, out _))
                 throw new ArgumentException("documentURL must be absolute.", nameof(DocumentURL));
@@ -318,15 +318,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Certificate = new TransparencySoftwareCertificate(
                                   Id:                                 TransparencySoftwareCertificate_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.Id)),
+                                  ChargingStationManufacturerId:      ChargingStationManufacturer_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.ChargingStationManufacturerId)),
                                   ChargingStationModel:               ChargingStationModel_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.ChargingStationModel)),
                                   ChargingStationModelVersion:        StrictJSON.RequiredText(JSON, PropertyKeys.ChargingStationModelVersion),
                                   VerifiedTransparencySoftwareIds:    StrictJSON.Array(JSON, PropertyKeys.VerifiedTransparencySoftwareIds,
                                                                                              token => TransparencySoftware_Id.Parse(StrictJSON.Identifier(token))),
                                   CompatibleTransparencySoftwareIds:  StrictJSON.Array(JSON, PropertyKeys.CompatibleTransparencySoftwareIds,
                                                                                              token => TransparencySoftware_Id.Parse(StrictJSON.Identifier(token))),
-                                  ChargingStationManufacturerId:      StrictJSON.Text(JSON, PropertyKeys.ChargingStationManufacturerId) is { } manufacturerId
-                                                                          ? ChargingStationManufacturer_Id.Parse(manufacturerId)
-                                                                          : null,
                                   DocumentNumber:                     StrictJSON.Text(JSON, PropertyKeys.DocumentNumber),
                                   DocumentURL:                        StrictJSON.Link(JSON, PropertyKeys.DocumentURL),
                                   NotBefore:                          StrictJSON.Date(JSON, PropertyKeys.NotBefore),
@@ -368,14 +366,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                ? new JProperty(PropertyKeys.Context,                             JSONLDContext)
                                : null,
 
+                                 new JProperty(PropertyKeys.ChargingStationManufacturerId,       ChargingStationManufacturerId.ToString()),
                                  new JProperty(PropertyKeys.ChargingStationModel,                ChargingStationModel.ToString()),
                                  new JProperty(PropertyKeys.ChargingStationModelVersion,         ChargingStationModelVersion),
                                  new JProperty(PropertyKeys.VerifiedTransparencySoftwareIds,     new JArray(VerifiedTransparencySoftwareIds.  Select(id => id.ToString()).Order(StringComparer.Ordinal))),
                                  new JProperty(PropertyKeys.CompatibleTransparencySoftwareIds,   new JArray(CompatibleTransparencySoftwareIds.Select(id => id.ToString()).Order(StringComparer.Ordinal))),
-
-                           ChargingStationManufacturerId.HasValue
-                               ? new JProperty(PropertyKeys.ChargingStationManufacturerId,       ChargingStationManufacturerId.Value.ToString())
-                               : null,
 
                            DocumentNumber is not null
                                ? new JProperty(PropertyKeys.DocumentNumber,                      DocumentNumber)

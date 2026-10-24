@@ -561,7 +561,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Add                   (ChargingStationManufacturer)
 
         /// <summary>
-        /// Add the given charging station manufacturer to its roaming network.
+        /// Add the given charging station manufacturer to its roaming network, with its keys and without its models.
         /// </summary>
         /// <param name="ChargingStationManufacturer">The new charging station manufacturer.</param>
         public static RoamingNetworkChange Add(ChargingStationManufacturer ChargingStationManufacturer)
@@ -571,7 +571,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    ChargingStationManufacturer.ToJSON(Embedded: true));
 
         /// <summary>
-        /// Remove the given charging station manufacturer, optionally checking its complete previous JSON representation.
+        /// Remove the given charging station manufacturer, with its models, optionally checking its complete previous JSON
+        /// representation.
         /// </summary>
         public static RoamingNetworkChange Remove(ChargingStationManufacturer_Id  ChargingStationManufacturerId,
                                                   JToken?                         OldValue   = null)
@@ -598,6 +599,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           JToken?                      OldValue   = null)
 
             => RemoveProperty(nameof(POI.ChargingStationManufacturer), ChargingStationManufacturer.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (ChargingStationModel, ChargingStationManufacturerId)
+
+        /// <summary>
+        /// Add the given charging station model to its manufacturer.
+        /// </summary>
+        /// <param name="ChargingStationModel">The new charging station model.</param>
+        /// <param name="ChargingStationManufacturerId">The identification of its manufacturer.</param>
+        public static RoamingNetworkChange Add(ChargingStationModel            ChargingStationModel,
+                                               ChargingStationManufacturer_Id  ChargingStationManufacturerId)
+
+            => Add(nameof(POI.ChargingStationModel),
+                   ChargingStationModel.Id.ToString(),
+                   ChargingStationModel.ToJSON(Embedded: true),
+                   nameof(POI.ChargingStationManufacturer),
+                   ChargingStationManufacturerId.ToString());
+
+        /// <summary>
+        /// Remove the given charging station model of the given manufacturer, optionally checking its complete previous JSON
+        /// representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(ChargingStationModel_Id         ChargingStationModelId,
+                                                  ChargingStationManufacturer_Id  ChargingStationManufacturerId,
+                                                  JToken?                         OldValue   = null)
+
+            => Remove(nameof(POI.ChargingStationModel),
+                      ChargingStationModelId.ToString(),
+                      OldValue,
+                      nameof(POI.ChargingStationManufacturer),
+                      ChargingStationManufacturerId.ToString());
+
+        /// <summary>
+        /// Update one property of the given charging station model of the given manufacturer, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(ChargingStationModel            ChargingStationModel,
+                                                          ChargingStationManufacturer_Id  ChargingStationManufacturerId,
+                                                          String                          PropertyName,
+                                                          JToken?                         OldValue,
+                                                          JToken                          NewValue)
+
+            => UpdateProperty(nameof(POI.ChargingStationModel), ChargingStationModel.Id.ToString(), PropertyName, OldValue, NewValue, nameof(POI.ChargingStationManufacturer), ChargingStationManufacturerId.ToString());
+
+        /// <summary>
+        /// Remove one property of the given charging station model of the given manufacturer, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(ChargingStationModel            ChargingStationModel,
+                                                          ChargingStationManufacturer_Id  ChargingStationManufacturerId,
+                                                          String                          PropertyName,
+                                                          JToken?                         OldValue   = null)
+
+            => RemoveProperty(nameof(POI.ChargingStationModel), ChargingStationModel.Id.ToString(), PropertyName, OldValue, nameof(POI.ChargingStationManufacturer), ChargingStationManufacturerId.ToString());
 
         #endregion
 
@@ -1843,7 +1897,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Add                   (EnergyMeterManufacturer)
 
         /// <summary>
-        /// Add the given energy meter manufacturer to its roaming network.
+        /// Add the given energy meter manufacturer to its roaming network, with its keys and without its models.
         /// </summary>
         /// <param name="EnergyMeterManufacturer">The new energy meter manufacturer.</param>
         public static RoamingNetworkChange Add(EnergyMeterManufacturer EnergyMeterManufacturer)
@@ -1853,7 +1907,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    EnergyMeterManufacturer.ToJSON(Embedded: true));
 
         /// <summary>
-        /// Remove the given energy meter manufacturer, optionally checking its complete previous JSON representation.
+        /// Remove the given energy meter manufacturer, with its models, optionally checking its complete previous JSON
+        /// representation.
         /// </summary>
         public static RoamingNetworkChange Remove(EnergyMeterManufacturer_Id  EnergyMeterManufacturerId,
                                                   JToken?                     OldValue   = null)
@@ -1880,6 +1935,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           JToken?                  OldValue   = null)
 
             => RemoveProperty(nameof(POI.EnergyMeterManufacturer), EnergyMeterManufacturer.Id.ToString(), PropertyName, OldValue);
+
+        #endregion
+
+        #region Add                   (EnergyMeterModel, EnergyMeterManufacturerId)
+
+        /// <summary>
+        /// Add the given energy meter model to its manufacturer.
+        /// </summary>
+        /// <param name="EnergyMeterModel">The new energy meter model.</param>
+        /// <param name="EnergyMeterManufacturerId">The identification of its manufacturer.</param>
+        public static RoamingNetworkChange Add(EnergyMeterModel            EnergyMeterModel,
+                                               EnergyMeterManufacturer_Id  EnergyMeterManufacturerId)
+
+            => Add(nameof(POI.EnergyMeterModel),
+                   EnergyMeterModel.Id.ToString(),
+                   EnergyMeterModel.ToJSON(Embedded: true),
+                   nameof(POI.EnergyMeterManufacturer),
+                   EnergyMeterManufacturerId.ToString());
+
+        /// <summary>
+        /// Remove the given energy meter model of the given manufacturer, optionally checking its complete previous JSON
+        /// representation.
+        /// </summary>
+        public static RoamingNetworkChange Remove(EnergyMeterModel_Id         EnergyMeterModelId,
+                                                  EnergyMeterManufacturer_Id  EnergyMeterManufacturerId,
+                                                  JToken?                     OldValue   = null)
+
+            => Remove(nameof(POI.EnergyMeterModel),
+                      EnergyMeterModelId.ToString(),
+                      OldValue,
+                      nameof(POI.EnergyMeterManufacturer),
+                      EnergyMeterManufacturerId.ToString());
+
+        /// <summary>
+        /// Update one property of the given energy meter model of the given manufacturer, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange UpdateProperty(EnergyMeterModel            EnergyMeterModel,
+                                                          EnergyMeterManufacturer_Id  EnergyMeterManufacturerId,
+                                                          String                      PropertyName,
+                                                          JToken?                     OldValue,
+                                                          JToken                      NewValue)
+
+            => UpdateProperty(nameof(POI.EnergyMeterModel), EnergyMeterModel.Id.ToString(), PropertyName, OldValue, NewValue, nameof(POI.EnergyMeterManufacturer), EnergyMeterManufacturerId.ToString());
+
+        /// <summary>
+        /// Remove one property of the given energy meter model of the given manufacturer, optionally asserting its previous value.
+        /// </summary>
+        public static RoamingNetworkChange RemoveProperty(EnergyMeterModel            EnergyMeterModel,
+                                                          EnergyMeterManufacturer_Id  EnergyMeterManufacturerId,
+                                                          String                      PropertyName,
+                                                          JToken?                     OldValue   = null)
+
+            => RemoveProperty(nameof(POI.EnergyMeterModel), EnergyMeterModel.Id.ToString(), PropertyName, OldValue, nameof(POI.EnergyMeterManufacturer), EnergyMeterManufacturerId.ToString());
 
         #endregion
 
@@ -2516,6 +2624,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (internal) WithParent(ParentEntityType, ParentEntityId)
+
+        /// <summary>
+        /// This change naming the given parent, e.g. of a model, whose identification is unique within its manufacturer only.
+        /// </summary>
+        internal RoamingNetworkChange WithParent(String  ParentEntityType,
+                                                 String  ParentEntityId)
+
+            => new (Kind,
+                    EntityType,
+                    EntityId,
+                    PropertyName,
+                    oldValue,
+                    newValue,
+                    ParentEntityType,
+                    ParentEntityId,
+                    ElementPath);
+
+        #endregion
 
         #region (internal) WithoutOldValue()
 

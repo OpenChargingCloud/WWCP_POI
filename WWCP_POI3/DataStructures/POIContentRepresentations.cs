@@ -162,6 +162,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    EMobilityProvider        eMobilityProvider        => Of(eMobilityProvider,        Format),
                    GridOperator             gridOperator             => Of(gridOperator,             Format),
                    ParkingOperator          parkingOperator          => Of(parkingOperator,          Format),
+                   ChargingStationManufacturer       chargingStationManufacturer       => Of(chargingStationManufacturer,      Format),
+                   EnergyMeterManufacturer           energyMeterManufacturer           => Of(energyMeterManufacturer,          Format),
                    TransparencySoftwareManufacturer  transparencySoftwareManufacturer  => Of(transparencySoftwareManufacturer, Format),
                    ConformityAssessmentBody          conformityAssessmentBody          => Of(conformityAssessmentBody,         Format),
                    ChargingPool             chargingPool             => Of(chargingPool,             Format),
@@ -195,11 +197,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          IncludeChildArrays:                       false),
 
                    [ Array(RoamingNetwork.PropertyKeys.ChargingStationOperators,          RoamingNetwork.ChargingStationOperators,         party => () => Of(party, Format)),
-                     Array(RoamingNetwork.PropertyKeys.ChargingStationManufacturers,      RoamingNetwork.ChargingStationManufacturers,     value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)),
+                     Array(RoamingNetwork.PropertyKeys.ChargingStationManufacturers,      RoamingNetwork.ChargingStationManufacturers,     party => () => Of(party, Format)),
                      Array(RoamingNetwork.PropertyKeys.EMobilityProviders,                RoamingNetwork.EMobilityProviders,               party => () => Of(party, Format)),
                      Array(RoamingNetwork.PropertyKeys.GridOperators,                     RoamingNetwork.GridOperators,                    party => () => Of(party, Format)),
                      Array(RoamingNetwork.PropertyKeys.ParkingOperators,                  RoamingNetwork.ParkingOperators,                 party => () => Of(party, Format)),
-                     Array(RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,          RoamingNetwork.EnergyMeterManufacturers,         value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)),
+                     Array(RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,          RoamingNetwork.EnergyMeterManufacturers,         party => () => Of(party, Format)),
                      Array(RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers, RoamingNetwork.TransparencySoftwareManufacturers, party => () => Of(party, Format)),
                      Array(RoamingNetwork.PropertyKeys.ConformityAssessmentBodies,        RoamingNetwork.ConformityAssessmentBodies,       party => () => Of(party, Format)) ],
 
@@ -273,6 +275,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    [ Array(GridOperator.PropertyKeys.GridConnectionPoints,  GridOperator.GridConnectionPoints,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)),
                      Array(GridOperator.PropertyKeys.EnergyMeterTemplates,  GridOperator.EnergyMeterTemplates,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)),
                      Array(GridOperator.PropertyKeys.EnergyMeterGroups,     GridOperator.EnergyMeterGroups,     value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)) ],
+
+                   Format));
+
+        #endregion
+
+        #region (private) Of(ChargingStationManufacturer, Format)
+
+        private static Representation Of(ChargingStationManufacturer       ChargingStationManufacturer,
+                                         ETagFormat                        Format)
+
+            => Kept(ChargingStationManufacturer, Format, () => Compose(
+
+                   ChargingStationManufacturer.ToJSON(Embedded: true, IncludeChildArrays: false),
+
+                   [ Array(ChargingStationManufacturer.PropertyKeys.Models,  ChargingStationManufacturer.Models,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)) ],
+
+                   Format));
+
+        #endregion
+
+        #region (private) Of(EnergyMeterManufacturer, Format)
+
+        private static Representation Of(EnergyMeterManufacturer           EnergyMeterManufacturer,
+                                         ETagFormat                        Format)
+
+            => Kept(EnergyMeterManufacturer, Format, () => Compose(
+
+                   EnergyMeterManufacturer.ToJSON(Embedded: true, IncludeChildArrays: false),
+
+                   [ Array(EnergyMeterManufacturer.PropertyKeys.Models,  EnergyMeterManufacturer.Models,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)) ],
 
                    Format));
 

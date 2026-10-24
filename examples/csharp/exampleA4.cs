@@ -10,7 +10,7 @@ using cloud.charging.open.protocols.WWCP.POI;
 public static class ExampleA4
 {
 
-    // The roaming network operator "OCC" makes the first checkpoint of "QA", of its revision 6: a signed statement that
+    // The roaming network operator "OCC" makes the first checkpoint of "QA", of its revision 7: a signed statement that
     // this commit and every commit before it are the history of QA. Then "DE*GEF" adds two pools more, after the pattern
     // of example A3; their AC stations are recorded as those of A3, with the AC template and EVSEs of 22 kW, though they
     // have 11 kW only. Example A5 corrects them.
@@ -28,15 +28,15 @@ public static class ExampleA4
 
         var checkpoint0 = MakeCheckpoint(A1);
 
-        // The proof that the commit of revision 3, the one adding the pool "Jena Paradies", is one of its commits.
-        var revision3   = CommitOf(A1, 3);
+        // The proof that the commit of revision 4, the one adding the pool "Jena Paradies", is one of its commits.
+        var revision4   = CommitOf(A1, 4);
 
-        if (!A1.History.TryGetCommitProof(revision3.Id, out var proof, out var error))
+        if (!A1.History.TryGetCommitProof(revision4.Id, out var proof, out var error))
             Helpers.Fail(error);
 
-        File.WriteAllText("published/QA-proof-revision-3.json", proof.ToJSON().ToString());
+        File.WriteAllText("published/QA-proof-revision-4.json", proof.ToJSON().ToString());
 
-        Console.WriteLine($"The commit of revision 3 is the commit {proof.Index} of the {proof.Size} of checkpoint {checkpoint0.Sequence}");
+        Console.WriteLine($"The commit of revision 4 is the commit {proof.Index} of the {proof.Size} of checkpoint {checkpoint0.Sequence}");
         Console.WriteLine();
 
         #endregion
@@ -110,11 +110,11 @@ public static class ExampleA4
 
         #region 4. The proof of a commit
 
-        // The commit of revision 3 is one of the commits of the checkpoint: its leaf, its commit id, revision and ETags,
+        // The commit of revision 4 is one of the commits of the checkpoint: its leaf, its commit id, revision and ETags,
         // leads with the audit path to the root of the commits the checkpoint signs. The joined history does not hold this
         // commit, but whoever kept it, or a proof of a charging station of its version, shows with this proof that it is
         // part of the history the checkpoint states.
-        if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-3.json"), out var proof, out error))
+        if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-4.json"), out var proof, out error))
             Helpers.Fail(error);
 
         Console.WriteLine($"The proof of the commit of revision {proof.Revision} in checkpoint {checkpoint0.Sequence}: {(proof.Verify(checkpoint0, out error) ? "valid" : error)}");
@@ -136,7 +136,7 @@ public static class ExampleA4
         Console.WriteLine($"A version of the checkpoint changed: {(RoamingNetworkHistory.TryFromCheckpointSnapshot(changedSnapshot, out _, out error, VerifyCheckpointSignature(anchor, network), [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ]) ? "taken" : error)}");
 
         // c) A proof of another position: it leads to another root.
-        var changedProof      = Helpers.ReadJSON("published/QA-proof-revision-3.json");
+        var changedProof      = Helpers.ReadJSON("published/QA-proof-revision-4.json");
         changedProof["@index"] = changedProof["@index"]!.Value<Int32>() + 1;
 
         Console.WriteLine($"A proof of another position: {(RoamingNetworkCheckpointProof.TryParse(changedProof, out var otherProof, out error) && otherProof.Verify(checkpoint0, out error) ? "valid" : error)}");

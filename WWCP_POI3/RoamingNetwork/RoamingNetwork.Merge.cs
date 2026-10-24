@@ -48,7 +48,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The key of an entity, as the merge finds it in every version: its entity type and its identification,
         /// compared as its identification type compares them, e.g. an e-mobility provider 'DE-ABC' as 'DE*ABC',
-        /// most without case; a text its type does not read, ordinally.
+        /// most without case; a text its type does not read, ordinally. An identification unique within its parent only,
+        /// as of a model within its manufacturer, is paired with the one of its parent.
         /// </summary>
         /// <param name="Type">The entity type.</param>
         /// <param name="Id">The typed identification, or the text its type does not read.</param>
@@ -61,10 +62,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             /// <param name="Type">An entity type.</param>
             /// <param name="Id">The text of its identification.</param>
-            internal static MergeKey Of(String  Type,
-                                        String  Id)
+            /// <param name="Parent">The key of the entity embedding it.</param>
+            internal static MergeKey Of(String     Type,
+                                        String     Id,
+                                        MergeKey?  Parent   = null)
 
-                => new (Type, TypedId(Type, Id) ?? Id);
+                => new (Type,
+                        UniqueInParent.Contains(Type) && Parent is MergeKey parent
+                            ? (parent.Id, TypedId(Type, Id) ?? Id)
+                            : TypedId(Type, Id) ?? Id);
 
         }
 
@@ -86,7 +92,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// <summary>
             /// Its key, as the merge finds it in every version.
             /// </summary>
-            internal MergeKey Key { get; } = MergeKey.Of(Type, Id);
+            internal MergeKey Key { get; } = MergeKey.Of(Type, Id, Parent);
 
         }
 
@@ -148,6 +154,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const String ConflictMarkerProperty = "@conflict";
 
         /// <summary>
+        /// The embedded children whose identifications are unique within their parent only: every change of them names it.
+        /// </summary>
+        private static readonly ImmutableHashSet<String> UniqueInParent = [
+            nameof(ChargingStationModel),
+            nameof(EnergyMeterModel)
+        ];
+
+        /// <summary>
         /// The embedded children a change set addresses on their own: their JSON key and entity type, by the entity type embedding them.
         /// A key holds an array of them, or, as the roaming network operator, one.
         /// </summary>
@@ -175,6 +189,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   (ChargingStationOperator.PropertyKeys.EnergyMeterGroups,         nameof(EnergyMeterGroup)),
                                                   (ChargingStationOperator.PropertyKeys.ChargingTariffOffers,      nameof(ChargingTariffOffer)),
                                                   (ChargingStationOperator.PropertyKeys.ParkingSpaces,             nameof(ParkingSpace)) ] },
+            { nameof(ChargingStationManufacturer),
+                                                [ (ChargingStationManufacturer.PropertyKeys.Models,                nameof(ChargingStationModel)) ] },
+            { nameof(EnergyMeterManufacturer),  [ (EnergyMeterManufacturer.PropertyKeys.Models,                    nameof(EnergyMeterModel)) ] },
+            { nameof(TransparencySoftwareManufacturer),
+                                                [ (TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware, nameof(TransparencySoftware)) ] },
+            { nameof(ConformityAssessmentBody), [ (ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates, nameof(TransparencySoftwareCertificate)) ] },
             { nameof(ChargingPool),             [ (ChargingPool.PropertyKeys.ChargingStations,                     nameof(ChargingStation)) ] },
             { nameof(ChargingStation),          [ (ChargingStation.PropertyKeys.EVSEs,                             nameof(EVSE)) ] },
             { nameof(EMobilityProvider),        [ (EMobilityProvider.PropertyKeys.EVSEGroups,                      nameof(EVSEGroup)),
@@ -526,7 +546,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     removed.Add(key);
 
                     if (!UnderAny(l, removed, Left))
-                        removes.Add(RoamingNetworkChange.Remove(l.Type, l.Id));
+                        removes.Add(Removal(l, Left));
 
                     continue;
 
@@ -550,7 +570,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (b is not null && l.Parent == b.Parent && SameSubtree(l, b, Left, Base))
                     {
                         replaced.Add(key);
-                        replaces.Add(RoamingNetworkChange.Remove(l.Type, l.Id));
+                        replaces.Add(Removal(l, Left));
                         replaces.Add(RoamingNetworkChange.Add(r.Type, r.Id, (JObject) r.Full.DeepClone(), ParentType(r), ParentId(r, Right)));
                         continue;
                     }
@@ -645,7 +665,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (differing.All(changeable.Contains))
                 {
                     foreach (var propertyName in differing)
-                        updates.AddRange(PropertyChanges(l.Type, l.Id, propertyName, l.Own[propertyName], target[propertyName]));
+                        updates.AddRange(PropertyChanges(l.Type, l.Id, propertyName, l.Own[propertyName], target[propertyName]).
+                                             Select(change => InParent(change, l, Left)));
                     continue;
                 }
 
@@ -653,7 +674,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (b is not null && l.Type is not (nameof(RoamingNetwork) or nameof(RoamingNetworkOperator)) && POIJSON.SameValue(target, r.Own) && SameSubtree(l, b, Left, Base))
                 {
                     replaced.Add(key);
-                    replaces.Add(RoamingNetworkChange.Remove(l.Type, l.Id));
+                    replaces.Add(Removal(l, Left));
                     replaces.Add(RoamingNetworkChange.Add(r.Type, r.Id, (JObject) r.Full.DeepClone(), ParentType(r), ParentId(r, Right)));
                     continue;
                 }
@@ -953,10 +974,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 nameof(RoamingNetworkOperator)           => RoamingNetworkOperator_Id.         TryParse(EntityId, out var networkOperatorId) ? networkOperatorId : null,
                 nameof(ChargingStationOperator)          => ChargingStationOperator_Id.        TryParse(EntityId, out var operatorId)        ? operatorId        : null,
                 nameof(ChargingStationManufacturer)      => ChargingStationManufacturer_Id.    TryParse(EntityId, out var manufacturerId)    ? manufacturerId    : null,
+                nameof(ChargingStationModel)             => ChargingStationModel_Id.           TryParse(EntityId, out var stationModelId)    ? stationModelId    : null,
                 nameof(EMobilityProvider)                => EMobilityProvider_Id.              TryParse(EntityId, out var providerId)        ? providerId        : null,
                 nameof(GridOperator)                     => GridOperator_Id.                   TryParse(EntityId, out var gridOperatorId)    ? gridOperatorId    : null,
                 nameof(ParkingOperator)                  => ParkingOperator_Id.                TryParse(EntityId, out var parkingOperatorId) ? parkingOperatorId : null,
                 nameof(EnergyMeterManufacturer)          => EnergyMeterManufacturer_Id.        TryParse(EntityId, out var meterMakerId)      ? meterMakerId      : null,
+                nameof(EnergyMeterModel)                 => EnergyMeterModel_Id.               TryParse(EntityId, out var meterModelId)      ? meterModelId      : null,
                 nameof(TransparencySoftwareManufacturer) => TransparencySoftwareManufacturer_Id.TryParse(EntityId, out var softwareMakerId)  ? softwareMakerId   : null,
                 nameof(TransparencySoftware)             => TransparencySoftware_Id.           TryParse(EntityId, out var softwareId)        ? softwareId        : null,
                 nameof(ConformityAssessmentBody)         => ConformityAssessmentBody_Id.       TryParse(EntityId, out var bodyId)            ? bodyId            : null,
@@ -983,6 +1006,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return id;
 
         }
+
+        #endregion
+
+        #region (private static) Removal(Entity, Version) / InParent(Change, Entity, Version)
+
+        /// <summary>
+        /// The removal of the given entity of the given version: naming its parent, where its identification is unique
+        /// within it only.
+        /// </summary>
+        private static RoamingNetworkChange Removal(MergeEntity                        Entity,
+                                                    Dictionary<MergeKey, MergeEntity>  Version)
+
+            => UniqueInParent.Contains(Entity.Type)
+                   ? RoamingNetworkChange.Remove(Entity.Type, Entity.Id, null, ParentType(Entity), ParentId(Entity, Version))
+                   : RoamingNetworkChange.Remove(Entity.Type, Entity.Id);
+
+        /// <summary>
+        /// The given change of the given entity of the given version, naming its parent where its identification is unique
+        /// within it only.
+        /// </summary>
+        private static RoamingNetworkChange InParent(RoamingNetworkChange               Change,
+                                                     MergeEntity                        Entity,
+                                                     Dictionary<MergeKey, MergeEntity>  Version)
+
+            => UniqueInParent.Contains(Entity.Type) && ParentType(Entity) is String parentType && ParentId(Entity, Version) is String parentId
+                   ? Change.WithParent(parentType, parentId)
+                   : Change;
 
         #endregion
 
@@ -1015,10 +1065,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    nameof(EVSE)                             => ChangeableEVSEProperties,
                    nameof(ChargingTariff)                   => ChangeableChargingTariffProperties,
                    nameof(ChargingStationManufacturer)      => ManufacturerRegistry.                   ChangeableProperties,
+                   nameof(ChargingStationModel)             => ChangeableChargingStationModelProperties,
                    nameof(EMobilityProvider)                => EMobilityProviderRegistry.              ChangeableProperties,
                    nameof(GridOperator)                     => GridOperatorRegistry.                   ChangeableProperties,
                    nameof(ParkingOperator)                  => ParkingOperatorRegistry.                ChangeableProperties,
                    nameof(EnergyMeterManufacturer)          => EnergyMeterManufacturerRegistry.        ChangeableProperties,
+                   nameof(EnergyMeterModel)                 => ChangeableEnergyMeterModelProperties,
                    nameof(TransparencySoftwareManufacturer) => TransparencySoftwareManufacturerRegistry.ChangeableProperties,
                    nameof(TransparencySoftware)             => ChangeableTransparencySoftwareProperties,
                    nameof(ConformityAssessmentBody)         => ConformityAssessmentBodyRegistry.       ChangeableProperties,

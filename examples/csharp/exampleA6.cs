@@ -192,10 +192,10 @@ public static class ExampleA6
 
         #region 7. Evidence
 
-        // The proof of revision 7, the pool "Jena Lobeda" with its AC station as A4 recorded it, in checkpoint 1: kept,
+        // The proof of revision 8, the pool "Jena Lobeda" with its AC station as A4 recorded it, in checkpoint 1: kept,
         // e.g. by an e-mobility provider disputing an invoice of a session there, it shows without asking the server of QA
         // that this commit is part of the history both witnesses saw.
-        if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-7.json"), out var proof, out error))
+        if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-8.json"), out var proof, out error))
             Helpers.Fail(error);
 
         Console.WriteLine($"The proof of revision {proof.Revision} in checkpoint 1, witnessed by {String.Join(", ", WitnessedBy(checkpoints[1], witnesses))}: {(proof.Verify(checkpoints[1], out error) ? "valid" : error)}");

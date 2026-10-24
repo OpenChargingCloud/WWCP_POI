@@ -1,19 +1,19 @@
 # Example A5: a correction between two checkpoints, and the data at every checkpoint
 
-The roaming network operator `OCC` makes the next checkpoint of `QA`, of revision 8, with the AC stations of the pools
+The roaming network operator `OCC` makes the next checkpoint of `QA`, of revision 9, with the AC stations of the pools
 `P3` and `P4` as [example A4](exampleA4.md) recorded them: 44 kW, EVSEs of 22 kW. Then `DE*GEF` corrects them, 22 kW
-each with two EVSEs of 11 kW, and `OCC` makes the checkpoint after, of revision 9. The correction changes the head, not
-the past: the version of revision 8 stays what checkpoint 1 states, and a server or an app finds the AC stations at
+each with two EVSEs of 11 kW, and `OCC` makes the checkpoint after, of revision 10. The correction changes the head, not
+the past: the version of revision 9 stays what checkpoint 1 states, and a server or an app finds the AC stations at
 every checkpoint as they were then.
 
 | Revision | Signed by | Commit |
 |---|---|---|
-| 0 to 6 | see [example A1](exampleA1.md) to [example A3](exampleA3.md) | |
-| | `OCC`, its three holders | checkpoint 0, of revision 6, see [example A4](exampleA4.md) |
-| 7, 8 | `DE*GEF`, its `infrastructure` key | the pools `P3` and `P4`, see [example A4](exampleA4.md) |
-| | `OCC` | **checkpoint 1**, of revision 8: the 2 commits since checkpoint 0 |
-| 9 | `DE*GEF` | **the correction:** `UpdateProperty` of `maxPower` of the AC stations `DE*GEF*S6` and `DE*GEF*S8`, 22 kW, and of their four EVSEs, 11 kW |
-| | `OCC` | **checkpoint 2**, of revision 9: the commit since checkpoint 1 |
+| 0 to 7 | see [example A1](exampleA1.md) to [example A3](exampleA3.md) | |
+| | `OCC`, its three holders | checkpoint 0, of revision 7, see [example A4](exampleA4.md) |
+| 8, 9 | `DE*GEF`, its `infrastructure` key | the pools `P3` and `P4`, see [example A4](exampleA4.md) |
+| | `OCC` | **checkpoint 1**, of revision 9: the 2 commits since checkpoint 0 |
+| 10 | `DE*GEF` | **the correction:** `UpdateProperty` of `maxPower` of the AC stations `DE*GEF*S6` and `DE*GEF*S8`, 22 kW, and of their four EVSEs, 11 kW |
+| | `OCC` | **checkpoint 2**, of revision 10: the commit since checkpoint 1 |
 
 The code is [exampleA5.cs](csharp/exampleA5.cs), with the helpers of [exampleA4.cs](csharp/exampleA4.cs), called by
 [Program.cs](csharp/Program.cs) after example A4:
@@ -30,19 +30,19 @@ The output is what one run printed, `…` for elided digests.
 ## 1. The second checkpoint: before the correction
 
 It names the first one as the one before, `previousId`, its `sequence` is 1, and its commits are those since: the
-revisions 7 and 8. The proof of revision 7 is published as well.
+revisions 8 and 9. The proof of revision 8 is published as well.
 
 ```csharp
 var checkpoint1  = ExampleA4.MakeCheckpoint(A1);
 
-if (!A1.History.TryGetCommitProof(ExampleA4.CommitOf(A1, 7).Id, out var proof7, out var error))
+if (!A1.History.TryGetCommitProof(ExampleA4.CommitOf(A1, 8).Id, out var proof8, out var error))
     Helpers.Fail(error);
 
-File.WriteAllText("published/QA-proof-revision-7.json", proof7.ToJSON().ToString());
+File.WriteAllText("published/QA-proof-revision-8.json", proof8.ToJSON().ToString());
 ```
 
 ```
-Checkpoint 1 of revision 8: 2 commit(s), 3 signatures, b322217a…
+Checkpoint 1 of revision 9: 2 commit(s), 3 signatures, b322217a…
 ```
 
 
@@ -67,10 +67,10 @@ ExampleA4.Commit(A1, A2, "The AC stations of Jena Lobeda and Jena Winzerla: 22 k
 ```
 
 ```
-Committed, revision 9: The AC stations of Jena Lobeda and Jena Winzerla: 22 kW, two EVSEs of 11 kW
+Committed, revision 10: The AC stations of Jena Lobeda and Jena Winzerla: 22 kW, two EVSEs of 11 kW
 ```
 
-What everybody may read then: `QA.json` and `QA-commit.json` at revision 9, and the commits since checkpoint 1,
+What everybody may read then: `QA.json` and `QA-commit.json` at revision 10, and the commits since checkpoint 1,
 `QA-commits-since-checkpoint-1.json`.
 
 
@@ -79,7 +79,7 @@ What everybody may read then: `QA.json` and `QA-commit.json` at revision 9, and 
 Its only commit is the correction; the proof of it is published as well.
 
 ```
-Checkpoint 2 of revision 9: 1 commit(s), 3 signatures, 88e69122…
+Checkpoint 2 of revision 10: 1 commit(s), 3 signatures, 88e69122…
 ```
 
 
@@ -96,10 +96,10 @@ for (var i = 1; i < checkpoints.Length; i++)
 ```
 
 ```
-Checkpoint 0 of epoch 1: revision 6, 7 commit(s) since the genesis, signed by AlphaOrg, BetaOrg, GammaOrg
-Checkpoint 1 of epoch 1: revision 8, 2 commit(s) since checkpoint c11fec63…, signed by AlphaOrg, BetaOrg, GammaOrg
-Checkpoint 2 of epoch 1: revision 9, 1 commit(s) since checkpoint b322217a…, signed by AlphaOrg, BetaOrg, GammaOrg
-One line: 0 (revision 6) <- 1 (revision 8) <- 2 (revision 9)
+Checkpoint 0 of epoch 1: revision 7, 8 commit(s) since the genesis, signed by AlphaOrg, BetaOrg, GammaOrg
+Checkpoint 1 of epoch 1: revision 9, 2 commit(s) since checkpoint c11fec63…, signed by AlphaOrg, BetaOrg, GammaOrg
+Checkpoint 2 of epoch 1: revision 10, 1 commit(s) since checkpoint b322217a…, signed by AlphaOrg, BetaOrg, GammaOrg
+One line: 0 (revision 7) <- 1 (revision 9) <- 2 (revision 10)
 ```
 
 
@@ -132,22 +132,22 @@ foreach (var commit in ExampleA4.CommitsSince(0).Concat(ExampleA4.CommitsSince(1
 ```
 
 ```
-Revision 6, checkpoint 0:
+Revision 7, checkpoint 0:
 no pool 3 or 4 yet
-Appended revision 7: Jena Lobeda, a DC and an AC station
+Appended revision 8: Jena Lobeda, a DC and an AC station
 DE*GEF*P3  Jena Lobeda
   DE*GEF*S5  300 kW: DE*GEF*E5*1 DC 150 kW, DE*GEF*E5*2 DC 150 kW
   DE*GEF*S6  44 kW: DE*GEF*E6*1 AC_ThreePhases 22 kW, DE*GEF*E6*2 AC_ThreePhases 22 kW
-Appended revision 8: Jena Winzerla, a DC and an AC station
-Revision 8, checkpoint 1, its ETags and those of the version reached: the same
+Appended revision 9: Jena Winzerla, a DC and an AC station
+Revision 9, checkpoint 1, its ETags and those of the version reached: the same
 DE*GEF*P3  Jena Lobeda
   DE*GEF*S5  300 kW: DE*GEF*E5*1 DC 150 kW, DE*GEF*E5*2 DC 150 kW
   DE*GEF*S6  44 kW: DE*GEF*E6*1 AC_ThreePhases 22 kW, DE*GEF*E6*2 AC_ThreePhases 22 kW
 DE*GEF*P4  Jena Winzerla
   DE*GEF*S7  300 kW: DE*GEF*E7*1 DC 150 kW, DE*GEF*E7*2 DC 150 kW
   DE*GEF*S8  44 kW: DE*GEF*E8*1 AC_ThreePhases 22 kW, DE*GEF*E8*2 AC_ThreePhases 22 kW
-Appended revision 9: The AC stations of Jena Lobeda and Jena Winzerla: 22 kW, two EVSEs of 11 kW
-Revision 9, checkpoint 2, its ETags and those of the version reached: the same
+Appended revision 10: The AC stations of Jena Lobeda and Jena Winzerla: 22 kW, two EVSEs of 11 kW
+Revision 10, checkpoint 2, its ETags and those of the version reached: the same
 DE*GEF*P3  Jena Lobeda
   DE*GEF*S5  300 kW: DE*GEF*E5*1 DC 150 kW, DE*GEF*E5*2 DC 150 kW
   DE*GEF*S6  22 kW: DE*GEF*E6*1 AC_ThreePhases 11 kW, DE*GEF*E6*2 AC_ThreePhases 11 kW
@@ -180,14 +180,14 @@ foreach (var checkpoint in checkpoints.Skip(1))
 ```
 
 ```
-Joined from checkpoint 1, revision 8, and the version reached commit by commit: the same
+Joined from checkpoint 1, revision 9, and the version reached commit by commit: the same
 DE*GEF*P3  Jena Lobeda
   DE*GEF*S5  300 kW: DE*GEF*E5*1 DC 150 kW, DE*GEF*E5*2 DC 150 kW
   DE*GEF*S6  44 kW: DE*GEF*E6*1 AC_ThreePhases 22 kW, DE*GEF*E6*2 AC_ThreePhases 22 kW
 DE*GEF*P4  Jena Winzerla
   DE*GEF*S7  300 kW: DE*GEF*E7*1 DC 150 kW, DE*GEF*E7*2 DC 150 kW
   DE*GEF*S8  44 kW: DE*GEF*E8*1 AC_ThreePhases 22 kW, DE*GEF*E8*2 AC_ThreePhases 22 kW
-Joined from checkpoint 2, revision 9, and the version reached commit by commit: the same
+Joined from checkpoint 2, revision 10, and the version reached commit by commit: the same
 DE*GEF*P3  Jena Lobeda
   DE*GEF*S5  300 kW: DE*GEF*E5*1 DC 150 kW, DE*GEF*E5*2 DC 150 kW
   DE*GEF*S6  22 kW: DE*GEF*E6*1 AC_ThreePhases 11 kW, DE*GEF*E6*2 AC_ThreePhases 11 kW
@@ -199,15 +199,15 @@ DE*GEF*P4  Jena Winzerla
 
 ## 7. The proofs, and what is refused
 
-a) The commits of revisions 3, 7 and 9, each in the checkpoint whose commits include it. b) The proof of the correction
+a) The commits of revisions 4, 8 and 10, each in the checkpoint whose commits include it. b) The proof of the correction
 against checkpoint 1: the correction is no commit of it. c) Checkpoint 2 without checkpoint 1: a history joined from
-checkpoint 0 and at revision 9 refuses it, as it does not name the latest checkpoint the history holds.
+checkpoint 0 and at revision 10 refuses it, as it does not name the latest checkpoint the history holds.
 
 ```
-The proof of revision 3 in checkpoint 0: valid
-The proof of revision 7 in checkpoint 1: valid
-The proof of revision 9 in checkpoint 2: valid
-The proof of revision 9 in checkpoint 1: The proof is for the checkpoint '88e69122…', not for 'b322217a…'!
+The proof of revision 4 in checkpoint 0: valid
+The proof of revision 8 in checkpoint 1: valid
+The proof of revision 10 in checkpoint 2: valid
+The proof of revision 10 in checkpoint 1: The proof is for the checkpoint '88e69122…', not for 'b322217a…'!
 Checkpoint 2 without checkpoint 1: The checkpoint does not follow the latest checkpoint 'c11fec63…' of the sequence 0 here!
 ```
 

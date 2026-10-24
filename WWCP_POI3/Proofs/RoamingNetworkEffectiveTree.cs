@@ -226,15 +226,66 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var energyMeters = chargingStation.AllEnergyMeters.ToArray();
 
-            SetPartialOfNetwork(networkJSON,
-                                POI.RoamingNetwork.PropertyKeys.ChargingStationManufacturers,
-                                RoamingNetwork.ChargingStationManufacturers.Ids,
-                                chargingStation.ManufacturerId.HasValue ? [ chargingStation.ManufacturerId.Value ] : []);
+            #region The manufacturer of the station and the ones of its energy meters, with the models they name
 
-            SetPartialOfNetwork(networkJSON,
-                                POI.RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,
-                                RoamingNetwork.EnergyMeterManufacturers.Ids,
-                                energyMeters.Select(energyMeter => energyMeter.ManufacturerId).OfType<EnergyMeterManufacturer_Id>());
+            if (chargingStation.ManufacturerId.HasValue)
+            {
+
+                var manufacturerIndex = RoamingNetwork.ChargingStationManufacturers.Ids.IndexOf(chargingStation.ManufacturerId.Value);
+
+                if (manufacturerIndex >= 0)
+                {
+
+                    var manufacturer      = RoamingNetwork.ChargingStationManufacturers[manufacturerIndex];
+                    var manufacturerNode  = Root.Arrays[POI.RoamingNetwork.PropertyKeys.ChargingStationManufacturers].Children![manufacturerIndex];
+                    var manufacturerJSON  = (JObject) manufacturerNode.Skeleton.DeepClone();
+
+                    SetPartial(manufacturerJSON,
+                               manufacturerNode,
+                               ChargingStationManufacturer.PropertyKeys.Models,
+                               chargingStation.ModelId.HasValue &&
+                               manufacturer.Models.Ids.IndexOf(chargingStation.ModelId.Value) is var modelIndex && modelIndex >= 0
+                                   ? [ (modelIndex, manufacturer.Models[modelIndex].ToJSON(Embedded: true)) ]
+                                   : []);
+
+                    networkJSON[POI.RoamingNetwork.PropertyKeys.ChargingStationManufacturers] = Partial(Root.Arrays[POI.RoamingNetwork.PropertyKeys.ChargingStationManufacturers],
+                                                                                                        [ (manufacturerIndex, manufacturerJSON) ]);
+
+                }
+
+            }
+
+            var meterManufacturers = new List<(Int32, JObject)>();
+
+            for (var manufacturerIndex = 0; manufacturerIndex < RoamingNetwork.EnergyMeterManufacturers.Count; manufacturerIndex++)
+            {
+
+                var manufacturer      = RoamingNetwork.EnergyMeterManufacturers[manufacturerIndex];
+                var itsMeters         = energyMeters.Where(energyMeter => energyMeter.ManufacturerId == manufacturer.Id).ToArray();
+
+                if (itsMeters.Length == 0)
+                    continue;
+
+                var modelIds          = itsMeters.Select(energyMeter => energyMeter.ModelId).OfType<EnergyMeterModel_Id>().ToHashSet();
+                var manufacturerNode  = Root.Arrays[POI.RoamingNetwork.PropertyKeys.EnergyMeterManufacturers].Children![manufacturerIndex];
+                var manufacturerJSON  = (JObject) manufacturerNode.Skeleton.DeepClone();
+
+                SetPartial(manufacturerJSON,
+                           manufacturerNode,
+                           EnergyMeterManufacturer.PropertyKeys.Models,
+                           Enumerable.Range(0, manufacturer.Models.Count).
+                                      Where (index => modelIds.Contains(manufacturer.Models[index].Id)).
+                                      Select(index => (index, manufacturer.Models[index].ToJSON(Embedded: true))));
+
+                meterManufacturers.Add((manufacturerIndex, manufacturerJSON));
+
+            }
+
+            if (meterManufacturers.Count > 0)
+                networkJSON[POI.RoamingNetwork.PropertyKeys.EnergyMeterManufacturers] = Partial(Root.Arrays[POI.RoamingNetwork.PropertyKeys.EnergyMeterManufacturers],
+                                                                                                meterManufacturers);
+
+            #endregion
 
             #region The transparency software releases its energy meters name, in their manufacturers
 
@@ -469,33 +520,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (leaves.Length > 0 && Node.Arrays.TryGetValue(ChildArray, out var array))
                 JSON[ChildArray] = Partial(array, leaves);
-
-        }
-
-        #endregion
-
-        #region (private) SetPartialOfNetwork(JSON, ChildArray, Ids, Named)
-
-        /// <summary>
-        /// Give the children of the given child array of the roaming network the given identifications name, as its tree
-        /// keeps them.
-        /// </summary>
-        private void SetPartialOfNetwork<TId>(JObject                       JSON,
-                                              String                        ChildArray,
-                                              ImmutableArray<TId>           Ids,
-                                              IEnumerable<TId>              Named)
-        {
-
-            if (!Root.Arrays.TryGetValue(ChildArray, out var array) || array.Children is null)
-                return;
-
-            SetPartial(JSON,
-                       Root,
-                       ChildArray,
-                       Named.Distinct().
-                             Select(id    => Ids.IndexOf(id)).
-                             Where (index => index >= 0).
-                             Select(index => (index, (JObject) array.Children[index].Skeleton.DeepClone())));
 
         }
 

@@ -55,14 +55,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
     /// <summary>
-    /// A manufacturer of charging stations, embedded completely in its roaming network.
-    /// Charging stations name it by its identification.
+    /// A manufacturer of charging stations, a party of its roaming network: the roaming network operator adds and removes it,
+    /// with its keys; it changes its own properties and its models, signed by its own keys. Its models are embedded in
+    /// it; charging stations, their templates and transparency software certificates name a model by its manufacturer and its identification, unique within its manufacturer.
     /// </summary>
     public sealed class ChargingStationManufacturer : AImmutableEMobilityEntity<ChargingStationManufacturer_Id,
                                                                                 ChargingStationManufacturerAdminStatusType,
                                                                                 ChargingStationManufacturerStatusType>,
                                                       IEquatable<ChargingStationManufacturer>,
-                                                      IComparable<ChargingStationManufacturer>
+                                                      IComparable<ChargingStationManufacturer>,
+                                                      IPOIParty
     {
 
         #region Data
@@ -130,12 +132,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  TermsAndConditions   = POIJSON.ContactKeys.TermsAndConditions;
 
             /// <summary>
-            /// The property of its signing keys, as of a party.
+            /// The property of its models.
+            /// </summary>
+            public const String  Models               = "chargingStationModels";
+
+            /// <summary>
+            /// The property naming its models by their identifications only, refused: they are embedded completely.
+            /// </summary>
+            public const String  ModelIds             = "chargingStationModelIds";
+
+            /// <summary>
+            /// The property of its signing keys.
             /// </summary>
             public const String  SigningKeys          = POIPartyKeys.SigningKeysProperty;
 
             /// <summary>
-            /// The property of its identity keys, as of a party.
+            /// The property of its identity keys.
             /// </summary>
             public const String  IdentityKeys         = POIPartyKeys.IdentityKeysProperty;
 
@@ -190,13 +202,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<DataLicense>   DataLicenses             { get; }
 
         /// <summary>
-        /// Its signing keys, as of a party; none unless given. A manufacturer is no party: the roaming network operator
-        /// changes them, as all of its registries.
+        /// Its models, ordered by their identifications.
+        /// </summary>
+        public POICollection<ChargingStationModel_Id, ChargingStationModel>  Models  { get; }
+
+        /// <summary>
+        /// Its signing keys: it signs its own properties and its models with them.
         /// </summary>
         public ImmutableArray<POIPublicKey>  SigningKeys              { get; }
 
         /// <summary>
-        /// Its identity keys, as of a party; none unless given.
+        /// Its identity keys, signing changes of its keys.
         /// </summary>
         public ImmutableArray<POIPublicKey>  IdentityKeys             { get; }
 
@@ -220,6 +236,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            PhoneNumber?                                                HotlinePhoneNumber           = null,
                                            URL?                                                        TermsAndConditionsURL        = null,
                                            IEnumerable<DataLicense>?                                   DataLicenses                 = null,
+
+                                           IEnumerable<ChargingStationModel>?                          Models                       = null,
 
                                            IEnumerable<POIPublicKey>?                                  IdentityKeys                 = null,
                                            IEnumerable<POIPublicKey>?                                  SigningKeys                  = null,
@@ -274,9 +292,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.DataLicenses           = [ .. dataLicenses.Ordered() ];
 
+            this.Models                 = new (Models, model => model.Id, "charging station model", $"the charging station manufacturer '{Id}'");
+
             (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the charging station manufacturer '{Id}'");
 
         }
+
+        #endregion
+
+
+        #region TryGetModel(ModelId, out Model)
+
+        /// <summary>
+        /// Try to get the model with the given identification.
+        /// </summary>
+        public Boolean TryGetModel(ChargingStationModel_Id                        ModelId,
+                                   [NotNullWhen(true)] out ChargingStationModel?  Model)
+
+            => Models.TryGet(ModelId, out Model);
 
         #endregion
 
@@ -397,6 +430,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                if (!POIJSON.TryParseChildren<ChargingStationModel>(JSON,
+                                                    PropertyKeys.Models,
+                                                    PropertyKeys.ModelIds,
+                                                    "charging station models",
+                                                    ChargingStationModel.TryParse,
+                                                    out var models,
+                                                    out ErrorResponse))
+                {
+                    return false;
+                }
+
                 if (!POIPartyKeys.TryParse(JSON, out var signingKeys, out var identityKeys, out ErrorResponse))
                     return false;
 
@@ -421,6 +465,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                               hotline,
                                                                               termsAndConditions,
                                                                               dataLicenses,
+                                                                              models,
                                                                               IdentityKeys:  identityKeys,
                                                                               SigningKeys:   signingKeys,
                                                                               DataSource:  dataSource,
@@ -457,10 +502,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
         /// <param name="IncludeETags">Whether to include its ETags, which describe its content as its parent embeds it (ContentETag(…)), irrespective of the view options.</param>
         /// <param name="ETagDigestEncoding">The encoding of the digests of its ETags, Base64 by default.</param>
+        /// <param name="IncludeChildArrays">Whether to include its models; without them, its node of the effective tree.</param>
         /// <param name="CustomChargingStationManufacturerSerializer">A delegate to serialize custom charging station manufacturer JSON objects.</param>
         public JObject ToJSON(Boolean                                                        Embedded                                      = false,
                               Boolean                                                        IncludeETags                                  = false,
                               ETagDigestEncoding?                                            ETagDigestEncoding                            = null,
+                              Boolean                                                        IncludeChildArrays                            = true,
                               CustomJObjectSerializerDelegate<ChargingStationManufacturer>?  CustomChargingStationManufacturerSerializer   = null)
         {
 
@@ -507,6 +554,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (TermsAndConditionsURL.HasValue)
                 json.Add(PropertyKeys.TermsAndConditions,   TermsAndConditionsURL.Value.ToString());
+
+            if (IncludeChildArrays && !Models.IsEmpty)
+                json.Add(PropertyKeys.Models,               new JArray(Models.Select(model => model.ToJSON(Embedded: true))));
 
             if (SigningKeys.Length > 0)
                 json.Add(PropertyKeys.SigningKeys,          new JArray(SigningKeys. Select(key => key.ToJSON(Embedded: true))));
@@ -582,7 +632,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
 
                 // What has no CBOR representation of its own is read as its JSON, with the parsers of the JSON
-                // representation: the contact data and the data licenses, the keys and the metadata.
+                // representation: the contact data and the data licenses, the models, the keys and the metadata.
                 var json = new JObject();
 
                 foreach (var key in new[] { PropertyKeys.Logos,
@@ -595,6 +645,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             PropertyKeys.TermsAndConditions,
                                             BasePropertyKeys.DataLicenses,
                                             BasePropertyKeys.DataLicenseIds,
+                                            PropertyKeys.Models,
+                                            PropertyKeys.ModelIds,
                                             PropertyKeys.SigningKeys,
                                             PropertyKeys.IdentityKeys,
                                             BasePropertyKeys.Created,
@@ -616,6 +668,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              out var termsAndConditions,
                                              out var dataLicenses,
                                              out ErrorResponse))
+                {
+                    return false;
+                }
+
+                if (!POIJSON.TryParseChildren<ChargingStationModel>(json,
+                                                    PropertyKeys.Models,
+                                                    PropertyKeys.ModelIds,
+                                                    "charging station models",
+                                                    ChargingStationModel.TryParse,
+                                                    out var models,
+                                                    out ErrorResponse))
                 {
                     return false;
                 }
@@ -644,6 +707,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                               hotline,
                                                                               termsAndConditions,
                                                                               dataLicenses,
+                                                                              models,
                                                                               IdentityKeys:  identityKeys,
                                                                               SigningKeys:   signingKeys,
                                                                               DataSource:  dataSource,
@@ -732,6 +796,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (TermsAndConditionsURL.HasValue)
                 cbor.Add(CBORValue.FromText(PropertyKeys.TermsAndConditions),   CBORValue.FromText(TermsAndConditionsURL.Value.ToString()));
+
+            if (!Models.IsEmpty)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Models),
+                         CBORValue.FromArray(Models.Select(model => CBORJSON.ToCBOR(model.ToJSON(Embedded: true)))));
 
             if (SigningKeys.Length > 0)
                 cbor.Add(CBORValue.FromText(PropertyKeys.SigningKeys),

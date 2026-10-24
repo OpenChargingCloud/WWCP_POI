@@ -50,7 +50,7 @@ is replaced or removed as a whole ([below](#change-sets)).
 |---|---|---|---|---|
 | `role` | `Role` | `EnergyMeterRole` | via parent | What it measures; predefined `grid`, `gridConnectionPoint`, `pool`, `station`, `evse`, `pv`, `wind`, `battery`, read in any case and written so, any other nonempty text accepted. |
 | `manufacturerId` | `ManufacturerId` | `EnergyMeterManufacturer_Id` | via parent | Its manufacturer, which must be an energy meter manufacturer of the roaming network ([below](#manufacturerid)). |
-| `modelId` | `ModelId` | `EnergyMeterModel_Id` | via parent | Its model, as its manufacturer names it; nonempty text, not checked against anything. |
+| `modelId` | `ModelId` | `EnergyMeterModel_Id` | via parent | A model of its manufacturer ([below](#manufacturerid)); only with its `manufacturerId`, its own or one of its templates. |
 | `modelURL` | `ModelURL` | URL | via parent | The homepage of its model, e.g. with its data sheet. |
 | `serialNumber` | `SerialNumber` | string | via parent | |
 | `hardwareVersion` | `HardwareVersion` | string | via parent | |
@@ -121,8 +121,10 @@ changes.
 ## manufacturerId
 
 A reference to an `EnergyMeterManufacturer` of the roaming network (its `energyMeterManufacturers`, owned by the
-RNO; documented in [RoamingNetwork](RoamingNetwork.md#energymetermanufacturers)). The manufacturer must exist in the
-version the meter is in; an energy meter manufacturer still named by a meter can not be removed.
+RNO; documented in [RoamingNetwork](RoamingNetwork.md#energymetermanufacturers)), a party; its `modelId` one of the
+[models](EnergyMeterManufacturer.md#energymetermodels) of that manufacturer. Both must exist in the version the meter
+is in, as the meter is at runtime, with what its templates give it; a manufacturer or a model still named by a meter
+can not be removed.
 
 
 ## transparencySoftwareStatus
@@ -194,7 +196,8 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `EnergyMe
 - Within one pool's or one station's `energyMeters`: no null entries, no identification twice.
 - Network level: an identification at most once in the whole roaming network, across all pools, grid connection
   points, stations and EVSEs of all operators.
-- `manufacturerId`, when given, names an energy meter manufacturer of the network.
+- `manufacturerId`, when given, names an energy meter manufacturer of the network, `modelId` one of its models; a
+  `modelId` without a manufacturer, its own or one of its templates, is refused.
 - `transparencySoftwareStatus`: a JSON array of objects, each with `transparencySoftwareId` and `legalStatus`;
   a release at most once; every release and certificate exists in the network; a given certificate covers its release.
 - `signatureMethods`: an array of nonempty texts, none twice, in any case.

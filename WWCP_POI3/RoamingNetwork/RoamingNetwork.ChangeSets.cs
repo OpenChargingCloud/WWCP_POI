@@ -959,6 +959,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                 }
 
+                else if (change.EntityType == nameof(ChargingStationModel))
+                {
+                    if (!TryApplyModelChange(ChargingStationModels,        change, index, ChangeSet.CreatedAt, manufacturers, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
                 else if (change.EntityType == nameof(EMobilityProvider))
                 {
                     if (!TryApplyRegistryChange(EMobilityProviderRegistry, change, index, ChangeSet.CreatedAt, providers,     out currentValue, out ErrorResponse))
@@ -1014,6 +1020,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 else if (change.EntityType == nameof(EnergyMeterManufacturer))
                 {
                     if (!TryApplyRegistryChange(EnergyMeterManufacturerRegistry, change, index, ChangeSet.CreatedAt, meterManufacturers, out currentValue, out ErrorResponse))
+                        return false;
+                }
+
+                else if (change.EntityType == nameof(EnergyMeterModel))
+                {
+                    if (!TryApplyModelChange(EnergyMeterModels,            change, index, ChangeSet.CreatedAt, meterManufacturers, out currentValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1113,7 +1125,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-            // Every manufacturer a charging station names, every grid connection point a charging pool names,
+            // Every manufacturer and model a charging station names, every grid connection point a charging pool names,
             // and every maintainer of a grid connection point must still be one of the network;
             // grid connection points, energy meters, and energy meter templates and groups must be unique within the network.
             var allEnergyMeters         = AllEnergyMeters        (operators.Values, gridOps.Values).ToArray();
@@ -1134,13 +1146,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  DuplicateTransparencySoftware(softwareManufacturers.Values) ??
                  DuplicateTransparencySoftwareCertificate(bodies.Values) ??
                  UnknownTransparencyReference(allEnergyMeters, softwares, certificates, manufacturers) ??
-                 UnknownEnergyMeterManufacturer(allEnergyMeters, meterManufacturers) ??
                  DuplicateEnergyMeterGroup(allEnergyMeterGroups)       ??
                  DuplicateProviderGroup(operators.Values, providers.Values) ??
                  DuplicateChargingTariffOffer(operators.Values, providers.Values) ??
                  NewProviderOfferOverlap(operators, providers) ??
                  DuplicateEnergyMeterTemplate(allEnergyMeterTemplates) ??
-                 UnknownEnergyMeterTemplateReference(allEnergyMeterTemplates, meterManufacturers, softwares, certificates)) is String referenceError)
+                 UnknownEnergyMeterTemplateReference(allEnergyMeterTemplates, meterManufacturers, softwares, certificates) ??
+                 UnknownEnergyMeterManufacturer(AllEffectiveEnergyMeters(operators.Values, gridOps.Values), meterManufacturers)) is String referenceError)
             {
                 ErrorResponse = referenceError;
                 return false;

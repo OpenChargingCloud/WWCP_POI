@@ -69,6 +69,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                     EnergyMeterManufacturers:  [ new EnergyMeterManufacturer(ACME,
                                                                              ImmutableI18NString.Create(Languages.en, "ACME Meters"),
                                                                              Homepage:  URL.Parse("https://meters.example.org"),
+                                                                             Models:    [ new EnergyMeterModel(ACME3000) ],
                                                                              Created:   Created) ],
                     GridOperators:             [ new GridOperator(NET,
                                                                   I18NString.Create(Languages.en, "Example Netz"),
@@ -391,7 +392,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var zap   = EnergyMeterManufacturer_Id.Parse("ZAP");
 
             var rn2   = Apply(rn1,
-                              RoamingNetworkChange.Add           (new EnergyMeterManufacturer(zap)),
+                              RoamingNetworkChange.Add           (new EnergyMeterManufacturer(zap).WithKeys()),
                               RoamingNetworkChange.UpdateProperty(acme, "hotline",     null, "+49 30 1234567"),
                               RoamingNetworkChange.UpdateProperty(e1,   "energyMeter", null, new EnergyMeter(EVSEMeter, ManufacturerId: zap).ToJSON()));
 

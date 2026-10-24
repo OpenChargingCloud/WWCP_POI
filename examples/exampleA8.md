@@ -9,13 +9,13 @@ of checkpoint 4, and keeps the proof of one: it was made between the two checkpo
 
 | Revision | Signed by | |
 |---|---|---|
-| 0 to 9 | see [example A1](exampleA1.md) to [example A5](exampleA5.md) | checkpoints 0 to 2 of [example A4](exampleA4.md) and [example A5](exampleA5.md) |
-| 10 | `DE*GEF`, its `tariffs` key | `Add` of the charging tariffs `DE*GEF*T_AC`, 0.49 €/kWh, and `DE*GEF*T_DC`, 0.69 €/kWh |
-| 11 | `DE*GEF`, its `infrastructure` key | `UpdateProperty` of `chargingTariffId` of the EVSE templates `DE*GEF*ET_AC` and `DE*GEF*ET_DC` |
-| | `OCC` | **checkpoint 3**, of revision 11 |
+| 0 to 10 | see [example A1](exampleA1.md) to [example A5](exampleA5.md) | checkpoints 0 to 2 of [example A4](exampleA4.md) and [example A5](exampleA5.md) |
+| 11 | `DE*GEF`, its `tariffs` key | `Add` of the charging tariffs `DE*GEF*T_AC`, 0.49 €/kWh, and `DE*GEF*T_DC`, 0.69 €/kWh |
+| 12 | `DE*GEF`, its `infrastructure` key | `UpdateProperty` of `chargingTariffId` of the EVSE templates `DE*GEF*ET_AC` and `DE*GEF*ET_DC` |
+| | `OCC` | **checkpoint 3**, of revision 12 |
 | no commit | `DE*GEF`, its `tariffs` key | **price statements:** `DE*GEF*E1*1` and `DE*GEF*E1*2` 0.59 €/kWh, then `DE*GEF*E1*1` 0.79 €/kWh |
-| 12 | `DE*GEF`, its `tariffs` key | `UpdateProperty` of the `elements` of `DE*GEF*T_AC`: 0.52 €/kWh |
-| | `OCC` | **checkpoint 4**, of revision 12, naming the 3 price statements |
+| 13 | `DE*GEF`, its `tariffs` key | `UpdateProperty` of the `elements` of `DE*GEF*T_AC`: 0.52 €/kWh |
+| | `OCC` | **checkpoint 4**, of revision 13, naming the 3 price statements |
 
 Two kinds of prices (SPECIFICATION.md, section 12): **charging tariffs** are content, they change slowly, by commits, and
 checkpoints prove them as all content. Ad hoc prices, like status messages in DATEX II, are the **price status** of
@@ -61,15 +61,15 @@ private static ChargingTariff Tariff(ChargingTariff_Id Id, String Name, Decimal 
 ```
 
 ```
-Committed, revision 10: The AC and the DC charging tariffs
-Committed, revision 11: The EVSE templates name the tariffs
+Committed, revision 11: The AC and the DC charging tariffs
+Committed, revision 12: The EVSE templates name the tariffs
 ```
 
 
 ## 2. Checkpoint 3
 
 ```
-Checkpoint 3 of revision 11: 2 commit(s), 3 signatures, c452cdc0…
+Checkpoint 3 of revision 12: 2 commit(s), 3 signatures, c452cdc0…
 ```
 
 
@@ -143,8 +143,8 @@ server took since checkpoint 3 and that were signed before it, by the Merkle roo
 (section 12.3); a checkpoint naming none has no `priceStatements`, as the checkpoints 0 to 3.
 
 ```
-Committed, revision 12: The AC charging tariff: 0.52 €/kWh
-Checkpoint 4 of revision 12: 1 commit(s), 3 signatures, 88412483…
+Committed, revision 13: The AC charging tariff: 0.52 €/kWh
+Checkpoint 4 of revision 13: 1 commit(s), 3 signatures, 88412483…
   naming 3 price statements, root be3b574a…
 ```
 
@@ -218,7 +218,7 @@ their tree must be the one of the checkpoint. b) Without one of them, the tree i
 another price: its signature is not the one of its content.
 
 ```
-Joined from checkpoint 4 with its price statements: revision 12, 3 statements
+Joined from checkpoint 4 with its price statements: revision 13, 3 statements
 Joined with a statement less: The checkpoint of the snapshot can not be taken: The price statements are not those the checkpoint '88412483…' names!
 A statement of another price: The signature of the price statement is invalid: The signature is invalid!
 ```

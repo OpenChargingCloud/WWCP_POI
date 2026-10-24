@@ -49,6 +49,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const String PriceStatements  = "priceStatements";
 
         /// <summary>
+        /// The models of a charging station or energy meter manufacturer.
+        /// </summary>
+        public const String Models           = "models";
+
+        /// <summary>
         /// The transparency software releases of a transparency software manufacturer.
         /// </summary>
         public const String Software         = "software";
@@ -71,6 +76,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                        Infrastructure,
                                                                                        Tariffs,
                                                                                        PriceStatements,
+                                                                                       Models,
                                                                                        Software,
                                                                                        Certificates,
                                                                                        Party);
@@ -107,6 +113,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    nameof(ParkingProduct)          or
                    nameof(ParkingSpaceTemplate)    or
                    nameof(ParkingSpaceGroup)       => Infrastructure,
+
+                   nameof(ChargingStationModel)    or
+                   nameof(EnergyMeterModel)        => Models,
 
                    nameof(TransparencySoftware)    => Software,
 

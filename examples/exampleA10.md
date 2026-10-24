@@ -8,10 +8,10 @@ applied when charging began? The driver's app answers it from one file it kept, 
 
 | Revision | Signed by | |
 |---|---|---|
-| 0 to 12 | see [example A1](exampleA1.md) to [example A9](exampleA9.md) | the version the app gets the station proof of, in checkpoint 4 |
+| 0 to 13 | see [example A1](exampleA1.md) to [example A9](exampleA9.md) | the version the app gets the station proof of, in checkpoint 4 |
 | price statement, sequence 2 | `DE*GEF`, its `tariffs` key | 0.65 €/kWh at `DE*GEF*E1*1`, after checkpoint 4 |
-| 13 | `DE*GEF`, its `tariffs` key | the DC charging tariff raised to 0.72 €/kWh, after the session |
-| checkpoint 5 | `OCC`, and both witnesses, after they checked its price statement | of revision 13, naming the statement |
+| 14 | `DE*GEF`, its `tariffs` key | the DC charging tariff raised to 0.72 €/kWh, after the session |
+| checkpoint 5 | `OCC`, and both witnesses, after they checked its price statement | of revision 14, naming the statement |
 
 The code is [exampleA10.cs](csharp/exampleA10.cs), with the helpers of [exampleA4.cs](csharp/exampleA4.cs),
 [exampleA6.cs](csharp/exampleA6.cs), [exampleA8.cs](csharp/exampleA8.cs) and [exampleA9.cs](csharp/exampleA9.cs), called
@@ -42,7 +42,7 @@ if (!A1.History.TryAttest(out var attestations, out var error))
 ```
 
 ```
-Revision 12 attested as OCC by AlphaOrg, BetaOrg, GammaOrg, until 2026-10-24T03:43:04.937Z
+Revision 13 attested as OCC by AlphaOrg, BetaOrg, GammaOrg, until 2026-10-24T03:43:04.937Z
 DE*GEF*E1*1, 0.65 €/kWh, sequence 2: Taken
 ```
 
@@ -81,11 +81,11 @@ of the EVSE with their manufacturers, and the price: the charging tariff the EVS
 price the statement sets for it.
 
 ```
-The app, at DE*GEF*E1*1: Quality Assurance of Open Charging Cloud, revision 12
+The app, at DE*GEF*E1*1: Quality Assurance of Open Charging Cloud, revision 13
 DE*GEF*S1: GraphDefined Charging Stations GD-DC300
 DE*GEF*M1*1, the energy meter of DE*GEF*E1*1: Kernberg DC Metering KDM-500, serial DCM-2026-001-1, OCMF, secp256r1 key 0cc14973…
 DE*GEF*E1*1, 150 kW: DE*GEF*T_DC 0.69 €/kWh, by the price statement 0.65 €/kWh
-Kept: driver/evidence-DE_GEF_E1_1.json, 31 KiB
+Kept: driver/evidence-DE_GEF_E1_1.json, 36 KiB
 ```
 
 c) It keeps the trust anchor, the EVSE, when charging began, the proof and the statements. When the session ends, the
@@ -95,14 +95,14 @@ the proof gives, not part of this example.
 
 ## 3. A week later: a commit, checkpoint 5, its witnesses
 
-`DE*GEF` raises its DC charging tariff to 0.72 €/kWh, revision 13: the network changes, the evidence of the session does
-not. Checkpoint 5 of revision 13 names the price statement of the session, taken since checkpoint 4 and signed before
+`DE*GEF` raises its DC charging tariff to 0.72 €/kWh, revision 14: the network changes, the evidence of the session does
+not. Checkpoint 5 of revision 14 names the price statement of the session, taken since checkpoint 4 and signed before
 checkpoint 5. The roaming network operator publishes the commits since checkpoint 4 and the statements of checkpoint 5;
 the witnesses check them and sign checkpoint 5, as in [example A9](exampleA9.md).
 
 ```
-Committed, revision 13: The DC charging tariff: 0.72 €/kWh
-Checkpoint 5 of revision 13: 1 commit(s), 3 signatures, dfc1497a…
+Committed, revision 14: The DC charging tariff: 0.72 €/kWh
+Checkpoint 5 of revision 14: 1 commit(s), 3 signatures, dfc1497a…
   naming 1 price statement(s)
 Checkpoint 5, dfc1497a…: 2 signatures more, 5 in all
 ```
@@ -112,7 +112,7 @@ Checkpoint 5, dfc1497a…: 2 signatures more, 5 in all
 
 Once checkpoint 5 is witnessed, the app gets three things.
 
-- The proof of the commit of the station proof, revision 12, in the first checkpoint whose commits include it,
+- The proof of the commit of the station proof, revision 13, in the first checkpoint whose commits include it,
   checkpoint 4: `GET ~/RNs/QA/history/commits/{commitId}/proof`.
 - The proof of the statement in checkpoint 5: `GET ~/RNs/QA/history/checkpoints/{checkpointId}/priceStatements/{digest}/proof`.
 - Both checkpoints, with the signatures of the witnesses.
@@ -126,7 +126,7 @@ if (!A1.History.TryGetPriceStatementProof(checkpoint5.Id, statement.Digest, out 
 ```
 
 ```
-Completed: driver/evidence-DE_GEF_E1_1.json, 40 KiB: the proof of revision 12 in checkpoint 4, of the statement in checkpoint 5, and both checkpoints
+Completed: driver/evidence-DE_GEF_E1_1.json, 45 KiB: the proof of revision 13 in checkpoint 4, of the statement in checkpoint 5, and both checkpoints
 ```
 
 What the file holds, as JSON, in bytes:
@@ -135,11 +135,11 @@ What the file holds, as JSON, in bytes:
 |---|---|---|
 | `trustAnchor` | 0.5 K | the QR code of `QA` |
 | `EVSEId`, `chargingStarted` | | the session |
-| `chargingStationProof` | 21.6 K | with the energy meters of the station and their manufacturer, and its 3 attestations, one of each holder of `OCC` |
-| `priceStatements` | 0.9 K | the statement of the EVSE |
-| `commitProof` | 0.6 K | revision 12 in checkpoint 4 |
+| `chargingStationProof` | 23.3 K | with the energy meters of the station, the manufacturers of both and the models they name, and its 3 attestations, one of each holder of `OCC` |
+| `priceStatements` | 0.8 K | the statement of the EVSE |
+| `commitProof` | 0.6 K | revision 13 in checkpoint 4 |
 | `priceStatementProofs` | 1.0 K | the statement in checkpoint 5 |
-| `checkpoints` | 5.0 K | 4 and 5, each with 3 signatures of `OCC` and 2 of witnesses |
+| `checkpoints` | 4.8 K | 4 and 5, each with 3 signatures of `OCC` and 2 of witnesses |
 
 
 ## 5. The evidence, months later
@@ -172,12 +172,12 @@ e) What applied: the station and the energy meter of the EVSE, with the key the 
 checked with, the tariff of the EVSE as the proof gives it, and the price the statement set for it.
 
 ```
-Checkpoint 4: revision 12, signed by AlphaOrg, BetaOrg, GammaOrg, witnessed by calibration.example, association.example
-Checkpoint 5: revision 13, signed by AlphaOrg, BetaOrg, GammaOrg, witnessed by calibration.example, association.example
+Checkpoint 4: revision 13, signed by AlphaOrg, BetaOrg, GammaOrg, witnessed by calibration.example, association.example
+Checkpoint 5: revision 14, signed by AlphaOrg, BetaOrg, GammaOrg, witnessed by calibration.example, association.example
 
 At 2026-10-24T04:06:58.083Z, when charging began: the station proof attested, the price statement valid
 2027-01-22T04:06:58.083Z, by its attestations alone: Valid attestations of trusted keys of 0 holders attest the root effectiveTree:sha256:hex:f6ab8661… of the proof, not of 2!
-Revision 12, the version of the station proof: in checkpoint 4, witnessed
+Revision 13, the version of the station proof: in checkpoint 4, witnessed
 The price statement, sequence 2: after checkpoint 4, before checkpoint 5, witnessed
 
 DE*GEF*S1: GraphDefined Charging Stations GD-DC300
@@ -206,7 +206,7 @@ Checkpoint 5 without its witnesses: witnessed by 0 of 2
 
 ## Limits
 
-- The app checks the signatures of `OCC` on checkpoint 5 with the certificates of the version of revision 12, which the
+- The app checks the signatures of `OCC` on checkpoint 5 with the certificates of the version of revision 13, which the
   station proof gives. Had a holder of `OCC` renewed its signing key in between, the app would need the certificate of
   the version of checkpoint 5 as well, e.g. by a proof of `OCC` in that version.
 - The app trusts the witnesses by configuration, as the verifier of [example A6](exampleA6.md). A signed list of them

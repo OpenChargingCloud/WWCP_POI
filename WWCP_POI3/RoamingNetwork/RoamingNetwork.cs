@@ -389,7 +389,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.chargingStationManufacturers = new (ChargingStationManufacturers, entity => entity.Id, "charging station manufacturer");
 
-            // Every manufacturer a charging station names is one of this network.
+            // Every manufacturer a charging station names is one of this network, with the model it names.
             if (UnknownManufacturer(chargingStationOperators, chargingStationManufacturers.Index) is String unknownManufacturer)
                 throw new ArgumentException(unknownManufacturer, nameof(ChargingStationManufacturers));
 
@@ -412,10 +412,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 energyMeters.TryAdd(energyMeter.Id, energyMeter);
 
             this.energyMeterManufacturers = new (EnergyMeterManufacturers, entity => entity.Id, "energy meter manufacturer");
-
-            // Every manufacturer an energy meter names is one of this network.
-            if (UnknownEnergyMeterManufacturer(AllEnergyMeters(chargingStationOperators, gridOperators), energyMeterManufacturers.Index) is String unknownEnergyMeterManufacturer)
-                throw new ArgumentException(unknownEnergyMeterManufacturer, nameof(EnergyMeterManufacturers));
 
             this.parkingOperators = new (ParkingOperators, entity => entity.Id, "parking operator");
 
@@ -459,18 +455,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.transparencySoftwareCertificates = TransparencySoftwareCertificatesOf(conformityAssessmentBodies);
 
-            // Certificates name releases and manufacturers of this network; energy meters name releases and certificates.
+            // Certificates name releases and models of this network; energy meters name releases and certificates.
             if (UnknownTransparencyReference(AllEnergyMeters(chargingStationOperators, gridOperators), transparencySoftware, transparencySoftwareCertificates, chargingStationManufacturers.Index) is String transparencyError)
                 throw new ArgumentException(transparencyError, nameof(TransparencySoftwareManufacturers));
 
-            // Energy meter templates and groups are unique within the network; templates name manufacturers, releases and
-            // certificates of it.
+            // Energy meter templates and groups are unique within the network; templates name manufacturers, models,
+            // releases and certificates of it.
             if ((DuplicateEnergyMeterGroup          (AllEnergyMeterGroups   (chargingStationOperators, gridOperators)) ??
                  DuplicateEnergyMeterTemplate       (AllEnergyMeterTemplates(chargingStationOperators, gridOperators)) ??
                  UnknownEnergyMeterTemplateReference(AllEnergyMeterTemplates(chargingStationOperators, gridOperators), energyMeterManufacturers.Index, transparencySoftware, transparencySoftwareCertificates)) is String energyMeterGroupError)
             {
                 throw new ArgumentException(energyMeterGroupError, nameof(ChargingStationOperators));
             }
+
+            // Every manufacturer an energy meter names is one of this network, with the model it names, as the meter is
+            // with what its templates give it.
+            if (UnknownEnergyMeterManufacturer(AllEffectiveEnergyMeters(chargingStationOperators, gridOperators), energyMeterManufacturers.Index) is String unknownEnergyMeterManufacturer)
+                throw new ArgumentException(unknownEnergyMeterManufacturer, nameof(EnergyMeterManufacturers));
 
             foreach (var energyMeterGroup in AllEnergyMeterGroups(chargingStationOperators, gridOperators))
                 energyMeterGroups.TryAdd(energyMeterGroup.Id, energyMeterGroup);
@@ -2355,7 +2356,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => transparencySoftwareCertificates.TryGetValue(CertificateId, out Certificate);
 
         /// <summary>
-        /// The error, when a certificate names an unknown release or manufacturer,
+        /// The error, when a certificate names an unknown release, manufacturer, model or version of its model,
         /// or an energy meter an unknown release, an unknown certificate, or a certificate not covering its release.
         /// </summary>
         internal static String? UnknownTransparencyReference(IEnumerable<EnergyMeter>                                                                EnergyMeters,
@@ -2371,11 +2372,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (!TransparencySoftware.ContainsKey(releaseId))
                         return $"The transparency software release '{releaseId}' of the certificate '{certificate.Id}' is unknown in the roaming network!";
 
-                if (certificate.ChargingStationManufacturerId.HasValue &&
-                    !ChargingStationManufacturers.ContainsKey(certificate.ChargingStationManufacturerId.Value))
-                {
+                if (!ChargingStationManufacturers.TryGetValue(certificate.ChargingStationManufacturerId, out var manufacturer))
                     return $"The manufacturer '{certificate.ChargingStationManufacturerId}' of the certificate '{certificate.Id}' is unknown in the roaming network!";
-                }
+
+                if (!manufacturer.TryGetModel(certificate.ChargingStationModel, out var model))
+                    return $"The charging station model '{certificate.ChargingStationModel}' of the certificate '{certificate.Id}' is unknown at its manufacturer '{manufacturer.Id}'!";
+
+                if (!model.HasVersion(certificate.ChargingStationModelVersion))
+                    return $"The version '{certificate.ChargingStationModelVersion}' of the certificate '{certificate.Id}' is no version of the charging station model '{model.Id}' of '{manufacturer.Id}'!";
 
             }
 
@@ -2675,18 +2679,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => energyMeterManufacturers.TryGet(EnergyMeterManufacturerId, out EnergyMeterManufacturer);
 
         /// <summary>
-        /// The error, when an energy meter of the given operators names a manufacturer not among the given ones.
+        /// The error, when an energy meter of the given operators names a manufacturer not among the given ones, or a
+        /// model without its manufacturer or one its manufacturer does not have: as it is at runtime, with what its
+        /// templates give it.
         /// </summary>
         internal static String? UnknownEnergyMeterManufacturer(IEnumerable<EnergyMeter>                                                  EnergyMeters,
                                                                IReadOnlyDictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>  EnergyMeterManufacturers)
         {
 
             foreach (var energyMeter in EnergyMeters)
-                if (energyMeter.ManufacturerId.HasValue &&
-                    !EnergyMeterManufacturers.ContainsKey(energyMeter.ManufacturerId.Value))
+                if (UnknownEnergyMeterModel($"The energy meter '{energyMeter.Id}'",
+                                            energyMeter.ManufacturerId,
+                                            energyMeter.ModelId,
+                                            EnergyMeterManufacturers) is String error)
                 {
-                    return $"The energy meter '{energyMeter.Id}' names the unknown energy meter manufacturer '{energyMeter.ManufacturerId}'!";
+                    return error;
                 }
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// The error, when what is given names an unknown energy meter manufacturer, or a model without its manufacturer
+        /// or one its manufacturer does not have.
+        /// </summary>
+        /// <param name="Named">What names them, in words, e.g. "The energy meter 'M1'".</param>
+        private static String? UnknownEnergyMeterModel(String                                                                    Named,
+                                                       EnergyMeterManufacturer_Id?                                               ManufacturerId,
+                                                       EnergyMeterModel_Id?                                                      ModelId,
+                                                       IReadOnlyDictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>  EnergyMeterManufacturers)
+        {
+
+            if (!ManufacturerId.HasValue)
+                return ModelId.HasValue
+                           ? $"{Named} names the model '{ModelId}' without its manufacturer!"
+                           : null;
+
+            if (!EnergyMeterManufacturers.TryGetValue(ManufacturerId.Value, out var manufacturer))
+                return $"{Named} names the unknown energy meter manufacturer '{ManufacturerId}'!";
+
+            if (ModelId.HasValue && !manufacturer.TryGetModel(ModelId.Value, out _))
+                return $"{Named} names the model '{ModelId}', unknown at its manufacturer '{manufacturer.Id}'!";
 
             return null;
 
@@ -2713,6 +2747,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters).
                    Concat(GridOperators.SelectMany(gridOperator => gridOperator.EnergyMeters));
+
+        /// <summary>
+        /// The energy meters of the given charging station operators and grid operators, with the properties the energy
+        /// meter templates of their owners give them, e.g. their manufacturer.
+        /// </summary>
+        internal static IEnumerable<EnergyMeter> AllEffectiveEnergyMeters(IEnumerable<ChargingStationOperator>  ChargingStationOperators,
+                                                                          IEnumerable<GridOperator>             GridOperators)
+        {
+
+            static EnergyMeter Effective(EnergyMeter                                                EnergyMeter,
+                                         POICollection<EnergyMeterTemplate_Id, EnergyMeterTemplate>  Templates)
+
+                => EnergyMeter.TemplateIds.Length > 0
+                       ? EnergyMeterTemplate.Effective(EnergyMeter, ChargingStationOperator.Values(EnergyMeter.TemplateIds, Templates))
+                       : EnergyMeter;
+
+            return ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EnergyMeters.Select(energyMeter => Effective(energyMeter, chargingStationOperator.EnergyMeterTemplates))).
+                       Concat(GridOperators.SelectMany(gridOperator => gridOperator.EnergyMeters.Select(energyMeter => Effective(energyMeter, gridOperator.EnergyMeterTemplates))));
+
+        }
 
         /// <summary>
         /// Try to get the energy meter having the given identification, anywhere in the network.
@@ -2857,8 +2911,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The error, when an energy meter template gives its members an unknown manufacturer, an unknown transparency
-        /// software release or certificate, or a certificate not covering its release.
+        /// The error, when an energy meter template gives its members an unknown manufacturer or model, an unknown
+        /// transparency software release or certificate, or a certificate not covering its release.
         /// </summary>
         internal static String? UnknownEnergyMeterTemplateReference(IEnumerable<EnergyMeterTemplate>                                                     EnergyMeterTemplates,
                                                                  IReadOnlyDictionary<EnergyMeterManufacturer_Id,         EnergyMeterManufacturer>          EnergyMeterManufacturers,
@@ -2869,10 +2923,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var energyMeterTemplate in EnergyMeterTemplates)
             {
 
-                if (energyMeterTemplate.ManufacturerId.HasValue &&
-                    !EnergyMeterManufacturers.ContainsKey(energyMeterTemplate.ManufacturerId.Value))
+                if (UnknownEnergyMeterModel($"The energy meter template '{energyMeterTemplate.Id}'",
+                                            energyMeterTemplate.ManufacturerId,
+                                            energyMeterTemplate.ModelId,
+                                            EnergyMeterManufacturers) is String modelError)
                 {
-                    return $"The energy meter template '{energyMeterTemplate.Id}' names the unknown energy meter manufacturer '{energyMeterTemplate.ManufacturerId}'!";
+                    return modelError;
                 }
 
                 foreach (var assignment in energyMeterTemplate.TransparencySoftwareStatus)
@@ -2924,25 +2980,57 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => chargingStationManufacturers.TryGet(ChargingStationManufacturerId, out ChargingStationManufacturer);
 
         /// <summary>
-        /// The error, when a charging station or a charging station template names a manufacturer the given ones do not have.
+        /// The error, when a charging station or a charging station template names a manufacturer the given ones do not
+        /// have, or a model without its manufacturer or one its manufacturer does not have: a charging station as it is at
+        /// runtime, with what its templates give it.
         /// </summary>
         internal static String? UnknownManufacturer(IEnumerable<ChargingStationOperator>                                              ChargingStationOperators,
                                                     IReadOnlyDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>  ChargingStationManufacturers)
         {
 
-            foreach (var chargingStation in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStations))
-                if (chargingStation.ManufacturerId.HasValue &&
-                    !ChargingStationManufacturers.ContainsKey(chargingStation.ManufacturerId.Value))
+            foreach (var chargingStationTemplate in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationTemplates))
+                if (UnknownChargingStationModel($"the charging station template '{chargingStationTemplate.Id}'",
+                                                chargingStationTemplate.ManufacturerId,
+                                                chargingStationTemplate.ModelId,
+                                                ChargingStationManufacturers) is String error)
                 {
-                    return $"The manufacturer '{chargingStation.ManufacturerId}' of the charging station '{chargingStation.Id}' is unknown in the roaming network!";
+                    return error;
                 }
 
-            foreach (var chargingStationTemplate in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationTemplates))
-                if (chargingStationTemplate.ManufacturerId.HasValue &&
-                    !ChargingStationManufacturers.ContainsKey(chargingStationTemplate.ManufacturerId.Value))
+            foreach (var chargingStation in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EffectiveChargingStations))
+                if (UnknownChargingStationModel($"the charging station '{chargingStation.Id}'",
+                                                chargingStation.ManufacturerId,
+                                                chargingStation.ModelId,
+                                                ChargingStationManufacturers) is String error)
                 {
-                    return $"The manufacturer '{chargingStationTemplate.ManufacturerId}' of the charging station template '{chargingStationTemplate.Id}' is unknown in the roaming network!";
+                    return error;
                 }
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// The error, when what is given names an unknown charging station manufacturer, or a model without its
+        /// manufacturer or one its manufacturer does not have.
+        /// </summary>
+        /// <param name="Named">What names them, in words, e.g. "the charging station 'DE*GEF*S1'".</param>
+        private static String? UnknownChargingStationModel(String                                                                            Named,
+                                                           ChargingStationManufacturer_Id?                                                   ManufacturerId,
+                                                           ChargingStationModel_Id?                                                          ModelId,
+                                                           IReadOnlyDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>  ChargingStationManufacturers)
+        {
+
+            if (!ManufacturerId.HasValue)
+                return ModelId.HasValue
+                           ? $"The model '{ModelId}' of {Named} is named without its manufacturer!"
+                           : null;
+
+            if (!ChargingStationManufacturers.TryGetValue(ManufacturerId.Value, out var manufacturer))
+                return $"The manufacturer '{ManufacturerId}' of {Named} is unknown in the roaming network!";
+
+            if (ModelId.HasValue && !manufacturer.TryGetModel(ModelId.Value, out _))
+                return $"The model '{ModelId}' of {Named} is unknown at its manufacturer '{manufacturer.Id}'!";
 
             return null;
 

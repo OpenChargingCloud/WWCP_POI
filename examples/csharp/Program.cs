@@ -4,7 +4,7 @@
 
 
 // What the last run wrote is removed first: its keys, what it published and its history would not fit the new keys.
-foreach (var directory in new[] { "AlphaOrg", "BetaOrg", "GammaOrg", "DE-GEF", "GraphDefined", "PTB", "published", "trusted", "driver", "poi" })
+foreach (var directory in new[] { "AlphaOrg", "BetaOrg", "GammaOrg", "DE-GEF", "GraphDefined", "SAALE", "KERNBERG", "PTB", "published", "trusted", "driver", "poi" })
     if (Directory.Exists(directory))
         Directory.Delete(directory, recursive: true);
 
@@ -19,9 +19,9 @@ Console.WriteLine();
 
 
 
-// The Charging Station Operator DE*GEF (GraphDefined) adds itself via a change set to the roaming network,
-// the roaming network operator checks the change set and
-// finally adds DE*GEF to its list of known parties.
+// The Charging Station Operator DE*GEF (GraphDefined) adds itself and the manufacturers of its stations and meters via a
+// change set to the roaming network, the roaming network operator checks the change set and finally adds them to its list
+// of known parties; the manufacturers then state their models themselves.
 var a2 = ExampleA2.Run(a1);
 
 ExampleA2.Validate();

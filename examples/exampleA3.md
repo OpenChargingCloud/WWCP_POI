@@ -7,12 +7,12 @@ EVSE with its energy meter, then a charging station group and an EVSE group for 
 
 | Revision | Signed by | Commit |
 |---|---|---|
-| 0, 1 | `OCC`, as the roaming network operator | `QA`, `DE*GEF` and the manufacturers, see [example A1](exampleA1.md) and [example A2](exampleA2.md) |
-| 2 | `DE*GEF`, its `infrastructure` key | `Add` of the charging station templates `DE*GEF*ST_DC` and `DE*GEF*ST_AC`, of the EVSE templates `DE*GEF*ET_DC` and `DE*GEF*ET_AC`, and of the energy meter templates `DE*GEF*EMT_DC` and `DE*GEF*EMT_AC` |
-| 3 | `DE*GEF` | `Add` of the pool `DE*GEF*P1`, Jena Paradies: the DC station `DE*GEF*S1` with `DE*GEF*E1*1` and `DE*GEF*E1*2`, the AC station `DE*GEF*S2` with `DE*GEF*E2*1` and `DE*GEF*E2*2`, each naming its template, each EVSE with its energy meter, `DE*GEF*M1*1` to `DE*GEF*M2*2` |
-| 4 | `DE*GEF` | `Add` of the pool `DE*GEF*P2`, Jena Nord: the DC station `DE*GEF*S3`, the AC station `DE*GEF*S4`, and their EVSEs |
-| 5 | `DE*GEF` | `Add` of the charging station groups `DE*GEF*SG_DC`, the DC stations `S1` and `S3`, and `DE*GEF*SG_AC`, the AC stations `S2` and `S4` |
-| 6 | `DE*GEF` | `Add` of the EVSE groups `DE*GEF*EG_DC`, the EVSEs of `S1` and `S3`, and `DE*GEF*EG_AC`, those of `S2` and `S4` |
+| 0 to 2 | `OCC`, as the roaming network operator; the manufacturers | `QA`, `DE*GEF`, the manufacturers and their models, see [example A1](exampleA1.md) and [example A2](exampleA2.md) |
+| 3 | `DE*GEF`, its `infrastructure` key | `Add` of the charging station templates `DE*GEF*ST_DC` and `DE*GEF*ST_AC`, of the EVSE templates `DE*GEF*ET_DC` and `DE*GEF*ET_AC`, and of the energy meter templates `DE*GEF*EMT_DC` and `DE*GEF*EMT_AC` |
+| 4 | `DE*GEF` | `Add` of the pool `DE*GEF*P1`, Jena Paradies: the DC station `DE*GEF*S1` with `DE*GEF*E1*1` and `DE*GEF*E1*2`, the AC station `DE*GEF*S2` with `DE*GEF*E2*1` and `DE*GEF*E2*2`, each naming its template, each EVSE with its energy meter, `DE*GEF*M1*1` to `DE*GEF*M2*2` |
+| 5 | `DE*GEF` | `Add` of the pool `DE*GEF*P2`, Jena Nord: the DC station `DE*GEF*S3`, the AC station `DE*GEF*S4`, and their EVSEs |
+| 6 | `DE*GEF` | `Add` of the charging station groups `DE*GEF*SG_DC`, the DC stations `S1` and `S3`, and `DE*GEF*SG_AC`, the AC stations `S2` and `S4` |
+| 7 | `DE*GEF` | `Add` of the EVSE groups `DE*GEF*EG_DC`, the EVSEs of `S1` and `S3`, and `DE*GEF*EG_AC`, those of `S2` and `S4` |
 
 An EVSE says itself what it is: its current type and its power, 150 kW DC or 22 kW AC. What a series of stations,
 EVSEs or energy meters has in common comes from a template it names in its `templateIds`: here each charging station
@@ -84,10 +84,11 @@ A [charging station template](../docs/ChargingStationTemplate.md) has the proper
 template names no members: a station, an EVSE or an energy meter names the templates it takes, so they come first. Each
 charging station template here gives its stations their power together, `maxPower`: a station takes it unless it has
 its own, and never above the one of all its EVSEs together; and their manufacturer, `GraphDefined` of
-[example A2](exampleA2.md), and model. Each EVSE template gives its EVSEs their connector: a CCS cable to the DC EVSEs,
+[example A2](exampleA2.md), and one of its models, `GD-DC300` or `GD-AC44`: a model is named with its manufacturer,
+and only one it stated. Each EVSE template gives its EVSEs their connector: a CCS cable to the DC EVSEs,
 a type 2 socket to the AC EVSEs; an EVSE takes the connectors of its templates besides its own, of the same
 identification its own. An [energy meter template](../docs/EnergyMeterTemplate.md) gives its meters what a series has in
-common: their role, `evse`, their manufacturer, `KERNBERG` for the DC meters, `SAALE` for the AC meters, their model and
+common: their role, `evse`, their manufacturer, `KERNBERG` for the DC meters, `SAALE` for the AC meters, its model and
 their signature method, `OCMF`; its identification is free text, here `{operatorId}*EMT{suffix}`, unique in the network,
 and it is embedded in its operator as `energyMeterTemplates`, added with its operator as the parent.
 
@@ -126,7 +127,7 @@ Commit("The templates of the DC and the AC stations, EVSEs and energy meters",
 ```
 
 ```
-Committed, revision 2: The templates of the DC and the AC stations, EVSEs and energy meters
+Committed, revision 3: The templates of the DC and the AC stations, EVSEs and energy meters
 ```
 
 All six in one change set, so in one commit. POI_API serves them, `GET ~/RNs/QA/CSOs/DE*GEF/CSTs` lists the charging station templates
@@ -239,7 +240,7 @@ Commit("Jena Paradies, a DC and an AC station", RoamingNetworkChange.Add(Pool(1,
 ```
 Signed by its tariffs key: Refused, Change 0: Add of the ChargingPool 'DE*GEF*P1' needs a signature by a signing key of the ChargingStationOperator 'DE*GEF' that may sign 'infrastructure'!
 Signed by AlphaOrg of OCC: Refused, Change 0: Add of the ChargingPool 'DE*GEF*P1' needs a signature by a signing key of the ChargingStationOperator 'DE*GEF'!
-Committed, revision 3: Jena Paradies, a DC and an AC station
+Committed, revision 4: Jena Paradies, a DC and an AC station
 ```
 
 A key of `DE*GEF` for its tariffs signs no pools, and the roaming network operator signs none of the data of a party;
@@ -247,7 +248,8 @@ nothing is committed then.
 
 One `Add` of the pool, with its stations, EVSEs and energy meters embedded: the parent of a pool is the operator its
 identification names, and only that operator's signature, by a key that may sign its `infrastructure`, lets it in. A
-template its members name must be one of that operator, a manufacturer they name one of the network. An energy meter is
+template its members name must be one of that operator, a manufacturer they name one of the network, and a model they
+name one of their manufacturer, as they are at runtime, with what their templates give them. An energy meter is
 no entity of a change set of its own: it is embedded in its EVSE, and changes as its property `energyMeter`, see
 [EnergyMeter](../docs/EnergyMeter.md). Its public key is the DER encoded SubjectPublicKeyInfo, here of a P-256 key, `@id`
 its SHA-256; a transparency software checks the signed meter values of a charging session with it.
@@ -260,7 +262,7 @@ Commit("Jena Nord, a DC and an AC station",     RoamingNetworkChange.Add(Pool(2,
 ```
 
 ```
-Committed, revision 4: Jena Nord, a DC and an AC station
+Committed, revision 5: Jena Nord, a DC and an AC station
 ```
 
 
@@ -282,7 +284,7 @@ Commit("The DC and the AC charging stations",
 ```
 
 ```
-Committed, revision 5: The DC and the AC charging stations
+Committed, revision 6: The DC and the AC charging stations
 ```
 
 `GET ~/RNs/QA/CSOs/DE*GEF/CSGs` lists both, as the operator embeds them:
@@ -328,7 +330,7 @@ Commit("The DC and the AC EVSEs",
 ```
 
 ```
-Committed, revision 6: The DC and the AC EVSEs
+Committed, revision 7: The DC and the AC EVSEs
 ```
 
 `GET ~/RNs/QA/CSOs/DE*GEF/EVSEGs/DE*GEF*EG_DC`:
@@ -352,7 +354,7 @@ may name several templates: of two giving a value, the one it names first gives 
 
 ## 7. As they are at runtime
 
-`ExampleA3.Validate()` checks `QA` as everybody does, now at revision 6, and shows the pools of `DE*GEF` as they are at
+`ExampleA3.Validate()` checks `QA` as everybody does, now at revision 7, and shows the pools of `DE*GEF` as they are at
 runtime, with what their templates give them, every EVSE with its energy meter, from what is published only:
 
 ```csharp
@@ -394,7 +396,7 @@ foreach (var pool in gef.EffectiveChargingPools)
 ```
 
 ```
-QA is checked: revision 6, commit 6b4309ffd15468b8cb160bdaa7293e03475e1e281d35ede3238846acd8b538cc, signed by AlphaOrg and BetaOrg and GammaOrg
+QA is checked: revision 7, commit 6b4309ffd15468b8cb160bdaa7293e03475e1e281d35ede3238846acd8b538cc, signed by AlphaOrg and BetaOrg and GammaOrg
 
 DE*GEF*P1  Jena Paradies
   DE*GEF*S1  300 kW  GraphDefined GD-DC300  (templates DE*GEF*ST_DC)
@@ -528,8 +530,8 @@ of a version gives them: `TryGetEffectiveEVSE(evseId, out var evse)`, `Effective
 
 A [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI) serving `QA` takes the change sets of `DE*GEF`
 over HTTP, `COMMIT /poi/RNs/QA/history/changeSets`, from anybody, and serves the pools as above. The templates,
-stations and energy meters name the manufacturers of [example A2](exampleA2.md), which the hub added
-[before](exampleA2.md#the-manufacturers); its revisions are three higher than above.
+stations and energy meters name the manufacturers of [example A2](exampleA2.md) and their models, which the hub added
+and they stated [before](exampleA2.md#the-manufacturers); its revisions are three higher than above.
 
 ### The program of `DE*GEF`, over HTTP
 
@@ -605,7 +607,7 @@ Steps 2 to 6 then run with `await Commit(…)`; each answers `201 Committed, rev
 {
   "status":          "Committed",
   "@id":             "2d2a60b9…",
-  "revision":        6,
+  "revision":        7,
   "parentIds":       [ "adcb769c…" ],
   "changeSetId":     "MSQ5AtSUtAG8542fS12Yh6rCW7x8xv2G",
   "createdAt":       "2026-10-17T18:16:17.709Z",
@@ -613,7 +615,7 @@ Steps 2 to 6 then run with `await Commit(…)`; each answers `201 Committed, rev
   "numberOfChanges": 1,
   "signatureKeyIds": [ "a3fec322…" ],
   "eTags":           [ [ "json", "sha256", "hex", "faf55b2e…" ], [ "cbor", "sha256", "hex", "23340139…" ] ],
-  "head":            { "@id": "2d2a60b9…", "revision": 6, … }
+  "head":            { "@id": "2d2a60b9…", "revision": 7, … }
 }
 ```
 
@@ -633,7 +635,7 @@ curl -X COMMIT -H "Content-Type: application/json" --data-binary @pool.json http
 
 ```
 RoamingHub> roamingNetworks
-QA  revision 9  Quality assurance  (operated by 'RNO-47EAB7CF', this hub, 1 charging station operator(s), 2 charging pool(s))
+QA  revision 10  Quality assurance  (operated by 'RNO-47EAB7CF', this hub, 1 charging station operator(s), 2 charging pool(s))
 ```
 
 The web interface shows them under **Points of interest → QA → Charging station operators → DE\*GEF**: its pools,
