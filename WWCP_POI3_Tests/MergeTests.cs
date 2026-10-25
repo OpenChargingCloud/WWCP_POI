@@ -550,13 +550,18 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             }
 
+            var ownTip = server1.Head.Commit.Id;
+
             Exchange(server2!, server1);
+
+            // The tips are ordered by their ids, so server 1's own is the left or the right version by chance.
+            var side   = server1.Tips[0].Commit.Id == ownTip ? "left" : "right";
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(server1.Tips,                         Has.Count.EqualTo(2));
                 Assert.That(server1.Conflicts.Single().Kind,      Is.EqualTo(RoamingNetworkMergeConflictKind.RevokedKey));
-                Assert.That(server1.Conflicts.Single().Description,  Does.Contain($"is not valid in the left version at {T0.AddMinutes(20).ToISO8601()}"));
+                Assert.That(server1.Conflicts.Single().Description,  Does.Contain($"is not valid in the {side} version at {T0.AddMinutes(20).ToISO8601()}"));
             }
 
         }
