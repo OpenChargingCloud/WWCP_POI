@@ -19,6 +19,7 @@
 
 using System.Collections.Immutable;
 
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
 using NUnit.Framework;
@@ -170,22 +171,50 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #region Custom_data_is_held_as_given()
 
         /// <summary>
-        /// Custom data is held as it is given, also a JSON-LD context in it: it is no object of POI.
+        /// Custom data is held as it is given, also a JSON-LD context in it: it is no object of POI. Numbers keep their
+        /// decimal places, and texts that look like timestamps stay texts, in every time zone; so does the custom data of
+        /// an address (WWCP_POI.TS, docs/csharp-review.md, findings 20 and 21).
         /// </summary>
         [Test]
         public void Custom_data_is_held_as_given()
         {
 
             var rn1         = NewNetwork();
-            var customData  = JObject.Parse("""{ "a": { "@context": "c", "b": 1 } }""");
+            var customData  = AsWritten("""{ "a": { "@context": "c", "b": 1 }, "price": 1.50, "tenth": 0.1, "at": "2024-01-01T12:00:00Z", "local": "2024-01-01T14:00:00+02:00" }""");
+            var address     = AsWritten("""{ "street": "Main", "houseNumber": "1", "postalCode": "07743", "city": { "de": "Jena" }, "country": "DEU", "customData": { "floor": 1.50, "since": "2024-01-01T14:00:00+02:00" } }""");
+
             var prepared    = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(EVSEOf(rn1, E1), "customData", null, customData) ], CreatedAt: T0);
             var rn2         = rn1.ApplyChangeSet(RoamingNetworkChangeSet.Parse(prepared.ToJSON().ToString()));
 
+            var withAddress = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(StationOf(rn1, S1), "address", null, address) ], CreatedAt: T0);
+            var rn3         = rn1.ApplyChangeSet(RoamingNetworkChangeSet.Parse(withAddress.ToJSON().ToString()));
+
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(CanonicalJSON.Serialize(prepared.Changes[0].NewValue),                       Is.EqualTo(CanonicalJSON.Serialize(customData)));
+
+                Assert.That(CanonicalJSON.Serialize(prepared.Changes[0].NewValue),                          Is.EqualTo(CanonicalJSON.Serialize(customData)));
                 Assert.That(CanonicalJSON.Serialize(EVSEOf(rn2, E1).ToJSON(Embedded: true)["customData"]),  Is.EqualTo(CanonicalJSON.Serialize(customData)));
+                Assert.That(CanonicalJSON.Serialize(customData),                                            Does.Contain("\"price\":1.50").And.Contain("\"local\":\"2024-01-01T14:00:00+02:00\""));
+
+                Assert.That(CanonicalJSON.Serialize(withAddress.Changes[0].NewValue),                       Is.EqualTo(CanonicalJSON.Serialize(address)));
+                Assert.That(CanonicalJSON.Serialize(StationOf(rn3, S1).ToJSON(Embedded: true)["address"]),  Is.EqualTo(CanonicalJSON.Serialize(address)));
+
             }
+
+        }
+
+        /// <summary>
+        /// The given JSON text as it is written: numbers with their decimal places, texts as texts.
+        /// </summary>
+        private static JObject AsWritten(String JSON)
+        {
+
+            using var reader = new JsonTextReader(new StringReader(JSON)) {
+                                   DateParseHandling   = DateParseHandling.None,
+                                   FloatParseHandling  = FloatParseHandling.Decimal
+                               };
+
+            return JObject.Load(reader);
 
         }
 

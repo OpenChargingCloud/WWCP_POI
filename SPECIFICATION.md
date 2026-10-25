@@ -107,7 +107,9 @@ A version of a roaming network is identified by its **content**: its JSON repres
     identifications of a certificate, the `name` of a charging station operator, `"24/7"` of opening times. An
     implementation MUST keep arrays as it read them.
   - **Unknown properties** are not held: an entity and a value hold only the properties their type defines.
-  - **Custom data** (`customData`) is held as given, a JSON-LD context in it as well (but see section 7).
+  - **Custom data** (`customData`) is held as given, a JSON-LD context in it as well, numbers with their decimal
+    places (`1.50`), and texts as texts, also those that look like timestamps, in every time zone; so is the custom
+    data of an address.
 - **Properties given by templates** are part of the content where they are given: an EVSE, charging
   station, charging pool, charging tariff, parking space or energy meter names its templates in
   `templateIds`, in an order that is content, and takes their properties at runtime only (the
@@ -818,11 +820,6 @@ and change sets name it as a precondition (section 4).
 
 1. **Co-signing across servers:** a change set waits for signatures at one server (4.2); holders using other
    servers sign it there, as peers learn of it only by its commit.
-2. **Custom data:** WWCP_POI holds custom data as given but for two kinds of values: non-integral numbers become binary
-   floating-point numbers (`1.50` is held as `1.5`), and texts that look like timestamps become .NET timestamps
-   (`2024-01-01T12:00:00Z` is held as `2024-01-01T12:00:00.0000000Z`), those with an offset in the local time zone of
-   the server, so that servers in other time zones hold them otherwise. Until it holds them as given, custom data
-   should hold neither.
 
 
 ## 8. Proofs of entities by a signed hash tree
