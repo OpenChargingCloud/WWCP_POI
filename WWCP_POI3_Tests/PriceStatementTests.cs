@@ -19,6 +19,7 @@
 
 using System.Globalization;
 using System.Net;
+using System.Numerics;
 using System.Text;
 
 using Newtonsoft.Json;
@@ -241,6 +242,35 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
         #endregion
 
+        #region (static) TwinOf(PriceStatement)
+
+        /// <summary>
+        /// The order n of the curve P-256.
+        /// </summary>
+        private static readonly BigInteger P256Order = BigInteger.Parse("0FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551", NumberStyles.HexNumber);
+
+        /// <summary>
+        /// The ECDSA twin of the given ES256 price statement: its signature (r, s) as (r, n − s), valid as well, which
+        /// anybody makes without the key.
+        /// </summary>
+        private static RoamingNetworkPriceStatement TwinOf(RoamingNetworkPriceStatement PriceStatement)
+        {
+
+            var value      = Convert.FromBase64String(PriceStatement.Value);
+            var s          = new BigInteger(value.AsSpan(32, 32), isUnsigned: true, isBigEndian: true);
+            var twinS      = (P256Order - s).ToByteArray(isUnsigned: true, isBigEndian: true);
+
+            var json       = PriceStatement.ToJSON();
+            json["value"]  = Convert.ToBase64String([ .. value.AsSpan(0, 32), .. new Byte[32 - twinS.Length], .. twinS ]);
+
+            Assert.That(RoamingNetworkPriceStatement.TryParse(json, out var twin, out var error), Is.True, error);
+
+            return twin!;
+
+        }
+
+        #endregion
+
 
         #region A_price_status_set_is_stated_in_a_chain_of_its_entity()
 
@@ -322,14 +352,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
         #endregion
 
-        #region A_price_statement_reads_back_and_its_digest_covers_its_signature()
+        #region A_price_statement_reads_back_and_its_digest_leaves_its_signature_out()
 
         [Test]
-        public void A_price_statement_reads_back_and_its_digest_covers_its_signature()
+        public void A_price_statement_reads_back_and_its_digest_leaves_its_signature_out()
         {
 
             var statement = Signer(GEF).StatePrices(RN, EVSEType, E11, Prices(0.29m), 0, null, since, since.AddSeconds(1), since.AddMinutes(15));
             var text      = statement.ToJSON().ToString();
+            var gefKey    = TestParties.Key(TestParties.Party(GEF)).Public;
 
             Assert.That(RoamingNetworkPriceStatement.TryParse(text, out var parsed, out var parseError),  Is.True, parseError);
 
@@ -352,7 +383,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(text,                                   Does.Not.Contain("\"profile\"").And.Not.Contain("\"encoding\""));
 
                 Assert.That(RoamingNetworkPriceStatement.TryParse(json, out var otherValue, out _),  Is.True);
-                Assert.That(otherValue!.Digest,                     Is.Not.EqualTo(statement.Digest), "The digest covers the signature.");
+                Assert.That(otherValue!.Digest,                     Is.EqualTo(statement.Digest), "The digest leaves the signature value out.");
+                Assert.That(statement.TryVerify([ gefKey ], out var verifyError),   Is.True, verifyError);
+                Assert.That(otherValue.TryVerify([ gefKey ], out _),                Is.False, "Its signature is still checked.");
 
                 Assert.That(RoamingNetworkPriceStatement.TryParse(cbor, out var fromCBOR, out var cborError),  Is.True, cborError);
                 Assert.That(fromCBOR!.Digest,                       Is.EqualTo(statement.Digest));
@@ -479,6 +512,38 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                             chargingStationOperator.TryGetEVSE(EVSE_Id.Parse(E11), out var evse) &&
                             evse.PriceStatus?.Value.Equals(Prices(0.33m)) == true,
                             Is.True);
+
+            }
+
+        }
+
+        #endregion
+
+        #region The_ECDSA_twin_of_a_price_statement_is_the_same_statement()
+
+        [Test]
+        public void The_ECDSA_twin_of_a_price_statement_is_the_same_statement()
+        {
+
+            var history  = NewHistory(Signing: false);
+            var signer   = Signer(GEF);
+            var t        = Timestamp.Now.AddMinutes(-10);
+
+            var s0       = signer.StatePrices(RN, EVSEType, E11, Prices(0.29m), 0, null,      t);
+            var s1       = signer.StatePrices(RN, EVSEType, E11, Prices(0.31m), 1, s0.Digest, t.AddMinutes(1));
+            var twin     = TwinOf(s0);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(twin.Value,   Is.Not.EqualTo(s0.Value));
+                Assert.That(twin.Digest,  Is.EqualTo(s0.Digest), "The digest leaves the signature value out.");
+
+                // Whoever relays the twin first makes the server take it: the statement of the operator is the same one,
+                // and the next one of the operator follows it.
+                Assert.That(history.TryAddPriceStatement(twin, out var eTwin),  Is.EqualTo(POIPriceStatementResult.Taken), eTwin);
+                Assert.That(history.TryAddPriceStatement(s0,   out var e0),     Is.EqualTo(POIPriceStatementResult.Known), e0);
+                Assert.That(history.TryAddPriceStatement(s1,   out var e1),     Is.EqualTo(POIPriceStatementResult.Taken), e1);
 
             }
 

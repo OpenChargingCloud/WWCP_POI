@@ -462,7 +462,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             const String KeyId              = "8cb46c0f98440da34ad4af304431f76c7cb7462fa8fdfd5d6261dc685809220d";
             const String Input              = "{\"@context\":\"https://open.charging.cloud/contexts/wwcp/roamingNetwork/priceStatement/v1\",\"algorithm\":\"Ed25519\",\"entityId\":\"DE*GEF*E1*1\",\"entityType\":\"EVSE\",\"keyId\":\"8cb46c0f98440da34ad4af304431f76c7cb7462fa8fdfd5d6261dc685809220d\",\"priceStatus\":{\"prices\":[{\"chargingTariffId\":\"DE*GEF*T1\",\"elements\":[{\"priceComponents\":[{\"price\":0.39,\"stepSize\":1,\"type\":\"ENERGY\"}]}]}]},\"roamingNetworkId\":\"rn1\",\"role\":\"chargingStationOperator\",\"sequence\":0,\"signedAt\":\"2026-10-19T11:59:58.000Z\",\"signer\":\"DE*GEF\",\"validFrom\":\"2026-10-19T12:00:00.000Z\",\"validUntil\":\"2026-10-19T12:15:00.000Z\"}";
             const String Value              = "On32sQ3JD5yUHL3CDnc0XA9+wpfEVw9wvXF3exh+rpcWOmBoD/tuvFBmNcolWWV5lOxF54JC5aJ0PmX9gPERAw==";
-            const String Digest             = "4e0901a796be06c7332548becf01cc4066c4b4ced59975012304d4a50458e943";
+            const String Digest             = "4cecb5d6ef7506ad518455d13d958c6b892d9fe8e70d1d7901f6fc5aa1d0f880";
 
             var operatorKey  = new Ed25519PrivateKeyParameters(Convert.FromHexString("404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f"), 0);
             var publicKey    = POIPublicKey.From(operatorKey);
@@ -482,7 +482,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                    DateTimeOffset.Parse("2026-10-19T12:00:00Z"),
                                                                    DateTimeOffset.Parse("2026-10-19T12:15:00Z"));
 
-            // The digest is the SHA-256 of the canonical JSON of the statement with its JSON-LD context, its signature value included.
+            // The digest is the SHA-256 of the signature input, the signature value left out.
             var withValue    = Input[..^1] + ",\"value\":\"" + Value + "\"}";
 
             using (Assert.EnterMultipleScope())
@@ -493,7 +493,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(statement.Value,                                                                    Is.EqualTo(Value));
                 Assert.That(CanonicalJSON.Serialize(statement.ToJSON(Embedded: false)),                                       Is.EqualTo(withValue));
                 Assert.That(statement.Digest,                                                                   Is.EqualTo(Digest));
-                Assert.That(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(withValue))),       Is.EqualTo(Digest));
+                Assert.That(Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Input))),           Is.EqualTo(Digest));
                 Assert.That(statement.TryVerify([ publicKey ], out var error),                                  Is.True, error);
             }
 

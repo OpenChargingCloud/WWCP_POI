@@ -714,9 +714,9 @@ Signature value:
 On32sQ3JD5yUHL3CDnc0XA9+wpfEVw9wvXF3exh+rpcWOmBoD/tuvFBmNcolWWV5lOxF54JC5aJ0PmX9gPERAw==
 ```
 
-Its digest, the SHA-256 of the signature input with `"value"` added, which the next statement of the EVSE
+Its digest, the SHA-256 of the signature input, `"value"` left out, which the next statement of the EVSE
 names as its `previous` and a checkpoint takes as a leaf:
-`4e0901a796be06c7332548becf01cc4066c4b4ced59975012304d4a50458e943`.
+`4cecb5d6ef7506ad518455d13d958c6b892d9fe8e70d1d7901f6fc5aa1d0f880`.
 
 **Genesis of a second epoch** (section 11.3) of the example, with SHA-512 identifications and the signature
 algorithms Ed25519 and ML-DSA-65: the SHA-512 of
@@ -1584,8 +1584,11 @@ operator with one of its signing keys (section 4.1) when it sets the price.
   `signedAt`; without `validUntil`, it is valid until the next statement of its entity.
 - **Chain per entity:** `sequence` is 0 for the first statement of an entity and one more for every next
   one; `previous` is the digest of the statement before, absent for sequence 0. The **digest** of a
-  statement is the SHA-256 of its canonical JSON with its `@context`, signature value included, as 64
-  lowercase hexadecimal digits. Statements are neither reordered nor withdrawn unnoticed.
+  statement is the SHA-256 of its signature input (below), `value` left out, as 64 lowercase hexadecimal
+  digits. Statements are neither reordered nor withdrawn unnoticed. Without `value`, as the identifications
+  of commits and checkpoints: another valid signature of the same statement, as the ECDSA twin `(r, n − s)`
+  anybody can make of a signature `(r, s)`, is the same statement, neither a second one of its sequence nor
+  a split view of its operator.
 - **Not before:** `after`, if given, names the latest checkpoint the operator knew: the statement was made
   after it.
 

@@ -243,12 +243,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public String                        Value               { get; }
 
         /// <summary>
-        /// The digest of this statement: the SHA-256 of its canonical JSON with its JSON-LD context, signature included, as
-        /// 64 lowercase hexadecimal digits. The next statement of the entity names it as its previous one, and a checkpoint
-        /// takes it as a leaf.
+        /// The digest of this statement: the SHA-256 of its signature input, its signature value left out, as 64 lowercase
+        /// hexadecimal digits. The next statement of the entity names it as its previous one, and a checkpoint takes it as
+        /// a leaf. Without the value, as the identifications of commits and checkpoints: another valid signature of the
+        /// same statement, as the ECDSA twin (r, n − s) anybody makes of one, is the same statement, not a second one.
         /// </summary>
         public String                        Digest
-            => digest ??= Convert.ToHexStringLower(SHA256.HashData(CanonicalJSON.ToUTF8Bytes(ToJSON(Embedded: false))));
+            => digest ??= Convert.ToHexStringLower(SHA256.HashData(CanonicalJSON.ToUTF8Bytes(SignatureInput())));
 
         #endregion
 
@@ -648,13 +649,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!COSEAlgorithm.TryParse(Algorithm, out var algorithm) || !algorithm.IsSupportedForSigning)
                 throw new ArgumentException("The algorithm is not supported for asymmetric signing.");
 
+            return CanonicalJSON.ToUTF8Bytes(SignatureInput());
+
+        }
+
+        #endregion
+
+        #region (private) SignatureInput()
+
+        /// <summary>
+        /// The signature input of this price statement: its JSON-LD context and its signed fields, without its value; what
+        /// it signs and what its digest covers.
+        /// </summary>
+        private JObject SignatureInput()
+        {
+
             var json = Content();
 
             json.AddFirst(new JProperty(PropertyKeys.KeyId,      KeyId));
             json.AddFirst(new JProperty(PropertyKeys.Algorithm,  Algorithm));
             json.AddFirst(new JProperty(PropertyKeys.Context,    JSONLDContext));
 
-            return CanonicalJSON.ToUTF8Bytes(json);
+            return json;
 
         }
 
