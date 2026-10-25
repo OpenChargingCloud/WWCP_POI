@@ -200,7 +200,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///         Its maintainedBy is changed by its grid operator, taking it over or handing it on, by its maintainer,
     ///         handing it on, or by an identity key of the roaming network operator.</item>
     ///   <item>A grid operator or a conformity assessment body may be added without keys: it does not take part. Then the
-    ///         roaming network operator signs in its place, until it gets keys from an identity key of the roaming network
+    ///         roaming network operator signs in its place, by a signing key that may sign "party", the usage of everything
+    ///         it owns, or the usage of what it changes, until it gets keys from an identity key of the roaming network
     ///         operator.</item>
     ///   <item>The signing keys of a party are changed with one of its current signing keys, or with one of its identity
     ///         keys when none of them can sign any more; its identity keys only with one of its identity keys.
@@ -511,7 +512,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         continue;
 
                     if ((kind == POIKeyKind.Identity ? party.IdentityKeys : party.SigningKeys).FirstOrDefault(key => key.Id == Withdrawal.KeyId) is not POIPublicKey key ||
-                        (kind == POIKeyKind.Signing && !key.MaySign(POIKeyUsages.Of(ChangeSet.Changes[index]))))
+                        (kind == POIKeyKind.Signing && !MaySign(key, partyId, ChangeSet.Changes[index])))
                         continue;
 
                     if (!key.IsValidAt(Withdrawal.WithdrawnAt))
@@ -675,12 +676,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 // One of its owners, by as many holders of its keys of the kinds named as its quorum needs: signing keys
                 // only that may sign what the change changes (POIKeyUsages), identity keys everything they own.
-                var usage          = POIKeyUsages.Of(change);
-
                 var holdersByParty = owners.GroupBy(owner => owner.Item1).
                                             Select (party => (Party:    party.Key,
                                                               Holders:  party.SelectMany(owner => signedBy.TryGetValue(owner, out var keys)
-                                                                                                      ? keys.Where (key => owner.Item2 == POIKeyKind.Identity || key.MaySign(usage)).
+                                                                                                      ? keys.Where (key => owner.Item2 == POIKeyKind.Identity || MaySign(key, owner.Item1, change)).
                                                                                                              Select(key => key.HolderOrUnnamed)
                                                                                                       : []).
                                                                               Distinct(StringComparer.Ordinal).
@@ -706,13 +705,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     // A signing key naming usages that do not cover the change is named, so that its signer learns why.
                     var usageNamed = owners.Any(owner => owner.Item2 == POIKeyKind.Signing &&
                                                          signedBy.TryGetValue(owner, out var keys) &&
-                                                         keys.Any(key => !key.MaySign(usage)));
+                                                         keys.Any(key => !MaySign(key, owner.Item1, change)));
 
                     missing.Add($"Change {index}: {change.Kind} of the {change.EntityType} '{change.EntityId}'{(change.EntityPropertyName is not null ? $" ('{change.EntityPropertyName}')" : "")} needs {(quorums ? "signatures" : "a signature")} by " +
                                 String.Join(" or ", owners.Select(owner => (MinConsensusOf(owner.Item1) > 1
                                                                                 ? $"{(owner.Item2 == POIKeyKind.Identity ? "identity" : "signing")} keys of {MinConsensusOf(owner.Item1)} holders of {owner.Item1}"
                                                                                 : $"a{(owner.Item2 == POIKeyKind.Identity ? "n identity" : " signing")} key of {owner.Item1}") +
-                                                                           (owner.Item2 == POIKeyKind.Signing && usageNamed ? $" that may sign '{usage}'" : ""))) + "!");
+                                                                           (owner.Item2 == POIKeyKind.Signing && usageNamed
+                                                                                ? $" that may sign {String.Join(" or ", UsagesOf(owner.Item1, change).Select(usage => $"'{usage}'"))}"
+                                                                                : ""))) + "!");
 
                     if (StopAtMissing)
                     {
@@ -892,11 +893,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private) UsagesOf(Owner, Change) / MaySign(SigningKey, Owner, Change)
+
+        /// <summary>
+        /// The usages of which a signing key of the given owner must name one to sign the given change (SPECIFICATION.md,
+        /// section 4.1): the one of what it changes (POIKeyUsages.Of); of the roaming network operator also "party", the
+        /// usage of everything it owns, as well where it signs in place of a party without signing keys (SignerOf), e.g.
+        /// the certificates of a conformity assessment body or the grid connection points of a grid operator not taking part.
+        /// </summary>
+        private IEnumerable<String> UsagesOf(POIPartyId            Owner,
+                                             RoamingNetworkChange  Change)
+        {
+
+            var usage = POIKeyUsages.Of(Change);
+
+            yield return usage;
+
+            if (Owner == OperatorParty && usage != POIKeyUsages.Party)
+                yield return POIKeyUsages.Party;
+
+        }
+
+        /// <summary>
+        /// Whether the given signing key of the given owner may sign the given change: it names one of its usages (UsagesOf).
+        /// </summary>
+        private Boolean MaySign(POIPublicKey          SigningKey,
+                                POIPartyId            Owner,
+                                RoamingNetworkChange  Change)
+
+            => UsagesOf(Owner, Change).Any(SigningKey.MaySign);
+
+        #endregion
+
         #region (private) SignerOf(PartyId)
 
         /// <summary>
         /// Who signs the data of the given party: the party with a signing key, or the roaming network operator
-        /// in the place of a party of this version without signing keys, e.g. a grid operator not taking part.
+        /// in the place of a party of this version without signing keys, e.g. a grid operator not taking part, with a
+        /// signing key that may sign "party" as well (UsagesOf).
         /// </summary>
         private (POIPartyId, POIKeyKind) SignerOf(POIPartyId PartyId)
 

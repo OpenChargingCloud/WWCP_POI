@@ -298,7 +298,9 @@ and an identity key naming any:
 | `party` | everything else the party owns: its own properties, its `signingKeys` by a signing key; of the RNO also the roaming network, adding and removing parties, commits and attestations (8.5) |
 
 A change is signed by a signing key of its owner that may sign the usage of the entity it changes, whoever owns
-it.
+it. A signing key of the RNO also signs it when it may sign `party`, the usage of everything the RNO owns: so the RNO
+signs in place of a party without signing keys, e.g. the certificates of a body or the grid connection points of a grid
+operator not taking part, with the keys it signs everything else with.
 
 A reader MUST calculate the thumbprint and refuse a key whose `@id` differs, and a key with
 private parts. The roaming network operator (RNO) and every other party - charging station operators,

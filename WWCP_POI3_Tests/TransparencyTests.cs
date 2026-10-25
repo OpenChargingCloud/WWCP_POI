@@ -535,6 +535,62 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region The_roaming_network_operator_signs_in_place_of_a_body_by_a_key_that_may_sign_party()
+
+        /// <summary>
+        /// The roaming network operator signs in place of a body without keys by a signing key that may sign "party", the
+        /// usage of everything it owns, as the examples certify its keys, or by one that may sign "certificates", the usage
+        /// of what it changes; not by one naming neither (csharp-review 13).
+        /// </summary>
+        [Test]
+        public void The_roaming_network_operator_signs_in_place_of_a_body_by_a_key_that_may_sign_party()
+        {
+
+            var withBSI  = Apply(NewNetwork(), RoamingNetworkChange.Add(NewBody(BSI, [ ConformityAssessmentBody.Legislations.CRA ])));
+            var rno      = TestParties.Party(withBSI);
+            var craCert  = TransparencySoftwareCertificate_Id.Parse("cra-1");
+            var addCert  = RoamingNetworkChange.Add(new TransparencySoftwareCertificate(craCert, ACME, Wallbox22.Id, "1.0", [ Chargy11 ], [], Legislation: ConformityAssessmentBody.Legislations.CRA), BSI);
+
+            // The network with the signing key of the roaming network operator certified for the given usage alone.
+            RoamingNetwork CertifiedFor(String Usage)
+            {
+
+                var json = withBSI.ToJSON(IncludeETags: false);
+
+                json["operator"]![RoamingNetworkSigningKeyCertificate.JSONProperty] = new JArray(
+                    RoamingNetworkSigningKeyCertificate.Create(TestParties.Key(rno, POIKeyKind.Identity).Private,
+                                                               COSEAlgorithm.ES512,
+                                                               RoamingNetworkOperator_Id.Parse(rno.EntityId),
+                                                               POIPublicKey.From(TestParties.Key(rno).Private, Usages: [ Usage ]),
+                                                               Created).ToJSON(Embedded: true));
+
+                Assert.That(RoamingNetwork.TryParse(json, out var network, out var error), Is.True, error);
+
+                return network!;
+
+            }
+
+            var byParty           = CertifiedFor(POIKeyUsages.Party);
+            var byCertificates    = CertifiedFor(POIKeyUsages.Certificates);
+            var byInfrastructure  = CertifiedFor(POIKeyUsages.Infrastructure);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(byParty.         TryApplyChangeSet(SignedBy(byParty,          rno, addCert), out var added, out var partyError),           Is.True,  partyError);
+                Assert.That(added!.ConformityAssessmentBodyOf(craCert)?.Id,                                                                             Is.EqualTo(BSI));
+
+                Assert.That(byCertificates.  TryApplyChangeSet(SignedBy(byCertificates,   rno, addCert), out _,         out var certificatesError),    Is.True,  certificatesError);
+
+                Assert.That(byInfrastructure.TryApplyChangeSet(SignedBy(byInfrastructure, rno, addCert), out _,         out var infrastructureError),  Is.False, "a certificate by a key that may sign infrastructure");
+                Assert.That(infrastructureError,                                                                                                        Does.Contain($"needs a signature by a signing key of {rno} that may sign 'certificates' or 'party'"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Changes_of_releases_and_certificates_on_two_branches_merge()
 
         [Test]

@@ -14,8 +14,9 @@ names it as its `legislation`; one the body is not notified for is refused.
 **What a signature says.** A certificate signed by the body is the body's statement, as the CRA properties of a
 [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md) are the manufacturer's: POI proves who says
 it, not that it is true; whoever doubts it asks the body, e.g. by its `documentURL`. A body not taking part (yet) is
-added **without keys**: then the RNO adds, changes and removes its certificates in its place, and they are statements
-of the RNO, not of the body, until the RNO gives the body keys with one of its identity keys. A reader tells them apart:
+added **without keys**: then the RNO adds, changes and removes its certificates in its place, with a signing key that
+may sign `party`, as its keys do, or `certificates`, and they are statements of the RNO, not of the body, until the RNO
+gives the body keys with one of its identity keys. A reader tells them apart:
 a body without keys signed none of its certificates.
 
 The identification is a `ConformityAssessmentBody_Id`, any nonempty text, trimmed, compared case-insensitively, e.g.

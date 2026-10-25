@@ -123,7 +123,8 @@ for the data.
 | `UpdateProperty`/`RemoveProperty` of its data, `Remove(pointId)` | its maintainer |
 | `UpdateProperty`/`RemoveProperty` of `maintainedBy` | its grid operator (taking it over, or handing it on), its maintainer (handing it on), or an identity key of the RNO |
 
-"The grid operator" signs with its signing key, or the RNO in its place while it has no signing keys.
+"The grid operator" signs with its signing key, or the RNO in its place while it has no signing keys, with a signing
+key that may sign `party`, as its keys do, or `infrastructure`.
 The grid operator takes a point over without the consent of its maintainer: `RemoveProperty(point, "maintainedBy")`.
 The former maintainer then can no longer change it, and can not take it back. The versions it maintained stay
 in the history. Taken over or handed on by a change of a change set, a point is the new maintainer's for the changes
