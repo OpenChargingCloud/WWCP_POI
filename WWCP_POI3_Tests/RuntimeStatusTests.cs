@@ -287,7 +287,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             history.RuntimeStatus.OnStatusUpdate += statusUpdate => told.TrySetResult(statusUpdate);
 
-            var due      = Timestamp.Now.AddMilliseconds(300);
+            // A whole millisecond, as a status is planned at: otherwise it is due up to a millisecond before.
+            var due      = DateTimeOffset.FromUnixTimeMilliseconds(Timestamp.Now.AddMilliseconds(300).ToUnixTimeMilliseconds());
             var result   = history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, Operator, "DE*GEF", "outOfService", due, out _, out _);
 
             var before   = GEFOf(history).AdminStatus.Value;

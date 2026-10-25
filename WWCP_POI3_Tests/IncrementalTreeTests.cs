@@ -303,7 +303,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                     told.TrySetResult(statusUpdate);
             };
 
-            var now      = Timestamp.Now;
+            // A whole millisecond, as a status is planned at: otherwise it is due up to a millisecond before now + 900 ms.
+            var now      = DateTimeOffset.FromUnixTimeMilliseconds(Timestamp.Now.ToUnixTimeMilliseconds());
             var first    = history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(ChargingStation), "DE*GEF*S3",   "OutOfService", now.AddMilliseconds(300), out _, out _);
             var second   = history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status,      nameof(EVSE),            "DE*GEF*E2*1", "charging",     now.AddMilliseconds(900), out _, out _);
 
