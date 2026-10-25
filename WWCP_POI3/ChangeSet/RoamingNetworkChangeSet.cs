@@ -378,7 +378,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Why the change sets this one names in its metadata as those it was rebased from are not those it was rebased from:
         /// "rebasedFrom" names each, the latest last, by its identification and its ETags, and each had the changes, the
         /// preconditions, the description, the creation and the metadata of this one, with the entries before it as its
-        /// "rebasedFrom", none for the first one. Null when they are, or when it names none.
+        /// "rebasedFrom", none for the first one; or why it was not rebased so: a change of it, but an Add or AddElement,
+        /// names no old value. Null when they are, or when it names none.
         /// </summary>
         private String? RebasedFromError()
         {
@@ -422,6 +423,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return $"Entry {index} of the {PropertyKeys.RebasedFrom} of the change set '{Id}' names '{entry[PropertyKeys.Id]!.Value<String>()}', not the change set it was rebased from with these ETags, '{originalId}'!";
 
             }
+
+            // Rebased, every change but an Add or AddElement names the old value it expects: only old values tell that a
+            // change set committed meanwhile changed what it changes, which a rebase would overwrite (SPECIFICATION.md,
+            // section 4), and TryRebase refuses such a change set.
+            for (var index = 0; index < Changes.Length; index++)
+                if (Changes[index].OldValue is null &&
+                    Changes[index].Kind is not (RoamingNetworkChangeKind.Add or RoamingNetworkChangeKind.AddElement))
+                {
+                    return $"Change {index} of the change set '{Id}', which was rebased, has no old value: the rebase may have overwritten a concurrent change!";
+                }
 
             return null;
 

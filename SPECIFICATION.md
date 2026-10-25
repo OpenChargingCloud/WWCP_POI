@@ -182,7 +182,9 @@ metadata: `"rebasedFrom": [ { "@id", "beforeETags", "afterETags" } ]`, the earli
 from last. A change set MUST be refused unless the `@id` of every entry is the one this change set has with the
 `beforeETags` and `afterETags` of the entry and with the entries before it as its `rebasedFrom` (before the first one
 none: without `rebasedFrom`), and `rebasedFrom`, when there, has an entry. A change set named so counts as committed with the rebased one: it is answered
-as committed, waits no longer (4.2) and is not committed again.
+as committed, waits no longer (4.2) and is not committed again. Only its old values tell that a change set committed
+meanwhile changed what a change set changes: one with a change, but an `Add` or `AddElement`, without `oldValue` is not
+rebased, and a change set naming `rebasedFrom` with such a change MUST be refused.
 
 **Preconditions** (optional, written only when there are any, signed with the change set): the ETag an
 entity MUST still have for the change set to apply, or to be rebased onto another version. The ETag of an
@@ -220,7 +222,10 @@ and the element changes `AddElement`, `RemoveElement`, `ReplaceElement`, `Update
 
 **Old values:** a change whose `oldValue` is not the value it finds MUST be refused. Both are compared as their
 canonical JSON (section 1): the number `22000` read from a text is the decimal 22000 without decimal places a
-reader holds, and `22000.0` is another value.
+reader holds, and `22000.0` is another value. A change without `oldValue` compares nothing: the `beforeETags` pin the
+version it applies to, and a merge (5.3) compares versions, not old values; but it can not be rebased (above). One
+preparing a change set therefore gives every change but an `Add` and an `AddElement` the `oldValue` it finds (JSON `null`
+for none).
 
 **New values:** what a change set gives is what the content holds. A change writes its new value into the entity,
 which is read again, and the content holds what the entity then writes (section 2, "Written forms"): a change whose

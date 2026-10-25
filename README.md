@@ -404,7 +404,9 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
 - **Rebase:** `rn2.TryRebase(cs, …)` prepares a change set of an older version again, unless it conflicts;
   the rebased change set is unsigned, its owners sign it again. It names the one it was prepared from in
   `metadata.rebasedFrom` by its `@id` and ETags, which everyone calculates again; committed, it answers that one as
-  committed.
+  committed. Only old values tell that a change set committed meanwhile changed what it changes: a change set with a
+  change, but an `Add` or `AddElement`, without old value is not rebased, and one naming `rebasedFrom` with such a
+  change is refused.
 - **Signatures:** `Sign(…)` and `VerifySignature(…)` over canonical JSON (COSE algorithms of Styx);
   an optional `VerifyChangeSetSignature` checks them in addition. What is signed, and in which version, the
   versioned JSON-LD context of the signed object names, e.g. `https://open.charging.cloud/contexts/wwcp/roamingNetwork/changeSet/v3`:

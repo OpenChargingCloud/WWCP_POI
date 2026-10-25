@@ -263,6 +263,46 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
         #endregion
 
+        #region A_rebased_change_set_without_old_value_is_refused()
+
+        /// <summary>
+        /// A change set naming the change sets it was rebased from is refused where a change of it, but an Add or AddElement,
+        /// names no old value: only old values tell that a change set committed meanwhile changed what it changes, which the
+        /// rebase would have overwritten. So a rebase made elsewhere is held to what TryRebase does (csharp-review 12).
+        /// </summary>
+        [Test]
+        public void A_rebased_change_set_without_old_value_is_refused()
+        {
+
+            var rn1        = NewNetwork();
+            var rn2        = rn1.ApplyChangeSet(rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ]));
+            var rename     = RoamingNetworkChange.UpdateProperty(rn1, "name", null, new JObject(new JProperty("en", "X")));
+
+            // Made by hand for rn1, without an old value, and rebased by hand onto rn2.
+            var handMade   = new RoamingNetworkChangeSet(ChangeSet_Id.NewRandom(), rn1.Id, Timestamp.Now, [ rename ], rn1.CalcETags(), rn1.CalcETags()).WithContentId();
+            var metadata   = handMade.Metadata;
+
+            metadata[RoamingNetworkChangeSet.PropertyKeys.RebasedFrom] = new JArray(new JObject(
+                                                                             new JProperty(RoamingNetworkChangeSet.PropertyKeys.Id,           handMade.Id.ToString()),
+                                                                             new JProperty(RoamingNetworkChangeSet.PropertyKeys.BeforeETags,  new JArray(handMade.BeforeETags.Select(eTag => eTag.ToJSON()))),
+                                                                             new JProperty(RoamingNetworkChangeSet.PropertyKeys.AfterETags,   new JArray(handMade.AfterETags. Select(eTag => eTag.ToJSON())))));
+
+            var rebased    = new RoamingNetworkChangeSet(handMade.Id, rn2.Id, handMade.CreatedAt, handMade.Changes, rn2.CalcETags(), rn2.CalcETags(), handMade.Description, metadata).WithContentId();
+
+            // Prepared by CreateChangeSet, it has its old value, and TryRebase keeps it.
+            Assert.That(rn2.TryRebase(rn1.CreateChangeSet([ rename ], CreatedAt: Timestamp.Now), out var byTryRebase, out var rebaseError),  Is.True, rebaseError);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(rebased.IdentificationError(),       Does.Contain($"Change 0 of the change set '{rebased.Id}', which was rebased, has no old value"));
+                Assert.That(byTryRebase!.IdentificationError(),  Is.Null);
+                Assert.That(byTryRebase.Changes[0].OldValue,     Is.Not.Null);
+            }
+
+        }
+
+        #endregion
+
         #region A_signed_change_set_is_verified_and_rebased_unsigned()
 
         [Test]
