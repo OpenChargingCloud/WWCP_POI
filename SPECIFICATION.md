@@ -463,6 +463,8 @@ first one, of the canonical JSON of
 
 as 64, 96 or 128 lowercase hexadecimal digits. A genesis commit has neither `parentIds` nor `changeSet`.
 From the second epoch on, the content names `"epoch"`, and the genesis of an epoch its `"profiles"` (11.3).
+In the first epoch it names neither, and a commit naming `"epoch": 1` is refused, so that a commit has one
+identification; checkpoints name their epoch in every one (10.1).
 The `eTags` include the `effectiveTree` ETags of the version (section 8.3).
 The `revision` is one more than the highest revision of the parents, 0 for a genesis commit.
 Signatures are not part of it: neither those of the change set nor those of the commit, so that
@@ -1420,6 +1422,8 @@ identifications are as without it.
   "signatures": [ … ] }
 ```
 
+- **epoch:** the epoch of the checkpoint (section 11), named by every checkpoint, 1 in the first epoch as
+  well, unlike a commit (5.1); a checkpoint without it is refused.
 - **sequence:** 0 for the first checkpoint of an epoch, one more for every next one; `previousId` names
   the one before and is absent for sequence 0.
 - **commitId, revision, eTags:** the commit, its revision and the ETags of its version, as in the commit.
@@ -1567,7 +1571,8 @@ formats its identifications, trees and signatures are calculated with. A new epo
 these must change, not periodically: when an algorithm becomes weak (crypto agility, e.g. from SHA-256
 to SHA-512 identifications, or from ECDSA to ML-DSA signatures), when the canonicalization changes, or
 after the RNO lost control of its keys. Checkpoints make periodic restarts unnecessary (section 10).
-Every history begins in epoch 1, whose commits and checkpoints do not name it.
+Every history begins in epoch 1. Its commits do not name it (5.1); its checkpoints do, as every checkpoint
+names its epoch (10.1).
 
 ### 11.1 Profiles
 

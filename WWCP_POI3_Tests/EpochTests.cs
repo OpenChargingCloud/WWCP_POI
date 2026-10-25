@@ -399,6 +399,49 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region The_first_epoch_is_named_by_its_checkpoints_not_by_its_commits()
+
+        /// <summary>
+        /// Every history begins in epoch 1: its checkpoints name it, as every checkpoint names its epoch, its commits do not
+        /// (SPECIFICATION.md, sections 5.1, 10.1 and 11). A checkpoint without its epoch is refused, as is a commit naming
+        /// the first one, which would be a second written form of it, of another identification.
+        /// </summary>
+        [Test]
+        public void The_first_epoch_is_named_by_its_checkpoints_not_by_its_commits()
+        {
+
+            var history = NewHistory();
+            var commit  = Commit(history, "v1", 1).Commit!;
+
+            Assert.That(history.TryMakeCheckpoint(out var checkpoint, out var checkpointError, CreatedAt: T0.AddMinutes(2)),  Is.True, checkpointError);
+
+            var checkpointJSON  = checkpoint!.ToJSON();
+            var commitJSON      = commit.ToJSON();
+
+            var withoutEpoch    = (JObject) checkpointJSON.DeepClone();
+            withoutEpoch.Remove("epoch");
+
+            var namingEpoch     = (JObject) commitJSON.DeepClone();
+            namingEpoch.Add("epoch", 1);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(checkpointJSON["epoch"]?.Value<UInt32>(),                                              Is.EqualTo(1));
+                Assert.That(commitJSON.ContainsKey("epoch"),                                                       Is.False);
+
+                Assert.That(RoamingNetworkCheckpoint.TryParse(withoutEpoch.ToString(), out _, out var withoutEpochError),  Is.False);
+                Assert.That(withoutEpochError,                                                                     Is.EqualTo("Missing or invalid 'epoch'!"));
+
+                Assert.That(RoamingNetworkCommit.    TryParse(namingEpoch.ToString(),  out _, out var namingEpochError),   Is.False);
+                Assert.That(namingEpochError,                                                                      Is.EqualTo("Invalid epoch: a commit names it from the second one on!"));
+
+            }
+
+        }
+
+        #endregion
+
         #region A_final_checkpoint_may_name_the_commit_of_the_checkpoint_before()
 
         [Test]
