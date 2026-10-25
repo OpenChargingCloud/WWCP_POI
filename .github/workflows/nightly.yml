@@ -1,0 +1,206 @@
+name: Nightly
+
+# The counterpart to ci.yml. That workflow gates every push; this one runs the
+# same build, the same tests and the same examples once a night, whether or not
+# anybody pushed — and that is the point. Nothing here is pinned: Styx, Hermod,
+# Norn, Urdr and WWCP_Node are built from master, so a breaking change in one
+# of them is found on the night it lands rather than on the day somebody next
+# touches this repository. On top of that, the night measures what a push has
+# no time for: the load tests' quick suite.
+#
+# Two things worth knowing about scheduled workflows: they only ever run on the
+# default branch, and GitHub disables them after 60 days without any repository
+# activity. If this stops reporting, that is the first thing to check.
+on:
+  schedule:
+    # 03:17 UTC. Not on the hour, because GitHub's scheduler is busiest then
+    # and delays runs by tens of minutes — and after the libraries of this
+    # stack (02:17) and WWCP_Node (02:47), before RoamingHubCLI (04:17), so
+    # that a morning is read in the order the dependencies are stacked: if
+    # WWCP_Node went red at 02:47, this night's red is already explained, and
+    # if this went red at 03:17, the hub's is.
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Everything, against the tips. Same two legs as ci.yml — see there for why
+  # it is exactly Windows and a debian:13 container, and for the side-by-side
+  # checkout of the five repositories this one is built on.
+  # ---------------------------------------------------------------------------
+  full-suite:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            leg: windows-latest
+          - os: ubuntu-latest
+            container: debian:13
+            leg: debian-13-container
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    steps:
+
+      - name: Allow long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
+
+      - name: Install prerequisites (Debian container)
+        if: runner.os == 'Linux'
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git libicu76 libssl3t64 libstdc++6 tzdata && git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v7
+        with:
+          path: WWCP_POI
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Vanaheimr/Styx
+          path: Styx
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Vanaheimr/Hermod
+          path: Hermod
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Vanaheimr/Norn
+          path: Norn
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Vanaheimr/Urdr
+          path: Urdr
+
+      - uses: actions/checkout@v7
+        with:
+          repository: OpenChargingCloud/WWCP_Node
+          path: WWCP_Node
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build
+        id: build
+        working-directory: WWCP_POI
+        shell: bash
+        run: |
+          set -e
+          dotnet build WWCP_POI2_Tests/WWCP_POI2_Tests.csproj         --configuration Release
+          dotnet build WWCP_POI3_Tests/WWCP_POI3_Tests.csproj         --configuration Release
+          dotnet build WWCP_POI3_LoadTests/WWCP_POI3_LoadTests.csproj --configuration Release
+          dotnet build examples/csharp/examples.csproj                --configuration Release
+
+      # The same set the gate runs, and fatal for the same reason: a red here
+      # is a real regression — in this repository, or in a library it is built
+      # on and has not caught up with yet, which for a night is the same thing.
+      # Repeating the gate's tests also catches the ones that only fail
+      # sometimes, which one run per push never would.
+      - name: Test WWCP_POI2
+        timeout-minutes: 30
+        working-directory: WWCP_POI
+        run: dotnet test WWCP_POI2_Tests/WWCP_POI2_Tests.csproj --configuration Release --no-build --logger "console;verbosity=normal" --logger "trx;LogFileName=${{ matrix.leg }}-poi2.trx" --results-directory artifacts
+
+      - name: Test WWCP_POI3
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 60
+        working-directory: WWCP_POI
+        run: dotnet test WWCP_POI3_Tests/WWCP_POI3_Tests.csproj --configuration Release --no-build --logger "console;verbosity=normal" --logger "trx;LogFileName=${{ matrix.leg }}-poi3.trx" --results-directory artifacts
+
+      - name: Examples A1 to A13
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 30
+        working-directory: WWCP_POI/examples/csharp
+        run: dotnet run --project examples.csproj --configuration Release --no-build
+
+      # The quick suite of WWCP_POI3_LoadTests: 10,000 charging stations, in
+      # memory and in the file store, each in a fresh process, see its README.
+      #
+      # Informational, and on one leg only. A hosted runner shares its machine
+      # with others and is not the same machine from one night to the next, so
+      # its numbers are a trend at best and must not be able to turn the night
+      # red; what the report is for is "how far is tonight from last week", read
+      # from the report the step summary shows and the files uploaded below. A
+      # run that ends with an error, though — out of memory, a refused commit —
+      # is worth looking at, and the summary says so.
+      - name: Load tests, quick suite (informational)
+        if: ${{ matrix.leg == 'debian-13-container' && !cancelled() && steps.build.outcome == 'success' }}
+        continue-on-error: true
+        # About 12 minutes on an 8-core desktop; a hosted runner has 4 vCPUs.
+        timeout-minutes: 45
+        working-directory: WWCP_POI
+        shell: bash
+        run: |
+          set +e
+          dotnet WWCP_POI3_LoadTests/bin/Release/net10.0/WWCP_POI3_LoadTests.dll --suite quick --label nightly --output artifacts/loadtests 2>&1 | tee loadtests.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo '## Load tests, quick suite (informational)'
+            echo
+            echo "Exit code ${status}. A hosted runner's numbers are a trend, not a verdict."
+            echo
+            cat artifacts/loadtests/*.md 2>/dev/null || tail -40 loadtests.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      # The NuGet packages of the whole graph, transitives included. The test
+      # projects and the examples are the widest of the projects here, and the
+      # libraries built from source beside them declare their packages inside
+      # them either way, so they need no scan of their own.
+      #
+      # One leg, because this is a property of the dependency graph and not of
+      # the operating system; printing it on both would only make a night look
+      # like it had found two of everything.
+      #
+      # Informational, and that is the part worth insisting on: an advisory
+      # published overnight is news about the world, not a regression here —
+      # the same commit that was green yesterday is affected today without a
+      # line having changed. That is also why it lives in the night and not in
+      # the gate: a gate that can go red for something no push caused stops
+      # being read as a gate.
+      - name: Known vulnerabilities (informational)
+        if: ${{ matrix.leg == 'debian-13-container' && !cancelled() }}
+        continue-on-error: true
+        working-directory: WWCP_POI
+        shell: bash
+        run: |
+          set +e
+          {
+            echo '## Known vulnerabilities (informational)'
+            echo
+            echo 'The NuGet packages of WWCP_POI, its tests and examples, transitives'
+            echo 'included - and with them those of Styx, Hermod, Norn, Urdr and'
+            echo 'WWCP_Node, which are built from source beside it. Informational: an'
+            echo 'advisory published overnight is news, not a regression, so this step'
+            echo 'cannot turn the night red.'
+            echo
+            echo '```'
+            for project in WWCP_POI2_Tests/WWCP_POI2_Tests.csproj WWCP_POI3_Tests/WWCP_POI3_Tests.csproj examples/csharp/examples.csproj; do
+              dotnet list "$project" package --vulnerable --include-transitive 2>&1 \
+                | grep -v "has no vulnerable packages given the current sources" \
+                | tail -40
+            done
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      # The .trx files of both test projects, and on the Debian leg the load
+      # tests' report: JSON, Markdown and the two CSV files, with the machine,
+      # the runtime and the commits it was built from, so that nights can be
+      # put side by side.
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.leg }}
+          path: |
+            WWCP_POI/artifacts/*.trx
+            WWCP_POI/artifacts/loadtests/

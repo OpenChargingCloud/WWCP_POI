@@ -1,0 +1,168 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  # Manual runs from the Actions tab ("Run workflow"), same as nightly.yml.
+  workflow_dispatch:
+
+concurrency:
+  # Pull requests: one run per branch, newest wins. Pushes: one run per commit,
+  # and nothing cancels anything — a commit with no verdict is a hole nobody
+  # comes back to fill. Keying the group on the SHA rather than only turning
+  # cancel-in-progress off is what makes that hold for more than two pushes.
+  # The same arrangement as Hermod, WWCP_Node and the other repositories of
+  # this stack.
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # One leg per platform a roaming network is kept on: Windows, where it is
+  # developed, and Debian 13, where the hub serving it is deployed. GitHub has
+  # no Debian runner image, so the second leg is an Ubuntu runner carrying a
+  # debian:13 container, the same as the libraries below this one.
+  #
+  # fail-fast is off on purpose: "red on exactly one platform" is the most
+  # valuable thing a two-leg matrix produces, so one leg must not cancel the
+  # other. The canonical JSON and CBOR every identifier is a hash of are the
+  # ones to watch for that: a number, a time or a text written differently
+  # by one platform is a different commit id there.
+  # ---------------------------------------------------------------------------
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            leg: windows-latest
+          - os: ubuntu-latest
+            container: debian:13
+            leg: debian-13-container
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    steps:
+
+      # Before the checkouts, not after them: Hermod carries FontAwesome icon
+      # files whose paths exceed the classic 260 characters once nested under
+      # the runner's workspace, and a checkout that gives up halfway through
+      # with "Filename too long" leaves a half-populated tree behind.
+      - name: Allow long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
+
+      # Also before the checkouts: git itself. The bare debian:13 image has
+      # none, and actions/checkout without git downloads a tarball instead.
+      # The rest is what .NET needs on a bare Debian: curl for the install
+      # script, ICU and tzdata for globalization, OpenSSL for crypto,
+      # ca-certificates for NuGet over HTTPS. The signatures of the network,
+      # ML-DSA of epoch 2 included, are BouncyCastle's and need none of it.
+      - name: Install prerequisites (Debian container)
+        if: runner.os == 'Linux'
+        run: apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git libicu76 libssl3t64 libstdc++6 tzdata && git config --global --add safe.directory '*'
+
+      # This repository cannot be built on its own. WWCP_POI2 and WWCP_POI3
+      # reference ..\..\Hermod\Hermod\Hermod.csproj — a SIBLING directory —
+      # and Hermod reaches for Styx the same way. The examples are a node's
+      # work as well: they also reference WWCP_Node, which brings Norn and
+      # Urdr. There are no submodules, so all six repositories are checked out
+      # side by side to reproduce the layout those relative paths assume, the
+      # one the RoamingHubCLI superproject checks them out in.
+      #
+      # Note what this does not do: pin any of them. All five are built from
+      # master, so a breaking change in one of them turns this red without
+      # anything here having moved. That is the honest signal for a library
+      # that has to keep up with its dependencies; RoamingHubCLI, which pins
+      # all of them as submodules, asks the other question.
+      - uses: actions/checkout@v7
+        with:
+          path: WWCP_POI
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Vanaheimr/Styx
+          path: Styx
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Vanaheimr/Hermod
+          path: Hermod
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Vanaheimr/Norn
+          path: Norn
+
+      - uses: actions/checkout@v7
+        with:
+          repository: Vanaheimr/Urdr
+          path: Urdr
+
+      - uses: actions/checkout@v7
+        with:
+          repository: OpenChargingCloud/WWCP_Node
+          path: WWCP_Node
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      # Both test projects, the load tests and the examples, so that all of
+      # them still compile against the libraries at their tips. old/ is not
+      # built: its tests expect transparency software releases with a vendor
+      # and certificates with an issuer, see old/README.md.
+      - name: Build
+        id: build
+        working-directory: WWCP_POI
+        shell: bash
+        run: |
+          set -e
+          dotnet build WWCP_POI2_Tests/WWCP_POI2_Tests.csproj         --configuration Release
+          dotnet build WWCP_POI3_Tests/WWCP_POI3_Tests.csproj         --configuration Release
+          dotnet build WWCP_POI3_LoadTests/WWCP_POI3_LoadTests.csproj --configuration Release
+          dotnet build examples/csharp/examples.csproj                --configuration Release
+
+      # No category filter. Nothing here queries the network: the HTTP and
+      # WebSocket APIs are started on port zero of localhost, and the two
+      # benchmarks (CommitCostBenchmark, EffectiveMembersBenchmark) are
+      # [Explicit], so they never run unless asked for by name.
+      - name: Test WWCP_POI2
+        timeout-minutes: 15
+        working-directory: WWCP_POI
+        run: dotnet test WWCP_POI2_Tests/WWCP_POI2_Tests.csproj --configuration Release --no-build --logger "console;verbosity=normal" --logger "trx;LogFileName=${{ matrix.leg }}-poi2.trx" --results-directory artifacts
+
+      - name: Test WWCP_POI3
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 30
+        working-directory: WWCP_POI
+        run: dotnet test WWCP_POI3_Tests/WWCP_POI3_Tests.csproj --configuration Release --no-build --logger "console;verbosity=normal" --logger "trx;LogFileName=${{ matrix.leg }}-poi3.trx" --results-directory artifacts
+
+      # The examples A1 to A13 the documentation in examples/ walks through,
+      # each building on what the one before published, and each checked by
+      # reading only what was published, as an operator or an app would. A
+      # check that fails ends the program with exit code 1, so a page of the
+      # documentation whose code no longer does what it says turns this red.
+      # They write their keys and what they publish beside the program, into
+      # directories .gitignore keeps out of the repository.
+      - name: Examples A1 to A13
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        timeout-minutes: 15
+        working-directory: WWCP_POI/examples/csharp
+        run: dotnet run --project examples.csproj --configuration Release --no-build
+
+      # The console log answers "did it pass" and almost nothing else. TRX keeps,
+      # per test: outcome, duration, error message, stack trace, and the reason
+      # an Assert.Ignore gave — which never reaches the console at all.
+      #
+      # !cancelled() rather than success(): a red run is when these files matter
+      # most, so uploading only on green would throw the evidence away in
+      # exactly the case it is wanted.
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ matrix.leg }}
+          path: WWCP_POI/artifacts/*.trx

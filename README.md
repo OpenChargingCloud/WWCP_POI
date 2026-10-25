@@ -1,5 +1,8 @@
 # WWCP POI
 
+[![CI](https://github.com/OpenChargingCloud/WWCP_POI/actions/workflows/ci.yml/badge.svg)](https://github.com/OpenChargingCloud/WWCP_POI/actions/workflows/ci.yml)
+[![Nightly](https://github.com/OpenChargingCloud/WWCP_POI/actions/workflows/nightly.yml/badge.svg)](https://github.com/OpenChargingCloud/WWCP_POI/actions/workflows/nightly.yml)
+
 WWCP/POI is the *"Git of EV charging related information sharing"*.
 
 It provides a decentralized, cryptographically verifiable approach to synchronizing EV charging infrastructure information between different actors, including Charging Station Operators (CSOs/CPOs), E-Mobility Providers (EMPs), Grid Operators (GOs), roaming platforms, and ultimately EV drivers using their smartphones.
