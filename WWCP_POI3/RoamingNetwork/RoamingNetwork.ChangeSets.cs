@@ -104,24 +104,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region CreateChangeSet  (Changes, Description = null, Metadata = null, Id = null, CreatedAt = null, Preconditions = null)
+        #region CreateChangeSet  (Changes, Description = null, Metadata = null, CreatedAt = null, Preconditions = null)
 
         /// <summary>
         /// Prepare an unsigned change set against this version: its before ETags are the ETags of this version,
         /// its after ETags the ETags of the result. A change without an old value (except Add and AddElement) gets the value
         /// it finds after the changes before it, so a change set prepared concurrently will not silently overwrite it.
-        /// This version stays unchanged.
+        /// It is identified by its content (SPECIFICATION.md, section 4). This version stays unchanged.
         /// </summary>
         /// <param name="Changes">The changes, applied in their order.</param>
         /// <param name="Description">An optional multi-language description.</param>
         /// <param name="Metadata">Optional application metadata.</param>
-        /// <param name="Id">An optional change set identification, a random one by default.</param>
         /// <param name="CreatedAt">An optional commit timestamp, now by default.</param>
         /// <param name="Preconditions">Optional ETags entities must still have, e.g. Precondition(entityType, entityId) of the version a client read; they must hold in this version.</param>
         public RoamingNetworkChangeSet CreateChangeSet(IEnumerable<RoamingNetworkChange>         Changes,
                                                        ImmutableI18NString?                      Description     = null,
                                                        JObject?                                  Metadata        = null,
-                                                       ChangeSet_Id?                             Id              = null,
                                                        DateTimeOffset?                           CreatedAt       = null,
                                                        IEnumerable<RoamingNetworkPrecondition>?  Preconditions   = null)
         {
@@ -133,8 +131,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var beforeETags  = CalcChangeSetETags();
 
+            // Identified by its content once its after ETags are known.
             var pending      = new RoamingNetworkChangeSet(
-                                   Id ?? ChangeSet_Id.NewRandom(),
+                                   ChangeSet_Id.NewRandom(),
                                    this.Id,
                                    CreatedAt ?? Timestamp.Now,
                                    [.. Changes],
@@ -158,7 +157,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        pending.Description,
                        pending.Metadata,
                        Preconditions: preconditions
-                   );
+                   ).WithContentId();
 
         }
 
@@ -442,8 +441,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// may have changed other values, but not these. That is why every change except Add needs an old value;
         /// CreateChangeSet gives every change one.
         /// The rebased change set is a new, unsigned one: its signatures would no longer cover its ETags.
-        /// It keeps the changes, description, metadata and timestamp, and names the original in its metadata
-        /// as "rebasedFrom". A signed change set requires a verifier accepting every signature.
+        /// It keeps the changes, preconditions, description, metadata and timestamp, names the original in its metadata
+        /// as "rebasedFrom", by its identification and its ETags, so that everyone can calculate the original's
+        /// identification again, and is identified by its content (SPECIFICATION.md, section 4).
+        /// A signed change set requires a verifier accepting every signature.
         /// </summary>
         /// <param name="ChangeSet">The change set.</param>
         /// <param name="RebasedChangeSet">The change set, fitting this version.</param>
@@ -510,14 +511,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 var metadata     = ChangeSet.Metadata;
-                var rebasedFrom  = metadata["rebasedFrom"] as JArray ?? [];
+                var rebasedFrom  = metadata[RoamingNetworkChangeSet.PropertyKeys.RebasedFrom] as JArray ?? [];
 
                 rebasedFrom.Add(new JObject(
                                     new JProperty(RoamingNetworkChangeSet.PropertyKeys.Id,           ChangeSet.Id.ToString()),
-                                    new JProperty(RoamingNetworkChangeSet.PropertyKeys.BeforeETags,  new JArray(ChangeSet.BeforeETags.Select(eTag => eTag.ToJSON())))
+                                    new JProperty(RoamingNetworkChangeSet.PropertyKeys.BeforeETags,  new JArray(ChangeSet.BeforeETags.Select(eTag => eTag.ToJSON()))),
+                                    new JProperty(RoamingNetworkChangeSet.PropertyKeys.AfterETags,   new JArray(ChangeSet.AfterETags. Select(eTag => eTag.ToJSON())))
                                 ));
 
-                metadata["rebasedFrom"] = rebasedFrom;
+                metadata[RoamingNetworkChangeSet.PropertyKeys.RebasedFrom] = rebasedFrom;
 
                 var beforeETags  = CalcChangeSetETags();
 
@@ -549,7 +551,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        pending.Description,
                                        pending.Metadata,
                                        Preconditions: pending.Preconditions
-                                   );
+                                   ).WithContentId();
 
                 ErrorResponse = null;
                 return true;

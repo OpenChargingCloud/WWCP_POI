@@ -652,6 +652,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                // A commit with one parent: its change set identified by its content, with changes (SPECIFICATION.md,
+                // sections 4 and 5.2); only the change set of a merge is identified by its parents.
+                if (commit.ParentIds.Length == 1 && changeSet is not null && (changeSet.IsMerge || changeSet.Changes.Length == 0))
+                {
+                    ErrorResponse = changeSet.IsMerge
+                                        ? $"The change set '{changeSet.Id}' of the commit '{id}' is identified as the change set of a merge, which only a merge commit has!"
+                                        : $"The change set '{changeSet.Id}' of the commit '{id}' has no changes: it would change nothing!";
+                    return false;
+                }
+
                 Commit         = commit;
                 ErrorResponse  = null;
                 return true;

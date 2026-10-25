@@ -231,7 +231,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var network   = Network();
             var history   = RoamingNetworkHistory.Start(network);
             var waiting   = ChangeSet(network);
-            var other     = network.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(network, "dataSource", null, "other") ], Id: waiting.Id, CreatedAt: T0);
+            // Another change set can be named so only by an identification other than its content's.
+            var content   = network.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(network, "dataSource", null, "other") ], CreatedAt: T0);
+            var other     = new RoamingNetworkChangeSet(waiting.Id, content.RoamingNetworkId, content.CreatedAt, content.Changes, content.BeforeETags, content.AfterETags, content.Description, content.Metadata);
 
             Assert.That(history.CoSign(SignedBy(waiting, network, "Alpha")).Status,  Is.EqualTo(RoamingNetworkCoSigningStatus.Pending));
 
@@ -240,9 +242,76 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(result.Status,                                Is.EqualTo(RoamingNetworkCoSigningStatus.Refused));
-                Assert.That(result.ErrorResponse,                         Does.Contain("is another one"));
+                Assert.That(result.ErrorResponse,                         Does.Contain("is not identified by its content"));
                 Assert.That(history.PendingChangeSets.Single().Signatures,  Has.Length.EqualTo(1));
                 Assert.That(history.Head.RoamingNetwork.DataSource,       Is.Not.EqualTo("other"));
+            }
+
+        }
+
+        #endregion
+
+        #region A_change_set_waiting_is_not_taken_by_another_one_naming_it()
+
+        /// <summary>
+        /// Another change set committed under the identification of one waiting for signatures, or naming it as the one it
+        /// was rebased from, made it count as committed: it was let go of, told as committed, and never applied (finding 4
+        /// of the review in WWCP_POI.TS). Identified by its content, neither is taken, nor one without changes, and the one
+        /// waiting is committed once signed.
+        /// </summary>
+        [Test]
+        public void A_change_set_waiting_is_not_taken_by_another_one_naming_it()
+        {
+
+            var network      = Network();
+            var history      = RoamingNetworkHistory.Start(network);
+            var waiting      = ChangeSet(network);
+            var announced    = new List<RoamingNetworkCoSigningResult>();
+
+            Assert.That(history.CoSign(SignedBy(waiting, network, "Alpha")).Status,  Is.EqualTo(RoamingNetworkCoSigningStatus.Pending));
+
+            history.OnPendingChangeSet += announced.Add;
+
+            // Another change set: under the identification of the one waiting, ...
+            var other        = ChangeSet(network, "other");
+            var sameId       = new RoamingNetworkChangeSet(waiting.Id, other.RoamingNetworkId, other.CreatedAt, other.Changes, other.BeforeETags, other.AfterETags, other.Description, other.Metadata);
+
+            // ... naming it, with its ETags, as the one it was rebased from, ...
+            var metadata     = other.Metadata;
+            metadata[RoamingNetworkChangeSet.PropertyKeys.RebasedFrom] = new JArray(new JObject(
+                                                                             new JProperty(RoamingNetworkChangeSet.PropertyKeys.Id,           waiting.Id.ToString()),
+                                                                             new JProperty(RoamingNetworkChangeSet.PropertyKeys.BeforeETags,  new JArray(waiting.BeforeETags.Select(eTag => eTag.ToJSON()))),
+                                                                             new JProperty(RoamingNetworkChangeSet.PropertyKeys.AfterETags,   new JArray(waiting.AfterETags. Select(eTag => eTag.ToJSON())))));
+
+            var rebasedFrom  = new RoamingNetworkChangeSet(other.Id, other.RoamingNetworkId, other.CreatedAt, other.Changes, other.BeforeETags, other.AfterETags, other.Description, metadata).WithContentId();
+
+            // ... and one without changes.
+            var empty        = network.CreateChangeSet([], CreatedAt: T0);
+
+            var byId         = history.Commit(SignedBy(sameId,      network, "Beta", "Gamma"));
+            var byRebase     = history.Commit(SignedBy(rebasedFrom, network, "Beta", "Gamma"));
+            var none         = history.Commit(SignedBy(empty,       network, "Beta", "Gamma"));
+            var noneWaiting  = history.CoSign(SignedBy(empty,       network, "Beta"));
+
+            var coSigned     = history.AddPendingSignatures(waiting.Id, SignedBy(waiting, network, "Beta").Signatures);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(byId.Status,                                Is.EqualTo(RoamingNetworkCommitStatus.Refused));
+                Assert.That(byId.ErrorResponse,                         Does.Contain("is not identified by its content"));
+                Assert.That(byRebase.Status,                            Is.EqualTo(RoamingNetworkCommitStatus.Refused));
+                Assert.That(byRebase.ErrorResponse,                     Does.Contain("not the change set it was rebased from"));
+                Assert.That(none.Status,                                Is.EqualTo(RoamingNetworkCommitStatus.Refused));
+                Assert.That(none.ErrorResponse,                         Does.Contain("has no changes"));
+                Assert.That(noneWaiting.Status,                         Is.EqualTo(RoamingNetworkCoSigningStatus.Refused));
+
+                Assert.That(coSigned.Status,                            Is.EqualTo(RoamingNetworkCoSigningStatus.Committed), coSigned.ErrorResponse);
+                Assert.That(history.Head.RoamingNetwork.DataSource,     Is.EqualTo("quorum"));
+                Assert.That(history.PendingChangeSets,                  Is.Empty);
+                Assert.That(announced.Single().Status,                  Is.EqualTo(RoamingNetworkCoSigningStatus.Committed));
+                Assert.That(announced.Single().Commit!.Id,              Is.EqualTo(coSigned.Commit!.Id));
+
             }
 
         }

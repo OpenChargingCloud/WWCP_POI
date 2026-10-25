@@ -19,6 +19,7 @@
 
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Security.Cryptography;
 using System.Text;
 
 using Newtonsoft.Json;
@@ -120,13 +121,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             public const String  ChangeSet          = "changeSet";
 
+            /// <summary>
+            /// The property of its metadata naming the change sets it was rebased from.
+            /// </summary>
+            public const String  RebasedFrom        = "rebasedFrom";
+
         }
 
         #endregion
 
 
         /// <summary>
-        /// The unique change set identifier.
+        /// The unique change set identifier: the identification of its content, see ContentId, unless it is the change set
+        /// of a merge.
         /// </summary>
         public ChangeSet_Id                                      Id                  { get; }
 
@@ -280,6 +287,145 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     metadata,
                     Signatures,
                     Preconditions);
+
+        #endregion
+
+
+        #region IsMerge
+
+        /// <summary>
+        /// Whether this is identified as the change set of a merge: by its parents, not by its content (SPECIFICATION.md,
+        /// section 5.3).
+        /// </summary>
+        public Boolean IsMerge
+
+            => Id.ToString().StartsWith(RoamingNetworkHistory.MergeChangeSetIdPrefix, StringComparison.Ordinal);
+
+        #endregion
+
+        #region ContentId
+
+        /// <summary>
+        /// The identification of its content: the SHA-256 of the canonical JSON of this change set with its JSON-LD context,
+        /// without its identification and its signatures, as 64 lowercase hex digits, in every epoch (SPECIFICATION.md,
+        /// section 4). Every change set but the one of a merge is identified so: the same identification is the same change
+        /// set, and nobody names another one with it.
+        /// </summary>
+        public ChangeSet_Id ContentId
+        {
+            get
+            {
+
+                var json = ToJSON(Embedded: false, IncludeSignatures: false);
+                json.Remove(PropertyKeys.Id);
+
+                return ChangeSet_Id.Parse(Convert.ToHexStringLower(SHA256.HashData(CanonicalJSON.ToUTF8Bytes(json))));
+
+            }
+        }
+
+        #endregion
+
+        #region WithContentId()
+
+        /// <summary>
+        /// Return an immutable copy identified by its content, without signatures: they would sign another identification.
+        /// </summary>
+        public RoamingNetworkChangeSet WithContentId()
+
+            => new (ContentId,
+                    RoamingNetworkId,
+                    CreatedAt,
+                    Changes,
+                    BeforeETags,
+                    AfterETags,
+                    Description,
+                    metadata,
+                    Preconditions: Preconditions);
+
+        #endregion
+
+        #region IdentificationError(MayBeMerge = false)
+
+        /// <summary>
+        /// Why this change set is not identified by its content, or names change sets it was rebased from that it was not
+        /// rebased from (SPECIFICATION.md, section 4); null when it is identified so. Identified as the change set of a merge,
+        /// by its parents, it is checked against them where its merge commit is (section 5.3).
+        /// </summary>
+        /// <param name="MayBeMerge">Whether it may be the change set of a merge.</param>
+        public String? IdentificationError(Boolean MayBeMerge = false)
+        {
+
+            if (IsMerge)
+                return MayBeMerge
+                           ? null
+                           : $"The change set '{Id}' is identified as the change set of a merge, which only a merge commit has!";
+
+            var contentId = ContentId.ToString();
+
+            if (Id.ToString() != contentId)
+                return $"The change set '{Id}' is not identified by its content, '{contentId}'!";
+
+            return RebasedFromError();
+
+        }
+
+        #endregion
+
+        #region (private) RebasedFromError()
+
+        /// <summary>
+        /// Why the change sets this one names in its metadata as those it was rebased from are not those it was rebased from:
+        /// "rebasedFrom" names each, the latest last, by its identification and its ETags, and each had the changes, the
+        /// preconditions, the description, the creation and the metadata of this one, with the entries before it as its
+        /// "rebasedFrom", none for the first one. Null when they are, or when it names none.
+        /// </summary>
+        private String? RebasedFromError()
+        {
+
+            if (metadata[PropertyKeys.RebasedFrom] is not JToken rebasedFromJSON)
+                return null;
+
+            if (rebasedFromJSON is not JArray rebasedFrom || rebasedFrom.Count == 0)
+                return $"The {PropertyKeys.RebasedFrom} of the change set '{Id}' must be an array of the change sets it was rebased from!";
+
+            for (var index = 0; index < rebasedFrom.Count; index++)
+            {
+
+                if (rebasedFrom[index] is not JObject entry ||
+                    entry.Properties().Any(property => property.Name is not (PropertyKeys.Id or PropertyKeys.BeforeETags or PropertyKeys.AfterETags)) ||
+                    entry[PropertyKeys.Id]?.Type != JTokenType.String ||
+                    !TryParseETags(entry, PropertyKeys.BeforeETags, out var beforeETags, out _) ||
+                    !TryParseETags(entry, PropertyKeys.AfterETags,  out var afterETags,  out _))
+                {
+                    return $"Entry {index} of the {PropertyKeys.RebasedFrom} of the change set '{Id}' must name the {PropertyKeys.Id}, the {PropertyKeys.BeforeETags} and the {PropertyKeys.AfterETags} of a change set it was rebased from!";
+                }
+
+                var originalMetadata = (JObject) metadata.DeepClone();
+
+                if (index == 0)
+                    originalMetadata.Remove(PropertyKeys.RebasedFrom);
+                else
+                    originalMetadata[PropertyKeys.RebasedFrom] = new JArray(rebasedFrom.Take(index).Select(earlier => earlier.DeepClone()));
+
+                var originalId = new RoamingNetworkChangeSet(Id,
+                                                             RoamingNetworkId,
+                                                             CreatedAt,
+                                                             Changes,
+                                                             beforeETags,
+                                                             afterETags,
+                                                             Description,
+                                                             originalMetadata,
+                                                             Preconditions: Preconditions).ContentId.ToString();
+
+                if (entry[PropertyKeys.Id]!.Value<String>() != originalId)
+                    return $"Entry {index} of the {PropertyKeys.RebasedFrom} of the change set '{Id}' names '{entry[PropertyKeys.Id]!.Value<String>()}', not the change set it was rebased from with these ETags, '{originalId}'!";
+
+            }
+
+            return null;
+
+        }
 
         #endregion
 
@@ -766,6 +912,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 signatures,
                                 preconditions.ToImmutable()
                             );
+
+                // Identified by its content, and rebased from what it names; the change set of a merge by its parents,
+                // checked where its merge commit is.
+                if (ChangeSet.IdentificationError(MayBeMerge: true) is String identificationError)
+                {
+                    ChangeSet      = null;
+                    ErrorResponse  = identificationError;
+                    return false;
+                }
 
                 ErrorResponse = null;
                 return true;

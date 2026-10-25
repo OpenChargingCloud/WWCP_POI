@@ -730,7 +730,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// must not be created later than then; made for an older version, it must not be signed by a key a tip it will be
         /// merged with removed, or which expired there (SPECIFICATION.md, sections 4.1 and 5.3).
         /// The new commit is merged with the other tips where it does not conflict.
-        /// A change set committed before, also in a rebased version, is not committed again.
+        /// It must be identified by its content and have changes; a change set committed before, also in a rebased
+        /// version, is not committed again (SPECIFICATION.md, section 4).
         /// </summary>
         /// <param name="ChangeSet">The change set.</param>
         /// <param name="VerifySignature">An optional verifier of its signatures, in addition to those of its owners.</param>
@@ -762,6 +763,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var signer in Signers.IsDefault ? [] : Signers.AsEnumerable())
                     if (SignatureAlgorithmError(signer.Algorithm.Name, $"the signer {signer}") is String signerError)
                         return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: signerError);
+
+                // Identified by its content: committed before is then this change set, or a rebased one of it.
+                if (ChangeSetError(ChangeSet) is String changeSetError)
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: changeSetError);
 
                 if (FindCommitted(ChangeSet) is RoamingNetworkCommit committed)
                     return new (RoamingNetworkCommitStatus.AlreadyCommitted, Head, committed);
@@ -933,6 +938,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
+                }
+
+                else if (ChangeSetError(Commit.ChangeSet!) is String changeSetError)
+                {
+                    ErrorResponse = changeSetError;
+                    return false;
                 }
 
                 else if (!TryGetVersion(parents[0].Id, out var parentVersion, out ErrorResponse) ||
@@ -1971,6 +1982,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private static) ChangeSetError(ChangeSet)
+
+        /// <summary>
+        /// Why the given change set, not one of a merge, can not be taken: it is not identified by its content, names change
+        /// sets it was rebased from that it was not rebased from, or has no changes (SPECIFICATION.md, section 4). Checked
+        /// before it is looked for as committed, so that only the change set itself, or a rebased one of it, is.
+        /// </summary>
+        private static String? ChangeSetError(RoamingNetworkChangeSet ChangeSet)
+
+            => ChangeSet.IdentificationError() ??
+                   (ChangeSet.Changes.Length == 0
+                        ? $"The change set '{ChangeSet.Id}' has no changes: it would change nothing!"
+                        : null);
+
+        #endregion
+
         #region (private static) ChangeSetSignatureError(ChangeSet)
 
         /// <summary>
@@ -2021,14 +2048,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) ChangeSetIds(ChangeSet)
 
         /// <summary>
-        /// The identification of the given change set and of those it was rebased from.
+        /// The identification of the given change set and of those it was rebased from, which it names as they were, as
+        /// checked when it was taken (RoamingNetworkChangeSet.IdentificationError).
         /// </summary>
         private static IEnumerable<ChangeSet_Id> ChangeSetIds(RoamingNetworkChangeSet ChangeSet)
         {
 
             yield return ChangeSet.Id;
 
-            if (ChangeSet.Metadata["rebasedFrom"] is JArray rebasedFrom)
+            if (ChangeSet.Metadata[RoamingNetworkChangeSet.PropertyKeys.RebasedFrom] is JArray rebasedFrom)
                 foreach (var original in rebasedFrom)
                     if (original["@id"]?.Type == JTokenType.String &&
                         ChangeSet_Id.TryParse(original["@id"]!.Value<String>()!, out var originalId))

@@ -318,6 +318,11 @@ var cs1 = qa1.CreateChangeSet(
 var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
 ```
 
+- **Identification:** the `@id` of a change set is the SHA-256 of its canonical JSON with its context, without `@id`
+  and signatures (`cs.ContentId`, set by `CreateChangeSet` and `TryRebase`): the same content, the same change set.
+  One identified otherwise, naming change sets in `rebasedFrom` it was not rebased from, or without changes is refused
+  when read or committed (`cs.IdentificationError()`), so nobody commits another change set in place of one, e.g. one
+  waiting for signatures; only the change set of a merge is identified by its parents (SPECIFICATION.md, section 4).
 - **Changes:** `UpdateProperty`/`RemoveProperty` of every entity's own properties, not of its children;
   `Add`/`Remove` of operators, charging station and energy meter manufacturers and their models (`Add(model, manufacturerId)`),
   e-mobility providers, grid operators, parking operators,
@@ -391,7 +396,9 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
     (`RoamingNetworkChangeSetWithdrawal.Create(…)`). The store keeps the change sets waiting (SPECIFICATION.md,
     section 4.2).
 - **Rebase:** `rn2.TryRebase(cs, …)` prepares a change set of an older version again, unless it conflicts;
-  the rebased change set is unsigned, its owners sign it again.
+  the rebased change set is unsigned, its owners sign it again. It names the one it was prepared from in
+  `metadata.rebasedFrom` by its `@id` and ETags, which everyone calculates again; committed, it answers that one as
+  committed.
 - **Signatures:** `Sign(…)` and `VerifySignature(…)` over canonical JSON (COSE algorithms of Styx);
   an optional `VerifyChangeSetSignature` checks them in addition. What is signed, and in which version, the
   versioned JSON-LD context of the signed object names, e.g. `https://open.charging.cloud/contexts/wwcp/roamingNetwork/changeSet/v3`:

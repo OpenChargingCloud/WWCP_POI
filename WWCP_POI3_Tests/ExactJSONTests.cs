@@ -55,15 +55,31 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             var rn1    = new RoamingNetwork(Id: RoamingNetwork_Id.Parse("rn1"), DataSource: "test");
             var eTags  = rn1.CalcETags();
 
-            return new RoamingNetworkChangeSet(
-                       Id:                ChangeSet_Id.Parse("cs1"),
-                       RoamingNetworkId:  rn1.Id,
-                       CreatedAt:         DateTimeOffset.Parse("2026-10-20T12:00:00Z"),
-                       Changes:           [ RoamingNetworkChange.UpdateProperty(rn1, "customData", null, new JObject(new JProperty("value", "@@value@@"))) ],
-                       BeforeETags:       eTags,
-                       AfterETags:        eTags
-                   ).ToJSON().ToString(Newtonsoft.Json.Formatting.None).
-                     Replace("{\"value\":" + Placeholder + "}", CustomData);
+            var text   = new RoamingNetworkChangeSet(
+                             Id:                ChangeSet_Id.Parse("cs1"),
+                             RoamingNetworkId:  rn1.Id,
+                             CreatedAt:         DateTimeOffset.Parse("2026-10-20T12:00:00Z"),
+                             Changes:           [ RoamingNetworkChange.UpdateProperty(rn1, "customData", null, new JObject(new JProperty("value", "@@value@@"))) ],
+                             BeforeETags:       eTags,
+                             AfterETags:        eTags
+                         ).ToJSON().ToString(Newtonsoft.Json.Formatting.None).
+                           Replace("{\"value\":" + Placeholder + "}", CustomData);
+
+            // Identified by its content as written, where a decimal holds it: otherwise it is refused for what it holds.
+            try
+            {
+
+                var json = (JObject) JToken.ReadFrom(new JsonTextReader(new StringReader(text)) { FloatParseHandling = FloatParseHandling.Decimal,
+                                                                                                  DateParseHandling  = DateParseHandling.None });
+                json.Remove("@id");
+
+                return text.Replace("\"cs1\"", $"\"{Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(CanonicalJSON.ToUTF8Bytes(json)))}\"");
+
+            }
+            catch (JsonException)
+            {
+                return text;
+            }
 
         }
 

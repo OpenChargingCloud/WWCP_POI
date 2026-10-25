@@ -218,7 +218,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Give the given change set to be signed by the holders of a quorum, or add the signatures it has to the change
-        /// set of its identification waiting already (SPECIFICATION.md, section 4.2). It must fit a version, every signature
+        /// set of its identification waiting already (SPECIFICATION.md, section 4.2). It must be identified by its content and
+        /// have changes (section 4), fit a version, every signature
         /// must be valid, by a key valid at its creation and when it is taken, by the clock of this server, it must not be
         /// created later than then, and an owner of one of its changes must have signed it. Once its owners signed it, by as
         /// many holders as their quorums need, it is committed; until then it waits, here, and is kept by the store.
@@ -246,6 +247,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var signature in ChangeSet.Signatures)
                     if (SignatureAlgorithmError(signature.Algorithm, "a signature of the change set") is String algorithmError)
                         return Refused(algorithmError);
+
+                // Identified by its content: committed before, or waiting already, is then this change set.
+                if (ChangeSetError(ChangeSet) is String changeSetError)
+                    return Refused(changeSetError);
 
                 if (FindCommitted(ChangeSet) is RoamingNetworkCommit committed)
                     return new (RoamingNetworkCoSigningStatus.AlreadyCommitted, ChangeSet, Commit: committed);

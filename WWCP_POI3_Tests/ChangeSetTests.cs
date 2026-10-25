@@ -69,7 +69,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                        Description:       I18NString.Create(Languages.en, "Hello world!"),
                        // A text that looks like a date must stay this exact text.
                        Metadata:          new JObject(new JProperty("validFrom", "2026-01-01T00:00:00Z"))
-                   );
+                   ).WithContentId();
 
         }
 
@@ -241,7 +241,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                               AfterETags:        eTags,
                               Description:       I18NString.Create(Languages.en, "Hello CBOR!"),
                               Metadata:          new JObject(new JProperty("validFrom", "2026-01-01T00:00:00Z"))
-                          ).Sign(Alice, "alice", COSEAlgorithm.Ed25519);
+                          ).WithContentId().Sign(Alice, "alice", COSEAlgorithm.Ed25519);
 
             var bytes   = cs1.ToCBOR().ToByteArray(CBORWriterOptions.Canonical);
             var cs2     = RoamingNetworkChangeSet.ParseCBOR(bytes);
@@ -306,6 +306,45 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
         #endregion
 
+        #region A_change_set_is_identified_by_its_content()
+
+        /// <summary>
+        /// A change set is identified by the SHA-256 of its canonical JSON with its context, without its identification and its
+        /// signatures: the same content has the same identification, another content another one, and signing it changes it not.
+        /// </summary>
+        [Test]
+        public void A_change_set_is_identified_by_its_content()
+        {
+
+            var rn1     = NewNetwork();
+            var at      = DateTimeOffset.Parse("2026-10-25T12:00:00Z");
+            var cs1     = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ], CreatedAt: at);
+            var same    = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ], CreatedAt: at);
+            var other   = rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "B") ], CreatedAt: at);
+            var signed  = cs1.Sign(Alice, "alice", COSEAlgorithm.Ed25519);
+
+            var content = signed.ToJSON();
+            content.Remove("@id");
+            content.Remove("signatures");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(cs1.Id.ToString(),           Does.Match("^[0-9a-f]{64}$"));
+                Assert.That(cs1.Id.ToString(),           Is.EqualTo(Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(CanonicalJSON.ToUTF8Bytes(content)))));
+                Assert.That(cs1.IdentificationError(),   Is.Null);
+                Assert.That(same.Id,                     Is.EqualTo(cs1.Id));
+                Assert.That(other.Id,                    Is.Not.EqualTo(cs1.Id));
+                Assert.That(signed.Id,                   Is.EqualTo(cs1.Id));
+                Assert.That(signed.ContentId,            Is.EqualTo(cs1.Id));
+                Assert.That(signed.IdentificationError(), Is.Null);
+
+            }
+
+        }
+
+        #endregion
+
         #region A_signature_survives_the_JSON_text()
 
         [Test]
@@ -315,12 +354,21 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             var signed     = NewChangeSet().Sign(Alice, "alice", COSEAlgorithm.Ed25519);
             var parsed     = RoamingNetworkChangeSet.Parse(signed.ToJSON().ToString());
 
+            // Changed, it is no longer identified by its content; identified anew, its signature signs the one before.
             var tampered   = signed.ToJSON();
             tampered["description"]!["en"] = "Hello moon!";
-            var forged     = RoamingNetworkChangeSet.Parse(tampered.ToString());
+
+            var forged     = RoamingNetworkChangeSet.Parse(new RoamingNetworkChangeSet(signed.Id, signed.RoamingNetworkId, signed.CreatedAt, signed.Changes, signed.BeforeETags, signed.AfterETags,
+                                                                                       ImmutableI18NString.Create(Languages.en, "Hello moon!"), signed.Metadata, Preconditions: signed.Preconditions).
+                                                               WithContentId().
+                                                               WithSignatures(signed.Signatures).
+                                                               ToJSON().ToString());
 
             using (Assert.EnterMultipleScope())
             {
+
+                Assert.That(RoamingNetworkChangeSet.TryParse(tampered.ToString(), out _, out var tamperedError),  Is.False);
+                Assert.That(tamperedError,                                                                        Does.Contain("is not identified by its content"));
 
                 Assert.That(parsed.Signatures,  Is.EqualTo(signed.Signatures));
 

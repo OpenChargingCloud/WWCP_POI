@@ -652,10 +652,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             var wrong   = ETag.Compute(ETagFormat.JSON, ETagHashAlgorithm.SHA512, CanonicalJSON.ToUTF8Bytes(rn2.ToJSON(IncludeETags: false)));
 
             // ...and they survive the JSON text of their change set.
-            var sha     = RoamingNetworkChangeSet.Parse(new RoamingNetworkChangeSet(cs1.Id, cs1.RoamingNetworkId, cs1.CreatedAt, cs1.Changes, [ before ], [ after ]).SignedByAll(rn1).
+            var sha     = RoamingNetworkChangeSet.Parse(new RoamingNetworkChangeSet(cs1.Id, cs1.RoamingNetworkId, cs1.CreatedAt, cs1.Changes, [ before ], [ after ]).WithContentId().SignedByAll(rn1).
                                                             ToJSON().ToString());
 
-            var stale   = new RoamingNetworkChangeSet(cs1.Id, cs1.RoamingNetworkId, cs1.CreatedAt, cs1.Changes, [ wrong ], [ after ]).SignedByAll(rn1);
+            var stale   = new RoamingNetworkChangeSet(cs1.Id, cs1.RoamingNetworkId, cs1.CreatedAt, cs1.Changes, [ wrong ], [ after ]).WithContentId().SignedByAll(rn1);
 
             using (Assert.EnterMultipleScope())
             {

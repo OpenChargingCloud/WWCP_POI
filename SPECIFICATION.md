@@ -133,6 +133,21 @@ A change set leads from the version of its `beforeETags` to the version of its `
   "beforeETags": [ … ], "afterETags": [ … ], "signatures": [ … ] }
 ```
 
+**Identification:** the `@id` of a change set is the SHA-256 of the canonical JSON (section 1) of the change set with
+its `@context`, without `@id` and without its signatures, as 64 lowercase hexadecimal digits, in every epoch. A
+change set identified otherwise MUST be refused, except the change set of a merge (5.3). So the same `@id` is the same
+change set: one committed before is answered as committed (`alreadyCommitted`) and not committed again, nobody names
+another change set with it, and signatures are added without changing it. A change set MUST have at least one change;
+one without changes MUST be refused, except the change set of a merge.
+
+**Rebased:** a change set prepared again for another version (rebased) keeps its changes, preconditions, description,
+`createdAt` and metadata, has the ETags of the new version, and names the change set it was prepared from in its
+metadata: `"rebasedFrom": [ { "@id", "beforeETags", "afterETags" } ]`, the earlier ones first, the one it was prepared
+from last. A change set MUST be refused unless the `@id` of every entry is the one this change set has with the
+`beforeETags` and `afterETags` of the entry and with the entries before it as its `rebasedFrom` (before the first one
+none: without `rebasedFrom`), and `rebasedFrom`, when there, has an entry. A change set named so counts as committed with the rebased one: it is answered
+as committed, waits no longer (4.2) and is not committed again.
+
 **Preconditions** (optional, written only when there are any, signed with the change set): the ETag an
 entity MUST still have for the change set to apply, or to be rebased onto another version. The ETag of an
 entity is the one of its representation as the roaming network embeds it, with everything it embeds: over
@@ -341,8 +356,8 @@ place where a change set **waits** for the signatures still missing, `~/history/
   version valid at its `createdAt` and when it takes it, or by a new identity key of one of its changes (4.1), at least one is by an owner
   of one of its changes (4.1), and its changes apply
   to that version, leading to its after ETags. So nobody makes it hold change sets nobody owning anything signed.
-- More signatures come with the change set again, or by themselves for its `@id`; a change set of the same `@id`
-  saying something else is refused. Signatures by the same holder count once, as in 4.1.
+- More signatures come with the change set again, or by themselves for its `@id`, which names its content (4), so no
+  other change set takes its place. Signatures by the same holder count once, as in 4.1.
 - Once its owners signed it, by as many holders as their quorums need, the server commits it as it commits any
   change set, and it waits no longer. Also when it is committed otherwise, e.g. as a peer sends its commit.
 - It waits until then, without a time limit, unless withdrawn, or once it fits no version any longer, e.g. after a
@@ -416,8 +431,8 @@ they can be added later without changing the identification.
 A reader MUST calculate the identification and refuse the commit when it differs from `@id`.
 The CBOR representation has the keys and values of the JSON one.
 
-A commit with one parent MUST be refused unless its change set fits the version of its parent,
-is signed by its owners (section 4.1) and leads to its ETags.
+A commit with one parent MUST be refused unless its change set is identified by its content and has changes
+(section 4), fits the version of its parent, is signed by its owners (section 4.1) and leads to its ETags.
 
 ### 5.3 Merges
 
@@ -427,8 +442,9 @@ first two tips that do not conflict, again and again. Their **merge commit**:
 
 - `parentIds`: the two tips in their order; its change set leads from the version of the first one;
 - the change set has the `@id` `merge-` followed by the first 32 hex digits of the SHA-256 of
-  `"<first parent id>+<second parent id>"` (UTF-8), the `createdAt` of the later `lastChange` of
-  both versions, the description `{"en":"Merge"}`, no metadata and no signatures;
+  `"<first parent id>+<second parent id>"` (UTF-8), identified by its parents, not by its content (section 4), which
+  only the change set of a merge commit is, the `createdAt` of the later `lastChange` of
+  both versions, the description `{"en":"Merge"}`, no metadata and no signatures; it may have no changes;
 - its changes follow from a three-way merge with the **merge base**, the best common ancestor
   (one no other common ancestor follows); several best common ancestors form a **virtual merge
   base** (below).

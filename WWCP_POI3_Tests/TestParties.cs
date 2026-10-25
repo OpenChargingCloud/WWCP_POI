@@ -416,13 +416,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                     IEnumerable<RoamingNetworkChange>  Changes,
                                                                     ImmutableI18NString?               Description   = null,
                                                                     JObject?                           Metadata      = null,
-                                                                    ChangeSet_Id?                      Id            = null,
                                                                     DateTimeOffset?                    CreatedAt     = null)
         {
 
             WholeNumbersAreIntegers(Network.ToJSON(), $"The roaming network '{Network.Id}'");
 
-            return Network.CreateChangeSet(Changes, Description, Metadata, Id, CreatedAt).
+            return Network.CreateChangeSet(Changes, Description, Metadata, CreatedAt).
                            SignedByAll(Network);
 
         }

@@ -275,7 +275,6 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                        ],
                        Description:  ImmutableI18NString.Create(Languages.en, "Hello world!").Set(Languages.de, "Hallo Welt!"),
                        Metadata:     new JObject(new JProperty("validFrom", "2026-01-01T00:00:00Z"), new JProperty("weight", 0.75m), new JProperty("count", 3)),
-                       Id:           ChangeSet_Id.Parse("cs-rich"),
                        CreatedAt:    DateTimeOffset.Parse("2026-10-11T12:34:56.7891234Z")
                    );
 

@@ -105,6 +105,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(csB2.CreatedAt,                               Is.EqualTo(csB.CreatedAt));
                 Assert.That(csB2.Metadata["author"]!.Value<String>(),     Is.EqualTo("bob"));
                 Assert.That(csB2.Metadata["rebasedFrom"]![0]!["@id"]!.Value<String>(),  Is.EqualTo(csB.Id.ToString()));
+                Assert.That(csB2.Metadata["rebasedFrom"]![0]!["afterETags"]!.Select(ETag.ParseHex),  Is.EqualTo(csB.AfterETags));
+
+                // Identified by their content, naming what they were rebased from as it was: once and twice rebased.
+                Assert.That(csB2.Id,                                      Is.EqualTo(csB2.ContentId));
+                Assert.That(csB2.IdentificationError(),                   Is.Null);
+                Assert.That(csC3.IdentificationError(),                   Is.Null);
 
                 Assert.That(rn3.DataSource,                               Is.EqualTo("A"));
                 Assert.That(rn3.Description.Count,                        Is.Zero);
@@ -114,6 +120,67 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(csC3.Metadata["rebasedFrom"]!.Count(),        Is.EqualTo(2));
                 Assert.That(rn4.Name[Languages.en],                       Is.EqualTo("C"));
                 Assert.That(rn4.Revision,                                 Is.EqualTo(3));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_rebased_change_set_names_only_what_it_was_rebased_from()
+
+        /// <summary>
+        /// A rebased change set names those it was rebased from by their identification and ETags, so that everyone can
+        /// calculate their identifications again: an entry naming another change set, with other ETags or without them, or
+        /// no entry at all, is refused, also as JSON, and a change set committed rebased is committed already as it was.
+        /// </summary>
+        [Test]
+        public void A_rebased_change_set_names_only_what_it_was_rebased_from()
+        {
+
+            var rn1        = NewNetwork();
+            var history    = RoamingNetworkHistory.Start(rn1);
+            var csA        = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataSource", null, "A") ]);
+            var csB        = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "name", null, new JObject(new JProperty("en", "B"))) ]);
+
+            Assert.That(history.Commit(csA).IsCommitted, Is.True);
+
+            var rn2        = history.Head.RoamingNetwork;
+            var csB2       = rn2.Rebase(csB).SignedByAll(rn2);
+
+            RoamingNetworkChangeSet WithRebasedFrom(JToken RebasedFrom)
+            {
+                var metadata = csB2.Metadata;
+                metadata[RoamingNetworkChangeSet.PropertyKeys.RebasedFrom] = RebasedFrom;
+                return new RoamingNetworkChangeSet(csB2.Id, csB2.RoamingNetworkId, csB2.CreatedAt, csB2.Changes, csB2.BeforeETags, csB2.AfterETags, csB2.Description, metadata,
+                                                   Preconditions: csB2.Preconditions).WithContentId();
+            }
+
+            var entry      = (JObject) csB2.Metadata[RoamingNetworkChangeSet.PropertyKeys.RebasedFrom]![0]!;
+
+            var otherId    = (JObject) entry.DeepClone();
+            otherId[RoamingNetworkChangeSet.PropertyKeys.Id] = csA.Id.ToString();
+
+            var otherETags = (JObject) entry.DeepClone();
+            otherETags[RoamingNetworkChangeSet.PropertyKeys.AfterETags] = entry[RoamingNetworkChangeSet.PropertyKeys.BeforeETags]!.DeepClone();
+
+            var noETags    = (JObject) entry.DeepClone();
+            noETags.Remove(RoamingNetworkChangeSet.PropertyKeys.AfterETags);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(WithRebasedFrom(new JArray(otherId)).   IdentificationError(),  Does.Contain("not the change set it was rebased from"));
+                Assert.That(WithRebasedFrom(new JArray(otherETags)).IdentificationError(),  Does.Contain("not the change set it was rebased from"));
+                Assert.That(WithRebasedFrom(new JArray(noETags)).   IdentificationError(),  Does.Contain("must name the @id, the beforeETags and the afterETags"));
+                Assert.That(WithRebasedFrom(new JArray()).          IdentificationError(),  Does.Contain("must be an array"));
+
+                Assert.That(RoamingNetworkChangeSet.TryParse(WithRebasedFrom(new JArray(otherId)).ToJSON().ToString(), out _, out var parseError),  Is.False);
+                Assert.That(parseError,                                                     Does.Contain("not the change set it was rebased from"));
+
+                // Committed rebased, the change set as it was is committed already.
+                Assert.That(history.Commit(csB2).Status,                                    Is.EqualTo(RoamingNetworkCommitStatus.Committed));
+                Assert.That(history.Commit(csB). Status,                                    Is.EqualTo(RoamingNetworkCommitStatus.AlreadyCommitted));
 
             }
 

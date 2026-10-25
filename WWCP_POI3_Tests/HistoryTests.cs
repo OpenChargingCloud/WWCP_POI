@@ -243,7 +243,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var commit1   = leader.Commit(DataSource(leader, "A", 1)).Commit!;
             var commit2   = leader.Commit(DataSource(leader, "B", 2)).Commit!;
 
-            // Another content under the same identification.
+            // Another content under the same identifications, of the change set and of the commit.
             var forged    = commit1.ToJSON();
             forged["changeSet"]!["description"]!["en"] = "forged";
 
@@ -255,7 +255,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             {
 
                 Assert.That(RoamingNetworkCommit.TryParse(forged,  out _, out var error1),  Is.False);
-                Assert.That(error1,                                                         Does.Contain("is not the one of its content"));
+                Assert.That(error1,                                                         Does.Contain("is not identified by its content"));
 
                 Assert.That(RoamingNetworkCommit.TryParse(wrongId, out _, out var error2),  Is.False);
                 Assert.That(error2,                                                         Does.Contain("is not the one of its content"));
