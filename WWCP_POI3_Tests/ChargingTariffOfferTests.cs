@@ -610,8 +610,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             };
 
+            // It begins 3 s from now, time enough to sign and commit it on a slow machine: an offer new in a version is not
+            // told of, the version tells it, so one committed after its notBefore is told neither active nor expired.
             var now      = Timestamp.Now;
-            var begin    = DateTimeOffset.FromUnixTimeMilliseconds(now.ToUnixTimeMilliseconds() + 1000);
+            var begin    = DateTimeOffset.FromUnixTimeMilliseconds(now.ToUnixTimeMilliseconds() + 3000);
             var end      = begin.AddMilliseconds(500);
 
             Assert.That(history.Commit(history.Head.RoamingNetwork.CreateSignedChangeSet([
@@ -623,6 +625,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                              Sessions:                    ChargingTariffOfferSessions.contract,
                                                                              Created:                     Created), GEF)
                         ], CreatedAt: now)).IsCommitted);
+
+            Assert.That(Timestamp.Now, Is.LessThan(begin),
+                        $"Signing and committing the offer took {(Timestamp.Now - now).TotalMilliseconds:F0} ms, until after its notBefore: " +
+                         "the version tells its status, the runtime status tells nothing to wait for!");
 
             await expired.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
