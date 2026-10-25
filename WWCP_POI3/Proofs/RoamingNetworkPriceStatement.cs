@@ -480,16 +480,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryVerify(SigningKeys, out ErrorResponse)
+        #region TryVerify(SigningKeys, out ErrorResponse, At = null)
 
         /// <summary>
         /// Verify the signature of this price statement with the one of the given signing keys of its operator it names,
-        /// which must be valid when it was signed and may sign price statements (POIKeyUsages).
+        /// which must be valid when it was signed and may sign price statements (POIKeyUsages); and, when a time is given,
+        /// valid then as well: a statement is valid no longer than its key, whatever its signedAt says.
         /// </summary>
         /// <param name="SigningKeys">The signing keys of the charging station operator of the entity.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="At">When the key must be valid as well, if anything.</param>
         public Boolean TryVerify(IEnumerable<POIPublicKey>         SigningKeys,
-                                 [NotNullWhen(false)] out String?  ErrorResponse)
+                                 [NotNullWhen(false)] out String?  ErrorResponse,
+                                 DateTimeOffset?                   At   = null)
         {
 
             if (SigningKeys.FirstOrDefault(signingKey => signingKey.Id == KeyId) is not POIPublicKey signingKey)
@@ -501,6 +504,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!signingKey.IsValidAt(SignedAt))
             {
                 ErrorResponse = $"The signing key '{KeyId}' of the charging station operator '{Signer}' is not valid at {SignedAt.ToISO8601()}, when the price statement was signed!";
+                return false;
+            }
+
+            if (At is DateTimeOffset at && !signingKey.IsValidAt(at))
+            {
+                ErrorResponse = $"The signing key '{KeyId}' of the charging station operator '{Signer}' is not valid at {at.ToISO8601()}: a price statement is valid no longer than its key!";
                 return false;
             }
 
@@ -528,7 +537,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Verify this price statement against what the given proof of a charging station gives (SPECIFICATION.md, section 12):
         /// its entity, below its charging station operator, and the signing key of the operator it is signed with, valid when
-        /// it was signed; and it must be valid at the given time, now by default. Whether the proof itself is attested, its
+        /// it was signed and at the given time; and it must be valid at the given time, now by default. Whether the proof itself is attested, its
         /// Verify(…) tells, or TryVerify(Proof, TrustedIdentityKeyIds, …) checks both. Its prices apply to the charging
         /// tariffs the proof gives, those of the EVSEs of the station.
         /// </summary>
@@ -578,7 +587,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            return TryVerify(signingKeys, out ErrorResponse);
+            return TryVerify(signingKeys, out ErrorResponse, at);
 
         }
 

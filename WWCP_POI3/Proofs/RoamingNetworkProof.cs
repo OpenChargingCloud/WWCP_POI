@@ -426,7 +426,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// operator the proof gives must be signed by trusted identity keys of as many holders as the given minConsensus and
         /// its own require, name their holders as the verifier knows them, and be valid at the given time, now by default;
         /// its identity keys are trusted then as well. The attestations of the root of the proof, in the role of the roaming
-        /// network operator, must be signed by signing keys of as many holders, valid when they were signed and allowed to
+        /// network operator, valid at that time, must be signed by signing keys of as many holders, valid when they were
+        /// signed and at that time, so that a signedAt chosen earlier does not let a key attest once it ended, and allowed to
         /// sign for the party, each certified by a trusted identity key of its holder, and counted for the holder of that
         /// identity key as the verifier knows it (SPECIFICATION.md, sections 4.1, 8.5 and 8.6): so that no holder of a quorum
         /// attests a version alone. Attestations of a subject do not count (VerifySubject).
@@ -460,13 +461,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var identityKeys  = keyStatement.IdentityKeys.Concat(operatorIdentityKeys).ToArray();
             var trustedIds    = holderOf.Keys.ToHashSet(StringComparer.Ordinal);
 
-            // The signing key of an attestation, certified by a trusted identity key of its holder, and that holder.
+            // The signing key of an attestation, certified by a trusted identity key of its holder, and that holder. Valid
+            // when the attestation was signed and at the time it is verified: its signedAt is the signer's choice.
             (POIPublicKey SigningKey, String Holder)? CertifiedSigningKeyOf(RoamingNetworkAttestation Attestation)
             {
 
                 foreach (var certificate in certificates)
                     if (certificate.SigningKey.Id == Attestation.KeyId              &&
                         certificate.SigningKey.IsValidAt(Attestation.SignedAt)      &&
+                        certificate.SigningKey.IsValidAt(at)                        &&
                         certificate.SigningKey.MaySign(POIKeyUsages.Party)          &&
                         certificate.TryVerify(identityKeys, out var identityKey, out _, trustedIds))
                     {

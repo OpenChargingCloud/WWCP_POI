@@ -404,6 +404,33 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
         #endregion
 
+        #region A_price_statement_is_valid_no_longer_than_its_key()
+
+        /// <summary>
+        /// A price statement is valid no longer than the signing key it is signed with, also one without a validUntil: its
+        /// signedAt is the choice of its operator, so a key that ended does not state prices by a signedAt within its
+        /// validity (SPECIFICATION.md, section 12.1; WWCP_POI.TS, docs/csharp-review.md, finding 7).
+        /// </summary>
+        [Test]
+        public void A_price_statement_is_valid_no_longer_than_its_key()
+        {
+
+            var statement  = Signer(GEF).StatePrices(RN, EVSEType, E11, Prices(0.29m), 0, null, since, since.AddSeconds(1));
+            var ending     = new POIPublicKey(TestParties.Key(TestParties.Party(GEF)).Public.Key, NotAfter: since.AddMinutes(10));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(statement.ValidUntil,                                         Is.Null, "valid until the next statement of its entity");
+                Assert.That(statement.TryVerify([ ending ], out var error),               Is.True, error);
+                Assert.That(statement.TryVerify([ ending ], out error, since.AddMinutes(10)),  Is.True, error);
+                Assert.That(statement.TryVerify([ ending ], out error, since.AddMinutes(11)),  Is.False, "its key ended");
+                Assert.That(error,                                                        Does.Contain("valid no longer than its key"));
+            }
+
+        }
+
+        #endregion
+
         #region An_app_checks_a_price_statement_with_the_proof_of_its_station()
 
         [Test]

@@ -435,7 +435,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             Assert.That(RoamingNetworkAttestation.TryParse(attestation.ToJSON().ToString(), out var parsed, out error), Is.True, error);
 
             var forged = new RoamingNetworkAttestation(attestation.RoamingNetworkId, attestation.CommitId, attestation.Revision, attestation.ETag,
-                                                       attestation.Role, attestation.Signer, attestation.SignedAt, attestation.ValidUntil.Value.AddDays(1),
+                                                       attestation.Role, attestation.Signer, attestation.SignedAt, attestation.ValidUntil.AddHours(1),
                                                        attestation.Subject, attestation.Algorithm, attestation.KeyId, attestation.Value);
 
             var byOther = OtherSigner.Attest(RN, attestation.CommitId, attestation.Revision, attestation.ETag, T0, T0.AddMinutes(15));
@@ -461,6 +461,59 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
                 Assert.That(parsed!.VerifySignature(RNOKey.GeneratePublicKey(), "rno", out error),        Is.True, error);
                 Assert.That(JToken.DeepEquals(parsed.ToJSON(), attestation.ToJSON()),                     Is.True);
+
+            }
+
+        }
+
+        #endregion
+
+        #region An_attestation_is_valid_from_its_signing_until_its_validUntil()
+
+        /// <summary>
+        /// An attestation counts from when it was signed until its validUntil, which it must give, at most 24 hours later: an
+        /// attestation of the future is no attestation now, and none outlives the day it was signed (SPECIFICATION.md,
+        /// section 8.5; WWCP_POI.TS, docs/csharp-review.md, finding 7).
+        /// </summary>
+        [Test]
+        public void An_attestation_is_valid_from_its_signing_until_its_validUntil()
+        {
+
+            var history = RoamingNetworkHistory.Start(NewNetwork());
+
+            history.AttestationSigners = [ RNOSigner ];
+
+            Assert.That(history.TryAttest(out var attestations, out var error, T0),               Is.True, error);
+            Assert.That(history.TryGetChargingStationProof(S1, out var proof, out error, At: T0),  Is.True, error);
+
+            var attestation  = attestations!.Single();
+
+            var withoutEnd   = (JObject) attestation.ToJSON();
+            withoutEnd.Remove("validUntil");
+
+            var tooLong      = (JObject) attestation.ToJSON();
+            tooLong["validUntil"] = T0.AddHours(24).AddMilliseconds(1).ToISO8601();
+
+            RoamingNetworkAttestation AttestedUntil(DateTimeOffset? ValidUntil)
+                => RNOSigner.Attest(RN, attestation.CommitId, attestation.Revision, attestation.ETag, T0, ValidUntil);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(proof!.Verify(Trusted, out _, out error, T0),                                       Is.True, error);
+                Assert.That(proof.Verify(Trusted, out _, out error, T0.AddMilliseconds(-1)),                    Is.False, "before it was signed");
+                Assert.That(proof.Verify(Trusted, out _, out error, T0.AddMinutes(15)),                         Is.True, error);
+                Assert.That(proof.Verify(Trusted, out _, out error, T0.AddMinutes(15).AddMilliseconds(1)),      Is.False, "after its validUntil");
+
+                Assert.That(RoamingNetworkAttestation.TryParse(withoutEnd, out _, out error),                   Is.False, "without validUntil");
+                Assert.That(error,                                                                              Does.Contain("must be given"));
+                Assert.That(RoamingNetworkAttestation.TryParse(tooLong, out _, out error),                      Is.False, "valid longer than a day");
+                Assert.That(error,                                                                              Does.Contain("24 hours at most"));
+
+                Assert.That(AttestedUntil(T0.AddHours(24)).ValidUntil,                                          Is.EqualTo(T0.AddHours(24)));
+                Assert.That(AttestedUntil(null).ValidUntil,                                                     Is.EqualTo(T0.AddMinutes(15)), "15 minutes by default");
+                Assert.That(() => AttestedUntil(T0.AddHours(24).AddMilliseconds(1)),                            Throws.ArgumentException);
+                Assert.That(() => { history.AttestationValidity = TimeSpan.FromHours(25); },                    Throws.InstanceOf<ArgumentOutOfRangeException>());
 
             }
 
@@ -586,6 +639,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             var wrongTag = RNOSigner.Attest(RN, head.Commit.Id, head.Commit.Revision, new ETag(ETagFormat.EffectiveTree, ETagHashAlgorithm.SHA256, new Byte[32]), Timestamp.Now, Timestamp.Now.AddMinutes(15));
             var expired  = RNOSigner.Attest(RN, head.Commit.Id, head.Commit.Revision, eTag, Timestamp.Now.AddHours(-1), Timestamp.Now.AddMinutes(-45));
 
+            // Of a server whose clock runs ahead: a minute is taken, as for change sets, and counts once it was signed.
+            var ahead    = RNOSigner.Attest(RN, head.Commit.Id, head.Commit.Revision, eTag, Timestamp.Now.AddMinutes(1),  Timestamp.Now.AddMinutes(16));
+            var future   = RNOSigner.Attest(RN, head.Commit.Id, head.Commit.Revision, eTag, Timestamp.Now.AddMinutes(10), Timestamp.Now.AddMinutes(25));
+
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(mirror.TryAddAttestation(good,     Trusted, out var error),  Is.True, error);
@@ -593,7 +650,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(mirror.TryAddAttestation(wrongTag, Trusted, out error),      Is.False);
                 Assert.That(mirror.TryAddAttestation(expired,  Trusted, out error),      Is.False);
                 Assert.That(mirror.TryAddAttestation(good,     _ => false, out error),   Is.False);
-                Assert.That(mirror.CurrentAttestations(),                                Has.Count.EqualTo(1));
+                Assert.That(mirror.TryAddAttestation(future,   Trusted, out error),      Is.False, "signed later than the clock may run ahead");
+                Assert.That(error,                                                       Does.Contain("later than now"));
+                Assert.That(mirror.TryAddAttestation(ahead,    Trusted, out error),      Is.True, error);
+                Assert.That(mirror.CurrentAttestations(),                                Has.Count.EqualTo(1), "not yet the one signed ahead");
+                Assert.That(mirror.CurrentAttestations(ahead.SignedAt),                  Has.Count.EqualTo(2));
             }
 
         }

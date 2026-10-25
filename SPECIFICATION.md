@@ -1013,14 +1013,21 @@ The signature input is the canonical JSON of
   "roamingNetworkId": "…", "commitId": "…", "revision": …, "eTag": [ … ], "subject": { … } }
 ```
 
-`signer`, `validUntil` and `subject` are left out where absent. The `eTag` is written in hex. The context,
-algorithms and verification are as in section 4; timestamps are written and signed as in section 5.4, and
-`validUntil` is not before `signedAt`. Section 6 has an example.
+`signer` and `subject` are left out where absent. The `eTag` is written in hex. The context,
+algorithms and verification are as in section 4; timestamps are written and signed as in section 5.4. Section 6
+has an example.
 
+- **Validity:** an attestation MUST give `validUntil`, not before `signedAt` and at most 24 hours after it; one
+  without, or valid longer, MUST be refused. It is valid from its `signedAt` to its `validUntil`: a verifier MUST
+  refuse it at a time before it was signed, an attestation of the future being no attestation now, and after its
+  `validUntil`. So no attestation outlives the day it was signed, also one of a key revoked since (8.6), and
+  `signedAt` being the signer's choice, its key MUST be valid at that time as well (8.6). A server takes an
+  attestation of another server signed a few minutes after its own clock, as a change set (4.1); it counts once it
+  was signed.
 - **Freshness:** a server SHOULD attest its head again before `validUntil`, also without new commits.
   POI3 attests every new head with the `AttestationSigners` of the history, valid for 15 minutes, and
   `RefreshAttestations()` attests the head again where the newest attestation of a signer is older than
-  5 minutes. A verifier SHOULD refuse an attestation after its `validUntil`.
+  5 minutes.
 - **Trust:** the verifier MUST trust the key of an attestation independently of the proof. A key the
   attested network names proves nothing, as whoever forged the network would name their own; the
   certificate of an identity key it trusts (8.6) names them. The key MUST be one that may sign for the
@@ -1102,8 +1109,10 @@ Section 6 has an example.
   for those of every other holder; else it is refused. The verifier checks that it is valid at the time it
   checks, `signedAt` ≤ time ≤ `validUntil`, and that it names the roaming network of the proof. The identity
   keys the statement names are trusted then as well, with the holders it names. An attestation of the proof
-  counts when its signing key is certified by a trusted identity key of its holder, is valid at the
-  attestation's `signedAt` and may sign for the `party`; it counts for the holder of that identity key as the
+  counts when it is valid at the time the verifier checks (8.5) and its signing key is certified by a trusted
+  identity key of its holder, is valid at the attestation's `signedAt` and at the time the verifier checks, so
+  that a `signedAt` chosen before lets no key attest once it expired, and may sign for the `party`; it counts for
+  the holder of that identity key as the
   verifier knows it, and is then trusted as 8.5 says. So no holder counts twice by naming a key of its own, or a
   signing key it certifies, as another's.
 - **Succession:** a verifier trusting a statement MAY trust its `identityKeys` for later statements, with the
@@ -1696,7 +1705,9 @@ operator with one of its signing keys (section 4.1) when it sets the price.
 - **priceStatus:** the price status, signed as it is written. A reader keeps it as given, numbers with a
   fraction as decimals, and checks that it is one.
 - **validFrom, validUntil:** when it is valid, written as in section 5.4. `validFrom` is not before
-  `signedAt`; without `validUntil`, it is valid until the next statement of its entity.
+  `signedAt`; without `validUntil`, it is valid until the next statement of its entity. Either way it is valid no
+  longer than the key it is signed with: an operator replacing that key states the price status of its entities
+  anew with the next one before it expires.
 - **Chain per entity:** `sequence` is 0 for the first statement of an entity and one more for every next
   one; `previous` is the digest of the statement before, absent for sequence 0. The **digest** of a
   statement is the SHA-256 of its signature input (below), `value` left out, as 64 lowercase hexadecimal
@@ -1763,7 +1774,8 @@ carries the signatures it requires: then the statement was made before the check
 A driver's app gets the proof of a charging station (8.4) and the current statements of its pool, of the
 station and of its EVSEs, and checks them offline: the proof against the identity keys of the roaming
 network operator it pinned (8.6), each statement against what the proof gives: its entity below its
-operator, the signing key of the operator it is signed with, and that it is valid when charging begins.
+operator, the signing key of the operator it is signed with, valid at `signedAt` and when charging begins, as the
+statement is valid no longer than its key (12.1), and that it is valid when charging begins.
 Its prices apply to the charging tariffs the proof gives, those of the EVSE. The app keeps the
 statement, the proof of the station and later the proof of the statement in a checkpoint: it was made
 after the checkpoint `after` names, and before the one naming it, which witnesses signed.

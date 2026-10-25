@@ -43,7 +43,7 @@ public static class ExampleA10
 
         var holders = attestations.Select(attestation => A1.RoamingNetwork.Operator!.SigningKeyCertificates.Single(certificate => certificate.SigningKey.Id == attestation.KeyId).SigningKey.HolderOrUnnamed);
 
-        Console.WriteLine($"Revision {A1.History.Head.Commit.Revision} attested as {attestations[0].Signer} by {String.Join(", ", holders)}, until {attestations[0].ValidUntil?.ToISO8601()}");
+        Console.WriteLine($"Revision {A1.History.Head.Commit.Revision} attested as {attestations[0].Signer} by {String.Join(", ", holders)}, until {attestations[0].ValidUntil.ToISO8601()}");
 
         // The happy hour of example A8 is over: 0.65 €/kWh at DE*GEF*E1*1, the next statement of its chain, made after
         // checkpoint 4.

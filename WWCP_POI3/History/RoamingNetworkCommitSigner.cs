@@ -152,7 +152,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Revision">The revision of the commit.</param>
         /// <param name="ETag">The effectiveTree ETag of the attested version.</param>
         /// <param name="SignedAt">When it is signed, now otherwise.</param>
-        /// <param name="ValidUntil">Until when it is valid, if it says.</param>
+        /// <param name="ValidUntil">Until when it is valid, at most RoamingNetworkAttestation.MaxValidity after it is signed; its DefaultValidity otherwise.</param>
         /// <param name="Subject">The digest of the one entity it attests instead of the root, if any.</param>
         public RoamingNetworkAttestation Attest(RoamingNetwork_Id                  RoamingNetworkId,
                                                 RoamingNetworkCommit_Id            CommitId,

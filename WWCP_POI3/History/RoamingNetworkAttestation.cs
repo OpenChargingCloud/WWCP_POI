@@ -145,6 +145,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String JSONLDContext   = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/attestation/v1";
 
+        /// <summary>
+        /// How long an attestation is valid at most, from its signedAt to its validUntil: 24 hours (SPECIFICATION.md,
+        /// section 8.5). So no attestation outlives the day it was signed, also one whose key was revoked since.
+        /// </summary>
+        public static readonly TimeSpan MaxValidity      = TimeSpan.FromHours(24);
+
+        /// <summary>
+        /// How long an attestation signed without a given validUntil is valid: 15 minutes.
+        /// </summary>
+        public static readonly TimeSpan DefaultValidity  = TimeSpan.FromMinutes(15);
+
         #endregion
 
         #region Properties
@@ -263,9 +274,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public DateTimeOffset                     SignedAt            { get; }
 
         /// <summary>
-        /// Until when it is valid, if it says: a verifier SHOULD refuse it after it.
+        /// Until when it is valid, at most MaxValidity after it was signed: a verifier refuses it after it.
         /// </summary>
-        public DateTimeOffset?                    ValidUntil          { get; }
+        public DateTimeOffset                     ValidUntil          { get; }
 
         /// <summary>
         /// The digest of the one entity it attests instead of the root, if any.
@@ -301,7 +312,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          String                             Role,
                                          String?                            Signer,
                                          DateTimeOffset                     SignedAt,
-                                         DateTimeOffset?                    ValidUntil,
+                                         DateTimeOffset                     ValidUntil,
                                          RoamingNetworkAttestationSubject?  Subject,
                                          String                             Algorithm,
                                          String                             KeyId,
@@ -317,8 +328,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (String.IsNullOrWhiteSpace(Algorithm) || String.IsNullOrWhiteSpace(KeyId) || String.IsNullOrEmpty(Value))
                 throw new ArgumentException("An attestation requires an algorithm, a key identification and a value.");
 
-            if (ValidUntil.HasValue && ValidUntil.Value < SignedAt)
+            if (ValidUntil < SignedAt)
                 throw new ArgumentException("An attestation is not valid until before it was signed.", nameof(ValidUntil));
+
+            if (ValidUntil - SignedAt > MaxValidity)
+                throw new ArgumentException($"An attestation is valid for {MaxValidity.TotalHours} hours at most.", nameof(ValidUntil));
 
             this.RoamingNetworkId  = RoamingNetworkId;
             this.CommitId          = CommitId;
@@ -353,7 +367,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ETag">The effectiveTree ETag of the attested version.</param>
         /// <param name="Signer">The optional name of the signer.</param>
         /// <param name="SignedAt">When it is signed, now otherwise.</param>
-        /// <param name="ValidUntil">Until when it is valid, if it says.</param>
+        /// <param name="ValidUntil">Until when it is valid, at most MaxValidity after it is signed; DefaultValidity otherwise.</param>
         /// <param name="Subject">The digest of the one entity it attests instead of the root, if any.</param>
         /// <param name="Deterministic">Whether to sign deterministically.</param>
         public static RoamingNetworkAttestation Create(AsymmetricKeyParameter             PrivateKey,
@@ -376,6 +390,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!PrivateKey.IsPrivate)
                 throw new ArgumentException("Signing requires a private asymmetric key.", nameof(PrivateKey));
 
+            var signedAt = Truncated(SignedAt ?? Timestamp.Now);
+
             // Without a value yet, only to get the signed fields exactly as they will be written.
             var unsigned = new RoamingNetworkAttestation(RoamingNetworkId,
                                                          CommitId,
@@ -383,8 +399,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                          ETag,
                                                          Role,
                                                          Signer,
-                                                         Truncated(SignedAt ?? Timestamp.Now),
-                                                         ValidUntil.HasValue ? Truncated(ValidUntil.Value) : null,
+                                                         signedAt,
+                                                         Truncated(ValidUntil ?? signedAt + DefaultValidity),
                                                          Subject,
                                                          Algorithm.Name,
                                                          KeyId,
@@ -412,11 +428,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region IsValidAt(Timestamp)
 
         /// <summary>
-        /// Whether it is valid at the given time: not after its validUntil, when it has one.
+        /// Whether it is valid at the given time: signed then or before, and not after its validUntil. An attestation of
+        /// the future is no attestation now.
         /// </summary>
         public Boolean IsValidAt(DateTimeOffset Timestamp)
 
-            => !ValidUntil.HasValue || Timestamp <= ValidUntil.Value;
+            => SignedAt <= Timestamp && Timestamp <= ValidUntil;
 
         #endregion
 
@@ -615,9 +632,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!TryParseTimestamp(JSON, PropertyKeys.ValidUntil, out var validUntil))
+                if (!TryParseTimestamp(JSON, PropertyKeys.ValidUntil, out var validUntil) || !validUntil.HasValue)
                 {
-                    ErrorResponse = "The end of the validity must be written as yyyy-MM-ddTHH:mm:ss.fffZ!";
+                    ErrorResponse = "The end of the validity must be given, written as yyyy-MM-ddTHH:mm:ss.fffZ!";
                     return false;
                 }
 
@@ -643,9 +660,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                if (validUntil.HasValue && validUntil.Value < signedAt.Value)
+                if (validUntil.Value < signedAt.Value)
                 {
                     ErrorResponse = "An attestation is not valid until before it was signed!";
+                    return false;
+                }
+
+                if (validUntil.Value - signedAt.Value > MaxValidity)
+                {
+                    ErrorResponse = $"An attestation is valid for {MaxValidity.TotalHours} hours at most, not until {validUntil.Value.ToISO8601()} when it was signed at {signedAt.Value.ToISO8601()}!";
                     return false;
                 }
 
@@ -656,7 +679,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                role,
                                                                signer,
                                                                signedAt.Value,
-                                                               validUntil,
+                                                               validUntil.Value,
                                                                subject,
                                                                algorithm,
                                                                keyId,
@@ -767,9 +790,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 cbor.Add(CBORValue.FromText(PropertyKeys.Signer),            CBORValue.FromText(Signer));
 
             cbor.Add(CBORValue.FromText(PropertyKeys.SignedAt),              CBORValue.FromText(SignedAt.ToISO8601()));
-
-            if (ValidUntil.HasValue)
-                cbor.Add(CBORValue.FromText(PropertyKeys.ValidUntil),        CBORValue.FromText(ValidUntil.Value.ToISO8601()));
+            cbor.Add(CBORValue.FromText(PropertyKeys.ValidUntil),            CBORValue.FromText(ValidUntil.ToISO8601()));
 
             if (Subject is not null)
                 cbor.Add(CBORValue.FromText(PropertyKeys.Subject),           new CBORMap {
@@ -811,9 +832,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(PropertyKeys.Signer,      Signer);
 
             json.Add(PropertyKeys.SignedAt,        SignedAt.ToISO8601());
-
-            if (ValidUntil.HasValue)
-                json.Add(PropertyKeys.ValidUntil,  ValidUntil.Value.ToISO8601());
+            json.Add(PropertyKeys.ValidUntil,      ValidUntil.ToISO8601());
 
             if (Subject is not null)
                 json.Add(PropertyKeys.Subject,     Subject.ToJSON(Embedded: true));
@@ -882,7 +901,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => $"Attestation of {ETag} of commit {CommitId} by {Role}{(Signer is not null ? $" {Signer}" : "")}{(ValidUntil.HasValue ? $", valid until {ValidUntil.Value.ToISO8601()}" : "")}";
+            => $"Attestation of {ETag} of commit {CommitId} by {Role}{(Signer is not null ? $" {Signer}" : "")}, valid until {ValidUntil.ToISO8601()}";
 
         #endregion
 

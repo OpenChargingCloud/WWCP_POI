@@ -314,6 +314,50 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
         #endregion
 
+        #region An_attestation_counts_while_its_key_is_valid()
+
+        /// <summary>
+        /// The signing key of an attestation must be valid when it was signed and when the proof is verified: its signedAt
+        /// is the choice of its signer, so a key that ended does not attest by a signedAt within its validity
+        /// (SPECIFICATION.md, sections 8.5 and 8.6; WWCP_POI.TS, docs/csharp-review.md, finding 7).
+        /// </summary>
+        [Test]
+        public void An_attestation_counts_while_its_key_is_valid()
+        {
+
+            var history              = RoamingNetworkHistory.Start(StationProofTests.NewNetwork());
+            var network              = history.Head.RoamingNetwork;
+            var (signing, identity)  = Keys(network);
+            var attestedAt           = T0.AddDays(1);
+
+            // The signing key ends five minutes after it attested, within the validity of the attestation.
+            var ending               = new POIPublicKey(signing.Public.Key, NotAfter: attestedAt.AddMinutes(5));
+            var certificate          = RoamingNetworkSigningKeyCertificate.Create(identity.Private, COSEAlgorithm.ES512, network.Operator!.Id, ending, T0);
+            var result               = Commit(history, Statement(network, T0, T0.AddDays(30)).ToJSON(), Certificates: [ certificate.ToJSON(Embedded: true) ]);
+
+            Assert.That(result.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), result.ErrorResponse);
+
+            history.AttestationSigners = [ new RoamingNetworkCommitSigner(signing.Private,
+                                                                          ending.Id,
+                                                                          COSEAlgorithm.ES256,
+                                                                          RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator) ];
+
+            Assert.That(history.TryAttest(out var attestations, out var error, attestedAt),                             Is.True, error);
+            Assert.That(attestations!.Single().ValidUntil,                                                              Is.EqualTo(attestedAt.AddMinutes(15)));
+            Assert.That(history.TryGetChargingStationProof(S1, out var proof, out error, At: attestedAt.AddMinutes(1)),  Is.True, error);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(proof!.Verify([ identity.Public.Id ], out _, out error, attestedAt.AddMinutes(1)),  Is.True, error);
+                Assert.That(proof.Verify([ identity.Public.Id ], out _, out error, attestedAt.AddMinutes(5)),   Is.True, error);
+                Assert.That(proof.Verify([ identity.Public.Id ], out _, out error, attestedAt.AddMinutes(6)),   Is.False, "the attestation is valid, its key no longer");
+                Assert.That(error,                                                                              Does.Contain("No valid attestation of a trusted key"));
+            }
+
+        }
+
+        #endregion
+
         #region A_proof_gives_the_texts_to_show()
 
         /// <summary>

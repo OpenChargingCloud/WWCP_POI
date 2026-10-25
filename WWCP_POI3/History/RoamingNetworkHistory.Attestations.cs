@@ -47,6 +47,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly Lock                                                            treeLock         = new ();
         private readonly Dictionary<ETagHashAlgorithm, RoamingNetworkEffectiveTree>      effectiveTrees   = [];
 
+        private          TimeSpan                                                        attestationValidity  = RoamingNetworkAttestation.DefaultValidity;
+
         #endregion
 
         #region Properties
@@ -57,9 +59,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<RoamingNetworkCommitSigner>  AttestationSigners    { get; set; } = [];
 
         /// <summary>
-        /// How long an attestation made here is valid: 15 minutes by default.
+        /// How long an attestation made here is valid: 15 minutes by default, RoamingNetworkAttestation.MaxValidity at most.
         /// </summary>
-        public TimeSpan                                    AttestationValidity   { get; set; } = TimeSpan.FromMinutes(15);
+        public TimeSpan                                    AttestationValidity
+        {
+            get => attestationValidity;
+            set => attestationValidity = value > TimeSpan.Zero && value <= RoamingNetworkAttestation.MaxValidity
+                                             ? value
+                                             : throw new ArgumentOutOfRangeException(nameof(AttestationValidity), value, $"An attestation is valid for some time, {RoamingNetworkAttestation.MaxValidity.TotalHours} hours at most.");
+        }
 
         /// <summary>
         /// How old the newest attestation of a signer may be before RefreshAttestations(…) attests the head again:
@@ -207,9 +215,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!Attestation.IsValidAt(At ?? Timestamp.Now))
+            var at = At ?? Timestamp.Now;
+
+            if (at > Attestation.ValidUntil)
             {
                 ErrorResponse = "The attestation is no longer valid!";
+                return false;
+            }
+
+            // Signed by another server, whose clock may run a little ahead of this one, as for change sets: it counts once
+            // it was signed (IsValidAt).
+            if (Attestation.SignedAt > at + MaxClockSkew)
+            {
+                ErrorResponse = $"The attestation was signed at {Attestation.SignedAt.ToISO8601()}, later than now, {at.ToISO8601()}!";
                 return false;
             }
 
@@ -411,7 +429,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var now = Timestamp.Now;
 
-            attestations.RemoveAll(taken => !taken.IsValidAt(now) || !commitIndex.ContainsKey(taken.CommitId));
+            attestations.RemoveAll(taken => now > taken.ValidUntil || !commitIndex.ContainsKey(taken.CommitId));
             attestations.Add(Attestation);
 
             if (attestations.Count > MaxAttestations)
