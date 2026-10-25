@@ -167,7 +167,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) TryApplyEnergyMeterGroupChange   (Change, Index, CreatedAt, ChargingStationOperators, GridOperators, out CurrentValue, out ErrorResponse)
+        #region (private static) TryApplyEnergyMeterGroupChange   (Change, Index, CreatedAt, AsHeld, ChargingStationOperators, GridOperators, out CurrentValue, out HeldValue, out ErrorResponse)
 
         /// <summary>
         /// Apply a change of an energy meter group to the given charging station operators or grid operators.
@@ -175,16 +175,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static Boolean TryApplyEnergyMeterGroupChange(RoamingNetworkChange                                             Change,
                                                               Int32                                                            Index,
                                                               DateTimeOffset                                                   CreatedAt,
+                                                              Boolean                                                          AsHeld,
                                                               Dictionary<ChargingStationOperator_Id, ChargingStationOperator>  ChargingStationOperators,
                                                               Dictionary<GridOperator_Id, GridOperator>                        GridOperators,
                                                               out JToken?                                                      CurrentValue,
+                                                              out JToken?                                                      HeldValue,
                                                               [NotNullWhen(false)] out String?                                 ErrorResponse)
 
-            => TryApplyEnergyMeterChildChange(EnergyMeterGroupKind, Change, Index, CreatedAt, ChargingStationOperators, GridOperators, out CurrentValue, out ErrorResponse);
+            => TryApplyEnergyMeterChildChange(EnergyMeterGroupKind, Change, Index, CreatedAt, AsHeld, ChargingStationOperators, GridOperators, out CurrentValue, out HeldValue, out ErrorResponse);
 
         #endregion
 
-        #region (private static) TryApplyEnergyMeterTemplateChange(Change, Index, CreatedAt, ChargingStationOperators, GridOperators, out CurrentValue, out ErrorResponse)
+        #region (private static) TryApplyEnergyMeterTemplateChange(Change, Index, CreatedAt, AsHeld, ChargingStationOperators, GridOperators, out CurrentValue, out HeldValue, out ErrorResponse)
 
         /// <summary>
         /// Apply a change of an energy meter template to the given charging station operators or grid operators.
@@ -192,16 +194,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static Boolean TryApplyEnergyMeterTemplateChange(RoamingNetworkChange                                             Change,
                                                                  Int32                                                            Index,
                                                                  DateTimeOffset                                                   CreatedAt,
+                                                                 Boolean                                                          AsHeld,
                                                                  Dictionary<ChargingStationOperator_Id, ChargingStationOperator>  ChargingStationOperators,
                                                                  Dictionary<GridOperator_Id, GridOperator>                        GridOperators,
                                                                  out JToken?                                                      CurrentValue,
+                                                                 out JToken?                                                      HeldValue,
                                                                  [NotNullWhen(false)] out String?                                 ErrorResponse)
 
-            => TryApplyEnergyMeterChildChange(EnergyMeterTemplateKind, Change, Index, CreatedAt, ChargingStationOperators, GridOperators, out CurrentValue, out ErrorResponse);
+            => TryApplyEnergyMeterChildChange(EnergyMeterTemplateKind, Change, Index, CreatedAt, AsHeld, ChargingStationOperators, GridOperators, out CurrentValue, out HeldValue, out ErrorResponse);
 
         #endregion
 
-        #region (private static) TryApplyEnergyMeterChildChange   (Kind, Change, Index, CreatedAt, ChargingStationOperators, GridOperators, out CurrentValue, out ErrorResponse)
+        #region (private static) TryApplyEnergyMeterChildChange   (Kind, Change, Index, CreatedAt, AsHeld, ChargingStationOperators, GridOperators, out CurrentValue, out HeldValue, out ErrorResponse)
 
         /// <summary>
         /// Apply a change of an energy meter template or group to the given charging station operators or grid operators.
@@ -210,13 +214,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                               RoamingNetworkChange                                             Change,
                                                               Int32                                                            Index,
                                                               DateTimeOffset                                                   CreatedAt,
+                                                              Boolean                                                          AsHeld,
                                                               Dictionary<ChargingStationOperator_Id, ChargingStationOperator>  ChargingStationOperators,
                                                               Dictionary<GridOperator_Id, GridOperator>                        GridOperators,
                                                               out JToken?                                                      CurrentValue,
+                                                              out JToken?                                                      HeldValue,
                                                               [NotNullWhen(false)] out String?                                 ErrorResponse)
         {
 
             CurrentValue = null;
+            HeldValue    = null;
+
+            var given    = Change;
 
             var description = Kind.Description;
             var entityId    = Change.EntityId;
@@ -423,10 +432,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (chargingStationOperator is not null)
             {
 
-                if (!ChargingStationOperator.TryParseWithinChangeSet(ownerJSON, out var changedOperator, out var changedOperatorError) ||
-                    !TryKeepChargingPools(changedOperator, chargingStationOperator, [], out changedOperator, out changedOperatorError))
+                if (!ChargingStationOperator.TryParseWithinChangeSet(ownerJSON, out var readOperator, out var changedOperatorError) ||
+                    !TryKeepChargingPools(readOperator, chargingStationOperator, [], out var changedOperator, out changedOperatorError))
                 {
                     ErrorResponse = $"Change {Index}: {changedOperatorError}";
+                    return false;
+                }
+
+                // What is signed is what is held: the entity as the operator read again writes it (SPECIFICATION.md, section 4).
+                if (!TryHeldAsGiven(given, () => FindHeld(readOperator.ToEmbeddedJSON([]), nameof(ChargingStationOperator), given), description, AsHeld, out HeldValue, out ErrorResponse))
+                {
+                    ErrorResponse = $"Change {Index}: {ErrorResponse}";
                     return false;
                 }
 
@@ -443,6 +459,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!GridOperator.TryParse(ownerJSON, out var changedOperator, out var changedOperatorError))
                 {
                     ErrorResponse = $"Change {Index}: {changedOperatorError}";
+                    return false;
+                }
+
+                // What is signed is what is held: the entity as the grid operator read again writes it (SPECIFICATION.md, section 4).
+                if (!TryHeldAsGiven(given, () => FindHeld(changedOperator.ToJSON(Embedded: true), nameof(GridOperator), given), description, AsHeld, out HeldValue, out ErrorResponse))
+                {
+                    ErrorResponse = $"Change {Index}: {ErrorResponse}";
                     return false;
                 }
 

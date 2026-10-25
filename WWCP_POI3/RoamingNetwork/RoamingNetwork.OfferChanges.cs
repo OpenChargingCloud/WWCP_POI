@@ -111,15 +111,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static Boolean TryApplyChargingTariffOfferChange(RoamingNetworkChange                                             Change,
                                                                  Int32                                                            Index,
                                                                  DateTimeOffset                                                   CreatedAt,
+                                                                 Boolean                                                          AsHeld,
                                                                  Dictionary<ChargingStationOperator_Id, ChargingStationOperator>  ChargingStationOperators,
                                                                  Dictionary<EMobilityProvider_Id,       EMobilityProvider>        EMobilityProviders,
                                                                  out JToken?                                                      CurrentValue,
+                                                                 out JToken?                                                      HeldValue,
                                                                  [NotNullWhen(false)] out String?                                 ErrorResponse)
         {
 
             CurrentValue = null;
+            HeldValue    = null;
 
             const String description = "charging tariff offer";
+
+            var given = Change;
 
             var entityId = Change.EntityId;
 
@@ -325,10 +330,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (chargingStationOperator is not null)
             {
 
-                if (!ChargingStationOperator.TryParseWithinChangeSet(ownerJSON, out var changedOperator, out var changedOperatorError) ||
-                    !TryKeepChargingPools(changedOperator, chargingStationOperator, [], out changedOperator, out changedOperatorError))
+                if (!ChargingStationOperator.TryParseWithinChangeSet(ownerJSON, out var readOperator, out var changedOperatorError) ||
+                    !TryKeepChargingPools(readOperator, chargingStationOperator, [], out var changedOperator, out changedOperatorError))
                 {
                     ErrorResponse = $"Change {Index}: {changedOperatorError}";
+                    return false;
+                }
+
+                // What is signed is what is held: the offer as the operator read again writes it (SPECIFICATION.md, section 4).
+                if (!TryHeldAsGiven(given, () => FindHeld(readOperator.ToEmbeddedJSON([]), nameof(ChargingStationOperator), given), description, AsHeld, out HeldValue, out ErrorResponse))
+                {
+                    ErrorResponse = $"Change {Index}: {ErrorResponse}";
                     return false;
                 }
 
@@ -345,6 +357,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!EMobilityProvider.TryParse(ownerJSON, out var changedProvider, out var changedProviderError))
                 {
                     ErrorResponse = $"Change {Index}: {changedProviderError}";
+                    return false;
+                }
+
+                // What is signed is what is held: the offer as the provider read again writes it (SPECIFICATION.md, section 4).
+                if (!TryHeldAsGiven(given, () => FindHeld(changedProvider.ToJSON(Embedded: true), nameof(EMobilityProvider), given), description, AsHeld, out HeldValue, out ErrorResponse))
+                {
+                    ErrorResponse = $"Change {Index}: {ErrorResponse}";
                     return false;
                 }
 

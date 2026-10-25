@@ -306,7 +306,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
         #region Empty_values_survive_the_JSON_text()
 
         /// <summary>
-        /// JSONObject.Create leaves out empty values; changes and change sets must not.
+        /// JSONObject.Create leaves out empty values; changes and change sets must not. An empty array the content holds as
+        /// none, as the data licenses, is refused, as is preparing it: it is a RemoveProperty (SPECIFICATION.md, section 4).
         /// </summary>
         [Test]
         public void Empty_values_survive_the_JSON_text()
@@ -314,14 +315,24 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
             var rn1    = NewNetwork();
             var empty  = rn1.CreateSignedChangeSet([]);
-            var none   = rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray()) ]);
+            var none   = new RoamingNetworkChangeSet(ChangeSet_Id.NewRandom(),
+                                                     rn1.Id,
+                                                     Timestamp.Now,
+                                                     [ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray()) ],
+                                                     rn1.CalcChangeSetETags(),
+                                                     rn1.CalcChangeSetETags()).WithContentId();
 
             using (Assert.EnterMultipleScope())
             {
 
                 Assert.That(RoamingNetworkChangeSet.Parse(empty.ToJSON().ToString()).Changes,                  Is.Empty);
                 Assert.That(RoamingNetworkChangeSet.Parse(none. ToJSON().ToString()).Changes[0].NewValue,      Is.EqualTo(new JArray()).Using<JToken>(JToken.DeepEquals));
-                Assert.That(rn1.ApplyChangeSet(RoamingNetworkChangeSet.Parse(none.ToJSON().ToString())).DataLicenses,  Is.Empty);
+
+                Assert.That(rn1.TryApplyPendingChangeSet(RoamingNetworkChangeSet.Parse(none.ToJSON().ToString()), out _, out var error),  Is.False);
+                Assert.That(error,  Does.Contain("the property 'dataLicenses' of the roaming network 'rn1' is given as '[]', which the content does not hold at all"));
+
+                Assert.That(() => rn1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray()) ]),
+                            Throws.ArgumentException.With.Message.Contains("which the content does not hold at all"));
 
             }
 

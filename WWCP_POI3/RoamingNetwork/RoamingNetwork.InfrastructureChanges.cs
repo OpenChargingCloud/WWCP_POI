@@ -345,7 +345,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) TryApplyInfrastructureChange(Change, Index, CreatedAt, Operators, out CurrentValue, out ErrorResponse)
+        #region (private static) TryApplyInfrastructureChange(Change, Index, CreatedAt, AsHeld, Operators, out CurrentValue, out HeldValue, out ErrorResponse)
 
         /// <summary>
         /// Apply a change of a charging pool, charging station or EVSE to the given operators.
@@ -353,13 +353,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static Boolean TryApplyInfrastructureChange(RoamingNetworkChange                                             Change,
                                                             Int32                                                            Index,
                                                             DateTimeOffset                                                   CreatedAt,
+                                                            Boolean                                                          AsHeld,
                                                             Dictionary<ChargingStationOperator_Id, ChargingStationOperator>  Operators,
                                                             out JToken?                                                      CurrentValue,
+                                                            out JToken?                                                      HeldValue,
                                                             [NotNullWhen(false)] out String?                                 ErrorResponse)
         {
 
             CurrentValue = null;
+            HeldValue    = null;
 
+            var given        = Change;
             var description  = Describe(Change.EntityType);
             var entityId     = Change.EntityId;
 
@@ -562,10 +566,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region The changed operator must still be a valid one
 
-            if (!ChargingStationOperator.TryParseWithinChangeSet(operatorJSON, out var changedOperator, out var changedOperatorError) ||
-                !TryKeepChargingPools(changedOperator, currentOperator, writtenChargingPools, out changedOperator, out changedOperatorError))
+            if (!ChargingStationOperator.TryParseWithinChangeSet(operatorJSON, out var readOperator, out var changedOperatorError) ||
+                !TryKeepChargingPools(readOperator, currentOperator, writtenChargingPools, out var changedOperator, out changedOperatorError))
             {
                 ErrorResponse = $"Change {Index}: {changedOperatorError}";
+                return false;
+            }
+
+            // What is signed is what is held: the entity as the operator read again writes it (SPECIFICATION.md, section 4).
+            if (!TryHeldAsGiven(given, () => FindHeld(readOperator.ToEmbeddedJSON([.. readOperator.ChargingPools]), nameof(ChargingStationOperator), given), description, AsHeld, out HeldValue, out ErrorResponse))
+            {
+                ErrorResponse = $"Change {Index}: {ErrorResponse}";
                 return false;
             }
 

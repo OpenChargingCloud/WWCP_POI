@@ -56,7 +56,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private static) TryApplyTransparencySoftwareChange(Change, Index, CreatedAt, Manufacturers, out CurrentValue, out ErrorResponse)
+        #region (private static) TryApplyTransparencySoftwareChange(Change, Index, CreatedAt, AsHeld, Manufacturers, out CurrentValue, out HeldValue, out ErrorResponse)
 
         /// <summary>
         /// Apply a change of a transparency software release to the given manufacturers: an added one to the manufacturer
@@ -65,12 +65,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static Boolean TryApplyTransparencySoftwareChange(RoamingNetworkChange                                                               Change,
                                                                   Int32                                                                              Index,
                                                                   DateTimeOffset                                                                     CreatedAt,
+                                                                  Boolean                                                                            AsHeld,
                                                                   Dictionary<TransparencySoftwareManufacturer_Id, TransparencySoftwareManufacturer>  Manufacturers,
                                                                   out JToken?                                                                        CurrentValue,
+                                                                  out JToken?                                                                        HeldValue,
                                                                   [NotNullWhen(false)] out String?                                                   ErrorResponse)
         {
 
             CurrentValue = null;
+            HeldValue    = null;
+
+            var given    = Change;
 
             #region The manufacturer: the one having it, or the parent of a new one
 
@@ -242,6 +247,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!TransparencySoftwareManufacturer.TryParse(manufacturerJSON, out var changedManufacturer, out var changedManufacturerError))
             {
                 ErrorResponse = $"Change {Index}: {changedManufacturerError}";
+                return false;
+            }
+
+            // What is signed is what is held: the release as the manufacturer read again writes it (SPECIFICATION.md, section 4).
+            if (!TryHeldAsGiven(given, () => FindHeld(changedManufacturer.ToJSON(Embedded: true), nameof(TransparencySoftwareManufacturer), given), "transparency software release", AsHeld, out HeldValue, out ErrorResponse))
+            {
+                ErrorResponse = $"Change {Index}: {ErrorResponse}";
                 return false;
             }
 

@@ -113,8 +113,8 @@ var cs = rn1.CreateChangeSet([
          Sign(gefSigningKey, POIPublicKey.From(gefSigningKey).Id, COSEAlgorithm.ES256);
 ```
 
-Give the new value as `ToJSON()` writes it, with `created` and `lastChange`: the change set does not set them for
-embedded meters. The runtime status of a meter is kept by its identification and goes along when its embedder
+Give the new value as the station writes it, embedded and with `created` and `lastChange`: the change set does not
+set them for embedded meters, and refuses a value the content would hold otherwise (`CreateChangeSet` writes it so). The runtime status of a meter is kept by its identification and goes along when its embedder
 changes.
 
 

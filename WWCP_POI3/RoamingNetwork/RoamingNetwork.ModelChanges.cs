@@ -138,7 +138,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private static) TryApplyModelChange<...>(Kind, Change, Index, CreatedAt, Manufacturers, out CurrentValue, out ErrorResponse)
+        #region (private static) TryApplyModelChange<...>(Kind, Change, Index, CreatedAt, AsHeld, Manufacturers, out CurrentValue, out HeldValue, out ErrorResponse)
 
         /// <summary>
         /// Apply a change of a model to the manufacturer its parent names: its identification is unique within its
@@ -148,8 +148,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                             RoamingNetworkChange                                 Change,
                                                                                             Int32                                                Index,
                                                                                             DateTimeOffset                                       CreatedAt,
+                                                                                            Boolean                                              AsHeld,
                                                                                             Dictionary<TManufacturerId, TManufacturer>           Manufacturers,
                                                                                             out JToken?                                          CurrentValue,
+                                                                                            out JToken?                                          HeldValue,
                                                                                             [NotNullWhen(false)] out String?                     ErrorResponse)
 
             where TManufacturerId : notnull
@@ -159,7 +161,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             CurrentValue = null;
+            HeldValue    = null;
 
+            var given       = Change;
             var description = Kind.Description;
 
             #region The manufacturer its parent names, and the model in it
@@ -314,6 +318,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!Kind.TryParseManufacturer(manufacturerJSON, out var changedManufacturer, out var changedManufacturerError))
             {
                 ErrorResponse = $"Change {Index}: {changedManufacturerError}";
+                return false;
+            }
+
+            // What is signed is what is held: the model as the manufacturer read again writes it (SPECIFICATION.md, section 4).
+            if (!TryHeldAsGiven(given, () => FindHeld(Kind.ToJSON(changedManufacturer), Kind.ManufacturerType, given), description, AsHeld, out HeldValue, out ErrorResponse))
+            {
+                ErrorResponse = $"Change {Index}: {ErrorResponse}";
                 return false;
             }
 

@@ -247,7 +247,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private) TryApplyRegistryChange<TId, TEntity>(Registry, Change, Index, CreatedAt, Entities, out CurrentValue, out ErrorResponse)
+        #region (private) TryApplyRegistryChange<TId, TEntity>(Registry, Change, Index, CreatedAt, AsHeld, Entities, out CurrentValue, out HeldValue, out ErrorResponse)
 
         /// <summary>
         /// Apply a change of an entity of the given registry to the given entities.
@@ -257,8 +257,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                              RoamingNetworkChange              Change,
                                                              Int32                             Index,
                                                              DateTimeOffset                    CreatedAt,
+                                                             Boolean                           AsHeld,
                                                              Dictionary<TId, TEntity>          Entities,
                                                              out JToken?                       CurrentValue,
+                                                             out JToken?                       HeldValue,
                                                              [NotNullWhen(false)] out String?  ErrorResponse)
 
             where TId     : notnull
@@ -267,7 +269,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             CurrentValue = null;
+            HeldValue    = null;
 
+            var given       = Change;
             var description = Registry.Description;
 
             if (Change.ParentEntityType is not null &&
@@ -356,6 +360,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
+                    // What is signed is what is held: the entity as it writes itself, read again (SPECIFICATION.md, section 4).
+                    if (!TryHeldAsGiven(given, () => FindHeld(Registry.ToJSON(changedEntity), given.EntityType, given), description, AsHeld, out HeldValue, out ErrorResponse))
+                    {
+                        ErrorResponse = $"Change {Index}: {ErrorResponse}";
+                        return false;
+                    }
+
                     // Admin status, status and internal data are not content: they go along.
                     Registry.ShareRuntimeOf(changedEntity, currentEntity!);
 
@@ -393,6 +404,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (!Registry.GetId(newEntity).Equals(entityId))
                     {
                         ErrorResponse = $"Change {Index}: the {description} '{Registry.GetId(newEntity)}' is not the one to add, '{entityId}'!";
+                        return false;
+                    }
+
+                    // What is signed is what is held: the entity as it writes itself, read again (SPECIFICATION.md, section 4).
+                    if (!TryHeldAsGiven(given, () => FindHeld(Registry.ToJSON(newEntity), given.EntityType, given), description, AsHeld, out HeldValue, out ErrorResponse))
+                    {
+                        ErrorResponse = $"Change {Index}: {ErrorResponse}";
                         return false;
                     }
 

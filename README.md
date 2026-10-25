@@ -340,6 +340,11 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
   "expected absent". A change finding another value conflicts. Values are compared as their content, their
   canonical JSON: the integer `22000` is the decimal `22000` the model holds, as a change set read from text says
   it, and `22000.0` is another value.
+- **New values:** what a change set gives is what the content holds (SPECIFICATION.md section 4, `TryHeldAsGiven`):
+  every changed entity is read again, and a new value it writes otherwise - an embedded object with its `@context`,
+  identifications in another order or case, a country as `de`, a timestamp in another form - is refused.
+  `CreateChangeSet` and merges write every new value as it is held before it is signed; one the content does not hold
+  at all, e.g. `[]` where it holds none, is refused there as well (it is a `RemoveProperty`).
 - **Preconditions:** a change set may name the ETags entities must still have, e.g. the HTTP `ETag` a client
   read a charging pool with: `CreateChangeSet(changes, Preconditions: [ version.Precondition("ChargingPool",
   poolId) ])`. It applies, is rebased and merged only while they hold: a change set made for an older version is

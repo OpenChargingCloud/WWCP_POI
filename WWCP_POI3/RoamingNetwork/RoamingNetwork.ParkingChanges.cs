@@ -266,13 +266,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static Boolean TryApplyParkingChange(RoamingNetworkChange                                             Change,
                                                      Int32                                                            Index,
                                                      DateTimeOffset                                                   CreatedAt,
+                                                     Boolean                                                          AsHeld,
                                                      Dictionary<ParkingOperator_Id, ParkingOperator>                  ParkingOperators,
                                                      Dictionary<ChargingStationOperator_Id, ChargingStationOperator>  ChargingStationOperators,
                                                      out JToken?                                                      CurrentValue,
+                                                     out JToken?                                                      HeldValue,
                                                      [NotNullWhen(false)] out String?                                 ErrorResponse)
         {
 
             CurrentValue = null;
+            HeldValue    = null;
+
+            var given    = Change;
 
             var (description, arrayName, changeable) = Change.EntityType switch {
                 nameof(ParkingGarage)  => ("parking garage", ParkingOperator.PropertyKeys.ParkingGarages, ChangeableParkingGarageProperties),
@@ -512,6 +517,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                // What is signed is what is held: the entity as the parking operator read again writes it (SPECIFICATION.md, section 4).
+                if (!TryHeldAsGiven(given, () => FindHeld(changedOperator.ToJSON(Embedded: true), nameof(ParkingOperator), given), description, AsHeld, out HeldValue, out ErrorResponse))
+                {
+                    ErrorResponse = $"Change {Index}: {ErrorResponse}";
+                    return false;
+                }
+
                 // Admin status, status and internal data are not content: they go along, at every level.
                 changedOperator.ShareRuntimeOfAll(owner);
 
@@ -522,10 +534,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             else
             {
 
-                if (!ChargingStationOperator.TryParseWithinChangeSet(operatorJSON, out var changedOperator, out var changedOperatorError) ||
-                    !TryKeepChargingPools(changedOperator, operatorOwner!, [], out changedOperator, out changedOperatorError))
+                if (!ChargingStationOperator.TryParseWithinChangeSet(operatorJSON, out var readOperator, out var changedOperatorError) ||
+                    !TryKeepChargingPools(readOperator, operatorOwner!, [], out var changedOperator, out changedOperatorError))
                 {
                     ErrorResponse = $"Change {Index}: {changedOperatorError}";
+                    return false;
+                }
+
+                // What is signed is what is held: the parking space as the operator read again writes it (SPECIFICATION.md, section 4).
+                if (!TryHeldAsGiven(given, () => FindHeld(readOperator.ToEmbeddedJSON([]), nameof(ChargingStationOperator), given), description, AsHeld, out HeldValue, out ErrorResponse))
+                {
+                    ErrorResponse = $"Change {Index}: {ErrorResponse}";
                     return false;
                 }
 

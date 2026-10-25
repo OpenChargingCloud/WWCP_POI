@@ -122,13 +122,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static Boolean TryApplyProviderGroupChange(RoamingNetworkChange                                 Change,
                                                            Int32                                                Index,
                                                            DateTimeOffset                                       CreatedAt,
+                                                           Boolean                                              AsHeld,
                                                            Dictionary<EMobilityProvider_Id, EMobilityProvider>  EMobilityProviders,
                                                            out JToken?                                          CurrentValue,
+                                                           out JToken?                                          HeldValue,
                                                            [NotNullWhen(false)] out String?                     ErrorResponse)
         {
 
             CurrentValue = null;
+            HeldValue    = null;
 
+            var given                    = Change;
             var (property, description)  = ProviderGroupKind(Change.EntityType)!.Value;
             var entityId                 = Change.EntityId;
 
@@ -290,6 +294,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!EMobilityProvider.TryParse(ownerJSON, out var changedProvider, out var changedProviderError))
             {
                 ErrorResponse = $"Change {Index}: {changedProviderError}";
+                return false;
+            }
+
+            // What is signed is what is held: the group as the provider read again writes it (SPECIFICATION.md, section 4).
+            if (!TryHeldAsGiven(given, () => FindHeld(changedProvider.ToJSON(Embedded: true), nameof(EMobilityProvider), given), description, AsHeld, out HeldValue, out ErrorResponse))
+            {
+                ErrorResponse = $"Change {Index}: {ErrorResponse}";
                 return false;
             }
 

@@ -415,10 +415,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(Apply(rn2, next.Sign(rotated.Private, rotated.Public.Id, COSEAlgorithm.ES256)).Applied,
                             Is.True);
 
-                // A party keeps at least one key of each kind.
-                Assert.That(Apply(rn1, Change(rn1, RoamingNetworkChange.UpdateProperty(gef, "signingKeys", null, new JArray())).
+                // A party keeps at least one key of each kind; no keys are none, not an empty array the content does not hold.
+                Assert.That(Apply(rn1, Change(rn1, RoamingNetworkChange.RemoveProperty(gef, "signingKeys")).
                                            SignedBy(TestParties.Party(GEF), POIKeyKind.Identity)).Error,
                             Does.Contain("must keep at least one of its signingKeys"));
+                Assert.That(() => Change(rn1, RoamingNetworkChange.UpdateProperty(gef, "signingKeys", null, new JArray())),
+                            Throws.ArgumentException.With.Message.Contains("the property 'signingKeys' of the charging station operator 'DE*GEF' is given as '[]', which the content does not hold at all"));
                 Assert.That(Apply(rn1, Change(rn1, RoamingNetworkChange.RemoveProperty(gef, "identityKeys")).
                                            SignedBy(TestParties.Party(GEF), POIKeyKind.Identity)).Error,
                             Does.Contain("must keep at least one of its identityKeys"));

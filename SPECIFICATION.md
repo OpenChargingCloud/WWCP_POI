@@ -37,7 +37,7 @@ e.g. `chargingPool`, `roamingNetworkChangeSet`, `roamingNetworkCommit`; a proof'
 - **Written on its own**, e.g. as the body of an HTTP response or a WebSocket message, an object names
   its context in `@context`, after its `@id`, in JSON as in CBOR.
 - **Embedded** in another object, e.g. an entity in its parent, a change set in its commit or an item of
-  a list, it does not.
+  a list, it does not; nor does what a change gives, as the content holds it embedded (section 4, "New values").
 - **Hashed, signed or identified**, an object is written embedded: a change set, commit, checkpoint,
   attestation or statement is hashed and signed without its `@context`, and the content of a version
   (section 2) names the context of the roaming network only. The contexts change no ETag,
@@ -66,14 +66,48 @@ A version of a roaming network is identified by its **content**: its JSON repres
   and `customData`.
 - **Excluded:** `eTags`; the runtime status (admin status, status, energy status); the local
   revision counter; internal data.
-- **Order:** embedded entities in the ordinal order of their identifications; the order of
-  properties does not matter, as canonical JSON sorts them.
-- **Timestamps:** UTC to the millisecond, `yyyy-MM-ddTHH:mm:ss.fffZ`.
-- **Numbers:** physical quantities as decimals in base units (V, A, W, Hz, VA, Wh, s), prices as
-  decimals.
-- **Absent values** are left out. Some arrays are written also when empty, as empty means
-  something there (e.g. `energySources: []`, unknown); an implementation MUST keep arrays as it
-  read them.
+- **Written forms:** the content holds every value as its entity writes it, read again; what a change set gives is what
+  the content holds (section 4, "New values"). An implementation MUST write the values it gives so:
+  - **Order:** the order of properties does not matter, as canonical JSON sorts them. Arrays are in the order the
+    content holds them in, each element once (an element given twice is refused):
+    - in the ordinal order of their identifications, as written: embedded entities, brands, charging connectors, energy
+      meters and their `publicKeys`, `dataLicenses`, the `signingKeys` and `identityKeys` of a party;
+    - in the ordinal order of their texts, as written: lists of identifications (e.g. `EVSEIds`, `chargingStationIds`,
+      `chargingPoolIds`, `chargingTariffIds`, `energyMeterIds`, `parkingSpaceIds`, `acceptedEMobilityProviderIds`, the
+      groups and parties an offer names, `verifiedTransparencySoftwareIds`, `compatibleTransparencySoftwareIds`) and of
+      predefined values (`facilities`, `paymentOptions`, `uiFeatures`, `features`, `parkingRestrictions`, `services`,
+      `standards`, `nutsCodes`, `vehicleTypes`, `euVehicleCategories`, `paymentMeans`, `paymentBrands`,
+      `signatureMethods`, `connectorTypes`, `measurands`, `notifiedFor`, `cardTypes`, `dimensions`, `usages`), and the
+      `URLs` of a data license;
+    - by other keys: the `signingKeyCertificates` of the roaming network operator by the `@id` of their signing key,
+      then their `keyId`; `authenticationModes` by their `type`; the `transparencySoftwareStatus` of an energy meter by
+      its `transparencySoftwareId`; the `openSourceLicenses` of a release by their `@id` in upper case, their
+      description, their URLs; `daysOfWeek` Monday first; `currentTypes` and `chargingModes` in the order of their
+      definition;
+    - as given: the `elements` of a tariff and their `priceComponents`, `images`, `relatedLocations`, `templateIds`,
+      `locationLanguages`, the `versions` of a model, regular openings and exceptional periods, `energySources`,
+      `environmentalImpacts`, `marketLocationIds`, `meteringLocationIds`, `officialLanguages`, `treeHashAlgorithms`,
+      certificate chains, and the arrays of custom data.
+  - **Identifications** trimmed, as their type writes them: of charging station operators and grid operators in upper
+    case with `*` (`DE*GEF`), of charging pools, stations, EVSEs, tariffs, groups and templates with their operator so,
+    of e-mobility providers in upper case with the separator given, every other one as given. Predefined values of
+    signature methods, energy meter roles and legal status in their defined spelling (`OCMF`), NUTS codes in upper
+    case, every other one trimmed; enumerations by their exact names.
+  - **Texts:** multi-language texts keyed by the lower-case code of a known language; a country by its ISO 3166-1
+    alpha-3 code (`DEU`); URLs with their scheme (`https://` unless given); e-mail addresses as `a@example.com` or
+    `Name <a@example.com>`; image types as registered (`image/png`); the shares of an energy mix as `42.5 %`, its
+    environmental impacts as `350 g/kWh`; regular opening hours as `HH:mm`.
+  - **Timestamps:** UTC to the millisecond, `yyyy-MM-ddTHH:mm:ss.fffZ`.
+  - **Numbers:** physical quantities as decimals in base units (V, A, W, Hz, VA, Wh, s), prices as decimals, each with
+    the decimal places given, but zero as `0`; durations in seconds without trailing zeros (`60`, `60.5`); geographic
+    coordinates as `lat`, `lng` and `alt`, without trailing zeros; numbers and booleans as JSON numbers and booleans,
+    never as texts.
+  - **Absent values** are left out, also empty arrays, texts and objects, except where empty means something: the
+    `energySources` and `environmentalImpacts` of an energy mix (`[]`, unknown), the arrays of transparency software
+    identifications of a certificate, the `name` of a charging station operator, `"24/7"` of opening times. An
+    implementation MUST keep arrays as it read them.
+  - **Unknown properties** are not held: an entity and a value hold only the properties their type defines.
+  - **Custom data** (`customData`) is held as given, a JSON-LD context in it as well (but see section 7).
 - **Properties given by templates** are part of the content where they are given: an EVSE, charging
   station, charging pool, charging tariff, parking space or energy meter names its templates in
   `templateIds`, in an order that is content, and takes their properties at runtime only (the
@@ -185,6 +219,15 @@ and the element changes `AddElement`, `RemoveElement`, `ReplaceElement`, `Update
 **Old values:** a change whose `oldValue` is not the value it finds MUST be refused. Both are compared as their
 canonical JSON (section 1): the number `22000` read from a text is the decimal 22000 without decimal places a
 reader holds, and `22000.0` is another value.
+
+**New values:** what a change set gives is what the content holds. A change writes its new value into the entity,
+which is read again, and the content holds what the entity then writes (section 2, "Written forms"): a change whose
+`newValue` is written otherwise MUST be refused, compared as canonical JSON - of an `UpdateProperty` the property, of
+an `Add` the entity without its `lastChange` (and without its `created`, unless given), of an `AddElement` or
+`ReplaceElement` the element, of an `UpdateElementProperty` the property of the element. A new value the content does
+not hold at all, e.g. an empty array it leaves out, MUST be refused as well: it is a removal. So the owners sign what
+the content holds, and an implementation applying change sets to JSON takes their values as they are; one preparing a
+change set, or a merge (5.3), writes them so before they are signed.
 
 **Timestamps:** a change set sets `lastChange` to its `createdAt`: of the roaming network always; of an entity
 when it is added (and `created`, unless given) or when one of its own properties changes; and of every entity
@@ -773,6 +816,11 @@ and change sets name it as a precondition (section 4).
 
 1. **Co-signing across servers:** a change set waits for signatures at one server (4.2); holders using other
    servers sign it there, as peers learn of it only by its commit.
+2. **Custom data:** WWCP_POI holds custom data as given but for two kinds of values: non-integral numbers become binary
+   floating-point numbers (`1.50` is held as `1.5`), and texts that look like timestamps become .NET timestamps
+   (`2024-01-01T12:00:00Z` is held as `2024-01-01T12:00:00.0000000Z`), those with an offset in the local time zone of
+   the server, so that servers in other time zones hold them otherwise. Until it holds them as given, custom data
+   should hold neither.
 
 
 ## 8. Proofs of entities by a signed hash tree

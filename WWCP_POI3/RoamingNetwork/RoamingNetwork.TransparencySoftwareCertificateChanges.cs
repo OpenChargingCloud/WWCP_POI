@@ -56,7 +56,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private static) TryApplyTransparencySoftwareCertificateChange(Change, Index, CreatedAt, Bodies, out CurrentValue, out ErrorResponse)
+        #region (private static) TryApplyTransparencySoftwareCertificateChange(Change, Index, CreatedAt, AsHeld, Bodies, out CurrentValue, out HeldValue, out ErrorResponse)
 
         /// <summary>
         /// Apply a change of a transparency software certificate to the given conformity assessment bodies: an added one to the body
@@ -65,12 +65,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static Boolean TryApplyTransparencySoftwareCertificateChange(RoamingNetworkChange                                                               Change,
                                                                   Int32                                                                              Index,
                                                                   DateTimeOffset                                                                     CreatedAt,
+                                                                  Boolean                                                                            AsHeld,
                                                                   Dictionary<ConformityAssessmentBody_Id, ConformityAssessmentBody>                  Bodies,
                                                                   out JToken?                                                                        CurrentValue,
+                                                                  out JToken?                                                                        HeldValue,
                                                                   [NotNullWhen(false)] out String?                                                   ErrorResponse)
         {
 
             CurrentValue = null;
+            HeldValue    = null;
+
+            var given    = Change;
 
             #region The conformity assessment body: the one having it, or the parent of a new one
 
@@ -242,6 +247,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!ConformityAssessmentBody.TryParse(bodyJSON, out var changedBody, out var changedBodyError))
             {
                 ErrorResponse = $"Change {Index}: {changedBodyError}";
+                return false;
+            }
+
+            // What is signed is what is held: the certificate as the body read again writes it (SPECIFICATION.md, section 4).
+            if (!TryHeldAsGiven(given, () => FindHeld(changedBody.ToJSON(Embedded: true), nameof(ConformityAssessmentBody), given), "transparency software certificate", AsHeld, out HeldValue, out ErrorResponse))
+            {
+                ErrorResponse = $"Change {Index}: {ErrorResponse}";
                 return false;
             }
 

@@ -90,7 +90,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) TryApplyGridConnectionPointChange(Change, Index, CreatedAt, GridOperators, out CurrentValue, out ErrorResponse)
+        #region (private static) TryApplyGridConnectionPointChange(Change, Index, CreatedAt, AsHeld, GridOperators, out CurrentValue, out HeldValue, out ErrorResponse)
 
         /// <summary>
         /// Apply a change of a grid connection point to the given grid operators.
@@ -98,12 +98,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static Boolean TryApplyGridConnectionPointChange(RoamingNetworkChange                       Change,
                                                                  Int32                                      Index,
                                                                  DateTimeOffset                             CreatedAt,
+                                                                 Boolean                                    AsHeld,
                                                                  Dictionary<GridOperator_Id, GridOperator>  GridOperators,
                                                                  out JToken?                                CurrentValue,
+                                                                 out JToken?                                HeldValue,
                                                                  [NotNullWhen(false)] out String?           ErrorResponse)
         {
 
             CurrentValue = null;
+            HeldValue    = null;
+
+            var given    = Change;
 
             #region The grid operator: the one having it, or the parent of a new one
 
@@ -275,6 +280,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!GridOperator.TryParse(operatorJSON, out var changedOperator, out var changedOperatorError))
             {
                 ErrorResponse = $"Change {Index}: {changedOperatorError}";
+                return false;
+            }
+
+            // What is signed is what is held: the point as the grid operator read again writes it (SPECIFICATION.md, section 4).
+            if (!TryHeldAsGiven(given, () => FindHeld(changedOperator.ToJSON(Embedded: true), nameof(GridOperator), given), "grid connection point", AsHeld, out HeldValue, out ErrorResponse))
+            {
+                ErrorResponse = $"Change {Index}: {ErrorResponse}";
                 return false;
             }
 

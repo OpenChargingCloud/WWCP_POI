@@ -144,7 +144,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    Preconditions: preconditions
                                );
 
-            if (!TryApplyChanges(pending, out var result, out var changesWithOldValues, out var errorResponse))
+            if (!TryApplyChanges(pending, AsHeld: true, out var result, out var changesWithOldValues, out var errorResponse))
                 throw new ArgumentException(errorResponse, nameof(Changes));
 
             return new RoamingNetworkChangeSet(
@@ -368,7 +368,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                if (!TryApplyChanges(ChangeSet, out var result, out _, out ErrorResponse))
+                if (!TryApplyChanges(ChangeSet, AsHeld: false, out var result, out _, out ErrorResponse))
                     return false;
 
                 #region After ETags
@@ -535,7 +535,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        Preconditions: ChangeSet.Preconditions
                                    );
 
-                if (!TryApplyChanges(pending, out var result, out _, out var applyError))
+                if (!TryApplyChanges(pending, AsHeld: false, out var result, out _, out var applyError))
                 {
                     ErrorResponse = "The change set can not be rebased: " + applyError;
                     return false;
@@ -569,15 +569,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private) TryApplyChanges(ChangeSet, out RoamingNetwork, out ChangesWithOldValues, out ErrorResponse)
+        #region (private) TryApplyChanges(ChangeSet, AsHeld, out RoamingNetwork, out ChangesWithOldValues, out ErrorResponse)
 
         /// <summary>
         /// Apply the changes to a new version, without checking signatures or ETags.
         /// Every change is checked against the state left by the changes before it.
         /// The changes are returned with their old values: a change without one
         /// gets the value it found, so the change set can detect a concurrent change later.
+        /// A new value the content does not hold as it is given is refused, or, as the given
+        /// changes are being prepared, taken as it is held (SPECIFICATION.md, section 4).
         /// </summary>
+        /// <param name="ChangeSet">The change set.</param>
+        /// <param name="AsHeld">Whether the changes are prepared (CreateChangeSet, merges): their new values are then returned as the content holds them, instead of being refused.</param>
+        /// <param name="RoamingNetwork">The new version.</param>
+        /// <param name="ChangesWithOldValues">The changes with their old values, and, prepared, with their new values as held.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
         private Boolean TryApplyChanges(RoamingNetworkChangeSet                                    ChangeSet,
+                                        Boolean                                                    AsHeld,
                                         [NotNullWhen(true)]  out RoamingNetwork?                   RoamingNetwork,
                                         out ImmutableArray<RoamingNetworkChange>                   ChangesWithOldValues,
                                         [NotNullWhen(false)] out String?                           ErrorResponse)
@@ -617,6 +625,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var      change        = ChangeSet.Changes[index];
                 JToken?  currentValue;
+                JToken?  heldValue     = null;
 
                 #region Charging station operators
 
@@ -719,10 +728,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             currentOperatorJSON![ChargingStationOperator.BasePropertyKeys.LastChange] = ChangeSet.CreatedAt.ToISO8601();
 
                             // The changed operator must still be a valid one.
-                            if (!ChargingStationOperator.TryParseWithinChangeSet(currentOperatorJSON, out var changedOperator, out var changedOperatorError) ||
-                                (ofItsOwn && !TryKeepChargingPools(changedOperator, currentOperator!, [], out changedOperator, out changedOperatorError)))
+                            if (!ChargingStationOperator.TryParseWithinChangeSet(currentOperatorJSON, out var readOperator, out var changedOperatorError))
                             {
                                 ErrorResponse = $"Change {index}: {changedOperatorError}";
+                                return false;
+                            }
+
+                            var changedOperator = readOperator;
+
+                            if (ofItsOwn && !TryKeepChargingPools(readOperator, currentOperator!, [], out changedOperator, out changedOperatorError))
+                            {
+                                ErrorResponse = $"Change {index}: {changedOperatorError}";
+                                return false;
+                            }
+
+                            // What is signed is what is held: the operator as it writes itself, read again (SPECIFICATION.md, section 4).
+                            if (!TryHeldAsGiven(change, () => FindHeld(ofItsOwn ? readOperator.ToEmbeddedJSON([]) : readOperator.ToEmbeddedJSON(), nameof(ChargingStationOperator), change), "charging station operator", AsHeld, out heldValue, out var operatorNotHeld))
+                            {
+                                ErrorResponse = $"Change {index}: {operatorNotHeld}";
                                 return false;
                             }
 
@@ -746,7 +769,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                             // The change set's timestamp is the last change and, unless given, the creation,
                             // so that its after ETags are deterministic.
-                            var newOperatorJSON = (JObject) applied.NewValue!;
+                            // A copy: the change set keeps its new value as it gives it.
+                            var newOperatorJSON = (JObject) applied.NewValue!.DeepClone();
                             newOperatorJSON[ChargingStationOperator.BasePropertyKeys.Created]    ??= ChangeSet.CreatedAt.ToISO8601();
                             newOperatorJSON[ChargingStationOperator.BasePropertyKeys.LastChange]   = ChangeSet.CreatedAt.ToISO8601();
 
@@ -759,6 +783,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             if (newOperator.Id != operatorId)
                             {
                                 ErrorResponse = $"Change {index}: the charging station operator '{newOperator.Id}' is not the one to add, '{operatorId}'!";
+                                return false;
+                            }
+
+                            // What is signed is what is held: the operator as it writes itself, read again (SPECIFICATION.md, section 4).
+                            if (!TryHeldAsGiven(change, () => FindHeld(newOperator.ToEmbeddedJSON(), nameof(ChargingStationOperator), change), "charging station operator", AsHeld, out heldValue, out var newOperatorNotHeld))
+                            {
+                                ErrorResponse = $"Change {index}: {newOperatorNotHeld}";
                                 return false;
                             }
 
@@ -961,6 +992,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     }
 
+                    // What is signed is what is held: the property as the roaming network writes it (SPECIFICATION.md, section 4).
+                    if (!TryHeldAsGiven(change,
+                                        () => CurrentValue(change.EntityPropertyName ?? "", name, description, dataSource, licenses, customData, treeHashAlgorithms) is JToken heldProperty
+                                                  ? new JObject { [change.EntityPropertyName!] = heldProperty }
+                                                  : new JObject(),
+                                        "roaming network",
+                                        AsHeld,
+                                        out heldValue,
+                                        out var networkNotHeld))
+                    {
+                        ErrorResponse = $"Change {index}: {networkNotHeld}";
+                        return false;
+                    }
+
                     // The old value of an element change is the value of what it addresses.
                     if (change.IsElementChange)
                         currentValue = networkElementValue;
@@ -980,7 +1025,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
-                    if (!TryApplyRegistryChange(RoamingNetworkOperatorRegistry, change, index, ChangeSet.CreatedAt, networkOperators, out currentValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(RoamingNetworkOperatorRegistry, change, index, ChangeSet.CreatedAt, AsHeld, networkOperators, out currentValue, out heldValue, out ErrorResponse))
                         return false;
 
                 }
@@ -991,45 +1036,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (change.EntityType == nameof(ChargingStationManufacturer))
                 {
-                    if (!TryApplyRegistryChange(ManufacturerRegistry,      change, index, ChangeSet.CreatedAt, manufacturers, out currentValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(ManufacturerRegistry,      change, index, ChangeSet.CreatedAt, AsHeld, manufacturers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(ChargingStationModel))
                 {
-                    if (!TryApplyModelChange(ChargingStationModels,        change, index, ChangeSet.CreatedAt, manufacturers, out currentValue, out ErrorResponse))
+                    if (!TryApplyModelChange(ChargingStationModels,        change, index, ChangeSet.CreatedAt, AsHeld, manufacturers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(EMobilityProvider))
                 {
-                    if (!TryApplyRegistryChange(EMobilityProviderRegistry, change, index, ChangeSet.CreatedAt, providers,     out currentValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(EMobilityProviderRegistry, change, index, ChangeSet.CreatedAt, AsHeld, providers,     out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 // Charging tariff offers of charging station operators and e-mobility providers.
                 else if (change.EntityType == nameof(ChargingTariffOffer))
                 {
-                    if (!TryApplyChargingTariffOfferChange(change, index, ChangeSet.CreatedAt, operators, providers, out currentValue, out ErrorResponse))
+                    if (!TryApplyChargingTariffOfferChange(change, index, ChangeSet.CreatedAt, AsHeld, operators, providers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 // Groups of e-mobility providers; those of charging station operators are part of their infrastructure.
                 else if (IsProviderGroupChange(change, providers.Values))
                 {
-                    if (!TryApplyProviderGroupChange(change, index, ChangeSet.CreatedAt, providers, out currentValue, out ErrorResponse))
+                    if (!TryApplyProviderGroupChange(change, index, ChangeSet.CreatedAt, AsHeld, providers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(GridOperator))
                 {
-                    if (!TryApplyRegistryChange(GridOperatorRegistry,      change, index, ChangeSet.CreatedAt, gridOps,       out currentValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(GridOperatorRegistry,      change, index, ChangeSet.CreatedAt, AsHeld, gridOps,       out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(GridConnectionPoint))
                 {
-                    if (!TryApplyGridConnectionPointChange(change, index, ChangeSet.CreatedAt, gridOps, out currentValue, out ErrorResponse))
+                    if (!TryApplyGridConnectionPointChange(change, index, ChangeSet.CreatedAt, AsHeld, gridOps, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1039,13 +1084,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (change.EntityType == nameof(ParkingOperator))
                 {
-                    if (!TryApplyRegistryChange(ParkingOperatorRegistry,   change, index, ChangeSet.CreatedAt, parkingOps,    out currentValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(ParkingOperatorRegistry,   change, index, ChangeSet.CreatedAt, AsHeld, parkingOps,    out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (IsParking(change.EntityType))
                 {
-                    if (!TryApplyParkingChange(change, index, ChangeSet.CreatedAt, parkingOps, operators, out currentValue, out ErrorResponse))
+                    if (!TryApplyParkingChange(change, index, ChangeSet.CreatedAt, AsHeld, parkingOps, operators, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1055,13 +1100,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (change.EntityType == nameof(EnergyMeterManufacturer))
                 {
-                    if (!TryApplyRegistryChange(EnergyMeterManufacturerRegistry, change, index, ChangeSet.CreatedAt, meterManufacturers, out currentValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(EnergyMeterManufacturerRegistry, change, index, ChangeSet.CreatedAt, AsHeld, meterManufacturers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(EnergyMeterModel))
                 {
-                    if (!TryApplyModelChange(EnergyMeterModels,            change, index, ChangeSet.CreatedAt, meterManufacturers, out currentValue, out ErrorResponse))
+                    if (!TryApplyModelChange(EnergyMeterModels,            change, index, ChangeSet.CreatedAt, AsHeld, meterManufacturers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1071,13 +1116,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (change.EntityType == nameof(EnergyMeterGroup))
                 {
-                    if (!TryApplyEnergyMeterGroupChange(change, index, ChangeSet.CreatedAt, operators, gridOps, out currentValue, out ErrorResponse))
+                    if (!TryApplyEnergyMeterGroupChange(change, index, ChangeSet.CreatedAt, AsHeld, operators, gridOps, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(EnergyMeterTemplate))
                 {
-                    if (!TryApplyEnergyMeterTemplateChange(change, index, ChangeSet.CreatedAt, operators, gridOps, out currentValue, out ErrorResponse))
+                    if (!TryApplyEnergyMeterTemplateChange(change, index, ChangeSet.CreatedAt, AsHeld, operators, gridOps, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1087,25 +1132,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (change.EntityType == nameof(TransparencySoftwareManufacturer))
                 {
-                    if (!TryApplyRegistryChange(TransparencySoftwareManufacturerRegistry, change, index, ChangeSet.CreatedAt, softwareManufacturers, out currentValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(TransparencySoftwareManufacturerRegistry, change, index, ChangeSet.CreatedAt, AsHeld, softwareManufacturers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(TransparencySoftware))
                 {
-                    if (!TryApplyTransparencySoftwareChange(change, index, ChangeSet.CreatedAt, softwareManufacturers, out currentValue, out ErrorResponse))
+                    if (!TryApplyTransparencySoftwareChange(change, index, ChangeSet.CreatedAt, AsHeld, softwareManufacturers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(ConformityAssessmentBody))
                 {
-                    if (!TryApplyRegistryChange(ConformityAssessmentBodyRegistry, change, index, ChangeSet.CreatedAt, bodies, out currentValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(ConformityAssessmentBodyRegistry, change, index, ChangeSet.CreatedAt, AsHeld, bodies, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(TransparencySoftwareCertificate))
                 {
-                    if (!TryApplyTransparencySoftwareCertificateChange(change, index, ChangeSet.CreatedAt, bodies, out currentValue, out ErrorResponse))
+                    if (!TryApplyTransparencySoftwareCertificateChange(change, index, ChangeSet.CreatedAt, AsHeld, bodies, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1115,7 +1160,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (IsInfrastructure(change.EntityType))
                 {
-                    if (!TryApplyInfrastructureChange(change, index, ChangeSet.CreatedAt, operators, out currentValue, out ErrorResponse))
+                    if (!TryApplyInfrastructureChange(change, index, ChangeSet.CreatedAt, AsHeld, operators, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1127,19 +1172,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                #region Remember the old value
+                #region Remember the old value, and the new value as it is held
 
                 // Add and AddElement have no old value; every other change without one gets the value it found,
-                // or JSON null when it found none: then the value is expected to be absent.
-                changesWithOldValues.Add(change.OldValue is null && change.Kind is not (RoamingNetworkChangeKind.Add or RoamingNetworkChangeKind.AddElement)
+                // or JSON null when it found none: then the value is expected to be absent. Prepared, a new value
+                // is the one the content holds.
+                var withOldValue = change.OldValue is null && change.Kind is not (RoamingNetworkChangeKind.Add or RoamingNetworkChangeKind.AddElement);
+                var asHeld       = AsHeld && heldValue is not null && !POIJSON.SameContent(heldValue, change.NewValue);
+
+                changesWithOldValues.Add(withOldValue || asHeld
 
                                              ? new RoamingNetworkChange(
                                                    change.Kind,
                                                    change.EntityType,
                                                    change.EntityId,
                                                    change.PropertyName,
-                                                   currentValue ?? JValue.CreateNull(),
-                                                   change.NewValue,
+                                                   withOldValue ? currentValue ?? JValue.CreateNull() : change.OldValue,
+                                                   asHeld       ? heldValue                          : change.NewValue,
                                                    change.ParentEntityType,
                                                    change.ParentEntityId,
                                                    change.ElementPath

@@ -300,7 +300,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         Left.CalcChangeSetETags(),
                                                         ImmutableI18NString.Create(Languages.en, "Merge"));
 
-            if (!Left.TryApplyChanges(pending, out var merge, out var changesWithOldValues, out var applyError))
+            if (!Left.TryApplyChanges(pending, AsHeld: true, out var merge, out var changesWithOldValues, out var applyError))
             {
                 Conflicts = [ new RoamingNetworkMergeConflict(RoamingNetworkMergeConflictKind.InvalidResult,
                                                               nameof(RoamingNetwork),
@@ -359,7 +359,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!TryApplyChanges(ChangeSet, out var result, out _, out ErrorResponse))
+            if (!TryApplyChanges(ChangeSet, AsHeld: false, out var result, out _, out ErrorResponse))
                 return false;
 
             result.CalcETags();
