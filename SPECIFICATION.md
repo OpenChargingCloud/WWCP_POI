@@ -948,9 +948,11 @@ depth, is given in one of three forms.
    them MUST give the same root; the array then is `{"@merkleRoot": <it>, "@size": n}`.
 
 The verifier calculates the digest of the roaming network from the proof, bottom-up, and MUST refuse
-the proof unless it is the `effectiveTree` ETag of the algorithm named that an attestation it trusts
-(8.5) names, or the `effectiveTree` ETag of a commit a checkpoint it trusts proves (10.4). Everything the
-proof gives completely is then attested, and nothing else. It MUST read the proof with numbers with a
+the proof unless it is the `effectiveTree` ETag of the algorithm named that an attestation of the root it
+trusts, in the role of the roaming network operator (8.5), names, or the `effectiveTree` ETag of a commit a
+checkpoint it trusts proves (10.4). Everything the proof gives completely is then attested, and nothing else.
+An attestation of a subject (8.5) attests only what the proof gives completely of its subject, the entity with
+everything below it; it does not attest the proof. It MUST read the proof with numbers with a
 fraction as decimals and strings as strings (section 1).
 
 ```json
@@ -1022,7 +1024,9 @@ algorithms and verification are as in section 4; timestamps are written and sign
 - **Trust:** the verifier MUST trust the key of an attestation independently of the proof. A key the
   attested network names proves nothing, as whoever forged the network would name their own; the
   certificate of an identity key it trusts (8.6) names them. The key MUST be one that may sign for the
-  `party` (4.1). Of an RNO with a quorum (section 4.1), the verifier MUST take a version only attested by signing
+  `party` (4.1). A version is attested by attestations of its root in the role `roamingNetworkOperator`
+  only: one its signer made in another role, e.g. as a witness, does not count for the RNO, nor does one of a
+  subject. Of an RNO with a quorum (section 4.1), the verifier MUST take a version only attested by signing
   keys of `minConsensus` different holders, each certified by a trusted identity key of its holder, so that no
   holder vouches for a version alone; each holder attests at its own server, and the servers exchange their
   attestations.
@@ -1033,8 +1037,11 @@ algorithms and verification are as in section 4; timestamps are written and sign
   `"subject": {"entityType": "ChargingStationOperator", "entityId": "DE*GEF", "digest": "<hex>"}`, with
   the `eTag` still naming the root. The effective members of a charging station operator depend only
   on its own templates. So the operator can attest its own node with one of its signing keys (role
-  `chargingStationOperator`), and a proof giving the operator is checked against it by the digest of the
-  operator. Histories keep only attestations of the root.
+  `chargingStationOperator`, `signer` the operator), and a proof giving the operator is checked against it by
+  the digest of the operator (`VerifySubject` of POI3). It attests the operator with everything below it, and
+  nothing else: not the root, nor what the proof gives above the operator, e.g. the name of the network, its
+  operator, the manufacturers, models, transparency software releases and certificates. A verifier MUST NOT take
+  it for the root, nor count it for a quorum (8.4). Histories keep only attestations of the root.
 - POI_API serves the current attestations, those of the head valid now, as `GET ~/RNs/{RN_Id}/attestations`
   and the WebSocket action `attestations`, and pushes every attestation the history takes on the topic
   `attestations` (action `attestation`); a proof embeds those it was made for. A peer verifying attestations

@@ -211,7 +211,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Verify this proof against its attestations: one of them must be valid at the given time, now by default, its
         /// signature verified by the given delegate with a key trusted independently of the network, and it must attest
-        /// the root this proof leads to, or the digest of an entity it gives, e.g. of a charging station operator.
+        /// the root this proof leads to, in the role of the roaming network operator. An attestation of a subject attests
+        /// one entity, not the root, and does not count here (VerifySubject).
         /// </summary>
         /// <param name="VerifyAttestation">Verifies the signature of an attestation with a trusted key.</param>
         /// <param name="Attestation">The attestation it was verified against.</param>
@@ -236,8 +237,79 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return true;
             }
 
-            ErrorResponse = $"No valid attestation of a trusted key attests the root {eTag} of the proof!";
+            ErrorResponse = $"No valid attestation of a trusted key attests the root {eTag} of the proof as its roaming network operator!";
             return false;
+
+        }
+
+        #endregion
+
+        #region VerifySubject(ChargingStationOperatorId, VerifyAttestation, out Attestation, out ErrorResponse, At = null)
+
+        /// <summary>
+        /// Verify the charging station operator this proof gives against an attestation of it as its subject
+        /// (SPECIFICATION.md, section 8.5): one must be valid at the given time, now by default, its signature verified by
+        /// the given delegate with a key trusted independently of the network, in the role of a charging station operator,
+        /// and attest the digest of the operator as this proof gives it. It attests the operator with everything below it,
+        /// and nothing else: not the roaming network, its operator, nor the manufacturers, models, transparency software
+        /// and certificates the proof gives above it.
+        /// </summary>
+        /// <param name="ChargingStationOperatorId">The charging station operator, the subject.</param>
+        /// <param name="VerifyAttestation">Verifies the signature of an attestation with a trusted key, e.g. of the operator.</param>
+        /// <param name="Attestation">The attestation it was verified against.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="At">When it must be valid, now by default.</param>
+        public Boolean VerifySubject(ChargingStationOperator_Id                            ChargingStationOperatorId,
+                                     VerifyAttestationDelegate                             VerifyAttestation,
+                                     [NotNullWhen(true)]  out RoamingNetworkAttestation?   Attestation,
+                                     [NotNullWhen(false)] out String?                      ErrorResponse,
+                                     DateTimeOffset?                                       At   = null)
+        {
+
+            Attestation = null;
+
+            // A proof that leads to no root is no proof of what it gives, of no part of it either.
+            if (!TryCalculateETag(out _, out ErrorResponse))
+                return false;
+
+            var operatorId = ChargingStationOperatorId.ToString();
+
+            Attestation = AttestationsOfThisVersion(At ?? Timestamp.Now).
+                              FirstOrDefault(attestation => attestation.Subject is RoamingNetworkAttestationSubject subject              &&
+                                                            subject.EntityType == nameof(ChargingStationOperator)                       &&
+                                                            subject.EntityId   == operatorId                                            &&
+                                                            attestation.Role   == RoamingNetworkCommitSignatureRoles.ChargingStationOperator &&
+                                                            (attestation.Signer is null || attestation.Signer == operatorId)            &&
+                                                            AttestsSubject(subject)                                                     &&
+                                                            VerifyAttestation(attestation));
+
+            if (Attestation is not null)
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            ErrorResponse = $"No valid attestation of a trusted key attests the charging station operator '{operatorId}' as this proof gives it!";
+            return false;
+
+        }
+
+        #endregion
+
+        #region (private) AttestationsOfThisVersion(At)
+
+        /// <summary>
+        /// The attestations of this proof of its roaming network, commit and hash algorithm, valid at the given time.
+        /// </summary>
+        private IEnumerable<RoamingNetworkAttestation> AttestationsOfThisVersion(DateTimeOffset At)
+        {
+
+            var roamingNetworkId = RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Type == JTokenType.String ? RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]!.Value<String>() : null;
+
+            return Attestations.Where(attestation => attestation.RoamingNetworkId.ToString() == roamingNetworkId         &&
+                                                     (!CommitId.HasValue || attestation.CommitId == CommitId.Value)      &&
+                                                     attestation.ETag.HashAlgorithm == HashAlgorithm                     &&
+                                                     attestation.IsValidAt(At));
 
         }
 
@@ -247,37 +319,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The attestations of this proof of its roaming network and commit, valid at the given time, that attest the given
-        /// root this proof leads to, or the digest of an entity it gives: those to verify.
+        /// root this proof leads to in the role of the roaming network operator: those to verify the proof with. An
+        /// attestation of a subject attests one entity, not the root (VerifySubject); one in another role, e.g. of a
+        /// witness, does not attest for the roaming network operator.
         /// </summary>
         private IEnumerable<RoamingNetworkAttestation> AttestationsOf(ETag            ETag,
                                                                        DateTimeOffset  At)
-        {
 
-            var roamingNetworkId = RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Type == JTokenType.String ? RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]!.Value<String>() : null;
-
-            foreach (var attestation in Attestations)
-            {
-
-                if (attestation.RoamingNetworkId.ToString() != roamingNetworkId                ||
-                    (CommitId.HasValue && attestation.CommitId != CommitId.Value)              ||
-                    attestation.ETag.HashAlgorithm != HashAlgorithm                            ||
-                    !attestation.IsValidAt(At))
-                {
-                    continue;
-                }
-
-                if (attestation.Subject is null
-                        ? !attestation.ETag.Equals(ETag)
-                        : !AttestsSubject(attestation.Subject))
-                {
-                    continue;
-                }
-
-                yield return attestation;
-
-            }
-
-        }
+            => AttestationsOfThisVersion(At).Where(attestation => attestation.Subject is null                                                  &&
+                                                                  attestation.ETag.Equals(ETag)                                           &&
+                                                                  attestation.Role == RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator);
 
         #endregion
 
@@ -374,10 +425,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// per holder, e.g. those of a trust anchor it scanned (RoamingNetworkTrustAnchor): the key statement of the
         /// operator the proof gives must be signed by trusted identity keys of as many holders as the given minConsensus and
         /// its own require, name their holders as the verifier knows them, and be valid at the given time, now by default;
-        /// its identity keys are trusted then as well. The attestations of the proof must be signed by signing keys of as
-        /// many holders, valid when they were signed and allowed to sign for the party, each certified by a trusted identity
-        /// key of its holder, and counted for the holder of that identity key as the verifier knows it (SPECIFICATION.md,
-        /// sections 4.1 and 8.6): so that no holder of a quorum attests a version alone.
+        /// its identity keys are trusted then as well. The attestations of the root of the proof, in the role of the roaming
+        /// network operator, must be signed by signing keys of as many holders, valid when they were signed and allowed to
+        /// sign for the party, each certified by a trusted identity key of its holder, and counted for the holder of that
+        /// identity key as the verifier knows it (SPECIFICATION.md, sections 4.1, 8.5 and 8.6): so that no holder of a quorum
+        /// attests a version alone. Attestations of a subject do not count (VerifySubject).
         /// </summary>
         /// <param name="TrustedHolders">The @ids of the identity keys the verifier trusts, their SHA-256 thumbprints, per holder.</param>
         /// <param name="Attestation">One of the attestations it was verified against.</param>

@@ -468,6 +468,73 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
         #endregion
 
+        #region A_subject_attestation_attests_its_subject_only()
+
+        /// <summary>
+        /// An attestation of a subject attests one entity, the node of a charging station operator, not the root: it does
+        /// not verify the proof, which gives what is above the operator as well, but VerifySubject verifies the operator as
+        /// the proof gives it. An attestation of the root verifies the proof only in the role of the roaming network operator
+        /// (SPECIFICATION.md, section 8.5; WWCP_POI.TS, docs/csharp-review.md, finding 6).
+        /// </summary>
+        [Test]
+        public void A_subject_attestation_attests_its_subject_only()
+        {
+
+            var gefKey      = new Ed25519PrivateKeyParameters(Convert.FromHexString("a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf"), 0);
+            var gefSigner   = new RoamingNetworkCommitSigner(gefKey, "gef", COSEAlgorithm.Ed25519, RoamingNetworkCommitSignatureRoles.ChargingStationOperator, GEF.ToString());
+            var asWitness   = new RoamingNetworkCommitSigner(RNOKey, "rno", COSEAlgorithm.Ed25519, RoamingNetworkCommitSignatureRoles.Witness,                 "DE*RNO");
+
+            VerifyAttestationDelegate trustedGEF = attestation => attestation.VerifySignature(gefKey.GeneratePublicKey(), "gef", out _);
+
+            var history     = RoamingNetworkHistory.Start(NewNetwork());
+
+            Assert.That(history.TryGetChargingStationProof(S1, out var proof, out var error, At: T0.AddMinutes(1)),  Is.True, error);
+            Assert.That(proof!.TryCalculateETag(out var root, out error),                                             Is.True, error);
+
+            // The node of DE*GEF as the proof gives it, a leaf of the operators of the network.
+            var gefNode     = (JObject) ((JObject) proof.RoamingNetwork["chargingStationOperators"]!)["@leaves"]![0]!["@entity"]!;
+
+            Assert.That(POIEffectiveTree.TryDigest((JObject) gefNode.DeepClone(), "chargingStationOperators", ETagHashAlgorithm.SHA256, out var gefDigest, out error),  Is.True, error);
+
+            var subject     = new RoamingNetworkAttestationSubject(nameof(ChargingStationOperator), GEF.ToString(), Convert.ToHexStringLower(gefDigest));
+            var commitId    = proof.CommitId!.Value;
+            var revision    = proof.Revision!.Value;
+
+            var bySubject   = gefSigner. Attest(RN, commitId, revision, root, T0, T0.AddMinutes(15), subject);
+            var byRNO       = RNOSigner. Attest(RN, commitId, revision, root, T0, T0.AddMinutes(15));
+            var byWitness   = asWitness. Attest(RN, commitId, revision, root, T0, T0.AddMinutes(15));
+
+            RoamingNetworkProof With(params RoamingNetworkAttestation[] Attestations)
+                => new (proof.HashAlgorithm, proof.RoamingNetwork, proof.CommitId, proof.Revision, Attestations);
+
+            // The operator given otherwise: its digest is another one.
+            var otherNetwork = (JObject) proof.RoamingNetwork.DeepClone();
+            ((JObject) otherNetwork["chargingStationOperators"]!["@leaves"]![0]!["@entity"]!)["description"] = new JObject(new JProperty("en", "another operator"));
+            var otherGEF     = new RoamingNetworkProof(proof.HashAlgorithm, otherNetwork, proof.CommitId, proof.Revision, [ bySubject ]);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(With(bySubject).Verify(trustedGEF, out _, out error, T0.AddMinutes(1)),                        Is.False, "a subject attestation verifies the proof");
+                Assert.That(error,                                                                                       Does.Contain("as its roaming network operator"));
+                Assert.That(With(bySubject).VerifySubject(GEF, trustedGEF, out var attestation, out error, T0.AddMinutes(1)),  Is.True, error);
+                Assert.That(attestation!.Value,                                                                          Is.EqualTo(bySubject.Value));
+
+                Assert.That(With(bySubject).VerifySubject(ChargingStationOperator_Id.Parse("DE*XYZ"), trustedGEF, out _, out _, T0.AddMinutes(1)),  Is.False, "another operator");
+                Assert.That(With(bySubject).VerifySubject(GEF, Trusted,    out _, out _, T0.AddMinutes(1)),              Is.False, "a key not trusted for it");
+                Assert.That(With(bySubject).VerifySubject(GEF, trustedGEF, out _, out _, T0.AddMinutes(16)),             Is.False, "after its validUntil");
+                Assert.That(otherGEF.       VerifySubject(GEF, trustedGEF, out _, out error, T0.AddMinutes(1)),           Is.False, "the operator given otherwise");
+
+                Assert.That(With(byRNO).    Verify       (Trusted,         out _, out error, T0.AddMinutes(1)),          Is.True, error);
+                Assert.That(With(byRNO).    VerifySubject(GEF, Trusted,    out _, out _, T0.AddMinutes(1)),              Is.False, "an attestation of the root is none of a subject");
+                Assert.That(With(byWitness).Verify       (Trusted,         out _, out error, T0.AddMinutes(1)),          Is.False, "the root attested in the role of a witness");
+
+            }
+
+        }
+
+        #endregion
+
         #region The_head_is_attested_when_it_changes_and_again_in_time()
 
         [Test]
