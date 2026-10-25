@@ -511,7 +511,7 @@ public static class ExampleA11
             Helpers.Fail(error!);
 
         var oldSigners = first.Signatures.Where (signature => signature.Role == RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator && !PostQuantum.AllowsSignatureAlgorithm(signature.Algorithm)).
-                                          Select(signature => ExampleA4.SigningKeyOf(anchor, genesis, signature)?.HolderOrUnnamed).
+                                          Select(signature => ExampleA4.HolderOf(anchor, genesis, signature)).
                                           OfType<String>().
                                           Distinct().
                                           Order();
@@ -524,7 +524,7 @@ public static class ExampleA11
         if (!RoamingNetwork.TryParse(Helpers.ReadJSON("published/QA.json"), out var head, out error))
             Helpers.Fail(error);
 
-        Console.WriteLine($"The head with the old trust anchor alone: {(head.Operator!.KeyStatement!.TryVerify(anchor.Keys, head.Operator.IdentityKeys, out error, anchor.MinConsensus, Timestamp.Now) ? "valid" : error)}");
+        Console.WriteLine($"The head with the old trust anchor alone: {(head.Operator!.KeyStatement!.TryVerify(anchor.Holders, head.Operator.IdentityKeys, out _, out error, anchor.MinConsensus, Timestamp.Now) ? "valid" : error)}");
 
         if (!RoamingNetworkTrustAnchor.TryParse(File.ReadAllText("published/QA-trustAnchor-mldsa.txt"), out var newAnchor, out error))
             Helpers.Fail(error);

@@ -372,20 +372,21 @@ public static class ExampleA10
         if (!Proof.TryGetSigningKeyCertificates(out var certificates, out error))
             Helpers.Fail(error);
 
-        if (!keyStatement.TryVerify(Anchor.Keys, identityKeys, out error, Anchor.MinConsensus, At))
+        // The holders as the trust anchor names them, and the key statement must name them so.
+        if (!keyStatement.TryVerify(Anchor.Holders, identityKeys, out var holderOf, out error, Anchor.MinConsensus, At))
             Helpers.Fail(error);
 
-        var trustedIds    = Anchor.Keys.Concat(keyStatement.IdentityKeys.Select(identityKey => identityKey.Id)).ToHashSet();
+        var trustedIds    = holderOf.Keys.ToHashSet();
         var identityPool  = keyStatement.IdentityKeys.Concat(identityKeys).ToArray();
 
+        // A signature counts for the holder of the identity key that certified its key, never as the signing key names itself.
         var signedBy = checkpoint.Signatures.Where (signature => signature.Role == RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator).
                                              Select(signature => certificates.FirstOrDefault(certificate => certificate.SigningKey.Id == signature.KeyId         &&
                                                                                                             certificate.SigningKey.IsValidAt(signature.SignedAt) &&
                                                                                                             certificate.SigningKey.MaySign(POIKeyUsages.Party)   &&
-                                                                                                            certificate.TryVerify(identityPool, out _, out _, trustedIds))?.
-                                                                              SigningKey is POIPublicKey key &&
-                                                                 checkpoint.VerifySignature(signature, key.Key, key.Id, out _)
-                                                                     ? key.HolderOrUnnamed
+                                                                                                            certificate.TryVerify(identityPool, out _, out _, trustedIds)) is RoamingNetworkSigningKeyCertificate certificate &&
+                                                                 checkpoint.VerifySignature(signature, certificate.SigningKey.Key, certificate.SigningKey.Id, out _)
+                                                                     ? holderOf[certificate.KeyId]
                                                                      : null).
                                              OfType<String>().
                                              ToHashSet();

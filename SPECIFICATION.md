@@ -213,7 +213,9 @@ A **key** of a party is a public COSE key in its static data:
 ```
 
 `holder`, optional, names who holds the private key, e.g. one of several companies holding the keys of the RNO
-together; it is no part of the thumbprint.
+together; it is no part of the thumbprint. A key keeps its holder: a version that names a key of a party with
+another `holder` than the version it follows, or with one where that named none or none where that named one,
+MUST be refused. A holder handing a key over to another gives that one a new key instead.
 
 `usages`, optional, names what a **signing key** may sign; a signing key naming none signs everything its party
 owns. So a charging station operator signs its pools with one key and its tariffs with another. The usages are
@@ -995,45 +997,56 @@ Section 6 has an example.
 
 - **Content:** the roaming network operator embeds it as `keyStatement` and its certificates as
   `signingKeyCertificates`, properties of its own (section 4.1). A version MUST be refused unless the statement
-  names this roaming network and this operator, only identity keys the operator names, its `minConsensus`, and is
-  signed by identity keys of `minConsensus` holders valid at `signedAt`; and unless every certificate names this
+  names this roaming network and this operator, only identity keys the operator names, as it names them, with
+  their holders, its `minConsensus`, and is signed by identity keys of `minConsensus` holders valid at `signedAt`; and unless every certificate names this
   operator and is signed by one of its identity keys of the holder of the signing key, valid at `signedAt`, and no
   signing key is certified twice in different forms. Every signature MUST be valid. Its validity in time is not checked there: a version keeps a statement that expired. So every
   proof of a charging station gives it with the operator, peers take it with the commits, and witnesses see
   it in the checkpoints: an operator stating other keys to some is a split view (10.2).
-- **Verification:** a verifier trusting identity keys by their `@id`s checks that the statement the proof
-  gives is signed by trusted ones of as many holders as the `minConsensus` it pinned and the one of the
-  statement require, found among its `identityKeys` or those of the operator, each `@id` the thumbprint of its
-  key (section 4.1); that it is valid at the time it checks, `signedAt` ≤ time ≤
-  `validUntil`; and that it names the roaming network of the proof. The identity keys the statement names are
-  trusted then as well. An attestation of the proof counts when its signing key is certified by a trusted identity
-  key of its holder, is valid at the attestation's `signedAt` and may sign for the `party`; it is then trusted as
-  8.5 says.
-- **Succession:** a verifier trusting a statement MAY trust its `identityKeys` for later statements, e.g.
-  when the operator replaces an identity key before it expires.
+- **Verification:** a verifier trusts identity keys by their `@id`s and knows which of them one holder holds,
+  e.g. as a trust anchor names them, one entry per holder. It checks that the statement the proof gives is signed
+  by trusted ones of as many holders as the `minConsensus` it pinned and the one of the statement require, found
+  among its `identityKeys` or those of the operator, each `@id` the thumbprint of its key (section 4.1); the
+  holders counted as the verifier knows them, never as the statement names them. The statement MUST name the
+  trusted keys it names as the verifier knows their holders: one `holder` for the keys of one holder, another
+  for those of every other holder; else it is refused. The verifier checks that it is valid at the time it
+  checks, `signedAt` ≤ time ≤ `validUntil`, and that it names the roaming network of the proof. The identity
+  keys the statement names are trusted then as well, with the holders it names. An attestation of the proof
+  counts when its signing key is certified by a trusted identity key of its holder, is valid at the
+  attestation's `signedAt` and may sign for the `party`; it counts for the holder of that identity key as the
+  verifier knows it, and is then trusted as 8.5 says. So no holder counts twice by naming a key of its own, or a
+  signing key it certifies, as another's.
+- **Succession:** a verifier trusting a statement MAY trust its `identityKeys` for later statements, with the
+  holders it names, e.g. when the operator replaces an identity key before it expires: a later statement is
+  checked against them as above.
 - **Trust anchor:** what a verifier pins of a roaming network, e.g. from a QR code on the website or in the
   documents of the roaming network operator:
 
   ```json
   { "@id": "rn1", "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/trustAnchor/v2",
     "urls": [ "https://hub.example/poi/RNs/rn1", "https://mirror.example/poi/RNs/rn1" ],
-    "keys": [ "<@id>", "<@id>", "<@id>" ],
+    "keys": [ "<@id>", [ "<@id>", "<@id>" ], "<@id>" ],
     "name": { "en": "…" }, "description": { "en": "…" }, "minConsensus": 2 }
   ```
 
   the roaming network and its `urls`, below each of which its proofs are served (`…/CSs/{CS_Id}/proof`), at least one,
   each once, all of the same roaming network, the preferred one first: a verifier tries the next when one does not
   answer, e.g. a server down or under attack; the proofs are signed, so none of the servers is trusted; as `keys` the `@id`s
-  of the identity keys of its operator, 64 lowercase hexadecimal digits each, and its `minConsensus`, unless 1; to show, its
-  `name` and `description`. Only the `@id`s and the `minConsensus` are trusted: not one
-  key, which would let its holder vouch for the network alone; the keys come with every proof. The texts to show
+  of the identity keys of its operator, 64 lowercase hexadecimal digits each, one entry per holder: the `@id` of its
+  key, or, where it holds several, e.g. an old and a new one, the array of their `@id`s in their order; each `@id`
+  once, the holders in the order of their first `@id`s. A verifier takes each entry as a holder of its own, so the
+  RNO groups the keys as its key statement names their holders. Then its `minConsensus`, unless 1, at most as many as
+  holders; to show, its `name` and `description`. Only the `@id`s, which of them one holder holds, and the
+  `minConsensus` are trusted: not one key, which would let its holder vouch for the network alone; the keys come
+  with every proof. The texts to show
   are those of a verified proof: the name and description of the roaming network and the name of its operator are
   part of its root, which the attestations cover. A verifier SHOULD show those, and SHOULD warn where a text of the
   trust anchor differs from the one of the proof in its language, e.g. of a QR code naming the network otherwise. The QR code holds
   `WWCP/TA-2:` and the Base45 [RFC 9285] of its deterministic CBOR, the keys and values of the JSON, the `@id`s as
   their 32 bytes, all of the alphanumeric mode of QR codes; a reader takes the URI
-  `https://hub.example/poi/RNs/rn1?keys=<@id>,<@id>&minConsensus=2&alsoAt=https%3A%2F%2Fmirror.example%2Fpoi%2FRNs%2Frn1`
-  as well, the preferred URL with each further one escaped as an `alsoAt`. A QR code is as trustworthy
+  `https://hub.example/poi/RNs/rn1?keys=<@id>,<@id>;<@id>,<@id>&minConsensus=2&alsoAt=https%3A%2F%2Fmirror.example%2Fpoi%2FRNs%2Frn1`
+  as well, the holders separated by `,`, the keys of one holder by `;`, the preferred URL with each further one
+  escaped as an `alsoAt`. A QR code is as trustworthy
   as the place it is found: one stuck on a charging station may be anybody's.
 - POI_API serves the key statement of the operator of the head as `GET ~/RNs/{RN_Id}/keyStatement` and its
   trust anchor as `GET ~/RNs/{RN_Id}/trustAnchor`, `{roamingNetworkId, identityKeyIds, minConsensus, uri, qrCode,

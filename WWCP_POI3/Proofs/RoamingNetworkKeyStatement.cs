@@ -179,6 +179,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<POIPublicKey>                         IdentityKeys                { get; }
 
         /// <summary>
+        /// The @ids of its identity keys per holder, as it names their holders, the keys naming none having one holder
+        /// together: what a trust anchor of this statement pins, and what a verifier trusting it knows of the holders of
+        /// the keys of a later statement (SPECIFICATION.md, section 8.6).
+        /// </summary>
+        public IEnumerable<IEnumerable<String>>                     Holders
+
+            => IdentityKeys.GroupBy(identityKey => identityKey.HolderOrUnnamed, StringComparer.Ordinal).
+                            Select (holder      => holder.Select(identityKey => identityKey.Id));
+
+        /// <summary>
         /// How many holders of the identity keys sign it, and of the signing keys they certify attest a version: the
         /// minConsensus of the roaming network operator (SPECIFICATION.md, section 4.1).
         /// </summary>
@@ -599,14 +609,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region TryVerify(TrustedIdentityKeyIds, OtherIdentityKeys, out ErrorResponse, MinConsensus = 1, At = null)
 
         /// <summary>
-        /// Verify this key statement against identity keys the verifier trusts by their @ids, e.g. those of a QR code it
-        /// scanned: it must be signed by trusted identity keys of as many holders as the given minConsensus and its own
-        /// require, the keys given among its own identity keys or among the given other ones, e.g. those of the roaming
-        /// network operator a proof gives, each found by its @id, the SHA-256 thumbprint of the key, and valid when it was
-        /// signed. Every signature must be valid; those of keys not trusted are not counted. With a time given, it must
-        /// also be valid then (IsValidAt); without, only its signatures are verified, e.g. as part of the content.
+        /// Verify this key statement against identity keys the verifier trusts by their @ids, each of a holder of its own:
+        /// as TryVerify(TrustedHolders, …) does. A verifier knowing that one holder holds several of them, e.g. by a trust
+        /// anchor, names them per holder there.
         /// </summary>
-        /// <param name="TrustedIdentityKeyIds">The @ids of the identity keys the verifier trusts.</param>
+        /// <param name="TrustedIdentityKeyIds">The @ids of the identity keys the verifier trusts, each of a holder of its own.</param>
         /// <param name="OtherIdentityKeys">Other identity keys, whose @ids the verifier may trust.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
         /// <param name="MinConsensus">How many holders of trusted identity keys must have signed it at least, e.g. as a trust anchor names it.</param>
@@ -616,14 +623,86 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  [NotNullWhen(false)] out String?    ErrorResponse,
                                  Byte                                MinConsensus   = 1,
                                  DateTimeOffset?                     At             = null)
+
+            => TryVerify(TrustedIdentityKeyIds.Select(id => (IEnumerable<String>) [ id ]),
+                         OtherIdentityKeys,
+                         out _,
+                         out ErrorResponse,
+                         MinConsensus,
+                         At);
+
+        #endregion
+
+        #region TryVerify(TrustedHolders, OtherIdentityKeys, out HolderOf, out ErrorResponse, MinConsensus = 1, At = null)
+
+        /// <summary>
+        /// Verify this key statement against identity keys the verifier trusts by their @ids, per holder, e.g. those of a
+        /// trust anchor it scanned: it must be signed by trusted identity keys of as many holders as the given minConsensus
+        /// and its own require, the keys given among its own identity keys or among the given other ones, e.g. those of the
+        /// roaming network operator a proof gives, each found by its @id, the SHA-256 thumbprint of the key, and valid when
+        /// it was signed. Every signature must be valid; those of keys not trusted are not counted. The holders are counted
+        /// as the verifier knows them, never as this statement names them, and this statement must name the trusted keys it
+        /// names as the verifier knows their holders: one holder for the keys of one, another for those of every other
+        /// (SPECIFICATION.md, section 8.6). So no holder counts twice by naming a key of its own as another's. With a time
+        /// given, it must also be valid then (IsValidAt); without, only its signatures are verified, e.g. as part of the
+        /// content.
+        /// </summary>
+        /// <param name="TrustedHolders">The @ids of the identity keys the verifier trusts, per holder.</param>
+        /// <param name="OtherIdentityKeys">Other identity keys, whose @ids the verifier may trust.</param>
+        /// <param name="HolderOf">The holder of every identity key the verifier trusts then, by its @id: those of this statement, and the trusted ones, as this statement names their holders or, where it names none of a holder, as the verifier knows it.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="MinConsensus">How many holders of trusted identity keys must have signed it at least, e.g. as a trust anchor names it.</param>
+        /// <param name="At">An optional time it must be valid at, e.g. now.</param>
+        public Boolean TryVerify(IEnumerable<IEnumerable<String>>                                  TrustedHolders,
+                                 IEnumerable<POIPublicKey>?                                        OtherIdentityKeys,
+                                 [NotNullWhen(true)]  out IReadOnlyDictionary<String, String>?     HolderOf,
+                                 [NotNullWhen(false)] out String?                                  ErrorResponse,
+                                 Byte                                                              MinConsensus   = 1,
+                                 DateTimeOffset?                                                   At             = null)
         {
 
-            var trusted   = TrustedIdentityKeyIds.ToHashSet(StringComparer.Ordinal);
+            HolderOf = null;
+
+            var trustedHolders  = TrustedHolders.Select(keys => keys.ToArray()).ToArray();
+            var trusted         = new Dictionary<String, Int32>(StringComparer.Ordinal);
+
+            for (var holder = 0; holder < trustedHolders.Length; holder++)
+                foreach (var id in trustedHolders[holder])
+                    if (!trusted.TryAdd(id, holder))
+                    {
+                        ErrorResponse = $"The identity key '{id}' is trusted as one of two holders!";
+                        return false;
+                    }
+
+            // This statement names the trusted keys as the verifier knows their holders.
+            var nameOf    = new Dictionary<Int32, String>();
+            var holderOf  = new Dictionary<String, Int32>(StringComparer.Ordinal);
+
+            foreach (var identityKey in IdentityKeys)
+            {
+
+                if (!trusted.TryGetValue(identityKey.Id, out var holder))
+                    continue;
+
+                var name = identityKey.HolderOrUnnamed;
+
+                if ((nameOf.  TryGetValue(holder, out var named) && named != name) ||
+                    (holderOf.TryGetValue(name,   out var other) && other != holder))
+                {
+                    ErrorResponse = $"The key statement names the holder of the trusted identity key '{identityKey.Id}' otherwise than it is trusted!";
+                    return false;
+                }
+
+                nameOf  [holder] = name;
+                holderOf[name]   = holder;
+
+            }
+
             var keys      = IdentityKeys.Concat(OtherIdentityKeys ?? []).ToArray();
             var required  = Math.Max(MinConsensus, this.MinConsensus);
-            var holders   = new HashSet<String>(StringComparer.Ordinal);
+            var holders   = new HashSet<Int32>();
 
-            if (Signatures.Length == 1 && required == 1 && !trusted.Contains(Signatures[0].KeyId))
+            if (Signatures.Length == 1 && required == 1 && !trusted.ContainsKey(Signatures[0].KeyId))
             {
                 ErrorResponse = $"The key statement is signed by the key '{Signatures[0].KeyId}', which is not trusted!";
                 return false;
@@ -647,8 +726,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!VerifySignature(signature, identityKey, out ErrorResponse))
                     return false;
 
-                if (trusted.Contains(signature.KeyId))
-                    holders.Add(identityKey.HolderOrUnnamed);
+                if (trusted.TryGetValue(signature.KeyId, out var holder))
+                    holders.Add(holder);
 
             }
 
@@ -664,7 +743,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            ErrorResponse = null;
+            // Trusted then: its own identity keys, as it names their holders, and the trusted ones it does not name, as it
+            // names the holder of another key of theirs, or else as a holder of its own the verifier knows.
+            var result = IdentityKeys.ToDictionary(identityKey => identityKey.Id, identityKey => identityKey.HolderOrUnnamed, StringComparer.Ordinal);
+
+            for (var holder = 0; holder < trustedHolders.Length; holder++)
+                foreach (var id in trustedHolders[holder])
+                    result.TryAdd(id, nameOf.TryGetValue(holder, out var name) ? name : $"\0{trustedHolders[holder][0]}");
+
+            HolderOf       = result;
+            ErrorResponse  = null;
             return true;
 
         }

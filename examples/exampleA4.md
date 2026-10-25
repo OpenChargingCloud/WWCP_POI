@@ -151,7 +151,7 @@ foreach (var signature in checkpoint.Signatures.Where(signature => signature.Rol
     if (!checkpoint.VerifySignature(signature, key.Key, key.Id, out error))
         Helpers.Fail(error);
 
-    signedBy.Add(key.HolderOrUnnamed);
+    signedBy.Add(HolderOf(Anchor, Network, signature)!);
 
 }
 

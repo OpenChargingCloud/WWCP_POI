@@ -503,14 +503,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (KeyStatement.RoamingNetworkOperatorId != Id)
                 return $"The key statement of the roaming network operator '{Id}' is one of '{KeyStatement.RoamingNetworkOperatorId}'!";
 
+            // Keys are equal with their holders, too.
             if (KeyStatement.IdentityKeys.FirstOrDefault(key => !IdentityKeys.Contains(key)) is POIPublicKey unknownIdentityKey)
                 return $"The key statement of the roaming network operator '{Id}' names the identity key '{unknownIdentityKey.Id}', which is not one of its identity keys!";
 
             if (KeyStatement.MinConsensus != MinConsensus)
                 return $"The key statement of the roaming network operator '{Id}' states the minConsensus {KeyStatement.MinConsensus}, not its {MinConsensus}!";
 
-            // Signed by as many holders of its identity keys as its quorum needs.
-            return KeyStatement.TryVerify(IdentityKeys.Select(key => key.Id), IdentityKeys, out var error, MinConsensus)
+            // Signed by as many holders of its identity keys as its quorum needs, as the operator names their holders.
+            return KeyStatement.TryVerify(IdentityKeys.GroupBy(key => key.HolderOrUnnamed, StringComparer.Ordinal).Select(holder => holder.Select(key => key.Id)),
+                                          IdentityKeys,
+                                          out _,
+                                          out var error,
+                                          MinConsensus)
                        ? null
                        : MinConsensus > 1
                              ? $"The key statement of the roaming network operator '{Id}' is not signed by identity keys of {MinConsensus} of its holders: {error}"

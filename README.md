@@ -534,10 +534,12 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   Signing keys may name `usages` (`infrastructure`, `tariffs`, `priceStatements`, `software`, `certificates`, `party`), e.g. one key of a charging
   station operator for its pools and one for its tariffs. An app scans the QR code of the trust anchor (`GET ~/RNs/{id}/trustAnchor`): `WWCP/TA-2:` and the
   Base45 of its CBOR, with the network, its name and description, the thumbprints of the identity
-  keys and the `minConsensus` (`RoamingNetworkTrustAnchor.TryParse(text, …)`; the URI
-  `https://hub.example/poi/RNs/rn1?keys=<@id>,…&alsoAt=…` is read as well), at one URL or more, e.g. a mirror for
-  when the hub is down (`RoamingNetwork.CreateTrustAnchor(keyStatement, url, mirrorURL)`), and verifies proofs with
-  `proof.Verify(anchor, …)`: only the thumbprints and the `minConsensus` are pinned.
+  keys per holder and the `minConsensus` (`RoamingNetworkTrustAnchor.TryParse(text, …)`; the URI
+  `https://hub.example/poi/RNs/rn1?keys=<@id>,<@id>;<@id>,…&alsoAt=…` is read as well, the holders separated by `,`,
+  the keys of one holder by `;`), at one URL or more, e.g. a mirror for when the hub is down
+  (`RoamingNetwork.CreateTrustAnchor(keyStatement, url, mirrorURL)`), and verifies proofs with `proof.Verify(anchor, …)`:
+  only the thumbprints, which of them one holder holds, and the `minConsensus` are pinned. The holders are counted as
+  the trust anchor names them, never as a key statement names them, and a key keeps its holder.
 
 ### Price statements
 
@@ -676,7 +678,7 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/history/archive/{number}` | one segment: `{info, base, commits}` |
 | `GET ~/RNs/{id}/attestations` | the attestations of the head valid now: `{attestations: […]}` |
 | `GET ~/RNs/{id}/keyStatement` | the key statement of the roaming network operator |
-| `GET ~/RNs/{id}/trustAnchor` | what an app pins: `{roamingNetworkId, identityKeyIds, minConsensus, uri, qrCode, trustAnchor}`, `qrCode` the text of its QR code |
+| `GET ~/RNs/{id}/trustAnchor` | what an app pins: `{roamingNetworkId, identityKeyIds, minConsensus, uri, qrCode, trustAnchor}`, `identityKeyIds` per holder, `qrCode` the text of its QR code |
 | `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/proof` | the proof of a charging station of the head, `?hashAlgorithm=` one of the network's |
 | `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/proof` | the proof of the charging station of an EVSE |
 | `GET ~/RNs/{id}/CSs/{CS_Id}/proof`, `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/proof` | the same, found by the identification alone |

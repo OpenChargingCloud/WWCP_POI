@@ -517,7 +517,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(error,  Does.Contain("from 1 to"));
 
                 Assert.That(RoamingNetworkTrustAnchor.TryParse(With("minConsensus", CBORValue.FromUInt64(3)),                   out _, out error),  Is.False);
-                Assert.That(error,  Does.Contain("needs as many identity keys"));
+                Assert.That(error,  Does.Contain("needs identity keys of as many holders"));
 
                 Assert.That(RoamingNetworkTrustAnchor.TryParse(With("name",         CBORValue.FromText("Example")),             out _, out error),  Is.False);
 

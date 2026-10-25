@@ -277,6 +277,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private) ChangedKeyHolder(Next)
+
+        /// <summary>
+        /// Why the given next version names a key of a party with another holder than this version does, or null: a key
+        /// keeps its holder, so that no holder counts twice in a quorum by naming a key of its own as another's
+        /// (SPECIFICATION.md, section 4.1).
+        /// </summary>
+        /// <param name="Next">The version following this one.</param>
+        private String? ChangedKeyHolder(RoamingNetwork Next)
+        {
+
+            var holders = new Dictionary<(POIPartyId, String), String?>();
+
+            foreach (var (partyId, party) in Parties)
+                foreach (var key in party.IdentityKeys.Concat(party.SigningKeys))
+                    holders[(partyId, key.Id)] = key.Holder;
+
+            foreach (var (partyId, party) in Next.Parties)
+                foreach (var key in party.IdentityKeys.Concat(party.SigningKeys))
+                    if (holders.TryGetValue((partyId, key.Id), out var holder) && holder != key.Holder)
+                        return $"The key '{key.Id}' of the {partyId.EntityType} '{partyId.EntityId}' keeps its holder {(holder is null ? "none" : $"'{holder}'")}, not {(key.Holder is null ? "none" : $"'{key.Holder}'")}!";
+
+            return null;
+
+        }
+
+        #endregion
+
         #region (private) TryApplyChangeSet(ChangeSet, CheckOwnership, out RoamingNetwork, out ErrorResponse, VerifySignature)
 
         private Boolean TryApplyChangeSet(RoamingNetworkChangeSet                   ChangeSet,
@@ -355,6 +383,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 #endregion
+
+                if (ChangedKeyHolder(result) is String holderError)
+                {
+                    ErrorResponse = holderError;
+                    return false;
+                }
 
                 RoamingNetwork = result;
                 ErrorResponse  = null;

@@ -175,6 +175,18 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region (static) HoldersOf(Network)
+
+        /// <summary>
+        /// The @ids of the identity keys of the operator of the given network per holder, as a trust anchor names them.
+        /// </summary>
+        private static String[][] HoldersOf(RoamingNetwork Network)
+
+            => [ .. Network.Operator!.IdentityKeys.GroupBy(key => key.HolderOrUnnamed, StringComparer.Ordinal).
+                                                   Select (holder => holder.Select(key => key.Id).ToArray()) ];
+
+        #endregion
+
 
         #region The_quorum_needs_more_than_half_of_the_holders()
 
@@ -483,7 +495,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                      T0,
                                                      T0.AddDays(30));
 
-            var trusted  = network.Operator!.IdentityKeys.Select(key => key.Id).ToArray();
+            // Trusted per holder, as a trust anchor of the operator names them.
+            var trusted  = HoldersOf(network);
 
             using (Assert.EnterMultipleScope())
             {
@@ -501,10 +514,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(changed!.Operator!.MinConsensus,  Is.EqualTo(3));
 
                 // A key statement: the same.
-                Assert.That(StatementOf(("Alpha", 1), ("Alpha", 2)).TryVerify(trusted, null, out var error3, At: T0),  Is.False, "one holder, two identity keys");
+                Assert.That(StatementOf(("Alpha", 1), ("Alpha", 2)).TryVerify(trusted, null, out _, out var error3, At: T0),  Is.False, "one holder, two identity keys");
                 Assert.That(error3,  Does.Contain("of 1 holder, not of 2"));
 
-                Assert.That(StatementOf(("Alpha", 2), ("Gamma", 1)).TryVerify(trusted, null, out var error4, At: T0),  Is.True, error4);
+                Assert.That(StatementOf(("Alpha", 2), ("Gamma", 1)).TryVerify(trusted, null, out _, out var error4, At: T0),  Is.True, error4);
 
             }
 
@@ -692,6 +705,145 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_trust_anchor_names_the_keys_per_holder()
+
+        /// <summary>
+        /// A trust anchor names the identity keys of the operator per holder: one entry for each, the @id of its key, or the
+        /// array of the @ids of its keys where it holds several, as in JSON, CBOR and the URL (holders separated by commas,
+        /// the keys of one holder by semicolons); its minConsensus counts holders (SPECIFICATION.md, section 8.6).
+        /// </summary>
+        [Test]
+        public void A_trust_anchor_names_the_keys_per_holder()
+        {
+
+            var network  = Network(2, ExtraIdentityKeyOf: "Alpha");
+            var alpha    = new[] { Key(network, "Alpha", POIKeyKind.Identity).Public.Id, Key(network, "Alpha", POIKeyKind.Identity, 2).Public.Id }.Order(StringComparer.Ordinal).ToArray();
+            var url      = URL.Parse($"https://hub.example/poi/RNs/{network.Id}");
+            var anchor   = new RoamingNetworkTrustAnchor(network.Id, [ url ], HoldersOf(network), 2);
+
+            Assert.That(RoamingNetworkTrustAnchor.TryParse(anchor.ToQRCode(),           out var fromQRCode, out var error1),  Is.True, error1);
+            Assert.That(RoamingNetworkTrustAnchor.TryParse(URL.Parse(anchor.ToURL()),   out var fromURL,    out var error2),  Is.True, error2);
+            Assert.That(RoamingNetworkTrustAnchor.TryParse(anchor.ToJSON(),             out var fromJSON,   out var error3),  Is.True, error3);
+
+            var keysJSON = (JArray) anchor.ToJSON()[RoamingNetworkTrustAnchor.PropertyKeys.Keys]!;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(anchor.Holders,                Has.Count.EqualTo(3));
+                Assert.That(anchor.Keys,                   Has.Length.EqualTo(4));
+                Assert.That(anchor.Holders.Any(keys => keys.SequenceEqual(alpha)),  Is.True, "Alpha with both its keys");
+
+                Assert.That(keysJSON.Count(holder => holder.Type == JTokenType.Array),   Is.EqualTo(1));
+                Assert.That(keysJSON.Count(holder => holder.Type == JTokenType.String),  Is.EqualTo(2));
+                Assert.That(anchor.ToURL(),                Does.Contain(String.Join(";", alpha)));
+
+                foreach (var read in new[] { fromQRCode!, fromURL!, fromJSON! })
+                    Assert.That(read.Holders.Select(keys => String.Join(";", keys)),  Is.EqualTo(anchor.Holders.Select(keys => String.Join(";", keys))));
+
+                // Each @id once, every holder with a key, and at most as many must sign as there are holders.
+                Assert.That(() => new RoamingNetworkTrustAnchor(network.Id, [ url ], [ alpha, [ alpha[0] ] ]),
+                            Throws.ArgumentException.With.Message.Contains("each once"));
+                Assert.That(() => new RoamingNetworkTrustAnchor(network.Id, [ url ], [ alpha, [] ]),
+                            Throws.ArgumentException.With.Message.Contains("every holder with at least one"));
+                Assert.That(() => new RoamingNetworkTrustAnchor(network.Id, [ url ], [ alpha ], 2),
+                            Throws.ArgumentException.With.Message.Contains("as many holders, not of 1"));
+
+                // Pinned without holders, each key is a holder of its own.
+                Assert.That(new RoamingNetworkTrustAnchor(network.Id, [ url ], anchor.Keys, 2).Holders,  Has.Count.EqualTo(4));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_holder_does_not_count_twice_by_naming_its_key_as_another_s()
+
+        /// <summary>
+        /// The holders of a quorum are counted as the verifier knows them, e.g. by its trust anchor, never as the key
+        /// statement it checks names them: a holder of two trusted identity keys, which writes a key statement naming one of
+        /// them as another holder's and signs it with both, is one holder, and the statement is refused, as it names the
+        /// holder of a trusted key otherwise than it is trusted (docs/csharp-review.md of WWCP_POI.TS, finding 1).
+        /// </summary>
+        [Test]
+        public void A_holder_does_not_count_twice_by_naming_its_key_as_another_s()
+        {
+
+            var network   = Network(2, ExtraIdentityKeyOf: "Alpha");
+            var trusted   = HoldersOf(network);
+            var alpha2    = Key(network, "Alpha", POIKeyKind.Identity, 2);
+
+            RoamingNetworkKeyStatement StatementOf(IEnumerable<POIPublicKey> IdentityKeys, params (String Holder, Int32 Number)[] Signers)
+
+                => RoamingNetworkKeyStatement.Create([ .. Signers.Select(signer => ((Org.BouncyCastle.Crypto.AsymmetricKeyParameter) Key(network, signer.Holder, POIKeyKind.Identity, signer.Number).Private, COSEAlgorithm.ES512)) ],
+                                                     2,
+                                                     network.Id,
+                                                     network.Operator!.Id,
+                                                     IdentityKeys,
+                                                     T0,
+                                                     T0.AddDays(30));
+
+            // Alpha names its second identity key as one of Beta.
+            var asBeta    = network.Operator!.IdentityKeys.Select(key => key.Id == alpha2.Public.Id
+                                                                             ? POIPublicKey.From(alpha2.Private, NotBefore: T0.AddDays(-1), NotAfter: T0.AddYears(2), Holder: "Beta")
+                                                                             : key).ToArray();
+
+            var forged    = StatementOf(asBeta,                          ("Alpha", 1), ("Alpha", 2));
+            var byAlpha   = StatementOf(network.Operator!.IdentityKeys,  ("Alpha", 1), ("Alpha", 2));
+            var byTwo     = StatementOf(network.Operator!.IdentityKeys,  ("Alpha", 2), ("Beta",  1));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(forged. TryVerify(trusted, null, out _, out var error1, 2, T0),  Is.False);
+                Assert.That(error1,  Does.Contain("names the holder of the trusted identity key").And.Contain("otherwise than it is trusted"));
+
+                Assert.That(byAlpha.TryVerify(trusted, null, out _, out var error2, 2, T0),  Is.False);
+                Assert.That(error2,  Does.Contain("of 1 holder, not of 2"));
+
+                Assert.That(byTwo.  TryVerify(trusted, null, out var holderOf, out var error3, 2, T0),  Is.True, error3);
+                Assert.That(holderOf![alpha2.Public.Id],  Is.EqualTo("Alpha"));
+
+                // A verifier pinning the keys of one holder as two refuses a statement naming them as one holder's.
+                Assert.That(byTwo.TryVerify(network.Operator!.IdentityKeys.Select(key => key.Id), null, out var error4, 2, T0),  Is.False);
+                Assert.That(error4,  Does.Contain("otherwise than it is trusted"));
+
+                // In a version, the statement names the keys as the operator does, with their holders.
+                Assert.That(() => network.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(network.Operator!, RoamingNetworkKeyStatement.JSONProperty, null, StatementOf(asBeta, ("Alpha", 2), ("Beta", 1)).ToJSON(Embedded: true)) ], CreatedAt: T0),
+                            Throws.ArgumentException.With.Message.Contains($"names the identity key '{alpha2.Public.Id}', which is not one of its identity keys"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_key_keeps_its_holder()
+
+        /// <summary>
+        /// A key keeps its holder: a version naming a key of a party with another holder than the version before, also by
+        /// the quorum, is refused; a holder handing a key over gives the other a new key instead (SPECIFICATION.md, 4.1).
+        /// </summary>
+        [Test]
+        public void A_key_keeps_its_holder()
+        {
+
+            var network    = Network(2, ExtraIdentityKeyOf: "Alpha");
+            var alpha2     = Key(network, "Alpha", POIKeyKind.Identity, 2);
+            var before     = new JArray(network.Operator!.IdentityKeys.Select(key => key.ToJSON(Embedded: true)));
+            var toBeta     = new JArray(network.Operator!.IdentityKeys.Select(key => (key.Id == alpha2.Public.Id
+                                                                                          ? POIPublicKey.From(alpha2.Private, NotBefore: T0.AddDays(-1), NotAfter: T0.AddYears(2), Holder: "Beta")
+                                                                                          : key).ToJSON(Embedded: true)));
+            var changeSet  = network.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(network.Operator!, POIPartyKeys.IdentityKeysProperty, before, toBeta) ], CreatedAt: T0);
+
+            Assert.That(network.TryApplyChangeSet(Signed(changeSet, network, POIKeyKind.Identity, "Alpha", "Beta", "Gamma"), out _, out var error), Is.False);
+            Assert.That(error,  Does.Contain($"The key '{alpha2.Public.Id}' of the RoamingNetworkOperator").And.Contain("keeps its holder 'Alpha', not 'Beta'"));
+
+        }
+
+        #endregion
+
         #region A_trust_anchor_is_CBOR_in_a_QR_code()
 
         /// <summary>
@@ -738,7 +890,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(fromURI!.MinConsensus,     Is.EqualTo((Byte) 2));
 
                 Assert.That(() => new RoamingNetworkTrustAnchor(anchor.Id, anchor.URLs, anchor.Keys, 4),
-                            Throws.ArgumentException.With.Message.Contains("needs as many identity keys"));
+                            Throws.ArgumentException.With.Message.Contains("needs identity keys of as many holders, not of 3"));
 
                 var otherNetwork = anchor.ToJSON();
                 otherNetwork[RoamingNetworkTrustAnchor.PropertyKeys.Id] = "rn9";

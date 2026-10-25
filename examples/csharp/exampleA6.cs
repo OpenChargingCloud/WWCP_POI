@@ -245,12 +245,12 @@ public static class ExampleA6
             Helpers.Fail("the genesis is not the one of the roaming network of the trust anchor");
 
         // Its key statement signed by enough holders, and the genesis commit by the quorum of the roaming network operator.
-        if (!genesis.Operator!.KeyStatement!.TryVerify(anchor.Keys, genesis.Operator.IdentityKeys, out error, anchor.MinConsensus, At: Timestamp.Now))
+        if (!genesis.Operator!.KeyStatement!.TryVerify(anchor.Holders, genesis.Operator.IdentityKeys, out _, out error, anchor.MinConsensus, At: Timestamp.Now))
             Helpers.Fail(error);
 
         var signedBy = history.Root.Signatures.Select(signature => ExampleA4.SigningKeyOf(anchor, genesis, signature) is POIPublicKey key &&
                                                                     history.Root.VerifySignature(signature, key.Key, key.Id, out _)
-                                                                        ? key.HolderOrUnnamed
+                                                                        ? ExampleA4.HolderOf(anchor, genesis, signature)
                                                                         : null).
                                                OfType<String>().
                                                ToHashSet();

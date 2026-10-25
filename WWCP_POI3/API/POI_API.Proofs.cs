@@ -111,7 +111,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   var path          = request.Path.ToString();
                                   var trustAnchor   = new RoamingNetworkTrustAnchor(roamingNetwork.Id,
                                                                                     [ URL.Parse($"{(local ? "http" : "https")}://{host}{path[..path.LastIndexOf("/trustAnchor", StringComparison.Ordinal)]}") ],
-                                                                                    [ .. roamingNetwork.Operator.IdentityKeys.Select(identityKey => identityKey.Id) ],
+                                                                                    roamingNetwork.Operator.IdentityKeys.GroupBy(identityKey => identityKey.HolderOrUnnamed, StringComparer.Ordinal).
+                                                                                                                         Select (holder      => holder.Select(identityKey => identityKey.Id)),
                                                                                     roamingNetwork.Operator.MinConsensus,
                                                                                     roamingNetwork.Name,
                                                                                     roamingNetwork.Description);
@@ -119,7 +120,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   return EntityResponse(request,
                                                         new JObject(
                                                             new JProperty(PropertyKeys.RoamingNetworkId,  roamingNetwork.Id.ToString()),
-                                                            new JProperty(PropertyKeys.IdentityKeyIds,    new JArray(trustAnchor.Keys)),
+                                                            new JProperty(PropertyKeys.IdentityKeyIds,    trustAnchor.KeysJSON()),
                                                             new JProperty(PropertyKeys.MinConsensus,      trustAnchor.MinConsensus),
                                                             new JProperty(PropertyKeys.URI,               trustAnchor.ToURL()),
                                                             new JProperty(PropertyKeys.QRCode,            trustAnchor.ToQRCode()),

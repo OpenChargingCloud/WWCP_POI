@@ -237,8 +237,10 @@ public static class ExampleA1
         if (statement is null)
             Helpers.Fail("the roaming network operator states no keys");
 
-        if (!statement.TryVerify(anchor.Keys,
+        //    The holders are counted as the trust anchor names them, and the key statement must name them so.
+        if (!statement.TryVerify(anchor.Holders,
                                  network.Operator!.IdentityKeys,
+                                 out var holderOf,
                                  out error,
                                  anchor.MinConsensus,
                                  At: Timestamp.Now))
@@ -246,28 +248,28 @@ public static class ExampleA1
 
         // f) The commit is signed, as the roaming network operator, by signing keys of as many holders, each certified by a
         //    trusted identity key of its holder, valid when it signed, and one that may sign for the party. The identity keys
-        //    of the key statement checked in e) are trusted as well.
-        var trustedIds   = anchor.Keys.Concat(statement.IdentityKeys.Select(identityKey => identityKey.Id)).ToHashSet();
+        //    of the key statement checked in e) are trusted as well; a signature counts for the holder of the identity key
+        //    that certified its key, as e) knows it, never as the signing key names itself.
+        var trustedIds   = holderOf.Keys.ToHashSet();
         var identityPool = statement.IdentityKeys.Concat(network.Operator.IdentityKeys).ToArray();
         var signedBy     = new HashSet<String>();
 
         foreach (var signature in commit.Signatures.Where(signature => signature.Role == RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator))
         {
 
-            var key = network.Operator.SigningKeyCertificates.
-                            FirstOrDefault(certificate => certificate.SigningKey.Id == signature.KeyId         &&
-                                                          certificate.SigningKey.IsValidAt(signature.SignedAt) &&
-                                                          certificate.SigningKey.MaySign(POIKeyUsages.Party)   &&
-                                                          certificate.TryVerify(identityPool, out _, out _, trustedIds))?.
-                            SigningKey;
+            var certificate = network.Operator.SigningKeyCertificates.
+                                  FirstOrDefault(certificate => certificate.SigningKey.Id == signature.KeyId         &&
+                                                                certificate.SigningKey.IsValidAt(signature.SignedAt) &&
+                                                                certificate.SigningKey.MaySign(POIKeyUsages.Party)   &&
+                                                                certificate.TryVerify(identityPool, out _, out _, trustedIds));
 
-            if (key is null)
+            if (certificate is null)
                 Helpers.Fail($"the key '{signature.KeyId}' is no signing key a trusted identity key of its holder certifies");
 
-            if (!commit.VerifySignature(signature, key.Key, key.Id, out error))
+            if (!commit.VerifySignature(signature, certificate.SigningKey.Key, certificate.SigningKey.Id, out error))
                 Helpers.Fail(error);
 
-            signedBy.Add(key.HolderOrUnnamed);
+            signedBy.Add(holderOf[certificate.KeyId]);
 
         }
 

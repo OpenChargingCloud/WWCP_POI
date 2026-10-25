@@ -304,7 +304,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            return Verify(TrustAnchor.Keys, out Attestation, out ErrorResponse, At, TrustAnchor.MinConsensus);
+            return Verify(TrustAnchor.Holders, out Attestation, out ErrorResponse, At, TrustAnchor.MinConsensus);
 
         }
 
@@ -345,19 +345,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Verify this proof against the identity keys of the roaming network operator the verifier trusts by their @ids,
-        /// e.g. those of a QR code it scanned (RoamingNetworkTrustAnchor): the key statement of the operator the proof gives
-        /// must be signed by trusted identity keys of as many holders as the given minConsensus and its own require, and be
-        /// valid at the given time, now by default; its identity keys are trusted then as well. The attestations of the
-        /// proof must be signed by signing keys of as many holders, valid when they were signed and allowed to sign for the
-        /// party, each certified by a trusted identity key of its holder (SPECIFICATION.md, sections 4.1 and 8.6): so that
-        /// no holder of a quorum attests a version alone.
+        /// each of a holder of its own: as Verify(TrustedHolders, …) does. A verifier knowing that one holder holds several
+        /// of them, e.g. by a trust anchor, names them per holder there.
         /// </summary>
-        /// <param name="TrustedIdentityKeyIds">The @ids of the identity keys the verifier trusts: their SHA-256 thumbprints.</param>
+        /// <param name="TrustedIdentityKeyIds">The @ids of the identity keys the verifier trusts, their SHA-256 thumbprints, each of a holder of its own.</param>
         /// <param name="Attestation">One of the attestations it was verified against.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
         /// <param name="At">When it must be valid, now by default.</param>
         /// <param name="MinConsensus">How many holders must have signed the key statement and attested the root at least, e.g. as a trust anchor names it.</param>
         public Boolean Verify(IEnumerable<String>                                   TrustedIdentityKeyIds,
+                              [NotNullWhen(true)]  out RoamingNetworkAttestation?   Attestation,
+                              [NotNullWhen(false)] out String?                      ErrorResponse,
+                              DateTimeOffset?                                       At             = null,
+                              Byte                                                  MinConsensus   = 1)
+
+            => Verify(TrustedIdentityKeyIds.Select(id => (IEnumerable<String>) [ id ]),
+                      out Attestation,
+                      out ErrorResponse,
+                      At,
+                      MinConsensus);
+
+        #endregion
+
+        #region Verify(TrustedHolders,        out Attestation, out ErrorResponse, At = null, MinConsensus = 1)
+
+        /// <summary>
+        /// Verify this proof against the identity keys of the roaming network operator the verifier trusts by their @ids,
+        /// per holder, e.g. those of a trust anchor it scanned (RoamingNetworkTrustAnchor): the key statement of the
+        /// operator the proof gives must be signed by trusted identity keys of as many holders as the given minConsensus and
+        /// its own require, name their holders as the verifier knows them, and be valid at the given time, now by default;
+        /// its identity keys are trusted then as well. The attestations of the proof must be signed by signing keys of as
+        /// many holders, valid when they were signed and allowed to sign for the party, each certified by a trusted identity
+        /// key of its holder, and counted for the holder of that identity key as the verifier knows it (SPECIFICATION.md,
+        /// sections 4.1 and 8.6): so that no holder of a quorum attests a version alone.
+        /// </summary>
+        /// <param name="TrustedHolders">The @ids of the identity keys the verifier trusts, their SHA-256 thumbprints, per holder.</param>
+        /// <param name="Attestation">One of the attestations it was verified against.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="At">When it must be valid, now by default.</param>
+        /// <param name="MinConsensus">How many holders must have signed the key statement and attested the root at least, e.g. as a trust anchor names it.</param>
+        public Boolean Verify(IEnumerable<IEnumerable<String>>                      TrustedHolders,
                               [NotNullWhen(true)]  out RoamingNetworkAttestation?   Attestation,
                               [NotNullWhen(false)] out String?                      ErrorResponse,
                               DateTimeOffset?                                       At             = null,
@@ -374,21 +401,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var at = At ?? Timestamp.Now;
 
-            if (!keyStatement.TryVerify(TrustedIdentityKeyIds, operatorIdentityKeys, out ErrorResponse, MinConsensus, at))
+            // A key statement trusted names identity keys to trust, e.g. those replacing pinned ones, with their holders.
+            if (!keyStatement.TryVerify(TrustedHolders, operatorIdentityKeys, out var holderOf, out ErrorResponse, MinConsensus, at))
                 return false;
 
-            // A key statement trusted names identity keys to trust, e.g. those replacing pinned ones.
             var identityKeys  = keyStatement.IdentityKeys.Concat(operatorIdentityKeys).ToArray();
-            var trustedIds    = TrustedIdentityKeyIds.Concat(keyStatement.IdentityKeys.Select(key => key.Id)).ToHashSet(StringComparer.Ordinal);
+            var trustedIds    = holderOf.Keys.ToHashSet(StringComparer.Ordinal);
 
-            // The signing key of an attestation, certified by a trusted identity key of its holder.
-            POIPublicKey? CertifiedSigningKeyOf(RoamingNetworkAttestation Attestation)
+            // The signing key of an attestation, certified by a trusted identity key of its holder, and that holder.
+            (POIPublicKey SigningKey, String Holder)? CertifiedSigningKeyOf(RoamingNetworkAttestation Attestation)
+            {
 
-                => certificates.FirstOrDefault(certificate => certificate.SigningKey.Id == Attestation.KeyId              &&
-                                                              certificate.SigningKey.IsValidAt(Attestation.SignedAt)      &&
-                                                              certificate.SigningKey.MaySign(POIKeyUsages.Party)          &&
-                                                              certificate.TryVerify(identityKeys, out _, out _, trustedIds))?.
-                                SigningKey;
+                foreach (var certificate in certificates)
+                    if (certificate.SigningKey.Id == Attestation.KeyId              &&
+                        certificate.SigningKey.IsValidAt(Attestation.SignedAt)      &&
+                        certificate.SigningKey.MaySign(POIKeyUsages.Party)          &&
+                        certificate.TryVerify(identityKeys, out var identityKey, out _, trustedIds))
+                    {
+                        return (certificate.SigningKey, holderOf[identityKey.Id]);
+                    }
+
+                return null;
+
+            }
 
             if (keyStatement.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
             {
@@ -399,13 +434,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var required = Math.Max(MinConsensus, keyStatement.MinConsensus);
 
             if (required == 1)
-                return Verify(attestation => CertifiedSigningKeyOf(attestation) is POIPublicKey signingKey &&
+                return Verify(attestation => CertifiedSigningKeyOf(attestation) is var (signingKey, _) &&
                                              attestation.VerifySignature(signingKey.Key.ToPublicKey(), signingKey.Id, out _),
                               out Attestation,
                               out ErrorResponse,
                               at);
 
-            #region Attested by as many holders of the signing keys certified
+            #region Attested by as many holders of the signing keys certified, as the verifier knows them
 
             if (!TryCalculateETag(out var eTag, out ErrorResponse))
                 return false;
@@ -414,11 +449,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var attestation in AttestationsOf(eTag, at))
             {
-                if (CertifiedSigningKeyOf(attestation) is POIPublicKey signingKey &&
+                if (CertifiedSigningKeyOf(attestation) is var (signingKey, holder) &&
                     attestation.VerifySignature(signingKey.Key.ToPublicKey(), signingKey.Id, out _))
                 {
                     Attestation ??= attestation;
-                    holders.Add(signingKey.HolderOrUnnamed);
+                    holders.Add(holder);
                 }
             }
 

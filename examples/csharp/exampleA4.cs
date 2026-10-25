@@ -255,9 +255,9 @@ public static class ExampleA4
 
     }
 
-    // The signing key of the roaming network operator a signature names, as example A1 checks those of a commit: certified
-    // by a trusted identity key of its holder, valid when it signed, and one that may sign for the party.
-    internal static POIPublicKey? SigningKeyOf(RoamingNetworkTrustAnchor Anchor, RoamingNetwork Network, RoamingNetworkCommitSignature Signature)
+    // The certificate of the signing key of the roaming network operator a signature names, as example A1 checks those of a
+    // commit: by a trusted identity key of its holder, the key valid when it signed, and one that may sign for the party.
+    private static RoamingNetworkSigningKeyCertificate? CertificateOf(RoamingNetworkTrustAnchor Anchor, RoamingNetwork Network, RoamingNetworkCommitSignature Signature)
     {
 
         var statement     = Network.Operator!.KeyStatement!;
@@ -270,10 +270,25 @@ public static class ExampleA4
                          FirstOrDefault(certificate => certificate.SigningKey.Id == Signature.KeyId         &&
                                                        certificate.SigningKey.IsValidAt(Signature.SignedAt) &&
                                                        certificate.SigningKey.MaySign(POIKeyUsages.Party)   &&
-                                                       certificate.TryVerify(identityPool, out _, out _, trustedIds))?.
-                         SigningKey;
+                                                       certificate.TryVerify(identityPool, out _, out _, trustedIds));
 
     }
+
+    // The signing key of the roaming network operator a signature names, as example A1 checks those of a commit: certified
+    // by a trusted identity key of its holder, valid when it signed, and one that may sign for the party.
+    internal static POIPublicKey? SigningKeyOf(RoamingNetworkTrustAnchor Anchor, RoamingNetwork Network, RoamingNetworkCommitSignature Signature)
+
+        => CertificateOf(Anchor, Network, Signature)?.SigningKey;
+
+    // The holder of the signing key a signature names, as the verifier knows it: the one of the trusted identity key that
+    // certified it, as the key statement names it once checked against the holders of the trust anchor, never as the
+    // signing key names itself (SPECIFICATION.md, section 8.6).
+    internal static String? HolderOf(RoamingNetworkTrustAnchor Anchor, RoamingNetwork Network, RoamingNetworkCommitSignature Signature)
+
+        => CertificateOf(Anchor, Network, Signature) is RoamingNetworkSigningKeyCertificate certificate &&
+           Network.Operator!.KeyStatement!.TryVerify(Anchor.Holders, Network.Operator.IdentityKeys, out var holderOf, out _, Anchor.MinConsensus)
+               ? holderOf[certificate.KeyId]
+               : null;
 
     // A verifier of the signatures of a checkpoint, by the signing keys of the roaming network operator.
     internal static VerifyCheckpointSignatureDelegate VerifyCheckpointSignature(RoamingNetworkTrustAnchor Anchor, RoamingNetwork Network)
@@ -306,7 +321,7 @@ public static class ExampleA4
             if (!checkpoint.VerifySignature(signature, key.Key, key.Id, out error))
                 Helpers.Fail(error);
 
-            signedBy.Add(key.HolderOrUnnamed);
+            signedBy.Add(HolderOf(Anchor, Network, signature)!);
 
         }
 
