@@ -698,6 +698,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(changedHPC!.ChargingStationOperatorIds,                           Is.EqualTo(new[] { GEF, ION }));
                 Assert.That(rn2.OffersCovering(E3).Select(offer => offer.Id),                 Is.EqualTo(new[] { HPC39 }));
 
+                // What embeds a changed offer changed with it (SPECIFICATION.md section 4): its operator, its provider.
+                Assert.That(changedSummer.LastChangeDate,                                     Is.EqualTo(T0));
+                Assert.That(rn2.GetChargingStationOperatorById(GEF)!.LastChangeDate,          Is.EqualTo(T0));
+                Assert.That(rn2.TryGetEMobilityProviderById(GDF, out var gdf2) ? gdf2.LastChangeDate : default(DateTimeOffset?),  Is.EqualTo(T0));
+                Assert.That(rn2.GetChargingStationOperatorById(ION)!.LastChangeDate,          Is.EqualTo(Created), "No offer of it changed.");
+
                 // A group an operator's offer names can not be removed; a provider's offer naming it does not keep it.
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.Remove(A9)),
                             Throws.ArgumentException.With.Message.Contains("The charging pool group 'DE*GEF*PGA9' of the charging tariff offer 'gef-summer-2026' is unknown"));

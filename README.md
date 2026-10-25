@@ -356,8 +356,9 @@ var rn2 = qa1.ApplyChangeSet(cs1);   // qa1 stays as it was!
   importers commit, write changes element by element (`POIElements.Diff`). See
   [docs/](docs/README.md#element-changes).
 - **Timestamps:** a change set sets `lastChange` to its `CreatedAt`, so its after ETags are deterministic:
-  of the roaming network always, of an entity when it is added or its own properties change, not when only what
-  it embeds changes. Whether anything below an entity changed shows its ETag, what changed the history.
+  of the roaming network always, of an entity when it is added or its own properties change, and of everything
+  embedding an entity added, changed or removed, up to the roaming network: the `lastChange` of an entity tells
+  the last change of its representation, as its ETag does; the history tells what changed.
 - **Owners:** every change set must be signed by the owner of every change it makes, with a key the owner has
   in the version it is applied to, valid at its `createdAt` (`TryCheckOwnership`); every signature must be one of
   a key of a party. Nobody else's signature counts, there is no external trust configuration.

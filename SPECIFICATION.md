@@ -187,11 +187,16 @@ canonical JSON (section 1): the number `22000` read from a text is the decimal 2
 reader holds, and `22000.0` is another value.
 
 **Timestamps:** a change set sets `lastChange` to its `createdAt`: of the roaming network always; of an entity
-when it is added (and `created`, unless given) or when one of its own properties changes; not when only an entity
-it embeds changes. `lastChange` therefore does not tell when anything below an entity last changed: its
-representation, and so its ETag, changes with everything it embeds, and the history tells what changed.
-Grid connection points, brands (embedded in operators, pools, stations, EVSEs and RFID authentication modes) and
-parking products have no timestamps.
+when it is added (and `created`, unless given) or when one of its own properties changes; and of every entity
+embedding one it adds, changes or removes, up to the roaming network: the charging station, charging pool and
+charging station operator of an EVSE, the charging pool and operator of a charging station, the operator of a
+charging pool, the owner of a charging tariff, template, group or offer, the grid operator of a grid connection
+point, the parking operator of a parking garage, space, space template, sensor, space group or product, the
+manufacturer of a model or transparency software release, the conformity assessment body of a certificate.
+`lastChange` therefore tells when the representation of an entity, with everything it embeds, last changed, as
+its ETag does; the history tells what changed. Grid connection points, brands (embedded in operators, pools,
+stations, EVSEs and RFID authentication modes), parking products, models, transparency software releases and
+certificates have no timestamps; energy meters, values of what embeds them, keep those of their new value.
 
 **What is signed** is named by a versioned JSON-LD context, `https://open.charging.cloud/contexts/wwcp/roamingNetwork/<object>/v<n>`:
 it tells what an object is and in which version, and every signature input and every identification

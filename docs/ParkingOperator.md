@@ -35,7 +35,7 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `description` | update/remove |
 | `dataSource` | update/remove |
 | `created` | — (set on `Add` unless given) |
-| `lastChange` | — (set to the change set's `createdAt` when its own properties change, and when its garages, spaces, sensors, space groups or products change) |
+| `lastChange` | — (set to the change set's `createdAt` when its own properties change, and when its garages, spaces, space templates, sensors, space groups or products change) |
 | `customData` | update/remove |
 
 

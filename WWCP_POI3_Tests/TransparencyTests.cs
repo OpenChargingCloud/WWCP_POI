@@ -377,9 +377,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(manufacturer!.TransparencySoftware.Select(release => release.Id.ToString()),      Is.EqualTo(new[] { "chargy-1.0", "chargy-1.1", "chargy-2.0" }));
                 Assert.That(changedChargy11!.SupportUntil,                                              Is.EqualTo(DateTimeOffset.Parse("2027-12-31T23:59:59Z")));
                 Assert.That(changedCert1!.Covers(chargy20),                                             Is.True);
-                // Releases and certificates have no timestamps; the manufacturer embedding them changed with them.
+                // Releases and certificates have no timestamps; the manufacturer and the body embedding them changed with them.
                 Assert.That(rn2.ToJSON()["transparencySoftwareManufacturers"]![0]!["transparencySoftware"]![2]!["created"],  Is.Null);
                 Assert.That(manufacturer.LastChangeDate,                                                Is.EqualTo(T0));
+                Assert.That(rn2.TryGetConformityAssessmentBodyById(PTB, out var ptb) ? ptb.LastChangeDate : default(DateTimeOffset?),  Is.EqualTo(T0));
 
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.Remove(Chargy10)),
                             Throws.ArgumentException.With.Message.Contains("release 'chargy-1.0' of the certificate 'cert-1'"));
