@@ -80,6 +80,9 @@ and at its partner sites. Its offers name groups, of its own or of any operator,
 identification, e.g. `DE*GDF*PGPARTNER`, and are unique in the roaming network.
 
 - **Owner:** it signs its groups and offers itself; they change nothing of an operator's, so no operator signs them.
+  Within a change set, a group is the provider's while it has it: once an earlier change removed it, alone or with
+  the provider, its identification names the group of the charging station operator of the same prefix again
+  (`DE-GDF` and `DE*GDF`), which that operator signs, see [SPECIFICATION.md](../SPECIFICATION.md#41-keys-and-owners).
 - **Weak references:** a member, group or operator its groups and offers name that does not exist (any more) is left
   out, and its owner removes it without the provider. A group an offer of its own names can not be removed.
 - **No overlap:** a change set of the provider must not make two of its offers overlap; offers coming to overlap by

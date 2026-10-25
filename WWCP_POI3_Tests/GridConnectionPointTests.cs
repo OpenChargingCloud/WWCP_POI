@@ -242,6 +242,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Grid
             var handedOn    = Apply(rn2, [ net ], RoamingNetworkChange.UpdateProperty(Point(rn2, GCP1), RoamingNetwork.MaintainedByProperty, null, Maintainer(exa)));
             var reassigned  = Apply(rn2, [ ],     RoamingNetworkChange.UpdateProperty(Point(rn2, GCP1), RoamingNetwork.MaintainedByProperty, null, Maintainer(gef)));
 
+            // Handed on in a change set, a later change of the same change set is the new maintainer's (csharp-review 9).
+            RoamingNetworkChange[] handOnAndChange = [ RoamingNetworkChange.UpdateProperty(Point(rn2, GCP1), RoamingNetwork.MaintainedByProperty, null, Maintainer(exa)),
+                                                       RoamingNetworkChange.UpdateProperty(Point(rn2, GCP1), "nominalVoltage", null, 400) ];
+
+            var notByNET    = Apply(rn2, [ net ],      handOnAndChange);
+            var withEXA     = Apply(rn2, [ net, exa ], handOnAndChange);
+
             var recovery    = rn2.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(Point(rn2, GCP1), RoamingNetwork.MaintainedByProperty, null, Maintainer(gef)) ], CreatedAt: T0).
                                   SignedBy(RNO, POIKeyKind.Identity);
 
@@ -259,6 +266,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Grid
                 Assert.That(takenBack.Error,                                              Does.Contain("needs a signature by"));
                 Assert.That(handedOn.Error,                                               Is.Null);
                 Assert.That(Point(handedOn.Network!, GCP1).MaintainedBy,                  Is.EqualTo(exa));
+
+                Assert.That(notByNET.Error,                                               Does.Contain("Change 1: UpdateProperty of the GridConnectionPoint 'connection-1' ('nominalVoltage') needs a signature by a signing key of the ChargingStationOperator 'DE*EXA'"));
+                Assert.That(withEXA.Error,                                                Is.Null);
 
                 Assert.That(reassigned.Error,                                             Does.Contain("unsigned"));
                 Assert.That(rn2.TryApplyChangeSet(recovery, out var recovered, out var recoveryError),  Is.True, recoveryError);

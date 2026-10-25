@@ -243,6 +243,61 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_provider_changes_no_group_of_the_operator_of_its_prefix()
+
+        /// <summary>
+        /// A group of a provider may have the identification of a group of the charging station operator of the same prefix
+        /// (DE-GDF and DE*GDF), unique in the roaming network once a change set is applied. Once an earlier change of the
+        /// change set removed the provider's group, alone or with the provider, the identification names the operator's
+        /// group, and the operator owns its change, as applying it decides (csharp-review 9).
+        /// </summary>
+        [Test]
+        public void A_provider_changes_no_group_of_the_operator_of_its_prefix()
+        {
+
+            var operatorId  = ChargingStationOperator_Id.Parse("DE*GDF");
+            var json        = NewNetwork().ToJSON(IncludeETags: false);
+
+            ((JArray) json["chargingStationOperators"]!).Add(new ChargingStationOperator(operatorId,
+                                                                                         Created:     Created,
+                                                                                         EVSEGroups:  [ new EVSEGroup(EVSEGroup_Id.Parse("DE*GDF*EGHIGHWAY"), Created: Created) ]).ToEmbeddedJSON());
+
+            Assert.That(RoamingNetwork.TryParse(json, out var parsed, out var parseError), Is.True, parseError);
+
+            var rn1         = parsed!.WithKeys();
+            var renamed     = RoamingNetworkChange.UpdateProperty(nameof(EVSEGroup), "DE*GDF*EGHIGHWAY", "name", null, I18NString.Create(Languages.en, "Renamed").ToJSON());
+
+            // The provider adds a group of the same identification, removes it again, and renames the operator's group.
+            var removed     = rn1.CreateChangeSet([ RoamingNetworkChange.Add(new EVSEGroup(EVSEGroup_Id.Parse("DE-GDF*EGHIGHWAY"), EVSEIds: [ E2 ]), GDF),
+                                                    RoamingNetworkChange.Remove(nameof(EVSEGroup), "DE-GDF*EGHIGHWAY"),
+                                                    renamed ], CreatedAt: T0);
+
+            // The provider adds it, the roaming network operator removes the provider with it.
+            var withParty   = rn1.CreateChangeSet([ RoamingNetworkChange.Add(new EVSEGroup(EVSEGroup_Id.Parse("DE-GDF*EGHIGHWAY"), EVSEIds: [ E2 ]), GDF),
+                                                    RoamingNetworkChange.Remove(GDF),
+                                                    renamed ], CreatedAt: T0);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(rn1.TryCheckOwnership(removed.SignedBy(GDFParty), out var providerError),                                        Is.False);
+                Assert.That(providerError,                                                                                                    Does.Contain("Change 2: UpdateProperty of the EVSEGroup 'DE*GDF*EGHIGHWAY' ('name') needs a signature by a signing key of the ChargingStationOperator 'DE*GDF'"));
+
+                Assert.That(rn1.TryCheckOwnership(withParty.SignedBy(GDFParty).SignedBy(TestParties.Party(rn1)), out var partyError),       Is.False);
+                Assert.That(partyError,                                                                                                       Does.Contain("Change 2: UpdateProperty of the EVSEGroup 'DE*GDF*EGHIGHWAY' ('name') needs a signature by a signing key of the ChargingStationOperator 'DE*GDF'"));
+
+                // Signed by the operator as well, it renames the operator's group.
+                var rn2 = rn1.ApplyChangeSet(removed.SignedBy(GDFParty).SignedBy(TestParties.Party(operatorId)));
+
+                Assert.That(rn2.GetChargingStationOperatorById(operatorId)!.EVSEGroups.Single().Name.FirstText(),                            Is.EqualTo("Renamed"));
+                Assert.That(rn2.EVSEGroups.Select(group => group.Id.ToString()),                                                              Is.EquivalentTo(new[] { "DE*GDF*EGHIGHWAY", Motorway.ToString() }));
+
+            }
+
+        }
+
+        #endregion
+
         #region A_provider_is_added_without_its_groups()
 
         [Test]

@@ -451,6 +451,17 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(operatorError,                                                                                   Does.Contain("needs a signature by"));
                 Assert.That(rn1.TryCheckOwnership(operatorChange.SignedBy(TestParties.Party(GEF)), out var operatorOK),     Is.True, operatorOK);
 
+                // What an earlier change of the change set removed has no owner, not even the one that added it (csharp-review 9).
+                var added    = rn1.CreateChangeSet([ RoamingNetworkChange.Add(poolTemplate, GEF) ], CreatedAt: T0);
+                var removed  = new RoamingNetworkChangeSet(added.Id, added.RoamingNetworkId, added.CreatedAt,
+                                                           [ .. added.Changes,
+                                                             RoamingNetworkChange.Remove(poolTemplate.Id),
+                                                             RoamingNetworkChange.UpdateProperty(poolTemplate, "manufacturerId", "ACME", "ZAP") ],
+                                                           added.BeforeETags, added.AfterETags).SignedBy(TestParties.Party(GEF));
+
+                Assert.That(rn1.TryCheckOwnership(removed, out var removedError),                                           Is.False);
+                Assert.That(removedError,                                                                                    Does.Contain("Change 2: the EnergyMeterTemplate 'gef-pool-meters' belongs to no charging station operator and no grid operator"));
+
             }
 
         }

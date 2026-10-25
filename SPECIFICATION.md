@@ -333,6 +333,15 @@ or the RNO in its place while it has none. A
 grid connection point's `maintainedBy` names a charging station operator or parking operator of
 the network; its identification is unique within the network.
 
+**Within a change set**, a change is owned as applying it decides, after the changes before it: what an earlier
+change of the change set added is owned by the parent of that `Add`, a grid connection point an earlier change handed
+on by its new maintainer; what an earlier change removed, alone or with the party embedding it, by nobody, and a change
+of it MUST be refused, until an `Add` adds it anew. A change of a group is
+one of a group of an e-mobility provider while a provider has it, after the changes before it, else one of the group of
+the charging station operator its identification names (9.3): once removed from its provider, the identification of a
+provider's group names the group of the operator of the same prefix (`DE-XYZ` and `DE*XYZ`), which that operator owns,
+not the provider.
+
 A change set MUST be refused unless, for every owner of one of its changes, it has a valid
 signature with a key that owner names **in the version the change set is applied to**, valid at
 its `createdAt`: a signing key for data, one that may sign its usage; for the `signingKeys` of a party, the
@@ -1292,7 +1301,8 @@ status, set manually or calculated from the status of its members. Groups may ov
 
 `{partyId}` is the identification of the party embedding it. The identification of a group is unique in
 the roaming network, so that a provider's group and an operator's group of the same identification can
-not both exist; a group belongs to the party embedding it. A group of an operator names members of its
+not both exist in a version; within a change set they may, until it is applied, and section 4.1 says who owns a change
+of such an identification. A group belongs to the party embedding it. A group of an operator names members of its
 own, of a parking operator its parking spaces, of a grid operator the energy meters of its grid
 connection points; a group of an e-mobility provider names members of any operator of the network, e.g.
 for its offers, by weak references (9.4).

@@ -126,7 +126,8 @@ for the data.
 "The grid operator" signs with its signing key, or the RNO in its place while it has no signing keys.
 The grid operator takes a point over without the consent of its maintainer: `RemoveProperty(point, "maintainedBy")`.
 The former maintainer then can no longer change it, and can not take it back. The versions it maintained stay
-in the history.
+in the history. Taken over or handed on by a change of a change set, a point is the new maintainer's for the changes
+after it in the same change set, as removed it is nobody's.
 
 ```csharp
 RoamingNetworkChange.Add           (new GridConnectionPoint(id, MaintainedBy: new POIPartyId("ChargingStationOperator", "DE*GEF")),

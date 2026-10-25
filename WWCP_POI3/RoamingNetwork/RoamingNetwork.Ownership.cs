@@ -207,6 +207,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///         For recovery, an identity key of the roaming network operator changes both kinds of keys of every other party.
     ///         A party always keeps at least one signing and one identity key.</item>
     ///   <item>A party is added with its keys and without embedded children: its data is its own to add.</item>
+    ///   <item>A change is owned as applying it decides, after the earlier changes of its change set: what they added by
+    ///         the parent of its Add, what they removed, alone or with the party embedding it, by nobody until it is added
+    ///         anew. So the identification of a group no e-mobility provider has any more names the group of the charging
+    ///         station operator of its prefix again.</item>
     /// </list>
     /// </remarks>
     public sealed partial class RoamingNetwork
@@ -489,15 +493,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            var addedParking               = new Dictionary<(String, Object), POIPartyId>();
-            var addedGridConnectionPoints  = new Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>();
-            var addedEnergyMeterChildren   = new Dictionary<(String, Object), POIPartyId>();
-            var addedProviderGroups        = new Dictionary<(String, Object), POIPartyId>();
+            var earlier = new EarlierChanges();
 
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
             {
 
-                if (!TryGetOwners(ChangeSet.Changes[index], addedParking, addedGridConnectionPoints, addedEnergyMeterChildren, addedProviderGroups, out var owners, out ErrorResponse))
+                if (!TryGetOwners(ChangeSet.Changes[index], earlier, out var owners, out ErrorResponse))
                 {
                     ErrorResponse = $"Change {index}: {ErrorResponse}";
                     return false;
@@ -658,27 +659,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region Every change needs one of its owners
 
-            // Parking entities added by an earlier change of this change set, by their parking operator;
-            // keyed by their typed identifications, so that a later change may name them in another spelling.
-            var addedParking = new Dictionary<(String, Object), POIPartyId>();
-
-            // Grid connection points added by an earlier change of this change set: their grid operator and maintainer.
-            var addedGridConnectionPoints = new Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>();
-
-            // Energy meter templates and groups added by an earlier change of this change set, by their owners;
-            // keyed by their typed identifications, so that a later change may name them in another spelling.
-            var addedEnergyMeterChildren = new Dictionary<(String, Object), POIPartyId>();
-
-            // Groups of e-mobility providers and charging tariff offers added by an earlier change of this change set, by
-            // their owners.
-            var addedProviderGroups      = new Dictionary<(String, Object), POIPartyId>();
+            // Who owns what the earlier changes of this change set added or removed.
+            var earlier = new EarlierChanges();
 
             for (var index = 0; index < ChangeSet.Changes.Length; index++)
             {
 
                 var change = ChangeSet.Changes[index];
 
-                if (!TryGetOwners(change, addedParking, addedGridConnectionPoints, addedEnergyMeterChildren, addedProviderGroups, out var owners, out ErrorResponse))
+                if (!TryGetOwners(change, earlier, out var owners, out ErrorResponse))
                 {
                     ErrorResponse = $"Change {index}: {ErrorResponse}";
                     return false;
@@ -917,18 +906,90 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TryGetOwners(Change, AddedParking, AddedGridConnectionPoints, AddedEnergyMeterChildren, AddedProviderGroups, out Owners, out ErrorResponse)
+        #region (private sealed class) EarlierChanges
 
         /// <summary>
-        /// The parties and kinds of keys of which one must sign the given change.
+        /// Who owns what the earlier changes of a change set added or removed, as applying them decides (SPECIFICATION.md,
+        /// section 4.1): what they added, the parent of its Add; what they removed, alone or with the party embedding it,
+        /// nobody, until it is added anew. Keyed by typed identifications, so that a later change may name them in another
+        /// spelling.
         /// </summary>
-        private Boolean TryGetOwners(RoamingNetworkChange                                                                    Change,
-                                     Dictionary<(String, Object), POIPartyId>                                                AddedParking,
-                                     Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)>  AddedGridConnectionPoints,
-                                     Dictionary<(String, Object), POIPartyId>                                                AddedEnergyMeterChildren,
-                                     Dictionary<(String, Object), POIPartyId>                                                AddedProviderGroups,
-                                     [NotNullWhen(true)]  out (POIPartyId, POIKeyKind)[]?                                    Owners,
-                                     [NotNullWhen(false)] out String?                                                        ErrorResponse)
+        private sealed class EarlierChanges
+        {
+
+            /// <summary>
+            /// Parking entities: their parking operator, or the charging station operator of a parking space.
+            /// </summary>
+            public Dictionary<(String, Object), POIPartyId?>                                               Parking               { get; } = [];
+
+            /// <summary>
+            /// Grid connection points: their grid operator and maintainer.
+            /// </summary>
+            public Dictionary<GridConnectionPoint_Id, (POIPartyId GridOperator, POIPartyId Maintainer)?>  GridConnectionPoints  { get; } = [];
+
+            /// <summary>
+            /// Energy meter templates and groups: their charging station operator or grid operator.
+            /// </summary>
+            public Dictionary<(String, Object), POIPartyId?>                                               EnergyMeterChildren   { get; } = [];
+
+            /// <summary>
+            /// Charging tariff offers: their charging station operator or e-mobility provider.
+            /// </summary>
+            public Dictionary<(String, Object), POIPartyId?>                                               ChargingTariffOffers  { get; } = [];
+
+            /// <summary>
+            /// Groups of e-mobility providers: their provider. Once nobody owns one, its identification names a group of the
+            /// charging station operator of its prefix again, as applying a later change decides (IsProviderGroupChange).
+            /// </summary>
+            public Dictionary<(String, Object), POIPartyId?>                                               ProviderGroups        { get; } = [];
+
+            /// <summary>
+            /// The parties removed, with everything they embed.
+            /// </summary>
+            public HashSet<POIPartyId>                                                                     RemovedParties        { get; } = [];
+
+            /// <summary>
+            /// The given owner, of the version the change set is applied to, unless an earlier change removed it.
+            /// </summary>
+            public POIPartyId? NotRemoved(POIPartyId Owner)
+
+                => RemovedParties.Contains(Owner)
+                       ? null
+                       : Owner;
+
+            /// <summary>
+            /// The given party removed: nobody owns what it embeds any more.
+            /// </summary>
+            public void RemoveParty(POIPartyId Party)
+            {
+
+                RemovedParties.Add(Party);
+
+                foreach (var owners in new[] { Parking, EnergyMeterChildren, ChargingTariffOffers, ProviderGroups })
+                    foreach (var (key, owner) in owners.ToArray())
+                        if (owner == Party)
+                            owners[key] = null;
+
+                foreach (var (gridConnectionPointId, point) in GridConnectionPoints.ToArray())
+                    if (point?.GridOperator == Party)
+                        GridConnectionPoints[gridConnectionPointId] = null;
+
+            }
+
+        }
+
+        #endregion
+
+        #region (private) TryGetOwners(Change, Earlier, out Owners, out ErrorResponse)
+
+        /// <summary>
+        /// The parties and kinds of keys of which one must sign the given change, after the given earlier changes of its
+        /// change set.
+        /// </summary>
+        private Boolean TryGetOwners(RoamingNetworkChange                                  Change,
+                                     EarlierChanges                                        Earlier,
+                                     [NotNullWhen(true)]  out (POIPartyId, POIKeyKind)[]?  Owners,
+                                     [NotNullWhen(false)] out String?                      ErrorResponse)
         {
 
             Owners         = null;
@@ -973,6 +1034,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var party = TryGetParty(new POIPartyId(Change.EntityType, Change.EntityId), out var namedParty)
                                 ? Parties.First(knownParty => ReferenceEquals(knownParty.Party, namedParty)).Id
                                 : new POIPartyId(Change.EntityType, Change.EntityId);
+
+                // Removed with everything it embeds: a later change of it has no owner.
+                if (Change.Kind == RoamingNetworkChangeKind.Remove)
+                    Earlier.RemoveParty(party);
 
                 // Signing keys are rotated by the signing keys they replace, or by an identity key when none of them
                 // can sign any more; identity keys only by an identity key. The roaming network operator recovers both.
@@ -1150,12 +1215,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     // The owner as the keys of the parties name it.
                     owner = PartyIdOf(new POIPartyId(Change.ParentEntityType, Change.ParentEntityId));
 
-                    AddedProviderGroups[(Change.EntityType, offerId)] = owner.Value;
+                    Earlier.ChargingTariffOffers[(Change.EntityType, offerId)] = owner.Value;
 
                 }
 
-                else if (AddedProviderGroups.TryGetValue((Change.EntityType, offerId), out var addedOwner))
-                    owner = addedOwner;
+                else if (Earlier.ChargingTariffOffers.TryGetValue((Change.EntityType, offerId), out var earlierOwner))
+                    owner = earlierOwner;
 
                 else
                 {
@@ -1163,10 +1228,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     var (chargingStationOperator, eMobilityProvider, _) = ChargingTariffOfferOwners(Change.EntityId, chargingStationOperators, eMobilityProviders);
 
                     if      (chargingStationOperator is not null)
-                        owner = new POIPartyId(nameof(ChargingStationOperator), chargingStationOperator.Id.ToString());
+                        owner = Earlier.NotRemoved(new POIPartyId(nameof(ChargingStationOperator), chargingStationOperator.Id.ToString()));
 
                     else if (eMobilityProvider is not null)
-                        owner = new POIPartyId(nameof(EMobilityProvider),       eMobilityProvider.      Id.ToString());
+                        owner = Earlier.NotRemoved(new POIPartyId(nameof(EMobilityProvider),       eMobilityProvider.      Id.ToString()));
 
                 }
 
@@ -1175,6 +1240,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' belongs to no charging station operator and no e-mobility provider!";
                     return false;
                 }
+
+                if (Change.Kind == RoamingNetworkChangeKind.Remove)
+                    Earlier.ChargingTariffOffers[(Change.EntityType, offerId)] = null;
 
                 Owners = [ SignerOf(owner.Value) ];
                 return true;
@@ -1185,6 +1253,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region The groups of an e-mobility provider: added to it, or found in it
 
+            // A group of a charging station operator may have the identification of one of a provider of the same prefix
+            // (DE*XYZ and DE-XYZ), until the change set is applied: a change is one of the provider's group while a
+            // provider has it, after the earlier changes, as applying it decides (IsProviderGroupChange); once removed,
+            // alone or with its provider, its identification names the operator's group again.
             if (ProviderGroupKind(Change.EntityType) is not null &&
                 TypedId(Change.EntityType, Change.EntityId) is Object providerGroupId)
             {
@@ -1197,20 +1269,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     {
                         // The provider as the keys of the parties name it.
                         provider = PartyIdOf(new POIPartyId(nameof(EMobilityProvider), Change.ParentEntityId));
-                        AddedProviderGroups[(Change.EntityType, providerGroupId)] = provider.Value;
+                        Earlier.ProviderGroups[(Change.EntityType, providerGroupId)] = provider.Value;
                     }
                 }
 
-                else if (AddedProviderGroups.TryGetValue((Change.EntityType, providerGroupId), out var addedProvider))
-                    provider = addedProvider;
+                else if (Earlier.ProviderGroups.TryGetValue((Change.EntityType, providerGroupId), out var earlierProvider))
+                    provider = earlierProvider;
 
                 else if (ProviderOfGroup(eMobilityProviders, Change.EntityType, Change.EntityId).EMobilityProvider is EMobilityProvider eMobilityProvider)
-                    provider = new POIPartyId(nameof(EMobilityProvider), eMobilityProvider.Id.ToString());
+                    provider = Earlier.NotRemoved(new POIPartyId(nameof(EMobilityProvider), eMobilityProvider.Id.ToString()));
 
                 if (provider.HasValue)
                 {
+
+                    if (Change.Kind == RoamingNetworkChangeKind.Remove)
+                        Earlier.ProviderGroups[(Change.EntityType, providerGroupId)] = null;
+
                     Owners = [ SignerOf(provider.Value) ];
                     return true;
+
                 }
 
             }
@@ -1279,7 +1356,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                  ? PartyIdOf(namedMaintainer)
                                                  : gridOperatorParty;
 
-                    AddedGridConnectionPoints[gridConnectionPointId] = (gridOperatorParty, newMaintainer);
+                    Earlier.GridConnectionPoints[gridConnectionPointId] = (gridOperatorParty, newMaintainer);
 
                     // Added by the maintainer it names, or by its grid operator.
                     Owners = [ .. new[] { SignerOf(newMaintainer), SignerOf(gridOperatorParty) }.Distinct() ];
@@ -1287,25 +1364,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                POIPartyId gridOperatorId;
-                POIPartyId maintainer;
+                (POIPartyId GridOperator, POIPartyId Maintainer)? point = null;
 
-                if (AddedGridConnectionPoints.TryGetValue(gridConnectionPointId, out var added))
-                    (gridOperatorId, maintainer) = added;
+                if (Earlier.GridConnectionPoints.TryGetValue(gridConnectionPointId, out var earlierPoint))
+                    point = earlierPoint;
 
-                else if (TryGetGridConnectionPoint(gridConnectionPointId, out var gridOperator, out var gridConnectionPoint))
+                else if (TryGetGridConnectionPoint(gridConnectionPointId, out var gridOperator, out var gridConnectionPoint) &&
+                         Earlier.NotRemoved(PartyIdOf(new POIPartyId(nameof(GridOperator), gridOperator.Id.ToString()))) is POIPartyId gridOperatorParty)
                 {
-                    gridOperatorId  = PartyIdOf(new POIPartyId(nameof(GridOperator), gridOperator.Id.ToString()));
-                    maintainer      = gridConnectionPoint.MaintainedBy is POIPartyId maintainedBy
-                                          ? PartyIdOf(maintainedBy)
-                                          : gridOperatorId;
+                    point = (gridOperatorParty,
+                             gridConnectionPoint.MaintainedBy is POIPartyId maintainedBy
+                                 ? PartyIdOf(maintainedBy)
+                                 : gridOperatorParty);
                 }
 
-                else
+                if (point is not { } found)
                 {
                     ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' belongs to no grid operator!";
                     return false;
                 }
+
+                var (gridOperatorId, maintainer) = found;
+
+                if (Change.Kind == RoamingNetworkChangeKind.Remove)
+                    Earlier.GridConnectionPoints[gridConnectionPointId] = null;
+
+                // Taken over or handed on: a later change is the new maintainer's. An invalid one is refused when applied.
+                else if (Change.Kind == RoamingNetworkChangeKind.RemoveProperty && Change.EntityPropertyName == MaintainedByProperty)
+                    Earlier.GridConnectionPoints[gridConnectionPointId] = (gridOperatorId, gridOperatorId);
+
+                else if (Change.Kind == RoamingNetworkChangeKind.UpdateProperty && Change.EntityPropertyName == MaintainedByProperty &&
+                         Change.NewValue is JToken newMaintainerJSON &&
+                         POIPartyId.TryParse(newMaintainerJSON, out var newMaintainer, out _))
+                    Earlier.GridConnectionPoints[gridConnectionPointId] = (gridOperatorId, PartyIdOf(newMaintainer));
 
                 // Taken over or handed on by its grid operator, handed on by its maintainer, or reassigned by the roaming network operator.
                 Owners = isProperty && Change.EntityPropertyName == MaintainedByProperty
@@ -1364,18 +1455,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                    : Change.ParentEntityId);
                     }
 
-                    AddedParking[(Change.EntityType, parkingId)] = owner.Value;
+                    Earlier.Parking[(Change.EntityType, parkingId)] = owner.Value;
 
                 }
 
-                else if (AddedParking.TryGetValue((Change.EntityType, parkingId), out var addedOwner))
-                    owner = addedOwner;
+                else if (Earlier.Parking.TryGetValue((Change.EntityType, parkingId), out var earlierOwner))
+                    owner = earlierOwner;
 
                 else if (parkingOperators.FirstOrDefault(parkingOperator => ParkingStoredId(parkingOperator, Change.EntityType, Change.EntityId) is not null) is ParkingOperator parkingOperator)
-                    owner = new POIPartyId(nameof(ParkingOperator), parkingOperator.Id.ToString());
+                    owner = Earlier.NotRemoved(new POIPartyId(nameof(ParkingOperator), parkingOperator.Id.ToString()));
 
                 else if (OperatorParkingSpace(chargingStationOperators, Change.EntityType, Change.EntityId) is ChargingStationOperator chargingStationOperator)
-                    owner = new POIPartyId(nameof(ChargingStationOperator), chargingStationOperator.Id.ToString());
+                    owner = Earlier.NotRemoved(new POIPartyId(nameof(ChargingStationOperator), chargingStationOperator.Id.ToString()));
 
                 if (!owner.HasValue)
                 {
@@ -1384,6 +1475,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         : $"the {Change.EntityType} '{Change.EntityId}' belongs to no parking operator!";
                     return false;
                 }
+
+                if (Change.Kind == RoamingNetworkChangeKind.Remove)
+                    Earlier.Parking[(Change.EntityType, parkingId)] = null;
 
                 Owners = [ (owner.Value, POIKeyKind.Signing) ];
                 return true;
@@ -1421,12 +1515,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     // The owner as the keys of the parties name it.
                     owner = PartyIdOf(new POIPartyId(Change.ParentEntityType, Change.ParentEntityId));
 
-                    AddedEnergyMeterChildren[(Change.EntityType, energyMeterChildId)] = owner.Value;
+                    Earlier.EnergyMeterChildren[(Change.EntityType, energyMeterChildId)] = owner.Value;
 
                 }
 
-                else if (AddedEnergyMeterChildren.TryGetValue((Change.EntityType, energyMeterChildId), out var addedOwner))
-                    owner = addedOwner;
+                else if (Earlier.EnergyMeterChildren.TryGetValue((Change.EntityType, energyMeterChildId), out var earlierOwner))
+                    owner = earlierOwner;
 
                 else
                 {
@@ -1439,10 +1533,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                             gridOperators);
 
                     if      (chargingStationOperator is not null)
-                        owner = new POIPartyId(nameof(ChargingStationOperator), chargingStationOperator.Id.ToString());
+                        owner = Earlier.NotRemoved(new POIPartyId(nameof(ChargingStationOperator), chargingStationOperator.Id.ToString()));
 
                     else if (gridOperator is not null)
-                        owner = new POIPartyId(nameof(GridOperator),            gridOperator.           Id.ToString());
+                        owner = Earlier.NotRemoved(new POIPartyId(nameof(GridOperator),            gridOperator.           Id.ToString()));
 
                 }
 
@@ -1451,6 +1545,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     ErrorResponse = $"the {Change.EntityType} '{Change.EntityId}' belongs to no charging station operator and no grid operator!";
                     return false;
                 }
+
+                if (Change.Kind == RoamingNetworkChangeKind.Remove)
+                    Earlier.EnergyMeterChildren[(Change.EntityType, energyMeterChildId)] = null;
 
                 // For a grid operator not taking part, the roaming network operator.
                 Owners = [ SignerOf(owner.Value) ];
