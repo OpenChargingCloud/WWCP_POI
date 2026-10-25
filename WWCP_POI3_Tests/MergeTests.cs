@@ -415,6 +415,154 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region (static) GEFSigningKeys(Network, Key)
+
+        /// <summary>
+        /// A change of the signing keys of GEF to the given one, signed by all parties of the given network.
+        /// </summary>
+        private static RoamingNetworkChange GEFSigningKeys(RoamingNetwork  Network,
+                                                           POIPublicKey    Key)
+
+            => RoamingNetworkChange.UpdateProperty(Network.GetChargingStationOperatorById(GEF)!,
+                                                   POIPartyKeys.SigningKeysProperty,
+                                                   null,
+                                                   new JArray(Key.ToJSON(Embedded: true)));
+
+        #endregion
+
+        #region A_removed_key_signs_no_change_set_through_an_older_version()
+
+        /// <summary>
+        /// GEF replaces its signing key K: a change set signed with K, made for the version before, is refused, as it
+        /// would carry K into the head, which no longer names it (docs/csharp-review.md of WWCP_POI.TS, finding 3).
+        /// </summary>
+        [Test]
+        public void A_removed_key_signs_no_change_set_through_an_older_version()
+        {
+
+            var (server1, _)  = Servers();
+            var v1            = server1.Head.RoamingNetwork;
+            var withK         = v1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(EVSE(v1), "maxPower", null, 11000) ], CreatedAt: T0.AddMinutes(2));
+            var next          = TestParties.Key(new POIPartyId(nameof(ChargingStationOperator), "DE*GEF/next"), POIKeyKind.Signing).Public;
+
+            Change(server1, 1, network => [ GEFSigningKeys(network, next) ]);
+
+            var refused = server1.Commit(withK);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(refused.Status,                                      Is.EqualTo(RoamingNetworkCommitStatus.Refused));
+                Assert.That(refused.ErrorResponse,                               Does.Contain($"is signed by the key '{TestParties.Key(TestParties.Party(GEF)).Public.Id}'").And.Contain("no longer names").And.Contain("Prepare it again for the head!"));
+                Assert.That(server1.Tips,                                        Has.Count.EqualTo(1));
+                Assert.That(EVSE(server1.Head.RoamingNetwork).MaxPower?.Value,   Is.EqualTo(22000m));
+            }
+
+        }
+
+        #endregion
+
+        #region A_peer_change_set_signed_by_a_key_the_other_tip_removed_conflicts()
+
+        /// <summary>
+        /// One server takes a change of GEF signed with its key K, while the other one takes the replacement of K: the
+        /// commit is taken from the peer, but the tips are not merged, as it would carry K into the version that removed it.
+        /// </summary>
+        [Test]
+        public void A_peer_change_set_signed_by_a_key_the_other_tip_removed_conflicts()
+        {
+
+            var (server1, server2) = Servers();
+            var next               = TestParties.Key(new POIPartyId(nameof(ChargingStationOperator), "DE*GEF/next"), POIKeyKind.Signing).Public;
+
+            Change(server2, 2, network => [ RoamingNetworkChange.UpdateProperty(EVSE(network), "maxPower", null, 11000) ]);
+            Change(server1, 1, network => [ GEFSigningKeys(network, next) ]);
+
+            Exchange(server2, server1);
+            Exchange(server1, server2);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(server1.Tips,                     Has.Count.EqualTo(2));
+                Assert.That(server2.Tips,                     Has.Count.EqualTo(2));
+
+                var conflict = server1.Conflicts.Single();
+                Assert.That(conflict.Kind,                    Is.EqualTo(RoamingNetworkMergeConflictKind.RevokedKey));
+                Assert.That(conflict.EntityId,                Is.EqualTo(GEF.ToString()));
+                Assert.That(conflict.Description,             Does.Contain("no longer names"));
+                Assert.That(server2.Conflicts.Single().Kind,  Is.EqualTo(RoamingNetworkMergeConflictKind.RevokedKey));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_key_signs_only_while_it_is_valid_when_taken()
+
+        /// <summary>
+        /// A key that expired signs nothing by a creation chosen before: a server takes a change set only when its keys are
+        /// valid also when it takes it, and one created no later than then. Merged, a key that expired by the time the
+        /// other tip moved on carries no change set into it.
+        /// </summary>
+        [Test]
+        public void A_key_signs_only_while_it_is_valid_when_taken()
+        {
+
+            // GEF signs with a key valid until ten minutes after T0.
+            var gef       = TestParties.Key(TestParties.Party(GEF));
+            var json      = NewNetwork().ToJSON();
+            var operators = (JArray) json[RoamingNetwork.PropertyKeys.ChargingStationOperators]!;
+            ((JObject) operators.Single(item => item["@id"]!.Value<String>() == GEF.ToString()))[POIPartyKeys.SigningKeysProperty] =
+                new JArray(POIPublicKey.From(gef.Private, NotAfter: T0.AddMinutes(10)).ToJSON(Embedded: true));
+
+            Assert.That(RoamingNetwork.TryParse(json, out var network, out var parseError), Is.True, parseError);
+
+            var server1 = RoamingNetworkHistory.Start(network!);
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(server1.ToSnapshotJSON(), out var server2, out var snapshotError), Is.True, snapshotError);
+
+            RoamingNetworkChangeSet SignedByGEF(RoamingNetwork Version, Int32 Minutes, Decimal MaxPower)
+                => Version.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(EVSE(Version), "maxPower", null, MaxPower) ], CreatedAt: T0.AddMinutes(Minutes)).
+                           Sign(gef.Private, gef.Public.Id, COSEAlgorithm.ES256);
+
+            var v1 = server1.Head.RoamingNetwork;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // Taken after the key expired, though created before: refused; created in the future: refused.
+                var expired = server1.Commit(SignedByGEF(v1, 5, 11000), At: T0.AddMinutes(30));
+                Assert.That(expired.Status,         Is.EqualTo(RoamingNetworkCommitStatus.Refused));
+                Assert.That(expired.ErrorResponse,  Does.Contain($"is not valid at {T0.AddMinutes(30).ToISO8601()}"));
+
+                var future  = server1.Commit(SignedByGEF(v1, 9, 11000), At: T0.AddMinutes(2));
+                Assert.That(future.Status,          Is.EqualTo(RoamingNetworkCommitStatus.Refused));
+                Assert.That(future.ErrorResponse,   Does.Contain("later than now"));
+
+                // Taken while it is valid, by server 2; server 1 moves on after it expired, with a change of EXA signed by EXA.
+                var taken   = server2!.Commit(SignedByGEF(v1, 5, 11000), At: T0.AddMinutes(6));
+                Assert.That(taken.Status,           Is.EqualTo(RoamingNetworkCommitStatus.Committed), taken.ErrorResponse);
+
+                var movedOn = server1.Commit(v1.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(v1.GetChargingStationOperatorById(EXA)!, "telephone", null, "+49 30 1") ], CreatedAt: T0.AddMinutes(20)).
+                                                SignedBy(TestParties.Party(EXA)),
+                                             At: T0.AddMinutes(20));
+                Assert.That(movedOn.Status,         Is.EqualTo(RoamingNetworkCommitStatus.Committed), movedOn.ErrorResponse);
+
+            }
+
+            Exchange(server2!, server1);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(server1.Tips,                         Has.Count.EqualTo(2));
+                Assert.That(server1.Conflicts.Single().Kind,      Is.EqualTo(RoamingNetworkMergeConflictKind.RevokedKey));
+                Assert.That(server1.Conflicts.Single().Description,  Does.Contain($"is not valid in the left version at {T0.AddMinutes(20).ToISO8601()}"));
+            }
+
+        }
+
+        #endregion
+
         #region Merge_commits_are_checked()
 
         [Test]

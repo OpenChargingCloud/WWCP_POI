@@ -280,6 +280,13 @@ party removes everything it embeds, and needs no signature of the party. The RNO
 neither added nor removed: a change set that does MUST be refused. A roaming network without an
 RNO can not be changed where only the RNO may.
 
+**When a server takes a change set**, to commit it or to let it wait (4.2), every key it counts MUST also be valid
+when the server takes it, by its clock, and its `createdAt` MUST NOT be later than then, a few minutes of clock skew
+aside: a `createdAt` chosen before lets no key sign once it expired. Made for another version than the head, it MUST
+also not conflict with a tip it will be merged with as section 5.3 says: signed by a key that tip removed, or which
+expired there; it is prepared again for the head. A server taking the commit of a peer checks what the commit says,
+not the clock of the server that took it.
+
 Nobody can replace the identity keys of the RNO once they are lost or expired. An RNO SHOULD name
 at least two identity keys with different `notAfter`, and SHOULD replace an identity key before it
 expires; with a quorum, each holder SHOULD, e.g. a next identity key whose `notBefore` and `notAfter`
@@ -331,7 +338,7 @@ signatures sign the change set without the others (4), so adding one changes not
 place where a change set **waits** for the signatures still missing, `~/history/changeSets/pending`:
 
 - It takes a change set to wait only when it fits a version (5), every signature it has is valid by a key of that
-  version valid at its `createdAt` or by a new identity key of one of its changes (4.1), at least one is by an owner
+  version valid at its `createdAt` and when it takes it, or by a new identity key of one of its changes (4.1), at least one is by an owner
   of one of its changes (4.1), and its changes apply
   to that version, leading to its after ETags. So nobody makes it hold change sets nobody owning anything signed.
 - More signatures come with the change set again, or by themselves for its `@id`; a change set of the same `@id`
@@ -430,6 +437,13 @@ Two tips also conflict where a change set of the one since the merge base has a 
 (section 4) naming an entity the other one changed or removed since the merge base: its full
 representation is other than in the merge base, or it is gone. Such a change set applied only while
 the entity was as it read it; the owner decides, with a change set on one of the tips.
+
+Two tips also conflict where a change set of the one since the merge base is signed by a key that a best common
+ancestor names for a party, while the other tip, still having that party, no longer names it for it, or names it as
+a key not valid at the later of the change set's `createdAt` and the `lastChange` of the other version: a key removed
+or expired on one branch, e.g. a signing key whose certificate was removed (8.6), carries no change set of the other
+branch into the merge. Keys a branch added itself since the merge base are not compared; a party the other tip
+removed conflicts as its removal does. The owner decides, with a change set signed anew on one of the tips.
 
 Several best common ancestors, in the order of tips, are merged one after the other: the first
 with the second, with their own merge base (calculated the same way), the result with the third,
@@ -990,7 +1004,8 @@ its signature input is its canonical JSON without `value`, with its `@context`, 
 certifies the signing key with its validity, its holder and its usages, and is signed by an identity key of the
 **same holder**, valid at `signedAt`: each holder certifies its own signing keys and renews them without the others
 (4.1), as such a key gives its holder one voice only. It has no validity of its own beyond the one of the key; a key
-is revoked by removing its certificate. The certificates are the only place naming the signing keys of the RNO. A
+is revoked by removing its certificate, and signs no change set into the head from then on, also not through an older
+version (5.3). The certificates are the only place naming the signing keys of the RNO. A
 certificate names the operator, not a roaming network: the signing keys of an operator are its own in every
 network it operates, and a network trusts a certificate only as far as it trusts the identity key that signed it.
 Section 6 has an example.

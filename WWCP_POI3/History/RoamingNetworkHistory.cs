@@ -716,18 +716,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region Commit   (ChangeSet, VerifySignature = null)
+        #region Commit   (ChangeSet, VerifySignature = null, At = null)
+
+        /// <summary>
+        /// How much later than the clock of this server the creation of a change set it takes may be.
+        /// </summary>
+        public static readonly TimeSpan MaxClockSkew = TimeSpan.FromMinutes(5);
 
         /// <summary>
         /// Commit the given change set, signed by its owners, to the version it was made for:
         /// the head, another tip or an older commit, which then starts a branch.
+        /// The keys it is signed by must be valid at its creation and when it is taken, by the clock of this server, and it
+        /// must not be created later than then; made for an older version, it must not be signed by a key a tip it will be
+        /// merged with removed, or which expired there (SPECIFICATION.md, sections 4.1 and 5.3).
         /// The new commit is merged with the other tips where it does not conflict.
         /// A change set committed before, also in a rebased version, is not committed again.
         /// </summary>
         /// <param name="ChangeSet">The change set.</param>
         /// <param name="VerifySignature">An optional verifier of its signatures, in addition to those of its owners.</param>
+        /// <param name="At">When it is taken, now by default.</param>
         public RoamingNetworkCommitResult Commit(RoamingNetworkChangeSet            ChangeSet,
-                                                 VerifyChangeSetSignatureDelegate?  VerifySignature   = null)
+                                                 VerifyChangeSetSignatureDelegate?  VerifySignature   = null,
+                                                 DateTimeOffset?                    At                = null)
         {
 
             lock (historyLock)
@@ -760,15 +770,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (FindVersionFor(ChangeSet) is not (RoamingNetworkCommit parent, RoamingNetwork parentVersion))
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: "The change set fits no version of this history: prepare it again for the head!");
 
+                // Taken now: its keys valid also now, by the clock of this server, so that a creation chosen earlier does
+                // not let a key sign once it expired; and created no later than now.
+                var at = At ?? Timestamp.Now;
+
+                if (ChangeSet.CreatedAt > at + MaxClockSkew)
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: $"The change set was created at {ChangeSet.CreatedAt.ToISO8601()}, later than now, {at.ToISO8601()}!");
+
+                if (!parentVersion.TryCheckOwnership(ChangeSet, out var keyError, [ ChangeSet.CreatedAt, at ]))
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: keyError);
+
                 if (!parentVersion.TryApplyChangeSet(ChangeSet, out var roamingNetwork, out var applyError, VerifySignature))
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: applyError);
 
                 if (VersionEpochError(roamingNetwork) is String versionError)
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: versionError);
 
-                // Made for an older version: its preconditions must also hold for the tips it will be merged with.
+                // Made for an older version: its preconditions must also hold for the tips it will be merged with, and its
+                // keys must not be ones they removed, or which expired there.
                 if (BrokenPreconditionOf(ChangeSet, parent.Id) is String preconditionError)
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: preconditionError);
+
+                if (RevokedKeyOfTips(ChangeSet, parent.Id) is String revokedKeyError)
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: revokedKeyError);
 
                 var commit = SignedBy(Signers, RoamingNetworkCommit.Next(parent, ChangeSet, roamingNetwork));
 
@@ -1339,6 +1363,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
+            // A change set of one branch signed by a key the other branch removed, or which expired there.
+            if (RevokedKeys(Left.Id, Right.Id, leftVersion, rightVersion, out ErrorResponse) is not List<RoamingNetworkMergeConflict> revoked)
+                return false;
+
+            if (revoked.Count > 0)
+            {
+                Conflicts = revoked;
+                return false;
+            }
+
             return POI.RoamingNetwork.TryMerge(mergeBase,
                                                leftVersion,
                                                rightVersion,
@@ -1409,6 +1443,197 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private) RevokedKeys(Left, Right, LeftVersion, RightVersion, out ErrorResponse)
+
+        /// <summary>
+        /// The change sets of each branch since their best common ancestors signed by a key the other branch removed, or
+        /// which expired there, as conflicts (RevokedKeyOf, SPECIFICATION.md section 5.3); null when the versions of the
+        /// common ancestors are not to be had.
+        /// </summary>
+        private List<RoamingNetworkMergeConflict>? RevokedKeys(RoamingNetworkCommit_Id  Left,
+                                                               RoamingNetworkCommit_Id  Right,
+                                                               POI.RoamingNetwork       LeftVersion,
+                                                               POI.RoamingNetwork       RightVersion,
+                                                               out String?              ErrorResponse)
+        {
+
+            if (!TryGetBestCommonAncestorVersions(Left, Right, out var bases, out ErrorResponse))
+                return null;
+
+            var conflicts       = new List<RoamingNetworkMergeConflict>();
+            var leftAncestors   = Ancestors(Left);
+            var rightAncestors  = Ancestors(Right);
+
+            void Check(IEnumerable<RoamingNetworkCommit_Id>  BranchOnly,
+                       POI.RoamingNetwork                    Other,
+                       String                                OtherName)
+            {
+                foreach (var commitId in BranchOnly.OrderBy(commitId => commitId.ToString(), StringComparer.Ordinal))
+                    if (commits[commitIndex[commitId]] is { ParentIds.Length: 1, ChangeSet: RoamingNetworkChangeSet changeSet } &&
+                        RevokedKeyOf(changeSet, Other, OtherName, bases) is (POIPartyId party, String description))
+                    {
+                        conflicts.Add(new RoamingNetworkMergeConflict(RoamingNetworkMergeConflictKind.RevokedKey,
+                                                                      party.EntityType,
+                                                                      party.EntityId,
+                                                                      null,
+                                                                      null,
+                                                                      null,
+                                                                      null,
+                                                                      description));
+                    }
+            }
+
+            Check(rightAncestors.Where(commitId => !leftAncestors. Contains(commitId)), LeftVersion,  "left version");
+            Check(leftAncestors. Where(commitId => !rightAncestors.Contains(commitId)), RightVersion, "right version");
+
+            ErrorResponse = null;
+            return conflicts;
+
+        }
+
+        #endregion
+
+        #region (private static) RevokedKeyOf(ChangeSet, Other, OtherName, Bases)
+
+        /// <summary>
+        /// The party and why, when the given change set of one branch is signed by a key the given versions of the best
+        /// common ancestors name for a party, which the other version no longer names for it, or names as not valid at the
+        /// later of the creation of the change set and the last change of the other version (SPECIFICATION.md, section 5.3):
+        /// a key removed or expired on one branch, e.g. a signing key whose certificate was removed, carries no change set of
+        /// the other into the merge. Keys a branch added itself since the common ancestors are not compared.
+        /// </summary>
+        private static (POIPartyId Party, String Description)? RevokedKeyOf(RoamingNetworkChangeSet           ChangeSet,
+                                                                            POI.RoamingNetwork                Other,
+                                                                            String                            OtherName,
+                                                                            IReadOnlyList<POI.RoamingNetwork>  Bases)
+        {
+
+            var at = ChangeSet.CreatedAt > Other.LastChangeDate ? ChangeSet.CreatedAt : Other.LastChangeDate;
+
+            foreach (var signature in ChangeSet.Signatures)
+                foreach (var @base in Bases)
+                    foreach (var (partyId, party) in @base.Parties)
+                        foreach (var (kind, keys) in new[] { (POIKeyKind.Signing, party.SigningKeys), (POIKeyKind.Identity, party.IdentityKeys) })
+                        {
+
+                            // A party the other removed conflicts as its removal does, with what the change set changes.
+                            if (!keys.Any(key => key.Id == signature.KeyId) ||
+                                !Other.TryGetParty(partyId, out var otherParty))
+                            {
+                                continue;
+                            }
+
+                            var otherKey = (kind == POIKeyKind.Signing ? otherParty.SigningKeys : otherParty.IdentityKeys).FirstOrDefault(key => key.Id == signature.KeyId);
+
+                            if (otherKey is null)
+                                return (partyId, $"The change set '{ChangeSet.Id}' is signed by the key '{signature.KeyId}' of {partyId}, which the {OtherName} no longer names!");
+
+                            if (!otherKey.IsValidAt(at))
+                                return (partyId, $"The change set '{ChangeSet.Id}' is signed by the key '{signature.KeyId}' of {partyId}, which is not valid in the {OtherName} at {at.ToISO8601()}!");
+
+                        }
+
+            return null;
+
+        }
+
+        #endregion
+
+        #region (private) RevokedKeyOfTips(ChangeSet, ParentId)
+
+        /// <summary>
+        /// Why the given change set, made for the given commit, would conflict with a tip it will be merged with, as a merge
+        /// would find it (RevokedKeyOf): signed by a key that tip removed, or which expired there; none when it would not.
+        /// </summary>
+        private String? RevokedKeyOfTips(RoamingNetworkChangeSet  ChangeSet,
+                                         RoamingNetworkCommit_Id  ParentId)
+        {
+
+            var parentAncestors = Ancestors(ParentId);
+
+            foreach (var tip in tips.Where(tip => !parentAncestors.Contains(tip)))
+            {
+
+                if (!TryGetBestCommonAncestorVersions(ParentId, tip, out var bases, out var error) ||
+                    !TryGetVersion(tip, out var tipVersion, out error))
+                {
+                    return error;
+                }
+
+                if (RevokedKeyOf(ChangeSet, tipVersion, $"version '{tip}'", bases) is (_, String revoked))
+                    return $"{revoked} Prepare it again for the head!";
+
+            }
+
+            return null;
+
+        }
+
+        #endregion
+
+        #region (private) TryGetBestCommonAncestorVersions(Left, Right, out Versions, out ErrorResponse)
+
+        /// <summary>
+        /// The versions of the best common ancestors of the given commits: those no other common ancestor follows.
+        /// </summary>
+        private Boolean TryGetBestCommonAncestorVersions(RoamingNetworkCommit_Id                              Left,
+                                                         RoamingNetworkCommit_Id                              Right,
+                                                         out IReadOnlyList<POI.RoamingNetwork>                Versions,
+                                                         [NotNullWhen(false)] out String?                     ErrorResponse)
+        {
+
+            var versions = new List<POI.RoamingNetwork>();
+            Versions     = versions;
+
+            foreach (var commit in BestCommonAncestors(Left, Right))
+            {
+
+                if (!TryGetVersion(commit.Id, out var version, out ErrorResponse))
+                    return false;
+
+                versions.Add(version);
+
+            }
+
+            ErrorResponse = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #region (private) BestCommonAncestors(Left, Right)
+
+        /// <summary>
+        /// The best common ancestors of the given commits, in their order: the common ancestors no other common ancestor
+        /// follows; none, when they have no common ancestor here.
+        /// </summary>
+        private List<RoamingNetworkCommit> BestCommonAncestors(RoamingNetworkCommit_Id  Left,
+                                                               RoamingNetworkCommit_Id  Right)
+        {
+
+            var common     = Ancestors(Left);
+            common.IntersectWith(Ancestors(Right));
+
+            var notBest    = new HashSet<RoamingNetworkCommit_Id>();
+
+            foreach (var commitId in common)
+                foreach (var parentId in commits[commitIndex[commitId]].ParentIds)
+                    if (commitIndex.ContainsKey(parentId))
+                        notBest.UnionWith(Ancestors(parentId));
+
+            var best       = common.Where(commitId => !notBest.Contains(commitId)).
+                                    Select(commitId => commits[commitIndex[commitId]]).
+                                    ToList();
+
+            best.Sort((commit1, commit2) => IsCanonicalOrder(commit1, commit2) ? (commit1.Id == commit2.Id ? 0 : -1) : 1);
+
+            return best;
+
+        }
+
+        #endregion
+
         #region (private) BrokenPreconditionOf(ChangeSet, ParentId)
 
         /// <summary>
@@ -1461,27 +1686,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             MergeBase      = null;
             ErrorResponse  = null;
 
-            var common     = Ancestors(Left);
-            common.IntersectWith(Ancestors(Right));
+            var best = BestCommonAncestors(Left, Right);
 
-            if (common.Count == 0)
+            if (best.Count == 0)
             {
                 ErrorResponse = $"The commits '{Left}' and '{Right}' have no common ancestor here!";
                 return false;
             }
-
-            var notBest    = new HashSet<RoamingNetworkCommit_Id>();
-
-            foreach (var commitId in common)
-                foreach (var parentId in commits[commitIndex[commitId]].ParentIds)
-                    if (commitIndex.ContainsKey(parentId))
-                        notBest.UnionWith(Ancestors(parentId));
-
-            var best       = common.Where(commitId => !notBest.Contains(commitId)).
-                                    Select(commitId => commits[commitIndex[commitId]]).
-                                    ToList();
-
-            best.Sort((commit1, commit2) => IsCanonicalOrder(commit1, commit2) ? (commit1.Id == commit2.Id ? 0 : -1) : 1);
 
             if (!TryGetVersion(best[0].Id, out var firstVersion, out ErrorResponse))
                 return false;

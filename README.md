@@ -421,13 +421,18 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
   The revision is one more than the highest one of the parents.
 - **Commit:** `Commit(cs)` commits a change set to the version it was made for, named by its before
   ETags: the head, another tip, or an older commit, which then starts a branch. Signed change sets
-  are not rebased: they are committed where they fit, and merged.
+  are not rebased: they are committed where they fit, and merged. The keys it is signed by must be valid at
+  its `createdAt` and when the server takes it (`Commit(cs, At: …)`, now by default), and it must not be created
+  later than then; made for an older version, it is refused when a tip it would be merged with removed a key it is
+  signed by, or that key expired there: a removed key signs nothing into the head through an older version.
 - **Tips and merges:** the tips are the commits no other one follows, ordered by revision, then by id;
   the head is the first one, its version is `Head.RoamingNetwork`. The first two tips that do not
   conflict are merged into a merge commit with both as `parentIds`: a three-way merge with their best
   common ancestor, entity by entity, found by their identifications as their types compare them
   (`DE-ABC` and `DE*ABC` are the same e-mobility provider), and property by property, written as an unsigned change set from
-  the first one; everyone can calculate it, and `TryAppend` checks it. Conflicting tips stay, with their
+  the first one; everyone can calculate it, and `TryAppend` checks it. Tips also conflict where a change set
+  of one is signed by a key both had before they parted that the other one removed, or which expired there
+  (`RevokedKey`). Conflicting tips stay, with their
   `Conflicts` (`{kind, entityType, entityId, propertyName?, base, left, right}`), until the owner commits
   a change set to one of them that resolves the conflict, e.g. taking the value of the other one.
 - **Several best common ancestors**, e.g. after a conflict was resolved on two servers, are merged into

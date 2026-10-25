@@ -214,18 +214,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region CoSign(ChangeSet, VerifySignature = null)
+        #region CoSign(ChangeSet, VerifySignature = null, At = null)
 
         /// <summary>
         /// Give the given change set to be signed by the holders of a quorum, or add the signatures it has to the change
         /// set of its identification waiting already (SPECIFICATION.md, section 4.2). It must fit a version, every signature
-        /// must be valid, and an owner of one of its changes must have signed it. Once its owners signed it, by as many
-        /// holders as their quorums need, it is committed; until then it waits, here, and is kept by the store.
+        /// must be valid, by a key valid at its creation and when it is taken, by the clock of this server, it must not be
+        /// created later than then, and an owner of one of its changes must have signed it. Once its owners signed it, by as
+        /// many holders as their quorums need, it is committed; until then it waits, here, and is kept by the store.
         /// </summary>
         /// <param name="ChangeSet">The change set, signed by an owner of one of its changes at least.</param>
         /// <param name="VerifySignature">An optional verifier of its signatures, in addition to those of its owners.</param>
+        /// <param name="At">When it is taken, now by default.</param>
         public RoamingNetworkCoSigningResult CoSign(RoamingNetworkChangeSet            ChangeSet,
-                                                    VerifyChangeSetSignatureDelegate?  VerifySignature   = null)
+                                                    VerifyChangeSetSignatureDelegate?  VerifySignature   = null,
+                                                    DateTimeOffset?                    At                = null)
         {
 
             lock (historyLock)
@@ -276,7 +279,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (FindVersionFor(changeSet) is not (_, RoamingNetwork version))
                     return Dropped(waiting, "The change set fits no version of this history: prepare it again for the head!");
 
-                if (!version.TryCheckCoSigning(changeSet, out var missing, out var signedByAnOwner, out var signatureError))
+                // Taken now: its keys valid also now, by the clock of this server, and created no later than now.
+                var at = At ?? Timestamp.Now;
+
+                if (changeSet.CreatedAt > at + MaxClockSkew)
+                    return Refused($"The change set was created at {changeSet.CreatedAt.ToISO8601()}, later than now, {at.ToISO8601()}!");
+
+                if (!version.TryCheckCoSigning(changeSet, out var missing, out var signedByAnOwner, out var signatureError, [ changeSet.CreatedAt, at ]))
                     return Refused(signatureError);
 
                 if (!signedByAnOwner)
@@ -292,7 +301,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (missing.Count == 0)
                 {
 
-                    var commitResult = Commit(changeSet, VerifySignature);
+                    var commitResult = Commit(changeSet, VerifySignature, at);
 
                     if (commitResult.IsCommitted)
                     {

@@ -398,17 +398,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region TryCheckOwnership(ChangeSet, out ErrorResponse)
+        #region TryCheckOwnership(ChangeSet, out ErrorResponse, ValidAt = null)
 
         /// <summary>
         /// Whether the given change set is signed by the owner of every change it makes,
         /// with keys of this version, the one it is applied to.
-        /// Every signature must be one of a known key, valid at the creation of the change set.
+        /// Every signature must be one of a known key, valid at the creation of the change set, or at every given time.
         /// </summary>
         /// <param name="ChangeSet">The change set.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="ValidAt">When the keys must be valid: at the creation of the change set by default; a server taking it also when it takes it (SPECIFICATION.md, section 4.1).</param>
         public Boolean TryCheckOwnership(RoamingNetworkChangeSet           ChangeSet,
-                                         [NotNullWhen(false)] out String?  ErrorResponse)
+                                         [NotNullWhen(false)] out String?  ErrorResponse,
+                                         IEnumerable<DateTimeOffset>?      ValidAt   = null)
         {
 
             if (ChangeSet.Signatures.IsEmpty)
@@ -417,7 +419,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!TryGetSigners(ChangeSet, out var signedBy, out var possessed, out ErrorResponse) ||
+            if (!TryGetSigners(ChangeSet, ValidAt, out var signedBy, out var possessed, out ErrorResponse) ||
                 !TryCheckOwners(ChangeSet, signedBy, possessed, true, out var missing, out _, out ErrorResponse))
             {
                 return false;
@@ -436,27 +438,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryCheckCoSigning(ChangeSet, out Missing, out SignedByAnOwner, out ErrorResponse)
+        #region TryCheckCoSigning(ChangeSet, out Missing, out SignedByAnOwner, out ErrorResponse, ValidAt = null)
 
         /// <summary>
         /// Whether the signatures the given change set has so far are all valid, by keys of this version, the one it is
-        /// applied to, valid at its creation; and which signatures are still missing (SPECIFICATION.md, section 4.2): one
-        /// text per change whose owners have not signed it by as many holders as their quorums need.
+        /// applied to, valid at its creation, or at every given time; and which signatures are still missing
+        /// (SPECIFICATION.md, section 4.2): one text per change whose owners have not signed it by as many holders as their
+        /// quorums need.
         /// </summary>
         /// <param name="ChangeSet">The change set.</param>
         /// <param name="Missing">The signatures still missing, by change; none once its owners signed it.</param>
         /// <param name="SignedByAnOwner">Whether an owner of one of its changes signed it already.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="ValidAt">When the keys must be valid: at the creation of the change set by default; a server taking it also when it takes it.</param>
         public Boolean TryCheckCoSigning(RoamingNetworkChangeSet           ChangeSet,
                                          out IReadOnlyList<String>         Missing,
                                          out Boolean                       SignedByAnOwner,
-                                         [NotNullWhen(false)] out String?  ErrorResponse)
+                                         [NotNullWhen(false)] out String?  ErrorResponse,
+                                         IEnumerable<DateTimeOffset>?      ValidAt   = null)
         {
 
             Missing          = [];
             SignedByAnOwner  = false;
 
-            return TryGetSigners(ChangeSet, out var signedBy, out var possessed, out ErrorResponse) &&
+            return TryGetSigners(ChangeSet, ValidAt, out var signedBy, out var possessed, out ErrorResponse) &&
                    TryCheckOwners(ChangeSet, signedBy, possessed, false, out Missing, out SignedByAnOwner, out ErrorResponse);
 
         }
@@ -534,19 +539,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TryGetSigners(ChangeSet, out SignedBy, out Possessed, out ErrorResponse)
+        #region (private) TryGetSigners(ChangeSet, ValidAt, out SignedBy, out Possessed, out ErrorResponse)
 
         /// <summary>
         /// The parties and kinds of keys that signed the given change set, with the keys, their holders and usages, and the
         /// new identity keys that signed it, as the proof that their parties hold them; every signature must be valid, by a
-        /// key of a party of this version valid at the creation of the change set, or by a new identity key of one of its
-        /// changes (NewIdentityKeysOf).
+        /// key of a party of this version valid at the creation of the change set, or at every given time, or by a new
+        /// identity key of one of its changes (NewIdentityKeysOf).
         /// </summary>
         private Boolean TryGetSigners(RoamingNetworkChangeSet                                       ChangeSet,
+                                      IEnumerable<DateTimeOffset>?                                  ValidAt,
                                       out Dictionary<(POIPartyId, POIKeyKind), List<POIPublicKey>>  SignedBy,
                                       out HashSet<String>                                           Possessed,
                                       [NotNullWhen(false)] out String?                              ErrorResponse)
         {
+
+            var validAt = ValidAt?.ToArray() ?? [ ChangeSet.CreatedAt ];
 
             #region The parties and kinds of keys that signed it, with the keys
 
@@ -574,11 +582,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         keyFound = true;
 
-                        if (!key.IsValidAt(ChangeSet.CreatedAt))
-                        {
-                            ErrorResponse = $"Signature {index}: the key '{key.Id}' of {partyId} is not valid at {ChangeSet.CreatedAt.ToISO8601()}!";
-                            return false;
-                        }
+                        foreach (var at in validAt)
+                            if (!key.IsValidAt(at))
+                            {
+                                ErrorResponse = $"Signature {index}: the key '{key.Id}' of {partyId} is not valid at {at.ToISO8601()}!";
+                                return false;
+                            }
 
                         if (!ChangeSet.VerifySignature(signature, key.Key, signature.KeyId, out var verificationError))
                         {

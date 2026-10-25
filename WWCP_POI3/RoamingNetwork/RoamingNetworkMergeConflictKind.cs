@@ -63,7 +63,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// A change set of one names an entity as it must still be, by a precondition, and the other changed or removed it.
         /// </summary>
-        Precondition
+        Precondition,
+
+        /// <summary>
+        /// A change set of one is signed by a key of a party both had before they parted, which the other removed, or which
+        /// is not valid there at the later of the creation of the change set and the last change of the other: a key
+        /// removed or expired on one branch carries no change set of the other into the merge.
+        /// </summary>
+        RevokedKey
 
     }
 
