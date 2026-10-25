@@ -12,7 +12,9 @@ public static class ExampleA6
     // authority and an association of operators. Each keeps its own copy of the history of QA, taken commit by commit
     // since the genesis and each commit checked, and signs a checkpoint only after it checked it against that copy. The
     // roaming network operator takes their signatures and publishes the checkpoints with them; a verifier then requires
-    // the signatures of the roaming network operator and of both witnesses.
+    // the signatures of the roaming network operator and of both witnesses. Each witness keeps a journal of what it signed,
+    // beyond its copy of the history: so it never signs two checkpoints of one sequence, nor another line, also not from a
+    // history started anew.
 
 
     // The witnesses: the names they sign as, and their keys.
@@ -20,13 +22,15 @@ public static class ExampleA6
 
 
     /// <summary>
-    /// What the witnesses keep for the examples building on this one: their private keys, and their copies of the
-    /// history of QA.
+    /// What the witnesses keep for the examples building on this one: their private keys, their copies of the history of
+    /// QA, and the journals of what they signed.
     /// </summary>
     /// <param name="Keys">The key of each witness.</param>
     /// <param name="Histories">The history of QA as each witness keeps it.</param>
-    public sealed record Result(IReadOnlyDictionary<String, COSEKeyPair>            Keys,
-                                IReadOnlyDictionary<String, RoamingNetworkHistory>  Histories);
+    /// <param name="Journals">The journal of each witness, of every checkpoint it signed.</param>
+    public sealed record Result(IReadOnlyDictionary<String, COSEKeyPair>                   Keys,
+                                IReadOnlyDictionary<String, RoamingNetworkHistory>         Histories,
+                                IReadOnlyDictionary<String, RoamingNetworkWitnessJournal>  Journals);
 
 
     public static Result Run(ExampleA1.Result A1)
@@ -46,6 +50,10 @@ public static class ExampleA6
         File.WriteAllText("trusted/witnesses.json",
                           new JArray(keys.Select(witness => new JObject(new JProperty("witness", witness.Key),
                                                                         new JProperty("key",     POIPublicKey.From(witness.Value.Private).ToJSON())))).ToString());
+
+        // And the journal of what it signs, in a file of its own: it outlives the process and every copy of the history.
+        var journals = keys.Keys.ToDictionary(witness => witness,
+                                              witness => new RoamingNetworkWitnessJournal($"witnesses/{witness}/journal.jsonl"));
 
         #endregion
 
@@ -69,7 +77,7 @@ public static class ExampleA6
         {
 
             var history = WitnessHistory(witness);
-            var signer  = SignerOf(witness, key);
+            var signer  = new RoamingNetworkWitness(SignerOf(witness, key), journals[witness]);
 
             histories.Add(witness, history);
 
@@ -135,11 +143,25 @@ public static class ExampleA6
         var calibration = WitnessHistory(Witnesses[0]);
 
         Console.WriteLine($"Another checkpoint {other.Sequence}, {other.Id.ToString()[..8]}…, at {Witnesses[0]}: {(calibration.TryAddCheckpoint(other, out error, ExampleA4.VerifyCheckpointSignature(A1.TrustAnchor, A1.RoamingNetwork), [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ]) ? "taken" : error)}");
+
+        // A copy of the history started anew, taking the checkpoints 0 and 1 and then the other one: a server takes it, but
+        // the journal of the witness, kept beyond every copy, holds the checkpoint 2 it signed.
+        var anew        = WitnessHistory(Witnesses[0], UpToSequence: latest.Sequence);
+        var witnessOf   = new RoamingNetworkWitness(SignerOf(Witnesses[0], keys[Witnesses[0]]), journals[Witnesses[0]]);
+
+        Console.WriteLine($"Started anew, the other checkpoint {other.Sequence}: {(anew.TryAddCheckpoint(other, out error, ExampleA4.VerifyCheckpointSignature(A1.TrustAnchor, A1.RoamingNetwork), [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ]) ? "taken" : error)}, " +
+                          $"signed by {Witnesses[0]}: {(anew.TryWitness(other.Id, witnessOf, out _, out _, out error) ? "yes" : error)}");
+
+        // A copy joined from the snapshot of checkpoint 2 holds none of its commits: the witness does not sign it.
+        if (!RoamingNetworkHistory.TryFromCheckpointSnapshot(File.ReadAllText($"published/QA-checkpoint-{latest.Sequence}-snapshot.json"), out var joined, out error, verify))
+            Helpers.Fail(error);
+
+        Console.WriteLine($"Joined from the snapshot of checkpoint {latest.Sequence}, signed by {Witnesses[0]}: {(joined.TryWitness(latest.Id, witnessOf, out _, out _, out error) ? "yes" : error)}");
         Console.WriteLine();
 
         #endregion
 
-        return new (keys, histories);
+        return new (keys, histories, journals);
 
     }
 
@@ -229,7 +251,8 @@ public static class ExampleA6
 
     // The history of QA as the given witness keeps it: from the genesis snapshot, every commit since checked as every
     // commit is, and the checkpoints checked against it (SPECIFICATION.md, section 10.2).
-    private static RoamingNetworkHistory WitnessHistory(String Witness)
+    private static RoamingNetworkHistory WitnessHistory(String   Witness,
+                                                        UInt64?  UpToSequence   = null)
     {
 
         // The trust anchor of QA, as scanned; the genesis version and its commit.
@@ -262,7 +285,7 @@ public static class ExampleA6
         // since the checkpoint before, with the root it signs, signed by the roaming network operator.
         AppendCommits(history, "published/QA-commits-since-genesis.json");
 
-        for (UInt64 sequence = 0; File.Exists($"published/QA-checkpoint-{sequence}.json"); sequence++)
+        for (UInt64 sequence = 0; File.Exists($"published/QA-checkpoint-{sequence}.json") && (UpToSequence is null || sequence < UpToSequence); sequence++)
             if (!TryTakeCheckpoint(history, sequence, out _, out error))
                 Helpers.Fail(error);
 
@@ -271,6 +294,11 @@ public static class ExampleA6
         return history;
 
     }
+
+    // The witness: signing as itself, in the role witness, with the given key of its own, keeping what it signs in its journal.
+    internal static RoamingNetworkWitness WitnessOf(Result A6, String Witness, COSEKeyPair Key)
+
+        => new (SignerOf(Witness, Key), A6.Journals[Witness]);
 
     // The witness signs as itself, in the role witness, with its own key.
     internal static RoamingNetworkCommitSigner SignerOf(String Witness, COSEKeyPair Key)

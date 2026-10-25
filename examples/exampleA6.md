@@ -51,6 +51,19 @@ var keys = new Dictionary<String, COSEKeyPair> {
 ]
 ```
 
+And each keeps a **journal** of what it signs, in a file of its own: it outlives the process and every copy of the
+history the witness keeps, so that it never signs two checkpoints of one sequence, nor another line, also not from a
+copy started anew (SPECIFICATION.md, section 10.2, [step 5](#5-a-split-view-is-refused)):
+
+```csharp
+var journals = keys.Keys.ToDictionary(witness => witness,
+                                      witness => new RoamingNetworkWitnessJournal($"witnesses/{witness}/journal.jsonl"));
+```
+
+```json
+{"checkpointId":"6983ee3c…","epoch":1,"roamingNetworkId":"QA","sequence":0,"signedAt":"2026-10-25T15:20:19.460Z"}
+```
+
 
 ## 2. What the roaming network operator publishes for them
 
@@ -79,11 +92,12 @@ File.WriteAllText("published/QA-commits-since-genesis.json", new JArray(commits.
   checkpoint before, with the Merkle root it signs, and signed by `OCC`. Signatures of other witnesses are not checked
   there.
 
-Then the witness signs each checkpoint, as itself and in the role `witness`, `SignerOf(…)`. `TryWitness` signs only a checkpoint its
-history holds, and it holds one per sequence:
+Then the witness signs each checkpoint, as itself and in the role `witness`, `SignerOf(…)`, keeping it in its journal.
+`TryWitness` signs only a checkpoint its history holds, one per sequence, whose commits it took one by one, and one its
+journal lets it sign:
 
 ```csharp
-var signer  = SignerOf(witness, key);
+var signer  = new RoamingNetworkWitness(SignerOf(witness, key), journals[witness]);
 
 foreach (var checkpoint in history.Checkpoints)
 {
@@ -169,6 +183,26 @@ other          = other.WithSignatures(A1.Signers.Select(signer => signer.Sign(ot
 
 ```
 Another checkpoint 2, db7225a1…, at calibration.example: This history has another checkpoint of the sequence 2: two checkpoints of one sequence are a split view!
+```
+
+A copy of the history started anew takes it: from the genesis, the checkpoints 0 and 1, and then the other one, which
+follows them. Its witness does not sign it all the same: its journal, kept beyond every copy, holds the checkpoint 2 it
+signed. Nor does it sign from a copy joined from the snapshot of checkpoint 2, which holds none of its commits:
+
+```csharp
+var anew        = WitnessHistory(Witnesses[0], UpToSequence: latest.Sequence);
+var witnessOf   = new RoamingNetworkWitness(SignerOf(Witnesses[0], keys[Witnesses[0]]), journals[Witnesses[0]]);
+
+anew.TryAddCheckpoint(other, …);
+anew.TryWitness(other.Id, witnessOf, …);
+
+RoamingNetworkHistory.TryFromCheckpointSnapshot(File.ReadAllText("published/QA-checkpoint-2-snapshot.json"), out var joined, out error, verify);
+joined.TryWitness(latest.Id, witnessOf, …);
+```
+
+```
+Started anew, the other checkpoint 2: taken, signed by calibration.example: This witness signed the checkpoint '2bde9380…' of the sequence 2 of the epoch 1 already: two checkpoints of one sequence are a split view!
+Joined from the snapshot of checkpoint 2, signed by calibration.example: The commits of the checkpoint '2bde9380…' are not checked here, as this history started from a snapshot; a witness signs only checkpoints whose commits it took one by one!
 ```
 
 

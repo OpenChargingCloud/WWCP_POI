@@ -142,7 +142,7 @@ public static class ExampleA10
             if (!ExampleA6.TryTakeCheckpoint(history, 5, out var taken, out error, ExampleA9.Statements("published/QA-checkpoint-5-priceStatements.json")))
                 Helpers.Fail(error);
 
-            if (!history.TryWitness(taken.Id, ExampleA6.SignerOf(witness, A6.Keys[witness]), out _, out var signature, out error))
+            if (!history.TryWitness(taken.Id, ExampleA6.WitnessOf(A6, witness, A6.Keys[witness]), out _, out var signature, out error))
                 Helpers.Fail(error);
 
             signatures.Add((taken.Id, signature));

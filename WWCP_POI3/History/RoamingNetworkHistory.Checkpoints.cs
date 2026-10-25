@@ -60,6 +60,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly List<RoamingNetworkCheckpoint>                             checkpoints          = [];
         private readonly Dictionary<RoamingNetworkCheckpoint_Id, Int32>             checkpointIndex      = [];
 
+        /// <summary>
+        /// The checkpoints taken without their commits checked: the first one of a history started from a snapshot.
+        /// </summary>
+        private readonly HashSet<RoamingNetworkCheckpoint_Id>                       uncheckedCheckpoints = [];
+
         #endregion
 
         #region Properties
@@ -227,7 +232,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// its commit is held, has its revision and ETags, follows the commit of the latest checkpoint, its commits are the ones
         /// since, it names the latest checkpoint as the one before and every signature is valid. A checkpoint held already only
         /// brings its signatures in addition. A history without checkpoints takes any one of a commit it holds as its first,
-        /// e.g. after it started from a snapshot, without checking its commits it does not hold.
+        /// e.g. after it started from a snapshot, without checking its commits it does not hold: a witness does not sign it.
         /// The price statements it names are checked when they are given, TryAddCheckpointPriceStatements(…) takes them later.
         /// </summary>
         /// <param name="Checkpoint">The checkpoint.</param>
@@ -396,18 +401,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region TryWitness(CheckpointId, Witness, out Checkpoint, out Signature, out ErrorResponse, SignedAt = null)
 
         /// <summary>
-        /// Sign a checkpoint of this history as a witness, e.g. with the role witness, and add the signature to it.
-        /// This history holds only checkpoints it checked, one per sequence, so a witness never signs two different ones
-        /// of the same sequence. The signature is to be sent to the server that made the checkpoint.
+        /// Sign a checkpoint of this history as a witness, e.g. with the role witness, and add the signature to it
+        /// (SPECIFICATION.md, section 10.2). Only one this history checked, its commits taken one by one and the price
+        /// statements it names: not the first one of a history started from a snapshot. The journal of the witness, kept
+        /// beyond this history, refuses another checkpoint of a sequence it signed, one of another line than the one it
+        /// signed last of the epoch, which this history must hold, and one of an epoch not starting from the final
+        /// checkpoint it signed of the epoch before; it keeps the checkpoint before the signature is given. The signature
+        /// is to be sent to the server that made the checkpoint.
         /// </summary>
         /// <param name="CheckpointId">The identification of the checkpoint.</param>
-        /// <param name="Witness">The key of the witness.</param>
+        /// <param name="Witness">The witness: its key and its journal.</param>
         /// <param name="Checkpoint">The checkpoint with the new signature.</param>
         /// <param name="Signature">The new signature.</param>
         /// <param name="ErrorResponse">Why it was not signed.</param>
         /// <param name="SignedAt">When it is signed, now otherwise.</param>
         public Boolean TryWitness(RoamingNetworkCheckpoint_Id                             CheckpointId,
-                                  RoamingNetworkCommitSigner                              Witness,
+                                  RoamingNetworkWitness                                   Witness,
                                   [NotNullWhen(true)]  out RoamingNetworkCheckpoint?      Checkpoint,
                                   [NotNullWhen(true)]  out RoamingNetworkCommitSignature? Signature,
                                   [NotNullWhen(false)] out String?                        ErrorResponse,
@@ -420,9 +429,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 Checkpoint  = null;
                 Signature   = null;
 
+                if (Witness is null)
+                {
+                    ErrorResponse = "The given witness must not be null!";
+                    return false;
+                }
+
                 if (!checkpointIndex.TryGetValue(CheckpointId, out var index))
                 {
                     ErrorResponse = $"The checkpoint '{CheckpointId}' is unknown here; a witness signs only checkpoints it checked!";
+                    return false;
+                }
+
+                if (uncheckedCheckpoints.Contains(CheckpointId))
+                {
+                    ErrorResponse = $"The commits of the checkpoint '{CheckpointId}' are not checked here, as this history started from a snapshot; a witness signs only checkpoints whose commits it took one by one!";
                     return false;
                 }
 
@@ -432,7 +453,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                var signature = Witness.Sign(checkpoints[index], SignedAt);
+                var signedAt = SignedAt ?? Timestamp.Now;
+
+                if (!Witness.Journal.TryKeep(checkpoints[index],
+                                             checkpointIndex.ContainsKey,
+                                             checkpoints[index].PreviousEpoch ?? previousEpoch,
+                                             signedAt,
+                                             out ErrorResponse))
+                {
+                    return false;
+                }
+
+                var signature = Witness.Signer.Sign(checkpoints[index], signedAt);
 
                 // The witness trusts its own signature: it just made it.
                 if (!TryAddCheckpointSignatures(CheckpointId, [ signature ], (checkpoint, sig) => sig == signature, out Checkpoint, out _, out ErrorResponse))
@@ -920,6 +952,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (PriceStatements is not null && Checkpoint.PriceStatementsSize > 0)
                 StoreAppend(RoamingNetworkHistoryLogEntry.ForCheckpointPriceStatements(Checkpoint.Id, PriceStatements));
 
+            if (TakenUnchecked(Checkpoint))
+                uncheckedCheckpoints.Add(Checkpoint.Id);
+
             checkpointIndex[Checkpoint.Id] = checkpoints.Count;
             checkpoints.Add(Checkpoint);
             PublishAddedCheckpoint(Checkpoint);
@@ -957,6 +992,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (checkpointIndex.ContainsKey(Checkpoint.Id))
                 return;
 
+            // Whether its commits were checked is told as it was when it was taken, or more strictly after a compaction.
+            if (TakenUnchecked(Checkpoint))
+                uncheckedCheckpoints.Add(Checkpoint.Id);
+
             checkpointIndex[Checkpoint.Id] = checkpoints.Count;
             checkpoints.Add(Checkpoint);
             PublishAddedCheckpoint(Checkpoint);
@@ -969,6 +1008,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             previousEpoch ??= Checkpoint.PreviousEpoch;
 
         }
+
+        #endregion
+
+        #region (private) TakenUnchecked(Checkpoint)
+
+        /// <summary>
+        /// Whether the given checkpoint, taken next, is taken without its commits checked: the first one of a history that
+        /// does not hold every commit since the genesis of its epoch, e.g. one started from a snapshot (SPECIFICATION.md,
+        /// section 10.1). Every later one is checked against the commits since the one before.
+        /// </summary>
+        private Boolean TakenUnchecked(RoamingNetworkCheckpoint Checkpoint)
+
+            => checkpoints.Count == 0 && CommitsOf(Checkpoint.CommitId, null) is null;
 
         #endregion
 

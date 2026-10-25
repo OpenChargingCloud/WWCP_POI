@@ -312,7 +312,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             Publish("v1");
             var witnessed  = MakeCheckpoint();
 
-            Assert.That(leader!.TryWitness(witnessed.Id, History.CheckpointTests.WitnessSigner, out _, out _, out var witnessError),  Is.True, witnessError);
+            Assert.That(leader!.TryWitness(witnessed.Id, History.CheckpointTests.Witness(), out _, out _, out var witnessError),  Is.True, witnessError);
 
             Publish("v2");
             var unwitnessed = MakeCheckpoint();

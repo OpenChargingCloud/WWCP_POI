@@ -32,7 +32,7 @@ public static class ExampleA11
     /// <param name="SigningKeys">The ML-DSA signing key of each organization.</param>
     /// <param name="Signers">The signers of commits as the roaming network operator, one of each organization.</param>
     /// <param name="GEF">The ML-DSA keys of DE*GEF.</param>
-    /// <param name="Witnesses">The ML-DSA keys of the witnesses, and their copies of the history of `QA` in epoch 2.</param>
+    /// <param name="Witnesses">The ML-DSA keys of the witnesses, their copies of the history of `QA` in epoch 2, and their journals, kept since epoch 1.</param>
     /// <param name="TrustAnchor">The trust anchor of `QA` naming the ML-DSA identity keys.</param>
     /// <param name="History">The history of `QA` in epoch 2.</param>
     /// <param name="Store">The store of the history, in poi/QA-epoch-2.</param>
@@ -220,7 +220,7 @@ public static class ExampleA11
             if (!ExampleA6.TryTakeCheckpoint(history, final.Sequence, out var taken, out error))
                 Helpers.Fail(error);
 
-            if (!history.TryWitness(taken.Id, ExampleA6.SignerOf(witness, A6.Keys[witness]), out _, out var signature, out error))
+            if (!history.TryWitness(taken.Id, ExampleA6.WitnessOf(A6, witness, A6.Keys[witness]), out _, out var signature, out error))
                 Helpers.Fail(error);
 
             signatures.Add((taken.Id, signature));
@@ -419,7 +419,7 @@ public static class ExampleA11
             foreach (var key in new[] { A6.Keys[witness], witnessKeys[witness] })
             {
 
-                if (!history.TryWitness(taken.Id, ExampleA6.SignerOf(witness, key), out _, out var signature, out error))
+                if (!history.TryWitness(taken.Id, ExampleA6.WitnessOf(A6, witness, key), out _, out var signature, out error))
                     Helpers.Fail(error);
 
                 signatures.Add((taken.Id, signature));
@@ -444,7 +444,7 @@ public static class ExampleA11
                     signingKeys,
                     signers,
                     new (gefIdentityKeys, gefSigningKeys),
-                    new (witnessKeys, witnessHistories),
+                    new (witnessKeys, witnessHistories, A6.Journals),
                     trustAnchor,
                     epoch2,
                     store);

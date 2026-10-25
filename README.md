@@ -494,8 +494,13 @@ proof.Verify(checkpoint, out _);
   RFC 9162 Merkle tree hash of the commits since the previous checkpoint, each leaf `{commitId, eTags, revision}`.
   The id is the SHA-256 of its canonical JSON without signatures (with its context `…/roamingNetwork/checkpoint/v1`).
 - **Signatures:** the roaming network operator signs first (`CheckpointSigners`), witnesses later
-  (`TryWitness(checkpointId, witnessSigner, …)`, which signs only checkpoints the history checked, one per
-  sequence). `TryAddCheckpoint` checks a checkpoint of another server against the history: its commit, the
+  (`TryWitness(checkpointId, witness, …)`, which signs only checkpoints whose commits the history took one by one,
+  not the first one of a history started from a snapshot). A witness is its key and its journal,
+  `new RoamingNetworkWitness(signer, new RoamingNetworkWitnessJournal(path))`, one per witness for all its histories:
+  the journal keeps every checkpoint signed, written through before the signature is given, and refuses another one
+  of a sequence signed, one the history signs from cannot tell is of the line signed last (it must hold that
+  checkpoint), and one of an epoch not starting from the final checkpoint signed of the epoch before
+  (SPECIFICATION.md, section 10.2). `TryAddCheckpoint` checks a checkpoint of another server against the history: its commit, the
   commits since the previous one, its place in the line, every signature (`VerifyCheckpointSignature`) and the
   roles required; another checkpoint of a sequence held is refused as a split view.
 - **Joining:** `TryGetCheckpointSnapshotJSON(checkpointId, …)` gives the version of its commit, without runtime status;
@@ -883,7 +888,7 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
   default, `VerifyCheckpointSignature`), and pushes those the other server misses (`FollowCheckpoints`,
   `PushCheckpoints`). A history it starts begins with the version of the latest checkpoint carrying the signatures
   required, or the latest one before that does, and takes the commits since (`JoinFromCheckpoint`); without a verifier
-  or such a checkpoint, from the head, and its line with the first checkpoint of a commit it holds. A witness running a peer signs with `history.TryWitness(…)`; the signature goes to the other server.
+  or such a checkpoint, from the head, and its line with the first checkpoint of a commit it holds. A witness running a peer signs with `history.TryWitness(…, witness, …)`, its journal outliving every history the peer starts anew; the signature goes to the other server.
 - **Attestations:** with `VerifyAttestation`, a verifier of the keys of the roaming network operator, it takes the
   attestations of the other server, so that it serves proofs of charging stations with them as well.
 - **Price statements:** after the commits, it takes the price statements of the other server and pushes those taken

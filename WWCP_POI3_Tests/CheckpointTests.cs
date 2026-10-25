@@ -61,6 +61,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         internal static RoamingNetworkCommitSigner WitnessSigner
             => new (WitnessKey, "witness", COSEAlgorithm.Ed25519, RoamingNetworkCommitSignatureRoles.Witness, "witness.example.org");
 
+        /// <summary>
+        /// The witness of the given journal, a new one in memory otherwise.
+        /// </summary>
+        internal static RoamingNetworkWitness Witness(RoamingNetworkWitnessJournal? Journal = null)
+            => new (WitnessSigner, Journal ?? new RoamingNetworkWitnessJournal());
+
         #endregion
 
 
@@ -369,7 +375,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var other     = RoamingNetworkCheckpoint.Create(cp1.RoamingNetworkId, 1, 1, cp0.Id, leader.Head.Commit, [ leader.Head.Commit ], T0.AddMinutes(21));
             var split     = witness.TryAddCheckpoint(other, out var splitError);
 
-            Assert.That(witness.TryWitness(cp1.Id, WitnessSigner, out var witnessed, out var signature, out var witnessError, T0.AddMinutes(25)),  Is.True, witnessError);
+            Assert.That(witness.TryWitness(cp1.Id, Witness(), out var witnessed, out var signature, out var witnessError, T0.AddMinutes(25)),  Is.True, witnessError);
 
             var told      = new List<Int32>();
             leader.OnCheckpointSignatures += (checkpoint, newSignatures) => told.Add(newSignatures.Count);
@@ -404,6 +410,221 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region (private static) Joined(Leader, CheckpointId)
+
+        /// <summary>
+        /// A history of another server joined from the snapshot of the given checkpoint of the leader, with every commit and
+        /// checkpoint of the leader since.
+        /// </summary>
+        private static RoamingNetworkHistory Joined(RoamingNetworkHistory        Leader,
+                                                    RoamingNetworkCheckpoint_Id  CheckpointId)
+        {
+
+            Assert.That(Leader.TryGetCheckpointSnapshotJSON(CheckpointId, out var snapshot, out var error),           Is.True, error);
+            Assert.That(RoamingNetworkHistory.TryFromCheckpointSnapshot(snapshot!, out var joined, out error, Verify),  Is.True, error);
+            Assert.That(Leader.TryGetCommitsSince(joined!.Head.Commit.Id, out var commits, out error),                 Is.True, error);
+            Assert.That(joined.TryAppend(commits!, out _, out error),                                                   Is.True, error);
+
+            foreach (var checkpoint in Leader.Checkpoints.SkipWhile(checkpoint => checkpoint.Id != CheckpointId).Skip(1))
+                Assert.That(joined.TryAddCheckpoint(checkpoint, out error, Verify),                                     Is.True, error);
+
+            return joined;
+
+        }
+
+        #endregion
+
+        #region A_witness_signs_no_checkpoint_it_did_not_check()
+
+        /// <summary>
+        /// A history joined from the snapshot of a checkpoint takes it without its commits, which it does not hold: a witness
+        /// does not sign it, as its commits were not taken one by one (finding 5 of the review in WWCP_POI.TS); the next one,
+        /// checked against the commits since, it signs.
+        /// </summary>
+        [Test]
+        public void A_witness_signs_no_checkpoint_it_did_not_check()
+        {
+
+            var leader   = NewHistory();
+            Commit(leader, "v1");
+            var cp0      = Checkpoint(leader, 10);
+            Commit(leader, "v2");
+            var cp1      = Checkpoint(leader, 20);
+
+            var joined   = Joined(leader, cp0.Id);
+            var witness  = Witness();
+
+            var first    = joined.TryWitness(cp0.Id, witness, out _, out _, out var firstError);
+            var next     = joined.TryWitness(cp1.Id, witness, out _, out _, out var nextError);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(joined.Checkpoints.Select(checkpoint => checkpoint.Id),       Is.EqualTo(new[] { cp0.Id, cp1.Id }));
+                Assert.That(first,                                                        Is.False);
+                Assert.That(firstError,                                                   Does.Contain("are not checked here, as this history started from a snapshot"));
+                Assert.That(next,                                                         Is.True, nextError);
+                Assert.That(witness.Journal.Entries.Select(entry => entry.CheckpointId),  Is.EqualTo(new[] { cp1.Id }));
+            }
+
+        }
+
+        #endregion
+
+        #region A_witness_signs_one_checkpoint_of_a_sequence_across_histories_and_restarts()
+
+        /// <summary>
+        /// The journal of a witness keeps what it signed beyond the history it signed it from: after a restart, another
+        /// history showing it another checkpoint of a sequence it signed is refused, the one it signed is signed again.
+        /// </summary>
+        [Test]
+        public void A_witness_signs_one_checkpoint_of_a_sequence_across_histories_and_restarts()
+        {
+
+            var directory  = Path.Combine(Path.GetTempPath(), "poi3-witness-" + Guid.NewGuid().ToString("N"));
+            var path       = Path.Combine(directory, "journal.jsonl");
+
+            var leader     = NewHistory();
+            Commit(leader, "v1");
+            var cp0        = Checkpoint(leader, 10);
+
+            // Another history of the roaming network, of another commit: another checkpoint 0, a split view.
+            var other      = NewHistory();
+            Commit(other, "w1");
+            var cp0b       = Checkpoint(other, 10);
+
+            try
+            {
+
+                using (var journal = new RoamingNetworkWitnessJournal(path))
+                    Assert.That(leader.TryWitness(cp0.Id, Witness(journal), out _, out _, out var signError, T0.AddMinutes(11)),  Is.True, signError);
+
+                // Restarted: the journal read from its file.
+                var restarted  = new RoamingNetworkWitnessJournal(path);
+
+                var split      = other. TryWitness(cp0b.Id, Witness(restarted), out _, out _, out var splitError);
+                var again      = leader.TryWitness(cp0. Id, Witness(restarted), out _, out _, out var againError);
+                var entries    = restarted.Entries;
+
+                restarted.Dispose();
+
+                using (Assert.EnterMultipleScope())
+                {
+                    Assert.That(cp0b.Id,                                                                    Is.Not.EqualTo(cp0.Id));
+                    Assert.That(entries.Single().CheckpointId,                                              Is.EqualTo(cp0.Id));
+                    Assert.That(entries.Single().SignedAt,                                                  Is.EqualTo(T0.AddMinutes(11)));
+                    Assert.That(split,                                                                      Is.False);
+                    Assert.That(splitError,                                                                 Does.Contain($"signed the checkpoint '{cp0.Id}' of the sequence 0 of the epoch 1 already"));
+                    Assert.That(again,                                                                      Is.True, againError);
+                    Assert.That(File.ReadAllLines(path),                                                    Has.Length.EqualTo(1));
+                }
+
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+
+        }
+
+        #endregion
+
+        #region A_witness_signs_only_the_line_it_signed()
+
+        /// <summary>
+        /// A history that does not hold the checkpoint a witness signed last of the epoch, e.g. one joined later from a snapshot,
+        /// can not tell that a checkpoint is of the same line: the witness does not sign from it. From one holding it, it signs
+        /// the checkpoints after it, and those before it.
+        /// </summary>
+        [Test]
+        public void A_witness_signs_only_the_line_it_signed()
+        {
+
+            var leader   = NewHistory();
+            Commit(leader, "v1");
+            var cp0      = Checkpoint(leader, 10);
+            Commit(leader, "v2");
+            var cp1      = Checkpoint(leader, 20);
+            Commit(leader, "v3");
+            var cp2      = Checkpoint(leader, 30);
+
+            var witness  = Witness();
+
+            Assert.That(leader.TryWitness(cp0.Id, witness, out _, out _, out var signError),  Is.True, signError);
+
+            var joined   = Joined(leader, cp1.Id);
+
+            var fromJoined  = joined.TryWitness(cp2.Id, witness, out _, out _, out var joinedError);
+            var after       = leader.TryWitness(cp2.Id, witness, out _, out _, out var afterError);
+            var before      = leader.TryWitness(cp1.Id, witness, out _, out _, out var beforeError);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(fromJoined,                                                       Is.False);
+                Assert.That(joinedError,                                                      Does.Contain($"does not hold the checkpoint '{cp0.Id}' of the sequence 0 this witness signed last"));
+                Assert.That(after,                                                            Is.True, afterError);
+                Assert.That(before,                                                           Is.True, beforeError);
+                Assert.That(witness.Journal.Entries.Select(entry => entry.Sequence),          Is.EqualTo(new UInt64[] { 0, 1, 2 }));
+            }
+
+        }
+
+        #endregion
+
+        #region The_journal_of_a_witness_drops_a_line_written_partly()
+
+        /// <summary>
+        /// A last line written only partly, e.g. by a crash before the signature was given, is dropped when the journal is read;
+        /// an invalid line before it, or two checkpoints of one sequence, are an error.
+        /// </summary>
+        [Test]
+        public void The_journal_of_a_witness_drops_a_line_written_partly()
+        {
+
+            var directory  = Path.Combine(Path.GetTempPath(), "poi3-witness-" + Guid.NewGuid().ToString("N"));
+            var path       = Path.Combine(directory, "journal.jsonl");
+
+            var leader     = NewHistory();
+            Commit(leader, "v1");
+            var cp0        = Checkpoint(leader, 10);
+
+            try
+            {
+
+                using (var journal = new RoamingNetworkWitnessJournal(path))
+                    Assert.That(leader.TryWitness(cp0.Id, Witness(journal), out _, out _, out var signError),  Is.True, signError);
+
+                var line = File.ReadAllLines(path).Single();
+
+                File.AppendAllText(path, line[..20]);
+
+                using (var reread = new RoamingNetworkWitnessJournal(path))
+                    Assert.That(reread.Entries.Single().CheckpointId,  Is.EqualTo(cp0.Id));
+
+                using (Assert.EnterMultipleScope())
+                {
+
+                    Assert.That(File.ReadAllText(path),  Is.EqualTo(line + "\n"));
+
+                    File.WriteAllText(path, line[..20] + "\n" + line + "\n");
+                    Assert.That(() => new RoamingNetworkWitnessJournal(path),  Throws.InstanceOf<InvalidDataException>().With.Message.Contains("Line 1"));
+
+                    File.WriteAllText(path, line + "\n" + line.Replace(cp0.Id.ToString(), new String('0', 64)) + "\n");
+                    Assert.That(() => new RoamingNetworkWitnessJournal(path),  Throws.InstanceOf<InvalidDataException>().With.Message.Contains("names two checkpoints of the sequence 0"));
+
+                }
+
+            }
+            finally
+            {
+                if (Directory.Exists(directory))
+                    Directory.Delete(directory, recursive: true);
+            }
+
+        }
+
+        #endregion
+
         #region Checkpoints_survive_a_restart_and_bound_the_compaction()
 
         [Test]
@@ -426,7 +647,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             Commit(history, "v5");
             Commit(history, "v6");
 
-            history.TryWitness(cp0.Id, WitnessSigner, out _, out _, out var witnessError);
+            history.TryWitness(cp0.Id, Witness(), out _, out _, out var witnessError);
 
             Assert.That(history.Compact(out var compactError),                                                       Is.True, compactError);
 

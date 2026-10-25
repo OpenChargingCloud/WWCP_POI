@@ -205,7 +205,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             var tookNext  = await Eventually(() => peer.History?.LatestCheckpoint?.Id == cp1!.Id);
 
             // The peer is run by a witness: its signature goes back to the server that made the checkpoint.
-            Assert.That(peer.History!.TryWitness(cp1!.Id, History.CheckpointTests.WitnessSigner, out _, out _, out var witnessError),  Is.True, witnessError);
+            Assert.That(peer.History!.TryWitness(cp1!.Id, History.CheckpointTests.Witness(), out _, out _, out var witnessError),  Is.True, witnessError);
 
             var signedThere = await Eventually(() => leader.LatestCheckpoint!.Signatures.Any(signature => signature.Role == RoamingNetworkCommitSignatureRoles.Witness));
 

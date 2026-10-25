@@ -34,7 +34,7 @@ public static class ExampleA9
         foreach (var (witness, history) in A6.Histories)
         {
 
-            var signer = ExampleA6.SignerOf(witness, A6.Keys[witness]);
+            var signer = ExampleA6.WitnessOf(A6, witness, A6.Keys[witness]);
 
             // a) The commits of example A8, each checked, and checkpoint 3, which names no price statements.
             ExampleA6.AppendCommits(history, "published/QA-commits-since-checkpoint-2.json");

@@ -1415,7 +1415,16 @@ signatures, as `"checkpoint"` in place of `"commit"`:
   in its own history, which it took commit by commit, each checked as section 5.2 says, and, when the
   checkpoint names price statements, after it checked them (12.3). A witness MUST
   NOT sign two different checkpoints of the same roaming network, epoch and `sequence`: that is what
-  makes a split view, one history shown to some and another one to others, visible.
+  makes a split view, one history shown to some and another one to others, visible. So it keeps what it
+  signed beyond its history, across restarts, histories started anew from a snapshot and epochs (its
+  journal: roaming network, epoch, `sequence` and `@id` of every checkpoint it signed, kept before the
+  signature is given), and signs a checkpoint only
+  - when its commits were taken one by one: not the first checkpoint of a history started from a snapshot
+    (10.5), whose commits that history does not hold;
+  - when its history holds the checkpoint it signed last of the epoch: one per `sequence`, each naming the
+    one before, the new one is then of the line it signed;
+  - in an epoch after the first one, when it signed the final checkpoint of the epoch before, only where
+    the epoch starts from that one (11.3).
 - Signatures may be added later, as to commits: `signCheckpoint` over the WebSocket or
   `POST …/history/checkpoints/{checkpointId}/signatures`; they do not change the identification.
 
@@ -1461,7 +1470,7 @@ version against the checkpoint's `eTags`, and then the commits since, as from a 
   leads to them (section 3).
 - **Which checkpoint:** the latest one, or, when it does not carry the signatures required yet, e.g. of
   witnesses, the latest one before that does. Without one, the server starts from the head.
-- **Afterwards:** the checkpoint is the first of its line (10.1), the price statements it names are checked
+- **Afterwards:** the checkpoint is the first of its line (10.1), not signed by a witness joining so (10.2), the price statements it names are checked
   when they come along with it (12.3), the commits since are taken as they come (5.2), and the runtime
   status is the one of the head of the other server.
 

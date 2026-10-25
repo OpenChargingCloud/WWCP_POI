@@ -628,10 +628,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             var witness  = NewHistory(Signing: false);
             Assert.That(witness.TryAddCheckpoint(checkpoint, out var addError),  Is.True, addError);
 
-            var signedUnchecked  = witness.TryWitness(checkpoint.Id, History.CheckpointTests.WitnessSigner, out _, out _, out var uncheckedError);
+            var signedUnchecked  = witness.TryWitness(checkpoint.Id, History.CheckpointTests.Witness(), out _, out _, out var uncheckedError);
             var oneMissing       = witness.TryAddCheckpointPriceStatements(checkpoint.Id, named.Skip(1), out var missingError);
             var checkedThem      = witness.TryAddCheckpointPriceStatements(checkpoint.Id, named.Reverse(), out var checkError);
-            var signedChecked    = witness.TryWitness(checkpoint.Id, History.CheckpointTests.WitnessSigner, out _, out _, out var witnessError);
+            var signedChecked    = witness.TryWitness(checkpoint.Id, History.CheckpointTests.Witness(), out _, out _, out var witnessError);
 
             // Given along with the checkpoint, another server checks them at once.
             var third    = NewHistory(Signing: false);

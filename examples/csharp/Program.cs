@@ -4,7 +4,7 @@
 
 
 // What the last run wrote is removed first: its keys, what it published and its history would not fit the new keys.
-foreach (var directory in new[] { "AlphaOrg", "BetaOrg", "GammaOrg", "DE-GEF", "GraphDefined", "SAALE", "KERNBERG", "PTB", "published", "trusted", "driver", "poi" })
+foreach (var directory in new[] { "AlphaOrg", "BetaOrg", "GammaOrg", "DE-GEF", "GraphDefined", "SAALE", "KERNBERG", "PTB", "published", "trusted", "driver", "poi", "witnesses" })
     if (Directory.Exists(directory))
         Directory.Delete(directory, recursive: true);
 

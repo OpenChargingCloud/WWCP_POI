@@ -230,6 +230,47 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region A_witness_signs_the_next_epoch_only_from_the_final_checkpoint_it_signed()
+
+        /// <summary>
+        /// A witness that signed the final checkpoint of an epoch signs a checkpoint of the next epoch only where that epoch
+        /// starts from it: not one of a next epoch started from another final checkpoint of the same epoch.
+        /// </summary>
+        [Test]
+        public void A_witness_signs_the_next_epoch_only_from_the_final_checkpoint_it_signed()
+        {
+
+            var (history, final)  = Close(Strong);
+            var (another, other)  = Close(Restricted);
+            var witness           = CheckpointTests.Witness();
+
+            Assert.That(history.TryWitness(final.Id, witness, out _, out _, out var finalError),          Is.True, finalError);
+
+            Assert.That(history.TryStartNextEpoch(out var next,        out var startError),               Is.True, startError);
+            Assert.That(another.TryStartNextEpoch(out var anotherNext, out var anotherStartError),        Is.True, anotherStartError);
+
+            next!.       CheckpointSigners = [ CheckpointTests.RNOSigner ];
+            anotherNext!.CheckpointSigners = [ CheckpointTests.RNOSigner ];
+
+            Assert.That(next.       TryMakeCheckpoint(out var first,      out var firstError,      CreatedAt: T0.AddMinutes(5)),  Is.True, firstError);
+            Assert.That(anotherNext.TryMakeCheckpoint(out var otherFirst, out var otherFirstError, CreatedAt: T0.AddMinutes(5)),  Is.True, otherFirstError);
+
+            var fromOther  = anotherNext.TryWitness(otherFirst!.Id, witness, out _, out _, out var otherError);
+            var fromFinal  = next.       TryWitness(first!.     Id, witness, out _, out _, out var nextError);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(other.Id,                         Is.Not.EqualTo(final.Id));
+                Assert.That(otherFirst.PreviousEpoch!.CheckpointId,  Is.EqualTo(other.Id));
+                Assert.That(fromOther,                        Is.False);
+                Assert.That(otherError,                       Does.Contain($"starts from the final checkpoint '{other.Id}', but this witness signed '{final.Id}'"));
+                Assert.That(fromFinal,                        Is.True, nextError);
+            }
+
+        }
+
+        #endregion
+
         #region Every_server_starts_the_same_next_epoch_from_the_same_final_checkpoint()
 
         [Test]
