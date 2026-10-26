@@ -224,6 +224,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  ParkingSpaceIds       = "parkingSpaceIds";
 
             /// <summary>
+            /// The property of the identifications of the certificates of its model it names.
+            /// </summary>
+            public const String  CertificateIds        = "certificateIds";
+
+            /// <summary>
             /// The property of the identifications of its templates.
             /// </summary>
             public const String  TemplateIds           = "templateIds";
@@ -350,6 +355,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<ParkingSpace_Id>         ParkingSpaceIds       { get; }
 
         /// <summary>
+        /// The certificates of conformity of its model, in its hardware revision and firmware version, of the roaming
+        /// network, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<ConformityCertificate_Id> CertificateIds       { get; }
+
+        /// <summary>
         /// The charging station templates it takes, each once, in its order: of every property they give, the first one giving it
         /// decides, unless it has its own. It names them; they do not name their members.
         /// </summary>
@@ -386,6 +397,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                Watt?                                           MaxPower                     = null,
                                IEnumerable<ParkingSpace_Id>?                   ParkingSpaceIds              = null,
                                IEnumerable<EUVehicleCategory>?                 EUVehicleCategories          = null,
+                               IEnumerable<ConformityCertificate_Id>?          CertificateIds               = null,
 
                                IEnumerable<ChargingStationTemplate_Id>?        TemplateIds                  = null,
 
@@ -466,6 +478,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.CertificationInfo   = CertificationInfo;
             this.MaxPower            = MaxPower;
             this.ParkingSpaceIds     = POIJSON.OrderedIds(ParkingSpaceIds, $"parking space of the charging station '{Id}'");
+            this.CertificateIds      = POIJSON.OrderedIds(CertificateIds,  $"certificate of the charging station '{Id}'");
             this.energyStatus        = new EnergyStatusRuntime(RaiseEnergyStatusChanged);
             this.priceStatus         = new PriceStatusRuntime (RaisePriceStatusChanged);
 
@@ -806,6 +819,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ParkingSpaceIds.Length > 0)
                 json.Add(PropertyKeys.ParkingSpaceIds,      POIJSON.IdsToJSON(ParkingSpaceIds));
 
+            if (CertificateIds.Length > 0)
+                json.Add(PropertyKeys.CertificateIds,       POIJSON.IdsToJSON(CertificateIds));
+
             if (TemplateIds.Length > 0)
                 json.Add(PropertyKeys.TemplateIds,          POIJSON.IdsToJSON(TemplateIds));
 
@@ -908,7 +924,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseIds (JSON, PropertyKeys.Features,            "charging station feature",     ChargingStationFeature.TryParse, out ImmutableArray<ChargingStationFeature>  features,           out ErrorResponse) ||
                     !POIJSON.TryParseText(JSON, PropertyKeys.CalibrationInfo,     "calibration information",      URL.                   TryParse, out URL?                                    calibrationInfo,    out ErrorResponse) ||
                     !POIJSON.TryParseText(JSON, PropertyKeys.CertificationInfo,   "certification information",    URL.                   TryParse, out URL?                                    certificationInfo,  out ErrorResponse) ||
-                    !POIJSON.TryParseIds (JSON, PropertyKeys.ParkingSpaceIds,     "parking space identification", ParkingSpace_Id.       TryParse, out ImmutableArray<ParkingSpace_Id>         parkingSpaceIds,    out ErrorResponse))
+                    !POIJSON.TryParseIds (JSON, PropertyKeys.ParkingSpaceIds,     "parking space identification", ParkingSpace_Id.       TryParse, out ImmutableArray<ParkingSpace_Id>         parkingSpaceIds,    out ErrorResponse) ||
+                    !POIJSON.TryParseIds (JSON, PropertyKeys.CertificateIds,      "certificate identification",   ConformityCertificate_Id.TryParse, out ImmutableArray<ConformityCertificate_Id> certificateIds,   out ErrorResponse))
                 {
                     return false;
                 }
@@ -952,6 +969,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       maxPower,
                                                       parkingSpaceIds,
                                                       euVehicleCategories,
+                                                      certificateIds,
                                                       TemplateIds:  templateIds,
                                                       DataSource:  dataSource,
                                                       Created:     created,

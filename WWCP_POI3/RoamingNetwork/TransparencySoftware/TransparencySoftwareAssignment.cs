@@ -30,16 +30,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// The legal status of a transparency software release for an energy meter, optionally proven by a certificate:
-    /// the JSON of a TransparencySoftwareStatus, naming the release and the certificate by their identifications.
-    /// Both are embedded in the roaming network; the certificate must cover the release.
+    /// The legal status of a transparency software release for an energy meter: the JSON of a TransparencySoftwareStatus,
+    /// naming the release by its identification, embedded in the roaming network. It names no certificate: a certificate
+    /// of the meter or of its charging station naming the release among its components proves the status.
     /// </summary>
     /// <param name="TransparencySoftwareId">The transparency software release.</param>
     /// <param name="LegalStatus">Its legal status, e.g. GermanCalibrationLaw.</param>
-    /// <param name="CertificateId">The certificate proving it.</param>
-    public sealed record TransparencySoftwareAssignment(TransparencySoftware_Id              TransparencySoftwareId,
-                                                        LegalStatus                          LegalStatus,
-                                                        TransparencySoftwareCertificate_Id?  CertificateId   = null)
+    public sealed record TransparencySoftwareAssignment(TransparencySoftware_Id  TransparencySoftwareId,
+                                                        LegalStatus              LegalStatus)
     {
 
         #region Data
@@ -75,7 +73,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  LegalStatus              = "legalStatus";
 
             /// <summary>
-            /// The property of its certificate.
+            /// The property of a certificate of before, refused: the certificates of the meter and of its station prove the
+            /// status.
             /// </summary>
             public const String  CertificateId            = "certificateId";
 
@@ -102,9 +101,6 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             json.Add(PropertyKeys.TransparencySoftwareId,      TransparencySoftwareId.ToString());
             json.Add(PropertyKeys.LegalStatus,                 LegalStatus.           ToString());
-
-            if (CertificateId.HasValue)
-                json.Add(PropertyKeys.CertificateId,           CertificateId.Value.   ToString());
 
             return CustomTransparencySoftwareAssignmentSerializer is not null
                        ? CustomTransparencySoftwareAssignmentSerializer(this, json)
@@ -133,9 +129,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!POIJSON.TryParseText(JSON, PropertyKeys.TransparencySoftwareId, "transparency software identification", TransparencySoftware_Id.           TryParse, out TransparencySoftware_Id?            transparencySoftwareId, out ErrorResponse) ||
-                !POIJSON.TryParseText(JSON, PropertyKeys.LegalStatus,            "legal status",                         POI.LegalStatus.                   TryParse, out LegalStatus?                        legalStatus,            out ErrorResponse) ||
-                !POIJSON.TryParseText(JSON, PropertyKeys.CertificateId,          "certificate identification",           TransparencySoftwareCertificate_Id.TryParse, out TransparencySoftwareCertificate_Id? certificateId,          out ErrorResponse))
+            if (JSON[PropertyKeys.CertificateId] is not null)
+            {
+                ErrorResponse = $"A transparency software status names no {PropertyKeys.CertificateId}: the certificates of the energy meter and of its charging station prove it!";
+                return false;
+            }
+
+            if (!POIJSON.TryParseText(JSON, PropertyKeys.TransparencySoftwareId, "transparency software identification", TransparencySoftware_Id.TryParse, out TransparencySoftware_Id?  transparencySoftwareId, out ErrorResponse) ||
+                !POIJSON.TryParseText(JSON, PropertyKeys.LegalStatus,            "legal status",                         POI.LegalStatus.        TryParse, out LegalStatus?              legalStatus,            out ErrorResponse))
             {
                 return false;
             }
@@ -146,7 +147,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            TransparencySoftwareAssignment  = new TransparencySoftwareAssignment(transparencySoftwareId.Value, legalStatus.Value, certificateId);
+            TransparencySoftwareAssignment  = new TransparencySoftwareAssignment(transparencySoftwareId.Value, legalStatus.Value);
             ErrorResponse                   = null;
             return true;
 

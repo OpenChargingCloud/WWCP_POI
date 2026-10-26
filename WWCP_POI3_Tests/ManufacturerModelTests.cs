@@ -77,7 +77,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             => new (M500,
                     ImmutableI18NString.Create(Languages.en, "DC meter"),
                     HardwareRevisions:  [ HardwareRevision.Parse("3.0") ],
-                    FirmwareVersions:   [ FirmwareVersion.Parse("1.7") ],
+                    FirmwareVersions:   [ FirmwareVersion.Parse("1.7"), FirmwareVersion.Parse("1.8") ],
                     CurrentTypes:       CurrentTypes.DC,
                     MaxCurrent:         Ampere.FromA(500),
                     AccuracyClass:      "B",
@@ -455,14 +455,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void Certificates_name_a_model_and_hardware_revisions_and_firmware_versions_of_it()
         {
 
-            TransparencySoftwareCertificate Certificate(ChargingStationManufacturer_Id  ManufacturerId,
+            ConformityCertificate Certificate(ChargingStationManufacturer_Id  ManufacturerId,
                                                         ChargingStationModel_Id         ModelId,
                                                         String                          HardwareRevision,
                                                         String                          FirmwareVersion   = "4.3")
 
-                => new (TransparencySoftwareCertificate_Id.Parse("cert-1"), ManufacturerId, ModelId, [ POI.HardwareRevision.Parse(HardwareRevision) ], [ POI.FirmwareVersion.Parse(FirmwareVersion) ], [ Chargy10 ], []);
+                => new (ConformityCertificate_Id.Parse("cert-1"), ManufacturerId, ModelId, [ POI.HardwareRevision.Parse(HardwareRevision) ], [ POI.FirmwareVersion.Parse(FirmwareVersion) ], [ Chargy10 ], []);
 
-            RoamingNetwork With(TransparencySoftwareCertificate Certificate)
+            RoamingNetwork With(ConformityCertificate Certificate)
 
                 => new (RoamingNetwork_Id.Parse("rn1"),
                         Created:                            Created,
@@ -474,7 +474,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                      [ OpenSourceLicense.AGPL3 ]) ],
                                                                                                    Created:               Created) ],
                         ConformityAssessmentBodies:         [ new ConformityAssessmentBody(ConformityAssessmentBody_Id.Parse("PTB"),
-                                                                                           TransparencySoftwareCertificates:  [ Certificate ],
+                                                                                           Certificates:  [ Certificate ],
                                                                                            Created:                           Created) ]);
 
             var json = Certificate(ACME, DC300, "1.1").ToJSON();
@@ -494,17 +494,136 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(json["firmwareVersions"]!. Select(version  => version. ToString()),   Is.EqualTo(new[] { "4.3" }));
 
                 // At least one of each, and no longer the one version of before.
-                Assert.That(() => new TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id.Parse("cert-2"), ACME, DC300, [ HardwareRevision.Parse("1.1") ], [], [ Chargy10 ], []),
+                Assert.That(() => new ConformityCertificate(ConformityCertificate_Id.Parse("cert-2"), ACME, DC300, [ HardwareRevision.Parse("1.1") ], [], [ Chargy10 ], []),
                             Throws.ArgumentException.With.Message.Contains("The certificate 'cert-2' must name at least one firmware version of its model"));
 
                 var withVersion = Certificate(ACME, DC300, "1.1").ToJSON();
                 withVersion.Add("chargingStationModelVersion", "1.1");
-                Assert.That(TransparencySoftwareCertificate.TryParse(withVersion, out _, out var versionError),  Is.False);
+                Assert.That(ConformityCertificate.TryParse(withVersion, out _, out var versionError),  Is.False);
                 Assert.That(versionError,                                                                         Does.Contain("chargingStationModelVersion"));
 
                 // The manufacturer of the model is no longer optional.
-                Assert.That(TransparencySoftwareCertificate.TryParse(json, out _, out var error),  Is.False);
-                Assert.That(error,                                                                 Does.Contain("chargingStationManufacturerId"));
+                Assert.That(ConformityCertificate.TryParse(json, out _, out var error),  Is.False);
+                Assert.That(error,                                                                 Does.Contain("must name the charging station model it is for with its manufacturer"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region CertifiedNetwork(Certificates, StationCertificates, MeterCertificates, MeterFirmware = "1.7")
+
+        /// <summary>
+        /// The station S1, a DC-300 of ACME in the hardware revision 1.1 with the firmware 4.3, and its meter, an M-500 of
+        /// METERS in the hardware revision 3.0 with the given firmware, naming the given certificates of the PTB.
+        /// </summary>
+        private static RoamingNetwork CertifiedNetwork(ConformityCertificate[]     Certificates,
+                                                       ConformityCertificate_Id[]  StationCertificates,
+                                                       ConformityCertificate_Id[]  MeterCertificates,
+                                                       String                      MeterFirmware   = "1.7")
+
+            => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
+                    Created:                            Created,
+                    ChargingStationManufacturers:       [ new ChargingStationManufacturer(ACME, Models: [ NewDC300(), new ChargingStationModel(AC22, HardwareRevisions: [ HardwareRevision.Parse("1.1") ], FirmwareVersions: [ FirmwareVersion.Parse("4.3") ]) ], Created: Created) ],
+                    EnergyMeterManufacturers:           [ new EnergyMeterManufacturer(METERS, Models: [ NewM500() ], Created: Created) ],
+                    TransparencySoftwareManufacturers:  [ new TransparencySoftwareManufacturer(TransparencySoftwareManufacturer_Id.Parse("OCC"),
+                                                                                               TransparencySoftware:  [ new TransparencySoftware(Chargy10,
+                                                                                                                                                 ImmutableI18NString.Create(Languages.en, "Chargy"),
+                                                                                                                                                 TransparencySoftwareVersion.Parse("1.0"),
+                                                                                                                                                 [ OpenSourceLicense.AGPL3 ]) ],
+                                                                                               Created:               Created) ],
+                    ConformityAssessmentBodies:         [ new ConformityAssessmentBody(ConformityAssessmentBody_Id.Parse("PTB"), Certificates: Certificates, Created: Created) ],
+                    ChargingStationOperators:           [ new ChargingStationOperator(GEF,
+                                                                                      Created:        Created,
+                                                                                      ChargingPools:  [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
+                                                                                                                         Created:           Created,
+                                                                                                                         ChargingStations:  [ new ChargingStation(S1,
+                                                                                                                                                                  ManufacturerId:    ACME,
+                                                                                                                                                                  ModelId:           DC300,
+                                                                                                                                                                  HardwareRevision:  HardwareRevision.Parse("1.1"),
+                                                                                                                                                                  FirmwareVersion:   FirmwareVersion.Parse("4.3"),
+                                                                                                                                                                  CertificateIds:    StationCertificates,
+                                                                                                                                                                  Created:           Created,
+                                                                                                                                                                  EVSEs:             [ new EVSE(EVSE_Id.Parse("DE*GEF*E1*1"),
+                                                                                                                                                                                                EnergyMeter:  new EnergyMeter(Meter1,
+                                                                                                                                                                                                                              ManufacturerId:              METERS,
+                                                                                                                                                                                                                              ModelId:                     M500,
+                                                                                                                                                                                                                              HardwareRevision:            HardwareRevision.Parse("3.0"),
+                                                                                                                                                                                                                              FirmwareVersion:             FirmwareVersion.Parse(MeterFirmware),
+                                                                                                                                                                                                                              TransparencySoftwareStatus:  [ new TransparencySoftwareAssignment(Chargy10, LegalStatus.GermanCalibrationLaw) ],
+                                                                                                                                                                                                                              CertificateIds:              MeterCertificates,
+                                                                                                                                                                                                                              Created:                     Created),
+                                                                                                                                                                                                Created:      Created) ]) ]) ]) ]).WithKeys();
+
+        #endregion
+
+        #region Stations_and_meters_name_the_certificates_of_their_models()
+
+        /// <summary>
+        /// A certificate is for a model of charging stations or of energy meters, in hardware revisions and firmware versions,
+        /// and names its components: the transparency software, and of a station the energy meters it mounts. A station
+        /// names the certificates of its model, a meter those of its model, each covering its revision and firmware.
+        /// </summary>
+        [Test]
+        public void Stations_and_meters_name_the_certificates_of_their_models()
+        {
+
+            var stationId    = ConformityCertificate_Id.Parse("PTB-S");
+            var meterId      = ConformityCertificate_Id.Parse("PTB-M");
+            var otherModel   = ConformityCertificate_Id.Parse("PTB-A");
+            var otherFirm    = ConformityCertificate_Id.Parse("PTB-S42");
+
+            var station      = new ConformityCertificate(stationId, ACME, DC300, [ HardwareRevision.Parse("1.1") ], [ FirmwareVersion.Parse("4.3") ], [ Chargy10 ], [],
+                                                         EnergyMeters: [ new CertifiedEnergyMeter(METERS, M500, [ HardwareRevision.Parse("3.0") ], [ FirmwareVersion.Parse("1.7") ]) ]);
+            var meter        = new ConformityCertificate(meterId,   METERS, M500, [ HardwareRevision.Parse("3.0") ], [ FirmwareVersion.Parse("1.7") ], [ Chargy10 ], []);
+            var forAC22      = new ConformityCertificate(otherModel, ACME, AC22,  [ HardwareRevision.Parse("1.1") ], [ FirmwareVersion.Parse("4.3") ], [ Chargy10 ], []);
+            var firmware42   = new ConformityCertificate(otherFirm,  ACME, DC300, [ HardwareRevision.Parse("1.1") ], [ FirmwareVersion.Parse("4.2") ], [ Chargy10 ], []);
+            var all          = new[] { station, meter, forAC22, firmware42 };
+
+            var unknownRevision = new ConformityCertificate(stationId, ACME, DC300, [ HardwareRevision.Parse("1.1") ], [ FirmwareVersion.Parse("4.3") ], [ Chargy10 ], [],
+                                                            EnergyMeters: [ new CertifiedEnergyMeter(METERS, M500, [ HardwareRevision.Parse("9.9") ], [ FirmwareVersion.Parse("1.7") ]) ]);
+
+            var meterJSON    = meter.ToJSON();
+            meterJSON.Add("energyMeters", new JArray(new CertifiedEnergyMeter(METERS, M500, [ HardwareRevision.Parse("3.0") ], [ FirmwareVersion.Parse("1.7") ]).ToJSON()));
+
+            var bothJSON     = meter.ToJSON();
+            bothJSON.Add("chargingStationManufacturerId", "ACME");
+            bothJSON.Add("chargingStationModel",          "DC-300");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(() => CertifiedNetwork(all, [ stationId ], [ meterId ]),                 Throws.Nothing);
+                Assert.That(station.ToJSON()["energyMeters"]![0]!["modelId"]!.ToString(),           Is.EqualTo("M-500"));
+                Assert.That(meter.  ToJSON()["energyMeterModel"]!.ToString(),                       Is.EqualTo("M-500"));
+                Assert.That(meter.  ToJSON()["chargingStationModel"],                               Is.Null);
+
+                // Of the other kind.
+                Assert.That(() => CertifiedNetwork(all, [ meterId ], []),
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB-M' of the charging station 'DE*GEF*S1' is for the energy meter model 'M-500' of 'METERS', not for a model of charging stations"));
+                Assert.That(() => CertifiedNetwork(all, [], [ stationId ]),
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB-S' of the energy meter 'meter-1' is for the charging station model 'DC-300' of 'ACME', not for a model of energy meters"));
+
+                // For another model, or not covering the firmware of the station or the meter.
+                Assert.That(() => CertifiedNetwork(all, [ otherModel ], []),
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB-A' of the charging station 'DE*GEF*S1' is for the charging station model 'AC-22' of 'ACME', not for the model of the station"));
+                Assert.That(() => CertifiedNetwork(all, [ otherFirm ], []),
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB-S42' of the charging station 'DE*GEF*S1' does not cover its hardware revision '1.1' and firmware version '4.3'"));
+                Assert.That(() => CertifiedNetwork(all, [], [ meterId ], MeterFirmware: "1.8"),
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB-M' of the energy meter 'meter-1' does not cover its hardware revision '3.0' and firmware version '1.8'"));
+
+                // A meter of the station is one of those the certificate of the station was issued with.
+                Assert.That(() => CertifiedNetwork(all, [ stationId ], [], MeterFirmware: "1.8"),
+                            Throws.ArgumentException.With.Message.Contains("The energy meter 'meter-1' of the charging station 'DE*GEF*S1' is none of the energy meters the certificate 'PTB-S' was issued with"));
+                Assert.That(() => CertifiedNetwork([ unknownRevision ], [ stationId ], []),
+                            Throws.ArgumentException.With.Message.Contains("The hardware revision '9.9' of the energy meter model 'M-500' the certificate 'PTB-S' was issued with is no hardware revision of the energy meter model 'M-500' of 'METERS'"));
+
+                // A certificate of a meter model names no energy meters, and a certificate is for one model.
+                Assert.That(ConformityCertificate.TryParse(meterJSON, out _, out var meterError),   Is.False);
+                Assert.That(meterError,                                                              Does.Contain("The certificate 'PTB-M' of an energy meter model names no energy meters"));
+                Assert.That(ConformityCertificate.TryParse(bothJSON,  out _, out var bothError),    Is.False);
+                Assert.That(bothError,                                                               Does.Contain("must be for either a charging station model or an energy meter model"));
 
             }
 

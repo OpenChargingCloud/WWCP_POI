@@ -42,7 +42,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="CustomTransparencySoftwareStatusParser">An optional delegate to parse custom transparency software status JSON objects.</param>
         public static TransparencySoftwareStatus Parse(JObject                                                   JSON,
                                                        TransparencySoftwareLookupDelegate                        TransparencySoftwareLookup,
-                                                       TransparencySoftwareCertificateLookupDelegate             CertificateLookup,
+                                                       ConformityCertificateLookupDelegate             CertificateLookup,
                                                        CustomJObjectParserDelegate<TransparencySoftwareStatus>?  CustomTransparencySoftwareStatusParser   = null)
         {
 
@@ -75,7 +75,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="CustomTransparencySoftwareStatusParser">An optional delegate to parse custom transparency software status JSON objects.</param>
         public static Boolean TryParse(JObject                                                   JSON,
                                        TransparencySoftwareLookupDelegate                        TransparencySoftwareLookup,
-                                       TransparencySoftwareCertificateLookupDelegate             CertificateLookup,
+                                       ConformityCertificateLookupDelegate             CertificateLookup,
                                        [NotNullWhen(true)]  out TransparencySoftwareStatus?      TransparencySoftwareStatus,
                                        [NotNullWhen(false)] out String?                          ErrorResponse,
                                        CustomJObjectParserDelegate<TransparencySoftwareStatus>?  CustomTransparencySoftwareStatusParser   = null)
@@ -121,7 +121,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse CertificateId             [optional]
 
                 var certificate = StrictJSON.Text(JSON, PropertyKeys.CertificateId) is { } certificateId
-                                      ? CertificateLookup(TransparencySoftwareCertificate_Id.Parse(certificateId)) ??
+                                      ? CertificateLookup(ConformityCertificate_Id.Parse(certificateId)) ??
                                             throw new ArgumentException($"{PropertyKeys.CertificateId}: unresolved document '{certificateId}'.")
                                       : null;
 

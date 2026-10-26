@@ -57,7 +57,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             EnergyMeter.PropertyKeys.HardwareRevision,
             EnergyMeter.PropertyKeys.FirmwareVersion,
             EnergyMeter.PropertyKeys.TransparencySoftwareStatus,
-            EnergyMeter.PropertyKeys.SignatureMethods
+            EnergyMeter.PropertyKeys.SignatureMethods,
+            EnergyMeter.PropertyKeys.CertificateIds
         ];
 
         /// <summary>

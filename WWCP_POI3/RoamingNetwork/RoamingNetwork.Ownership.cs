@@ -270,7 +270,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             { nameof(TransparencySoftwareManufacturer),
                                                [ TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware ] },
             { nameof(ConformityAssessmentBody),
-                                               [ ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates ] }
+                                               [ ConformityAssessmentBody.PropertyKeys.Certificates ] }
         };
 
         #endregion
@@ -1181,12 +1181,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region The transparency software certificates of a conformity assessment body: added to it, or found in it
+            #region The certificates of a conformity assessment body: added to it, or found in it
 
-            if (Change.EntityType == nameof(TransparencySoftwareCertificate))
+            if (Change.EntityType == nameof(ConformityCertificate))
             {
 
-                if (!TransparencySoftwareCertificate_Id.TryParse(Change.EntityId, out var certificateId))
+                if (!ConformityCertificate_Id.TryParse(Change.EntityId, out var certificateId))
                 {
                     ErrorResponse = $"invalid {Change.EntityType} identification '{Change.EntityId}'!";
                     return false;

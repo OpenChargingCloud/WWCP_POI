@@ -73,21 +73,22 @@ A version of a roaming network is identified by its **content**: its JSON repres
     - in the ordinal order of their identifications, as written: embedded entities, brands, charging connectors, energy
       meters and their `publicKeys`, `dataLicenses`, the `signingKeys` and `identityKeys` of a party;
     - in the ordinal order of their texts, as written: lists of identifications (e.g. `EVSEIds`, `chargingStationIds`,
-      `chargingPoolIds`, `chargingTariffIds`, `energyMeterIds`, `parkingSpaceIds`, `acceptedEMobilityProviderIds`, the
-      groups and parties an offer names, `verifiedTransparencySoftwareIds`, `compatibleTransparencySoftwareIds`) and of
-      predefined values (`facilities`, `paymentOptions`, `uiFeatures`, `features`, `parkingRestrictions`, `services`,
-      `standards`, `nutsCodes`, `vehicleTypes`, `euVehicleCategories`, `paymentMeans`, `paymentBrands`,
-      `signatureMethods`, `connectorTypes`, `measurands`, `notifiedFor`, `cardTypes`, `dimensions`, `usages`), and the
-      `URLs` of a data license;
+      `chargingPoolIds`, `chargingTariffIds`, `energyMeterIds`, `parkingSpaceIds`, `certificateIds`,
+      `acceptedEMobilityProviderIds`, the groups and parties an offer names, `verifiedTransparencySoftwareIds`,
+      `compatibleTransparencySoftwareIds`) and of predefined values (`facilities`, `paymentOptions`, `uiFeatures`,
+      `features`, `parkingRestrictions`, `services`, `standards`, `nutsCodes`, `vehicleTypes`, `euVehicleCategories`,
+      `paymentMeans`, `paymentBrands`, `signatureMethods`, `connectorTypes`, `measurands`, `notifiedFor`, `cardTypes`,
+      `dimensions`, `usages`), and the `URLs` of a data license;
     - by other keys: the `signingKeyCertificates` of the roaming network operator by the `@id` of their signing key,
       then their `keyId`; `authenticationModes` by their `type`; the `transparencySoftwareStatus` of an energy meter by
       its `transparencySoftwareId`; the `openSourceLicenses` of a release by their `@id` in upper case, their
       description, their URLs; `daysOfWeek` Monday first; `currentTypes` and `chargingModes` in the order of their
       definition;
     - as given: the `elements` of a tariff and their `priceComponents`, `images`, `relatedLocations`, `templateIds`,
-      `locationLanguages`, the `hardwareRevisions` and `firmwareVersions` of a model and of a certificate, regular
-      openings and exceptional periods, `energySources`, `environmentalImpacts`, `marketLocationIds`,
-      `meteringLocationIds`, `officialLanguages`, `treeHashAlgorithms`, certificate chains, and the arrays of custom data.
+      `locationLanguages`, the `hardwareRevisions` and `firmwareVersions` of a model, of a certificate and of the
+      `energyMeters` of a certificate, these as well, regular openings and exceptional periods, `energySources`,
+      `environmentalImpacts`, `marketLocationIds`, `meteringLocationIds`, `officialLanguages`, `treeHashAlgorithms`,
+      certificate chains, and the arrays of custom data.
   - **Identifications** trimmed, as their type writes them: of charging station operators and grid operators in upper
     case with `*` (`DE*GEF`), of charging pools, stations, EVSEs, tariffs, groups and templates with their operator so,
     of e-mobility providers in upper case with the separator given, every other one as given. Predefined values of
@@ -299,7 +300,7 @@ and an identity key naming any:
 | `priceStatements` | price statements (section 12) |
 | `models` | the models of a charging station or energy meter manufacturer |
 | `software` | the transparency software releases of a transparency software manufacturer |
-| `certificates` | the transparency software certificates of a conformity assessment body |
+| `certificates` | the certificates of a conformity assessment body, of charging station and energy meter models |
 | `party` | everything else the party owns: its own properties, its `signingKeys` by a signing key; of the RNO also the roaming network, adding and removing parties, commits and attestations (8.5) |
 
 A change is signed by a signing key of its owner that may sign the usage of the entity it changes, whoever owns
@@ -331,7 +332,7 @@ Every change has exactly one **owner**:
 | parking garages, spaces, sensors and products | their parking operator (the parent of an `Add`) |
 | charging station and energy meter models | their manufacturer, the parent of every change of them: a model is unique within its manufacturer only |
 | transparency software releases | their transparency software manufacturer (the parent of an `Add`) |
-| transparency software certificates | the conformity assessment body that issued them (the parent of an `Add`); the RNO for a body without signing keys |
+| certificates (`ConformityCertificate`) | the conformity assessment body that issued them (the parent of an `Add`); the RNO for a body without signing keys |
 | a grid connection point | its maintainer: the party its `maintainedBy` names, else its grid operator; an `Add` also its grid operator |
 | `maintainedBy` of a grid connection point | its grid operator, its maintainer, or an identity key of the RNO |
 
@@ -905,7 +906,7 @@ RFC 9162, section 2.1.1:
 | charging station manufacturer | `chargingStationModels` |
 | energy meter manufacturer | `energyMeterModels` |
 | transparency software manufacturer | `transparencySoftware` |
-| conformity assessment body | `transparencySoftwareCertificates` |
+| conformity assessment body | `certificates` |
 
 Everything else is part of the entity that embeds it: its roaming network operator with its keys,
 brands, charging connectors, energy meters, images, keys of parties, opening times.
@@ -990,9 +991,9 @@ A **charging station proof** gives completely:
   `signatureMethods` and `publicKeys`;
 - the charging tariffs its effective EVSEs name, in the `chargingTariffs` of its operator;
 - the manufacturer its `manufacturerId` names with the model its `modelId` names, the energy meter manufacturers the
-  energy meters of the station and of its EVSEs name with the models they name, and the transparency software releases
-  and certificates their `transparencySoftwareStatus` names, in the skeletons of their manufacturers and conformity
-  assessment bodies;
+  energy meters of the station and of its EVSEs name with the models they name, the transparency software releases
+  their `transparencySoftwareStatus` names, and the certificates the station and its energy meters name in their
+  `certificateIds`, in the skeletons of their manufacturers and conformity assessment bodies;
 - the parking spaces it names, of its operator or of parking operators, and the grid connection point of its pool.
 
 All other child arrays are pruned. POI_API serves it as

@@ -123,8 +123,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/TSMs/{TSM_Id}/TSs/{TS_Id}                                a transparency software release of the manufacturer
     /// GET ~/RNs/{RN_Id}/CABs                                                     its conformity assessment bodies, in short
     /// GET ~/RNs/{RN_Id}/CABs/{CAB_Id}                                            a conformity assessment body, with its certificates;
-    ///     ?without=transparencySoftwareCertificates leaves them out, which ~/RNs/{RN_Id}/CABs/{CAB_Id}/TSCs lists
-    /// GET ~/RNs/{RN_Id}/CABs/{CAB_Id}/TSCs/{TSC_Id}                              a transparency software certificate of the body
+    ///     ?without=certificates leaves them out, which ~/RNs/{RN_Id}/CABs/{CAB_Id}/certificates lists
+    /// GET ~/RNs/{RN_Id}/CABs/{CAB_Id}/certificates/{Certificate_Id}                              a certificate of the body
     /// GET ~/RNs/{RN_Id}/POs                                                      its parking operators, in short
     /// GET ~/RNs/{RN_Id}/POs/{PO_Id}                                              a parking operator;
     ///     ?without=parkingGarages,parkingSpaces,parkingSpaceTemplates,parkingSpaceGroups,parkingSensors,parkingProducts,
@@ -1121,7 +1121,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              ? CachedEntityResponseWithout(request,
                                                                            conformityAssessmentBody,
                                                                            () => conformityAssessmentBody.ToJSON(Embedded: true),
-                                                                           [ ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates ],
+                                                                           [ ConformityAssessmentBody.PropertyKeys.Certificates ],
                                                                            "a conformity assessment body")
                                              : EntityErrorResponse(request, HTTPStatusCode.NotFound, $"The conformity assessment body '{conformityAssessmentBodyId}' is unknown in the roaming network '{roamingNetwork.Id}'!");
 
@@ -1129,18 +1129,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region ~/RNs/{RN_Id}/CABs/{CAB_Id}/TSCs[/{TSC_Id}]
+            #region ~/RNs/{RN_Id}/CABs/{CAB_Id}/certificates[/{Certificate_Id}]
 
-            AddEmbeddedListHandlers<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(
-                roamingNetworkPath + "/CABs/{conformityAssessmentBodyId}/TSCs",
+            AddEmbeddedListHandlers<ConformityCertificate_Id, ConformityCertificate>(
+                roamingNetworkPath + "/CABs/{conformityAssessmentBodyId}/certificates",
                 RequestedCertificatesOfConformityAssessmentBody,
                 certificate => certificate.ToJSON(Embedded: true));
 
-            AddEmbeddedEntityHandlers<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>(
-                roamingNetworkPath + "/CABs/{conformityAssessmentBodyId}/TSCs/{certificateId}",
+            AddEmbeddedEntityHandlers<ConformityCertificate_Id, ConformityCertificate>(
+                roamingNetworkPath + "/CABs/{conformityAssessmentBodyId}/certificates/{certificateId}",
                 RequestedCertificatesOfConformityAssessmentBody,
-                TransparencySoftwareCertificate_Id.TryParse,
-                "transparency software certificate",
+                ConformityCertificate_Id.TryParse,
+                "certificate",
                 certificate => certificate.ToJSON(Embedded: true));
 
             #endregion
@@ -2336,7 +2336,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The certificates of the conformity assessment body of the given request, ~/RNs/{RN_Id}/CABs/{CAB_Id}/...
         /// </summary>
-        private (POICollection<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>? Collection, HTTPResponse? ErrorResponse) RequestedCertificatesOfConformityAssessmentBody(HTTPRequest Request)
+        private (POICollection<ConformityCertificate_Id, ConformityCertificate>? Collection, HTTPResponse? ErrorResponse) RequestedCertificatesOfConformityAssessmentBody(HTTPRequest Request)
         {
 
             if (!TryGetRequestedRoamingNetwork(Request, out var roamingNetwork, out var errorResponse))
@@ -2346,7 +2346,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return (null, EntityErrorResponse(Request, HTTPStatusCode.BadRequest, "Invalid conformity assessment body identification!"));
 
             return roamingNetwork.TryGetConformityAssessmentBodyById(bodyId, out var body)
-                       ? (body.TransparencySoftwareCertificates, null)
+                       ? (body.Certificates, null)
                        : (null, EntityErrorResponse(Request, HTTPStatusCode.NotFound, $"The conformity assessment body '{bodyId}' is unknown in the roaming network '{roamingNetwork.Id}'!"));
 
         }

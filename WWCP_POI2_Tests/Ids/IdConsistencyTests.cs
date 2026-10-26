@@ -188,14 +188,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Ids
         {
 
             AssertSame(TransparencySoftware_Id.           Parse("Release-1"),  TransparencySoftware_Id.           Parse("release-1"));
-            AssertSame(TransparencySoftwareCertificate_Id.Parse("PTB-1"),      TransparencySoftwareCertificate_Id.Parse("ptb-1"));
-            AssertSame(TransparencySoftwareCertificate_Id.Parse("PTB-1"),      TransparencySoftwareCertificate_Id.Parse(" PTB-1 "));
+            AssertSame(ConformityCertificate_Id.Parse("PTB-1"),      ConformityCertificate_Id.Parse("ptb-1"));
+            AssertSame(ConformityCertificate_Id.Parse("PTB-1"),      ConformityCertificate_Id.Parse(" PTB-1 "));
 
-            Assert.That(TransparencySoftwareCertificate_Id.Parse(" PTB-1 ").ToString(),  Is.EqualTo("PTB-1"));
+            Assert.That(ConformityCertificate_Id.Parse(" PTB-1 ").ToString(),  Is.EqualTo("PTB-1"));
             Assert.That(TransparencySoftware_Id.           Parse("Release-1").ToString(), Is.EqualTo("Release-1"));
-            Assert.That(TransparencySoftwareCertificate_Id.TryParse("   ",    out _),  Is.False);
-            Assert.That(TransparencySoftwareCertificate_Id.TryParse("",       out _),  Is.False);
-            Assert.That(TransparencySoftwareCertificate_Id.New,                         Is.Not.EqualTo(TransparencySoftwareCertificate_Id.New));
+            Assert.That(ConformityCertificate_Id.TryParse("   ",    out _),  Is.False);
+            Assert.That(ConformityCertificate_Id.TryParse("",       out _),  Is.False);
+            Assert.That(ConformityCertificate_Id.New,                         Is.Not.EqualTo(ConformityCertificate_Id.New));
 
         }
 
@@ -212,7 +212,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Ids
 
             Assert.That(default(ParkingGarage_Id)   == default(ParkingGarage_Id),   Is.True);
             Assert.That(default(ParkingSensor_Id).IsNullOrEmpty,                    Is.True);
-            Assert.That(default(TransparencySoftwareCertificate_Id).ToString(),     Is.Empty);
+            Assert.That(default(ConformityCertificate_Id).ToString(),     Is.Empty);
             Assert.That(ParkingGarage_Id.New,                                       Is.Not.EqualTo(ParkingGarage_Id.New));
 
         }

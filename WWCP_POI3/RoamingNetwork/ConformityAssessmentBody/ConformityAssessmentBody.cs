@@ -155,14 +155,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  NotifiedFor                         = "notifiedFor";
 
             /// <summary>
-            /// The property of the transparency software certificates it issued.
+            /// The property of the certificates it issued.
             /// </summary>
-            public const String  TransparencySoftwareCertificates    = "transparencySoftwareCertificates";
+            public const String  Certificates    = "certificates";
 
             /// <summary>
             /// The property naming its certificates by their identifications only, refused: they are embedded completely.
             /// </summary>
-            public const String  TransparencySoftwareCertificateIds  = "transparencySoftwareCertificateIds";
+            public const String  CertificateIds  = "certificateIds";
 
             /// <summary>
             /// The property of its signing keys.
@@ -258,9 +258,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<String>                         NotifiedFor                       { get; }
 
         /// <summary>
-        /// The transparency software certificates it issued, ordered by their identifications.
+        /// The certificates it issued, ordered by their identifications.
         /// </summary>
-        public POICollection<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  TransparencySoftwareCertificates  { get; }
+        public POICollection<ConformityCertificate_Id, ConformityCertificate>  Certificates  { get; }
 
         /// <summary>
         /// Its signing keys: it signs its own properties and its certificates with them; none while it does not take part.
@@ -296,7 +296,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         String?                                                    NotifiedBodyNumber                 = null,
                                         IEnumerable<String>?                                       NotifiedFor                        = null,
 
-                                        IEnumerable<TransparencySoftwareCertificate>?              TransparencySoftwareCertificates   = null,
+                                        IEnumerable<ConformityCertificate>?              Certificates   = null,
 
                                         IEnumerable<POIPublicKey>?                                 IdentityKeys                       = null,
                                         IEnumerable<POIPublicKey>?                                 SigningKeys                        = null,
@@ -365,11 +365,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.NotifiedBodyNumber     = NotifiedBodyNumber;
             this.NotifiedFor            = [ .. notifiedFor.Order(StringComparer.Ordinal) ];
 
-            this.TransparencySoftwareCertificates = new (TransparencySoftwareCertificates, certificate => certificate.Id, "transparency software certificate", $"the conformity assessment body '{Id}'");
+            this.Certificates = new (Certificates, certificate => certificate.Id, "certificate", $"the conformity assessment body '{Id}'");
 
             // A certificate issued under a legislation is one of a notified body for it.
-            if (this.TransparencySoftwareCertificates.FirstOrDefault(certificate => certificate.Legislation is String legislation && !this.NotifiedFor.Contains(legislation)) is TransparencySoftwareCertificate notNotified)
-                throw new ArgumentException($"The transparency software certificate '{notNotified.Id}' is issued under the legislation '{notNotified.Legislation}', which the conformity assessment body '{Id}' is not notified for!", nameof(TransparencySoftwareCertificates));
+            if (this.Certificates.FirstOrDefault(certificate => certificate.Legislation is String legislation && !this.NotifiedFor.Contains(legislation)) is ConformityCertificate notNotified)
+                throw new ArgumentException($"The certificate '{notNotified.Id}' is issued under the legislation '{notNotified.Legislation}', which the conformity assessment body '{Id}' is not notified for!", nameof(Certificates));
 
             (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the conformity assessment body '{Id}'");
 
@@ -378,15 +378,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region TryGetTransparencySoftwareCertificate(CertificateId, out Certificate)
+        #region TryGetConformityCertificate(CertificateId, out Certificate)
 
         /// <summary>
         /// Try to get the certificate with the given identification.
         /// </summary>
-        public Boolean TryGetTransparencySoftwareCertificate(TransparencySoftwareCertificate_Id                        CertificateId,
-                                                             [NotNullWhen(true)] out TransparencySoftwareCertificate?  Certificate)
+        public Boolean TryGetConformityCertificate(ConformityCertificate_Id                        CertificateId,
+                                                             [NotNullWhen(true)] out ConformityCertificate?  Certificate)
 
-            => TransparencySoftwareCertificates.TryGet(CertificateId, out Certificate);
+            => Certificates.TryGet(CertificateId, out Certificate);
 
         #endregion
 
@@ -513,11 +513,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseChildren<TransparencySoftwareCertificate>(JSON,
-                                                                               PropertyKeys.TransparencySoftwareCertificates,
-                                                                               PropertyKeys.TransparencySoftwareCertificateIds,
-                                                                               "transparency software certificates",
-                                                                               TransparencySoftwareCertificate.TryParse,
+                if (!POIJSON.TryParseChildren<ConformityCertificate>(JSON,
+                                                                               PropertyKeys.Certificates,
+                                                                               PropertyKeys.CertificateIds,
+                                                                               "certificates",
+                                                                               ConformityCertificate.TryParse,
                                                                                out var certificates,
                                                                                out ErrorResponse))
                 {
@@ -646,8 +646,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (NotifiedFor.Length > 0)
                 json.Add(PropertyKeys.NotifiedFor,                      new JArray(NotifiedFor));
 
-            if (IncludeChildArrays && !TransparencySoftwareCertificates.IsEmpty)
-                json.Add(PropertyKeys.TransparencySoftwareCertificates, new JArray(TransparencySoftwareCertificates.Select(certificate => certificate.ToJSON(Embedded: true))));
+            if (IncludeChildArrays && !Certificates.IsEmpty)
+                json.Add(PropertyKeys.Certificates, new JArray(Certificates.Select(certificate => certificate.ToJSON(Embedded: true))));
 
             if (SigningKeys.Length > 0)
                 json.Add(PropertyKeys.SigningKeys,                      new JArray(SigningKeys. Select(key => key.ToJSON(Embedded: true))));
@@ -737,8 +737,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             PropertyKeys.TermsAndConditions,
                                             PropertyKeys.NotifiedBodyNumber,
                                             PropertyKeys.NotifiedFor,
-                                            PropertyKeys.TransparencySoftwareCertificates,
-                                            PropertyKeys.TransparencySoftwareCertificateIds,
+                                            PropertyKeys.Certificates,
+                                            PropertyKeys.CertificateIds,
                                             BasePropertyKeys.DataLicenses,
                                             BasePropertyKeys.DataLicenseIds,
                                             PropertyKeys.SigningKeys,
@@ -772,11 +772,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseChildren<TransparencySoftwareCertificate>(json,
-                                                                               PropertyKeys.TransparencySoftwareCertificates,
-                                                                               PropertyKeys.TransparencySoftwareCertificateIds,
-                                                                               "transparency software certificates",
-                                                                               TransparencySoftwareCertificate.TryParse,
+                if (!POIJSON.TryParseChildren<ConformityCertificate>(json,
+                                                                               PropertyKeys.Certificates,
+                                                                               PropertyKeys.CertificateIds,
+                                                                               "certificates",
+                                                                               ConformityCertificate.TryParse,
                                                                                out var certificates,
                                                                                out ErrorResponse))
                 {
@@ -905,9 +905,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (NotifiedFor.Length > 0)
                 cbor.Add(CBORValue.FromText(PropertyKeys.NotifiedFor),                   CBORValue.FromArray(NotifiedFor.Select(CBORValue.FromText)));
 
-            if (!TransparencySoftwareCertificates.IsEmpty)
-                cbor.Add(CBORValue.FromText(PropertyKeys.TransparencySoftwareCertificates),
-                         CBORValue.FromArray(TransparencySoftwareCertificates.Select(certificate => CBORJSON.ToCBOR(certificate.ToJSON(Embedded: true)))));
+            if (!Certificates.IsEmpty)
+                cbor.Add(CBORValue.FromText(PropertyKeys.Certificates),
+                         CBORValue.FromArray(Certificates.Select(certificate => CBORJSON.ToCBOR(certificate.ToJSON(Embedded: true)))));
 
             if (SigningKeys.Length > 0)
                 cbor.Add(CBORValue.FromText(PropertyKeys.SigningKeys),

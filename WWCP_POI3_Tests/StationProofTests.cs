@@ -64,13 +64,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
         private static readonly ChargingStationManufacturer_Id      ACME        = ChargingStationManufacturer_Id.    Parse("ACME");
         private static readonly ChargingStationModel                Wallbox22   = new (ChargingStationModel_Id.Parse("Wallbox-22"), HardwareRevisions: [ HardwareRevision.Parse("1.0") ], FirmwareVersions: [ FirmwareVersion.Parse("1.0.0") ]);
         private static readonly ChargingStationModel                Wallbox11   = new (ChargingStationModel_Id.Parse("Wallbox-11"));
-        private static readonly EnergyMeterModel                    M500        = new (EnergyMeterModel_Id.Parse("M-500"), SignatureMethods: [ SignatureMethod.OCMF ]);
+        private static readonly EnergyMeterModel                    M500        = new (EnergyMeterModel_Id.Parse("M-500"), HardwareRevisions: [ HardwareRevision.Parse("2.0") ], FirmwareVersions: [ FirmwareVersion.Parse("2.0.1") ], SignatureMethods: [ SignatureMethod.OCMF ]);
         private static readonly EnergyMeterModel                    M300        = new (EnergyMeterModel_Id.Parse("M-300"));
         private static readonly EnergyMeterManufacturer_Id          Meters      = EnergyMeterManufacturer_Id.        Parse("METERS");
         private static readonly EnergyMeterManufacturer_Id          Others      = EnergyMeterManufacturer_Id.        Parse("OTHERS");
         private static readonly TransparencySoftware_Id             Chargy10    = TransparencySoftware_Id.           Parse("chargy-1.0");
         private static readonly TransparencySoftware_Id             Chargy11    = TransparencySoftware_Id.           Parse("chargy-1.1");
-        private static readonly TransparencySoftwareCertificate_Id  Cert1       = TransparencySoftwareCertificate_Id.Parse("cert-1");
+        private static readonly ConformityCertificate_Id  Cert1       = ConformityCertificate_Id.Parse("cert-1");
         private static readonly GridOperator_Id                     NET         = GridOperator_Id.                   Parse("DE*NET");
         private static readonly GridConnectionPoint_Id              GCP1        = GridConnectionPoint_Id.            Parse("gcp-1");
         private static readonly ParkingOperator_Id                  PAR         = ParkingOperator_Id.                Parse("DE*PAR");
@@ -112,7 +112,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                    ConformityAssessmentBodies:        [ new ConformityAssessmentBody(ConformityAssessmentBody_Id.Parse("PTB"),
                                                                                      NotifiedBodyNumber:                "0102",
                                                                                      NotifiedFor:                       [ ConformityAssessmentBody.Legislations.MID ],
-                                                                                     TransparencySoftwareCertificates:  [ new TransparencySoftwareCertificate(Cert1,
+                                                                                     Certificates:  [ new ConformityCertificate(Cert1,
                                                                                                                                                               ACME,
                                                                                                                                                               Wallbox22.Id,
                                                                                                                                                               [ HardwareRevision.Parse("1.0") ],
@@ -121,7 +121,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                                                                                                                                                               [ Chargy11 ],
                                                                                                                                                               DocumentNumber:                 "DE-123",
                                                                                                                                                               NotBefore:                      Created,
-                                                                                                                                                              Legislation:                    ConformityAssessmentBody.Legislations.MID) ],
+                                                                                                                                                              Legislation:                    ConformityAssessmentBody.Legislations.MID),
+                                                                                                        new ConformityCertificate(ConformityCertificate_Id.Parse("cert-2"),
+                                                                                                                                  Meters,
+                                                                                                                                  M500.Id,
+                                                                                                                                  [ HardwareRevision.Parse("2.0") ],
+                                                                                                                                  [ FirmwareVersion.Parse("2.0.1") ],
+                                                                                                                                  [ Chargy10 ],
+                                                                                                                                  [],
+                                                                                                                                  Legislation:  ConformityAssessmentBody.Legislations.MID) ],
                                                                                      Created:                           Created) ],
                    GridOperators:                     [ new GridOperator(NET,
                                                                          GridConnectionPoints:  [ new GridConnectionPoint(GCP1, VoltageLevel: GridVoltageLevel.LowVoltage),
@@ -146,17 +154,23 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                                                                                                  GridConnectionPointId:  GCP1,
                                                                                                  Created:                Created,
                                                                                                  ChargingStations:       [ new ChargingStation(S1,
-                                                                                                                                               ManufacturerId:   ACME,
-                                                                                                                                               ModelId:          Wallbox22.Id,
-                                                                                                                                               ParkingSpaceIds:  [ Space1 ],
+                                                                                                                                               ManufacturerId:    ACME,
+                                                                                                                                               ModelId:           Wallbox22.Id,
+                                                                                                                                               HardwareRevision:  HardwareRevision.Parse("1.0"),
+                                                                                                                                               FirmwareVersion:   FirmwareVersion.Parse("1.0.0"),
+                                                                                                                                               CertificateIds:    [ Cert1 ],
+                                                                                                                                               ParkingSpaceIds:   [ Space1 ],
                                                                                                                                                Created:          Created,
                                                                                                                                                EVSEs:            [ new EVSE(E11,
                                                                                                                                                                             TemplateIds:  [ ET1 ],
                                                                                                                                                                             EnergyMeter:  new EnergyMeter(EnergyMeter_Id.Parse("meter-1"),
                                                                                                                                                                                                           ManufacturerId:              Meters,
                                                                                                                                                                                                           ModelId:                     M500.Id,
+                                                                                                                                                                                                          HardwareRevision:            HardwareRevision.Parse("2.0"),
+                                                                                                                                                                                                          FirmwareVersion:             FirmwareVersion.Parse("2.0.1"),
+                                                                                                                                                                                                          CertificateIds:              [ ConformityCertificate_Id.Parse("cert-2") ],
                                                                                                                                                                                                           SerialNumber:                "M-1",
-                                                                                                                                                                                                          TransparencySoftwareStatus:  [ new TransparencySoftwareAssignment(Chargy10, LegalStatus.GermanCalibrationLaw, Cert1) ],
+                                                                                                                                                                                                          TransparencySoftwareStatus:  [ new TransparencySoftwareAssignment(Chargy10, LegalStatus.GermanCalibrationLaw) ],
                                                                                                                                                                                                           Created:                     Created),
                                                                                                                                                                             Created:      Created),
                                                                                                                                                                    new EVSE(E12,
@@ -333,7 +347,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(Ids(proof.Given("transparencySoftwareManufacturers")),                    Is.EqualTo(new[] { "OpenChargingCloud" }));
                 Assert.That(Ids(proof.Given("transparencySoftwareManufacturers", "transparencySoftware")), Is.EqualTo(new[] { "chargy-1.0" }));
                 Assert.That(Ids(proof.Given("conformityAssessmentBodies")),                           Is.EqualTo(new[] { "PTB" }));
-                Assert.That(Ids(proof.Given("conformityAssessmentBodies", "transparencySoftwareCertificates")), Is.EqualTo(new[] { "cert-1" }));
+                Assert.That(Ids(proof.Given("conformityAssessmentBodies", "certificates")),         Is.EqualTo(new[] { "cert-1", "cert-2" }));
                 Assert.That(Ids(proof.Given("parkingOperators", "parkingSpaces")),                    Is.EqualTo(new[] { "space-1" }));
                 Assert.That(proof.Given("parkingOperators", "parkingSpaces").Single()["roofed"]?.Value<Boolean>(), Is.True, "the effective parking space");
                 Assert.That(Ids(proof.Given("gridOperators", "gridConnectionPoints")),                Is.EqualTo(new[] { "gcp-1" }));

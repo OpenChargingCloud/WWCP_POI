@@ -114,6 +114,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ChargingStation.PropertyKeys.CertificationInfo,
             ChargingStation.PropertyKeys.MaxPower,
             ChargingStation.PropertyKeys.ParkingSpaceIds,
+            ChargingStation.PropertyKeys.CertificateIds,
             ChargingStation.PropertyKeys.TemplateIds,
             ChargingStation.BasePropertyKeys.CustomData
         ];
@@ -186,7 +187,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ChargingStation.PropertyKeys.CalibrationInfo,
             ChargingStation.PropertyKeys.CertificationInfo,
             ChargingStation.PropertyKeys.MaxPower,
-            ChargingStation.PropertyKeys.ParkingSpaceIds
+            ChargingStation.PropertyKeys.ParkingSpaceIds,
+            ChargingStation.PropertyKeys.CertificateIds
         ];
 
         /// <summary>

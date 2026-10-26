@@ -1086,6 +1086,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     EUVehicleCategories:  Templates.Union (ChargingStation.EUVehicleCategories, template => template.EUVehicleCategories),
                                     Features:             Templates.Union (ChargingStation.Features,            template => template.Features),
                                     ParkingSpaceIds:      Templates.Union (ChargingStation.ParkingSpaceIds,     template => template.ParkingSpaceIds),
+                                    CertificateIds:       Templates.Union (ChargingStation.CertificateIds,      template => template.CertificateIds),
 
                                     // Its effective EVSEs, and its very energy meters, with the properties of their templates.
                                     EVSEs:                EVSEs,

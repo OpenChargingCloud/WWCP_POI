@@ -133,6 +133,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  PublicKeys                   = "publicKeys";
 
             /// <summary>
+            /// The property of the identifications of the certificates of its model it names.
+            /// </summary>
+            public const String  CertificateIds               = "certificateIds";
+
+            /// <summary>
             /// The property of its templates.
             /// </summary>
             public const String  TemplateIds                  = "templateIds";
@@ -193,6 +198,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<EnergyMeterPublicKey>            PublicKeys                  { get; }
 
         /// <summary>
+        /// The certificates of conformity of its model, in its hardware revision and firmware version, of the roaming
+        /// network, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<ConformityCertificate_Id>        CertificateIds              { get; }
+
+        /// <summary>
         /// The energy meter templates it takes, each once, in its order: of every property they give, the first one giving it
         /// decides, unless it has its own. It names them; they do not name their members.
         /// </summary>
@@ -218,6 +229,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            IEnumerable<TransparencySoftwareAssignment>? TransparencySoftwareStatus  = null,
                            IEnumerable<SignatureMethod>?               SignatureMethods             = null,
                            IEnumerable<EnergyMeterPublicKey>?          PublicKeys                   = null,
+                           IEnumerable<ConformityCertificate_Id>?      CertificateIds               = null,
 
                            IEnumerable<EnergyMeterTemplate_Id>?        TemplateIds                  = null,
 
@@ -264,6 +276,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.TransparencySoftwareStatus = TransparencySoftwareAssignment.Checked(TransparencySoftwareStatus, $"the energy meter '{Id}'");
             this.SignatureMethods = POIJSON.OrderedIds(SignatureMethods, $"signature method of the energy meter '{Id}'");
             this.PublicKeys       = EnergyMeterPublicKey.Ordered(PublicKeys, $"public key of the energy meter '{Id}'");
+            this.CertificateIds   = POIJSON.OrderedIds(CertificateIds, $"certificate of the energy meter '{Id}'");
 
         }
 
@@ -391,6 +404,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (PublicKeys.Length > 0)
                 json.Add(PropertyKeys.PublicKeys,                  new JArray(PublicKeys.Select(publicKey => publicKey.ToJSON(Embedded: true))));
 
+            if (CertificateIds.Length > 0)
+                json.Add(PropertyKeys.CertificateIds,              POIJSON.IdsToJSON(CertificateIds));
+
             if (TemplateIds.Length > 0)
                 json.Add(PropertyKeys.TemplateIds,                 POIJSON.IdsToJSON(TemplateIds));
 
@@ -452,7 +468,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseText  (JSON, PropertyKeys.HardwareRevision,     "hardware revision",         POI.HardwareRevision.TryParse, out POI.HardwareRevision? hardwareRevision, out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, PropertyKeys.FirmwareVersion,      "firmware version",          POI.FirmwareVersion. TryParse, out POI.FirmwareVersion?  firmwareVersion,  out ErrorResponse) ||
                     !POIJSON.TryParseIds<SignatureMethod>(JSON, PropertyKeys.SignatureMethods, "signature method",          SignatureMethod.TryParse,      out var signatureMethods, out ErrorResponse) ||
-                    !POIJSON.TryParseObjects<EnergyMeterPublicKey>(JSON, PropertyKeys.PublicKeys,      "public key",                EnergyMeterPublicKey.TryParse, out var publicKeys,       out ErrorResponse))
+                    !POIJSON.TryParseObjects<EnergyMeterPublicKey>(JSON, PropertyKeys.PublicKeys,      "public key",                EnergyMeterPublicKey.TryParse, out var publicKeys,       out ErrorResponse) ||
+                    !POIJSON.TryParseIds    (JSON, PropertyKeys.CertificateIds,  "certificate identification", ConformityCertificate_Id.TryParse, out ImmutableArray<ConformityCertificate_Id> certificateIds, out ErrorResponse))
                 {
                     return false;
                 }
@@ -511,6 +528,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               transparencySoftwareStatus,
                                               signatureMethods,
                                               publicKeys,
+                                              certificateIds,
                                               TemplateIds:  templateIds,
                                               DataSource:  dataSource,
                                               Created:     created,

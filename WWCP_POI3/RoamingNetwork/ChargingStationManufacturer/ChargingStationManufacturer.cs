@@ -57,7 +57,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A manufacturer of charging stations, a party of its roaming network: the roaming network operator adds and removes it,
     /// with its keys; it changes its own properties and its models, signed by its own keys. Its models are embedded in
-    /// it; charging stations, their templates and transparency software certificates name a model by its manufacturer and its identification, unique within its manufacturer.
+    /// it; charging stations, their templates and certificates name a model by its manufacturer and its identification, unique within its manufacturer.
     /// </summary>
     public sealed class ChargingStationManufacturer : AImmutableEMobilityEntity<ChargingStationManufacturer_Id,
                                                                                 ChargingStationManufacturerAdminStatusType,

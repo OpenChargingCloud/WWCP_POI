@@ -52,8 +52,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
         private static TransparencySoftware Release(string version, params OpenSourceLicense[] licenses)
             => new(TransparencySoftware_Id.Parse("verifier"), I18NString.Create("Verifier"), TransparencySoftwareVersion.Parse(version), licenses);
 
-        private static TransparencySoftwareCertificate Certificate(string id = "certificate-1", DateTimeOffset? start = null)
-            => new(TransparencySoftwareCertificate_Id.Parse(id), ChargingStationManufacturer_Id.Parse("station-maker"), ChargingStationModel_Id.Parse("station-model"), [HardwareRevision.Parse("1.0")], [FirmwareVersion.Parse("1.0.0")],
+        private static ConformityCertificate Certificate(string id = "certificate-1", DateTimeOffset? start = null)
+            => new(ConformityCertificate_Id.Parse(id), ChargingStationManufacturer_Id.Parse("station-maker"), ChargingStationModel_Id.Parse("station-model"), [HardwareRevision.Parse("1.0")], [FirmwareVersion.Parse("1.0.0")],
                 [Software("2.0").Id, Software("3.0").Id, Software("4.0").Id],
                 NotBefore: start ?? DateTimeOffset.Parse("2026-01-01T12:30:00.1234567+02:00", CultureInfo.InvariantCulture),
                 NotAfter: DateTimeOffset.Parse("2027-01-01T12:30:00.7654321+02:00", CultureInfo.InvariantCulture));
@@ -61,12 +61,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
         private static TransparencySoftwareStatus Status(string version = "2.0") => new(Software(version), LegalStatus.Verified, Certificate());
 
         private static readonly TransparencySoftware[]             Registry      = [Software("2.0"), Software("3.0"), Software("4.0")];
-        private static readonly TransparencySoftwareCertificate[]  Certificates  = [Certificate(), Certificate("certificate-2")];
+        private static readonly ConformityCertificate[]  Certificates  = [Certificate(), Certificate("certificate-2")];
 
         private static TransparencySoftware? SoftwareLookup(TransparencySoftware_Id Id)
             => Registry.FirstOrDefault(software => software.Id == Id);
 
-        private static TransparencySoftwareCertificate? CertificateLookup(TransparencySoftwareCertificate_Id Id)
+        private static ConformityCertificate? CertificateLookup(ConformityCertificate_Id Id)
             => Certificates.FirstOrDefault(certificate => certificate.Id == Id);
 
         private static TransparencySoftwareStatus ParseStatus(JObject json,
@@ -366,11 +366,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Transparency
 
             if (!timestamp.EndsWith('Z') && !timestamp.Contains('+'))
             {
-                Assert.Throws<ArgumentException>(() => TransparencySoftwareCertificate.Parse(json));
+                Assert.Throws<ArgumentException>(() => ConformityCertificate.Parse(json));
                 return;
             }
 
-            var parsed = TransparencySoftwareCertificate.Parse(json);
+            var parsed = ConformityCertificate.Parse(json);
 
             Assert.That(parsed.NotBefore, Is.EqualTo(DateTimeOffset.Parse("2026-01-01T10:30:00.123Z", CultureInfo.InvariantCulture)), "To the millisecond, as the content keeps timestamps.");
             Assert.That(parsed.NotBefore!.Value.Offset, Is.EqualTo(TimeSpan.Zero));

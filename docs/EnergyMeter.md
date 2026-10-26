@@ -58,6 +58,7 @@ is replaced or removed as a whole ([below](#change-sets)).
 | `transparencySoftwareStatus` | `TransparencySoftwareStatus` | [TransparencySoftwareAssignment](#transparencysoftwarestatus)[] | via parent | The transparency software releases for its measurements, with their legal status; ordered by `transparencySoftwareId` (ordinal), at most one per release. Omitted when empty. |
 | `signatureMethods` | `SignatureMethods` | [SignatureMethod](#signaturemethods)[] | via parent | How it signs its measurements, e.g. `OCMF`; ordered by name (ordinal), each once. Omitted when empty. |
 | `publicKeys` | `PublicKeys` | [EnergyMeterPublicKey](#publickeys)[] | via parent | The public keys it signs its measurements with, with their certificate chains; ordered by `@id` (ordinal), each once. Omitted when empty. |
+| `certificateIds` | `CertificateIds` | `ImmutableArray<ConformityCertificate_Id>` | via parent | The [certificates](ConformityAssessmentBody.md#certificates) of its model of the network it names, each for its manufacturer and model and covering its `hardwareRevision` and `firmwareVersion`; ordered by identification (ordinal), each once. Omitted when empty. |
 | `templateIds` | `TemplateIds` | `ImmutableArray<EnergyMeterTemplate_Id>` | via parent | The [energy meter templates](EnergyMeterTemplate.md) it takes, each once, in its order, the first deciding; see [templates and groups](#templates-and-groups). |
 
 All are optional and omitted when absent.
@@ -87,8 +88,8 @@ stations' and EVSEs'), `ChargingStation.AllEnergyMeters`, `EVSE.AllEnergyMeters`
 
 An energy meter names [energy meter templates](EnergyMeterTemplate.md) in `templateIds`: of the charging station
 operator of its pool, station or EVSE, or, of a grid connection point, of its grid operator. A template may give it
-`role`, `manufacturerId`, `modelId`, `modelURL`, `hardwareRevision`, `firmwareVersion`, `transparencySoftwareStatus`
-and `signatureMethods`, but never `serialNumber` or `publicKeys`: a value of its own wins, else the first template's;
+`role`, `manufacturerId`, `modelId`, `modelURL`, `hardwareRevision`, `firmwareVersion`, `transparencySoftwareStatus`,
+`signatureMethods` and `certificateIds`, but never `serialNumber` or `publicKeys`: a value of its own wins, else the first template's;
 arrays are united. The meter keeps only its own; it takes the others at runtime, as the effective energy meter the
 effective EVSEs, charging stations, charging pools and grid connection points embed.
 
@@ -131,18 +132,18 @@ revision or a firmware version still named by a meter can not be removed.
 ## transparencySoftwareStatus
 
 `TransparencySoftwareAssignment` ([source](../WWCP_POI3/RoamingNetwork/TransparencySoftware/TransparencySoftwareAssignment.cs)):
-the legal status of one transparency software release for this meter, optionally proven by a certificate. The
-release is embedded in its [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md#transparencysoftware),
-the certificate in the [ConformityAssessmentBody](ConformityAssessmentBody.md#transparencysoftwarecertificates) that
-issued it.
+the legal status of one transparency software release for this meter. The release is embedded in its
+[TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md#transparencysoftware). It names no certificate: a
+[certificate](ConformityAssessmentBody.md#certificates) of the meter, or of the charging station it is part of, naming
+the release among its components proves the status; an app finds it among the `certificateIds` of both.
 
 | JSON key | Type | Description |
 |---|---|---|
 | `transparencySoftwareId` | string | Mandatory: a `TransparencySoftware_Id` of the network, compared case-insensitively. At most once per meter. |
 | `legalStatus` | string | Mandatory: a `LegalStatus`; predefined `forInformationOnly`, `verified`, `germanCalibrationLaw`, read in any case and written so, any other nonempty text accepted. |
-| `certificateId` | string | Optional: a `TransparencySoftwareCertificate_Id` of the network. The certificate must cover the release, i.e. name it among its verified or compatible releases. |
 
-The array is ordered by `transparencySoftwareId` (ordinal) whatever the given order.
+The array is ordered by `transparencySoftwareId` (ordinal) whatever the given order. A `certificateId`, the one of before,
+is refused.
 
 
 ## signatureMethods
@@ -201,8 +202,12 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `EnergyMe
   `hardwareRevision` and `firmwareVersion` one of the model's; a `modelId` without a manufacturer, or a
   `hardwareRevision` or `firmwareVersion` without a model, its own or one of its templates, is refused.
   `hardwareVersion`, its name of before, is no property of a meter.
-- `transparencySoftwareStatus`: a JSON array of objects, each with `transparencySoftwareId` and `legalStatus`;
-  a release at most once; every release and certificate exists in the network; a given certificate covers its release.
+- `transparencySoftwareStatus`: a JSON array of objects, each with `transparencySoftwareId` and `legalStatus`, no
+  `certificateId`; a release at most once; every release exists in the network.
+- `certificateIds`: certificates of the network, each one of an energy meter model, the model of the meter with its
+  manufacturer, covering its hardware revision and firmware version, as the meter is at runtime, with what its templates
+  give it; a certificate still named can not be removed. A meter of a charging station is, moreover, one of the
+  `energyMeters` a certificate of its station names, where it names any.
 - `signatureMethods`: an array of nonempty texts, none twice, in any case.
 - `publicKeys`: an array of objects, none twice; a key a valid public key of a known algorithm, DER encoded, with
   its SHA-256 as `@id`; the first certificate of a chain the one of the key, each one issued by the next one, all DER
@@ -225,8 +230,9 @@ An EVSE's meter, as `energyMeter`:
   "hardwareRevision": "1.2",
   "firmwareVersion": "4.7.1",
   "transparencySoftwareStatus": [
-    { "transparencySoftwareId": "chargy-1.5.0", "legalStatus": "germanCalibrationLaw", "certificateId": "PTB-2026-001" }
+    { "transparencySoftwareId": "chargy-1.5.0", "legalStatus": "germanCalibrationLaw" }
   ],
+  "certificateIds": [ "PTB-2026-0017" ],
   "signatureMethods": [ "OCMF" ],
   "publicKeys": [
     { "@id": "b19e015397ed17785f274eee8706d2be6474a2ebc50c91d322a6f89cc894a72b",

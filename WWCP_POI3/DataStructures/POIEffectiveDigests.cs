@@ -302,7 +302,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                    ConformityAssessmentBody.ToJSON(Embedded: true, IncludeChildArrays: false),
 
-                   [ (ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates,  Leaves(ConformityAssessmentBody.TransparencySoftwareCertificates,  value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
+                   [ (ConformityAssessmentBody.PropertyKeys.Certificates,  Leaves(ConformityAssessmentBody.Certificates,  value => value.ToJSON(Embedded: true), HashAlgorithm)) ],
 
                    HashAlgorithm));
 

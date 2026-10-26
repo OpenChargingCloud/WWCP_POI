@@ -12,18 +12,22 @@ using cloud.charging.open.protocols.WWCP.POI;
 public static class ExampleA13
 {
 
-    // Who checks the meter? The signed meter values of a charging session are checked by a transparency software, and
-    // the software is approved for a charging station model by a conformity assessment body. Each says so itself: the
-    // transparency software manufacturer GraphDefined signs its release, the PTB, notified body for the Measuring
-    // Instruments Directive, signs its certificate; the BSI, for the Cyber Resilience Act, does not take part yet. DE*GEF
-    // names both for the energy meters of its DC stations, and the station proof of the driver's app gives them.
+    // Who checks the meter? The signed meter values of a charging session are checked by a transparency software, a
+    // product of its own manufacturer, and a conformity assessment body certifies a model of charging stations or of
+    // energy meters with its components: the transparency software it verified, and of a station the meters it mounts.
+    // Each says so itself: the transparency software manufacturer GraphDefined signs its release, the PTB, notified body
+    // for the Measuring Instruments Directive, signs its certificates; the BSI, for the Cyber Resilience Act, does not
+    // take part yet. DE*GEF names the certificates for its DC stations and their meters, and the station proof of the
+    // driver's app gives them.
 
 
     internal static readonly TransparencySoftwareManufacturer_Id  softwareMakerId  = TransparencySoftwareManufacturer_Id.Parse("GraphDefined");
     internal static readonly ConformityAssessmentBody_Id          ptbId            = ConformityAssessmentBody_Id.Parse("PTB");
     internal static readonly ConformityAssessmentBody_Id          bsiId            = ConformityAssessmentBody_Id.Parse("BSI");
     internal static readonly TransparencySoftware_Id              chargyId         = TransparencySoftware_Id.Parse("chargy-1.5.0");
-    internal static readonly TransparencySoftwareCertificate_Id   certificateId    = TransparencySoftwareCertificate_Id.Parse("PTB-2026-0042");
+    internal static readonly ConformityCertificate_Id             certificateId       = ConformityCertificate_Id.Parse("PTB-2026-0042");
+    internal static readonly ConformityCertificate_Id             meterCertificateId  = ConformityCertificate_Id.Parse("PTB-2026-0017");
+    internal static readonly EnergyMeterModel_Id                  kdm500              = EnergyMeterModel_Id.Parse("KDM-500");
 
     /// <summary>
     /// The station proof of DE*GEF*E1*1 the app gets.
@@ -129,9 +133,11 @@ public static class ExampleA13
 
         #endregion
 
-        #region 3. The PTB certifies Chargy for the DC stations of GraphDefined
+        #region 3. The PTB certifies the DC stations of GraphDefined and their meters, with Chargy
 
-        TransparencySoftwareCertificate CertificateUnder(String Legislation)
+        // The DC station in its hardware revision 1.0 with the firmware 2.5.0, with its components: Chargy 1.5.0, verified,
+        // and the KDM-500 of KERNBERG it mounts, in its hardware revision 2.1 with the firmware 3.2.
+        ConformityCertificate CertificateUnder(String Legislation)
 
             => new (certificateId,
                     ExampleA2.stationMakerId,
@@ -140,10 +146,23 @@ public static class ExampleA13
                     [ FirmwareVersion. Parse("2.5.0") ],
                     [ chargyId ],
                     [],
-                    DocumentURL:                    URL.Parse("https://www.ptb.example/certificates/PTB-2026-0042.pdf"),
-                    NotBefore:                      now,
-                    NotAfter:                       now.AddYears(10),
-                    Legislation:                    Legislation);
+                    DocumentURL:   URL.Parse("https://www.ptb.example/certificates/PTB-2026-0042.pdf"),
+                    NotBefore:     now,
+                    NotAfter:      now.AddYears(10),
+                    Legislation:   Legislation,
+                    EnergyMeters:  [ new CertifiedEnergyMeter(ExampleA2.dcMeterMakerId, kdm500, [ HardwareRevision.Parse("2.1") ], [ FirmwareVersion.Parse("3.2") ]) ]);
+
+        // The meter on its own, the KDM-500 in the same revision and firmware, with Chargy 1.5.0 as well.
+        var meterCertificate = new ConformityCertificate(meterCertificateId,
+                                                         ExampleA2.dcMeterMakerId,
+                                                         kdm500,
+                                                         [ HardwareRevision.Parse("2.1") ],
+                                                         [ FirmwareVersion.Parse("3.2") ],
+                                                         [ chargyId ],
+                                                         [],
+                                                         DocumentURL:  URL.Parse("https://www.ptb.example/certificates/PTB-2026-0017.pdf"),
+                                                         NotBefore:    now,
+                                                         NotAfter:     now.AddYears(10));
 
         // Under the CRA, which the PTB is not notified for: refused.
         try
@@ -156,25 +175,31 @@ public static class ExampleA13
         }
 
         var addCertificate = history.Head.RoamingNetwork.CreateChangeSet(
-                                 [ RoamingNetworkChange.Add(CertificateUnder(ConformityAssessmentBody.Legislations.MID), ptbId) ],
-                                 Description: ImmutableI18NString.Create(Languages.en, "PTB-2026-0042: Chargy 1.5.0 for the GD-DC300")
+                                 [ RoamingNetworkChange.Add(CertificateUnder(ConformityAssessmentBody.Legislations.MID), ptbId),
+                                   RoamingNetworkChange.Add(meterCertificate,                                             ptbId) ],
+                                 Description: ImmutableI18NString.Create(Languages.en, "PTB-2026-0042 for the GD-DC300 with the KDM-500, PTB-2026-0017 for the KDM-500, each with Chargy 1.5.0")
                              );
 
         Committed(history, addCertificate.Sign(ptbCertificatesKey.Private, POIPublicKey.From(ptbCertificatesKey.Private).Id, ptbCertificatesKey.Algorithm));
 
         #endregion
 
-        #region 4. DE*GEF names them for the energy meters of its DC stations
+        #region 4. DE*GEF names them for its DC stations and their energy meters
 
         if (!history.Head.RoamingNetwork.TryGetChargingStationOperatorById(ExampleA2.gefId, out var gef))
             Helpers.Fail($"QA has no charging station operator '{ExampleA2.gefId}'");
 
         var infrastructureKey = A11.GEF.SigningKeys[POIKeyUsages.Infrastructure];
-        var dcMeters          = gef.EnergyMeterTemplates.Single(template => template.Id == EnergyMeterTemplate_Id.Parse("DE*GEF*EMT_DC"));
+        var dcStations        = gef.ChargingStationTemplates.Single(template => template.Id == ChargingStationTemplate_Id.Parse("DE*GEF*ST_DC"));
+        var dcMeters          = gef.EnergyMeterTemplates.    Single(template => template.Id == EnergyMeterTemplate_Id.    Parse("DE*GEF*EMT_DC"));
 
+        // The templates give them: the stations their certificate, the meters theirs and the legal status of Chargy, which
+        // the certificates naming it among their components prove.
         var nameChargy        = history.Head.RoamingNetwork.CreateChangeSet(
-                                    [ RoamingNetworkChange.UpdateProperty(dcMeters, "transparencySoftwareStatus", null, new JArray(new TransparencySoftwareAssignment(chargyId, LegalStatus.GermanCalibrationLaw, certificateId).ToJSON(Embedded: true))) ],
-                                    Description: ImmutableI18NString.Create(Languages.en, "The DC energy meters: Chargy 1.5.0 under the German calibration law, PTB-2026-0042")
+                                    [ RoamingNetworkChange.UpdateProperty(dcStations, "certificateIds",             null, new JArray(certificateId.ToString())),
+                                      RoamingNetworkChange.UpdateProperty(dcMeters,   "certificateIds",             null, new JArray(meterCertificateId.ToString())),
+                                      RoamingNetworkChange.UpdateProperty(dcMeters,   "transparencySoftwareStatus", null, new JArray(new TransparencySoftwareAssignment(chargyId, LegalStatus.GermanCalibrationLaw).ToJSON(Embedded: true))) ],
+                                    Description: ImmutableI18NString.Create(Languages.en, "The DC stations: PTB-2026-0042; their energy meters: PTB-2026-0017, Chargy 1.5.0 under the German calibration law")
                                 );
 
         Committed(history, nameChargy.Sign(infrastructureKey.Private, POIPublicKey.From(infrastructureKey.Private).Id, infrastructureKey.Algorithm));
@@ -205,8 +230,9 @@ public static class ExampleA13
 
 
     /// <summary>
-    /// The app checks the station proof against the trust anchor of epoch 2, and shows who checks its meter: the release,
-    /// its manufacturer and the certificate, its body.
+    /// The app checks the station proof against the trust anchor of epoch 2, and shows who checks its meter: the release
+    /// and its manufacturer, the certificates of the station and of the meter and their body, each compared with what it
+    /// is for.
     /// </summary>
     public static void Validate()
     {
@@ -225,35 +251,69 @@ public static class ExampleA13
         var station  = proof.GivenBelow(gef, ChargingStationOperator.PropertyKeys.ChargingPools, ChargingPool.PropertyKeys.ChargingStations).Single(json => json[ChargingStation.PropertyKeys.EVSEs]?.Any(evse => evse["@id"]?.Value<String>() == ExampleA10.EVSEId.ToString()) == true);
         var meter    = (JObject) station[ChargingStation.PropertyKeys.EVSEs]!.Single(evse => evse["@id"]?.Value<String>() == ExampleA10.EVSEId.ToString())["energyMeter"]!;
 
-        foreach (var assignment in meter["transparencySoftwareStatus"]!.Cast<JObject>())
+        var bodies   = proof.Given(RoamingNetwork.PropertyKeys.ConformityAssessmentBodies);
+
+        // A certificate the proof gives, with the body that issued it.
+        (JObject Body, JObject Certificate) CertificateOf(String? Id)
+        {
+            var body = bodies.Single(json => proof.GivenBelow(json, ConformityAssessmentBody.PropertyKeys.Certificates).Any(certificate => certificate["@id"]?.Value<String>() == Id));
+            return (body, proof.GivenBelow(body, ConformityAssessmentBody.PropertyKeys.Certificates).Single(json => json["@id"]?.Value<String>() == Id));
+        }
+
+        var certified = new List<String>();
+
+        // The station and its meter, each a model of its manufacturer as the proof gives it, with the certificates they name.
+        foreach (var (named, kind, makers, models, makerKey, modelKey) in new[] {
+                     (station, "charging station", RoamingNetwork.PropertyKeys.ChargingStationManufacturers, ChargingStationManufacturer.PropertyKeys.Models, "chargingStationManufacturerId", "chargingStationModel"),
+                     (meter,   "energy meter",     RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,     EnergyMeterManufacturer.    PropertyKeys.Models, "energyMeterManufacturerId",     "energyMeterModel") })
         {
 
-            var makers   = proof.Given(RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers);
-            var maker    = makers.Single(json => proof.GivenBelow(json, TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware).Any(release => release["@id"]?.Value<String>() == assignment["transparencySoftwareId"]?.Value<String>()));
-            var release  = proof.GivenBelow(maker, TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware).Single(json => json["@id"]?.Value<String>() == assignment["transparencySoftwareId"]?.Value<String>());
+            var maker     = proof.Given(makers).Single(json => json["@id"]?.Value<String>() == named["manufacturerId"]?.Value<String>());
+            var model     = proof.GivenBelow(maker, models).Single(json => json["@id"]?.Value<String>() == named["modelId"]?.Value<String>());
+            var revision  = named["hardwareRevision"]?.Value<String>();
+            var firmware  = named["firmwareVersion"]?. Value<String>();
 
-            var bodies   = proof.Given(RoamingNetwork.PropertyKeys.ConformityAssessmentBodies);
-            var body     = bodies.Single(json => proof.GivenBelow(json, ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates).Any(certificate => certificate["@id"]?.Value<String>() == assignment["certificateId"]?.Value<String>()));
-            var cert     = proof.GivenBelow(body, ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates).Single(json => json["@id"]?.Value<String>() == assignment["certificateId"]?.Value<String>());
+            Console.WriteLine($"The {kind} {named["@id"]}: a {model["@id"]} of {maker["@id"]}, {model["name"]?["en"]}, hardware {revision}, firmware {firmware}");
 
-            Console.WriteLine($"{meter["@id"]}, the energy meter of {ExampleA10.EVSEId}: {assignment["legalStatus"]}");
-            Console.WriteLine($"  {release["name"]!["en"]} {release["version"]}, by {maker["name"]!["en"]}, {maker["craRole"]}, supported until {release["supportUntil"]}, vulnerabilities to {maker["vulnerabilityContact"]}, bill of materials {release["softwareBillOfMaterials"]}");
-            Console.WriteLine($"  {cert["@id"]} for the {cert["chargingStationModel"]} {String.Join("/", cert["hardwareRevisions"]!.Values<String>())}, firmware {String.Join("/", cert["firmwareVersions"]!.Values<String>())}, under the {cert["legislation"]}, by the {body["@id"]}, notified body {body["notifiedBodyNumber"]} for {String.Join(", ", body["notifiedFor"]!.Values<String>())}; signed by itself: {(body["signingKeys"] is JArray { Count: > 0 } ? "yes, it has keys of its own" : "no, the roaming network operator in its place")}");
-            // The model of the station, as its manufacturer states it, given by the proof with its manufacturer.
-            var stationMaker  = proof.Given(RoamingNetwork.PropertyKeys.ChargingStationManufacturers).Single(json => json["@id"]?.Value<String>() == station["manufacturerId"]?.Value<String>());
-            var model         = proof.GivenBelow(stationMaker, ChargingStationManufacturer.PropertyKeys.Models).Single(json => json["@id"]?.Value<String>() == station["modelId"]?.Value<String>());
-            var revision      = station["hardwareRevision"]?.Value<String>();
-            var firmware      = station["firmwareVersion"]?. Value<String>();
+            foreach (var id in named["certificateIds"]?.Values<String>() ?? [])
+            {
 
-            Console.WriteLine($"  the station {station["@id"]} is a {model["@id"]} of {stationMaker["@id"]}, {model["name"]?["en"]}, hardware {revision}, firmware {firmware}: " +
-                              (cert["chargingStationModel"]?.Value<String>() == model["@id"]?.Value<String>() && cert["chargingStationManufacturerId"]?.Value<String>() == stationMaker["@id"]?.Value<String>() &&
-                               cert["hardwareRevisions"]!.Values<String>().Contains(revision) && cert["firmwareVersions"]!.Values<String>().Contains(firmware)
-                                   ? "the model, hardware revision and firmware version the certificate is for"
-                                   : "another model, hardware revision or firmware version"));
+                var (body, cert) = CertificateOf(id);
+                var components   = cert["verifiedTransparencySoftwareIds"]!.Values<String>().Select(release => $"{release} verified").
+                                       Concat(cert["compatibleTransparencySoftwareIds"]!.Values<String>().Select(release => $"{release} compatible")).
+                                       Concat((cert["energyMeters"] as JArray ?? []).Select(energyMeter => $"the {energyMeter["modelId"]} of {energyMeter["manufacturerId"]}, hardware {String.Join("/", energyMeter["hardwareRevisions"]!.Values<String>())}, firmware {String.Join("/", energyMeter["firmwareVersions"]!.Values<String>())}"));
+
+                certified.Add(cert["@id"]!.ToString());
+
+                Console.WriteLine($"  {cert["@id"]}{(cert["legislation"] is JToken legislation ? $", under the {legislation}" : "")}, by the {body["@id"]}, notified body {body["notifiedBodyNumber"]} for {String.Join(", ", body["notifiedFor"]!.Values<String>())}; signed by itself: {(body["signingKeys"] is JArray { Count: > 0 } ? "yes, it has keys of its own" : "no, the roaming network operator in its place")}");
+                Console.WriteLine($"    for the {cert[modelKey]} of {cert[makerKey]}, hardware {String.Join("/", cert["hardwareRevisions"]!.Values<String>())}, firmware {String.Join("/", cert["firmwareVersions"]!.Values<String>())}: " +
+                                  (cert[modelKey]?.Value<String>() == model["@id"]?.Value<String>() && cert[makerKey]?.Value<String>() == maker["@id"]?.Value<String>() &&
+                                   cert["hardwareRevisions"]!.Values<String>().Contains(revision) && cert["firmwareVersions"]!.Values<String>().Contains(firmware)
+                                       ? $"the model, hardware revision and firmware version of the {kind}"
+                                       : "another model, hardware revision or firmware version"));
+                Console.WriteLine($"    with {String.Join(", ", components)}");
+
+            }
 
         }
 
-        // The BSI is not given: no energy meter of the station names a certificate of it.
+        // The releases of the meter, with their legal status, which the certificates naming them among their components prove.
+        foreach (var assignment in meter["transparencySoftwareStatus"]!.Cast<JObject>())
+        {
+
+            var releaseId  = assignment["transparencySoftwareId"]?.Value<String>();
+            var makers     = proof.Given(RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers);
+            var maker      = makers.Single(json => proof.GivenBelow(json, TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware).Any(release => release["@id"]?.Value<String>() == releaseId));
+            var release    = proof.GivenBelow(maker, TransparencySoftwareManufacturer.PropertyKeys.TransparencySoftware).Single(json => json["@id"]?.Value<String>() == releaseId);
+            var provenBy   = certified.Where(id => CertificateOf(id).Certificate is var cert &&
+                                                   cert["verifiedTransparencySoftwareIds"]!.Values<String>().Concat(cert["compatibleTransparencySoftwareIds"]!.Values<String>()).Contains(releaseId));
+
+            Console.WriteLine($"{meter["@id"]}, the energy meter of {ExampleA10.EVSEId}: {release["name"]!["en"]} {release["version"]}, {assignment["legalStatus"]}, as {String.Join(" and ", provenBy)} name it");
+            Console.WriteLine($"  by {maker["name"]!["en"]}, {maker["craRole"]}, supported until {release["supportUntil"]}, vulnerabilities to {maker["vulnerabilityContact"]}, bill of materials {release["softwareBillOfMaterials"]}");
+
+        }
+
+        // The BSI is not given: neither the station nor its meter names a certificate of it.
         Console.WriteLine($"Conformity assessment bodies the proof gives: {String.Join(", ", proof.Given(RoamingNetwork.PropertyKeys.ConformityAssessmentBodies).Select(json => json["@id"]))}");
 
         // A certificate changed on the way: the proof is no longer one of the version the attestations name.
