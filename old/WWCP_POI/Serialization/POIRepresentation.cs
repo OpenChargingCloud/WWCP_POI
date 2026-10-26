@@ -310,7 +310,7 @@ public static class POIRepresentation
 
     private static readonly HashSet<String> TaggedKinds = new(RuntimeEntityKinds.Concat(new[] {
         nameof(ChargingConnector), nameof(ChargingCable), nameof(GridConnectionPoint), nameof(ChargingStationManufacturer),
-        nameof(TransparencySoftware), nameof(TransparencySoftwareCertificate), nameof(TransparencySoftwareStatus), nameof(Brand), nameof(EnergyMix),
+        nameof(TransparencySoftware), nameof(InfrastructureEntityType.TransparencySoftwareCertificate), nameof(TransparencySoftwareStatus), nameof(Brand), nameof(EnergyMix),
         nameof(ChargingProduct), nameof(ParkingProduct), nameof(ChargingTariffElement), nameof(ChargingTariffRestriction),
         nameof(ChargingPriceComponent), nameof(Image), nameof(AdditionalGeoLocation), nameof(AuthenticationModes),
         nameof(PublicKey), nameof(ImmutableCryptoKeyInfo), nameof(RootCAInfo), nameof(EVRoamingPartnerInfo)
@@ -329,7 +329,7 @@ public static class POIRepresentation
     internal static void NormalizeStaticTimestamps(JObject json, String kind)
         => Visit(json, kind, "", (document, type, _) => {
             IEnumerable<String> fields = type switch {
-                nameof(TransparencySoftwareStatus) or nameof(TransparencySoftwareCertificate) or nameof(RootCAInfo) or nameof(EVRoamingPartnerInfo) => ["notBefore", "notAfter"],
+                nameof(TransparencySoftwareStatus) or nameof(InfrastructureEntityType.TransparencySoftwareCertificate) or nameof(RootCAInfo) or nameof(EVRoamingPartnerInfo) => ["notBefore", "notAfter"],
                 nameof(ChargingTariffRestriction) => ["startDate", "endDate"],
                 _ => RuntimeEntityKinds.Contains(type) ? ["created", "lastChange"] : []
             };
@@ -400,7 +400,7 @@ public static class POIRepresentation
             "gridConnectionPoint" when kind == nameof(ChargingPool) => nameof(GridConnectionPoint),
             "transparencySoftware" when kind == nameof(EnergyMeter) => nameof(TransparencySoftwareStatus),
             "transparencySoftware" when kind == nameof(RoamingNetwork) => nameof(TransparencySoftware),
-            "transparencySoftwareCertificates" when kind == nameof(RoamingNetwork) => nameof(TransparencySoftwareCertificate),
+            "transparencySoftwareCertificates" when kind == nameof(RoamingNetwork) => nameof(InfrastructureEntityType.TransparencySoftwareCertificate),
             "parkingProducts" when kind == nameof(ParkingOperator) => nameof(ParkingProduct),
             "cable" when kind == nameof(ChargingConnector) => nameof(ChargingCable),
             "brand" or "brands" when RuntimeEntityKinds.Contains(kind) => nameof(Brand),

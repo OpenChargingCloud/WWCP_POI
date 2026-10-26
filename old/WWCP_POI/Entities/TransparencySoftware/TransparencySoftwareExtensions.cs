@@ -36,9 +36,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public static class TransparencySoftwareExtensions
     {
 
-        #region TransparencySoftwareCertificate
+        #region ConformityCertificate
 
-        extension(TransparencySoftwareCertificate)
+        extension(ConformityCertificate)
         {
 
             /// <summary>
@@ -47,13 +47,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             /// <param name="JSON">The JSON to parse.</param>
             /// <param name="RoamingNetwork">The roaming network with the referenced registries.</param>
-            public static TransparencySoftwareCertificate Parse(JObject         JSON,
-                                                                RoamingNetwork  RoamingNetwork)
+            public static ConformityCertificate Parse(JObject         JSON,
+                                                      RoamingNetwork  RoamingNetwork)
             {
 
                 ArgumentNullException.ThrowIfNull(RoamingNetwork);
 
-                var certificate = TransparencySoftwareCertificate.Parse(POIEnvelope.Content(JSON));
+                var certificate = ConformityCertificate.Parse(POIEnvelope.Content(JSON));
 
                 foreach (var transparencySoftwareId in certificate.VerifiedTransparencySoftwareIds.Concat(certificate.CompatibleTransparencySoftwareIds))
                     if (RoamingNetwork.GetTransparencySoftwareById(transparencySoftwareId) is null)
@@ -77,12 +77,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// <param name="ErrorResponse">An optional error response.</param>
             public static Boolean TryParse(JObject                                                   JSON,
                                            RoamingNetwork                                            RoamingNetwork,
-                                           [NotNullWhen(true)]  out TransparencySoftwareCertificate?  Certificate,
+                                           [NotNullWhen(true)]  out ConformityCertificate?            Certificate,
                                            [NotNullWhen(false)] out String?                           ErrorResponse)
             {
                 try
                 {
-                    Certificate    = TransparencySoftwareCertificate.Parse(JSON, RoamingNetwork);
+                    Certificate    = ConformityCertificate.Parse(JSON, RoamingNetwork);
                     ErrorResponse  = null;
                     return true;
                 }

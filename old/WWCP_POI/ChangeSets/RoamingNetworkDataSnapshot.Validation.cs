@@ -114,7 +114,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     InfrastructureEntityType.GridOperator             => GridOperator.Parse(document, (RoamingNetwork) parent!),
                     InfrastructureEntityType.ParkingOperator          => ParkingOperator.Parse(ValidationDocument(key, map), (RoamingNetwork) parent!, Stations()),
                     InfrastructureEntityType.TransparencySoftware     => TransparencySoftware.Parse(POIEnvelope.Content(document)),
-                    InfrastructureEntityType.TransparencySoftwareCertificate => TransparencySoftwareCertificate.Parse(document, (RoamingNetwork) parent!),
+                    InfrastructureEntityType.TransparencySoftwareCertificate => ConformityCertificate.Parse(document, (RoamingNetwork) parent!),
                     InfrastructureEntityType.ParkingProduct           => ParkingProduct.Parse(document),
                     InfrastructureEntityType.ParkingGarage            => ParkingGarage.Parse(document, Stations()),
                     InfrastructureEntityType.ParkingSpace             => ParkingSpace.Parse(document, Stations()),

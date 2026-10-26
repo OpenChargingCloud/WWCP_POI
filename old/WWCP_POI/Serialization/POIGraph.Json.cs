@@ -79,9 +79,9 @@ public sealed partial class RoamingNetwork
 {
     private readonly ConcurrentDictionary<InfrastructureEntityKey, GridOperator> projectedGridOperatorReferences = [];
     private ImmutableDictionary<TransparencySoftware_Id, TransparencySoftware> projectedSoftwareReferences = ImmutableDictionary<TransparencySoftware_Id, TransparencySoftware>.Empty;
-    private ImmutableDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate> projectedCertificateReferences = ImmutableDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>.Empty;
+    private ImmutableDictionary<ConformityCertificate_Id, ConformityCertificate> projectedCertificateReferences = ImmutableDictionary<ConformityCertificate_Id, ConformityCertificate>.Empty;
     private ImmutableArray<TransparencySoftware> projectedTransparencySoftware = [];
-    private ImmutableArray<TransparencySoftwareCertificate> projectedTransparencySoftwareCertificates = [];
+    private ImmutableArray<ConformityCertificate> projectedTransparencySoftwareCertificates = [];
 
     /// <summary>
     /// Software releases owned once by this network version and referenced by meters and certificates.
@@ -94,7 +94,7 @@ public sealed partial class RoamingNetwork
     /// <summary>
     /// Model/version approval documents owned once by this network version.
     /// </summary>
-    public ImmutableArray<TransparencySoftwareCertificate> TransparencySoftwareCertificates
+    public ImmutableArray<ConformityCertificate> TransparencySoftwareCertificates
     {
         get { EnsureSnapshotProjection(); return projectedTransparencySoftwareCertificates; }
     }
@@ -108,7 +108,7 @@ public sealed partial class RoamingNetwork
     /// <summary>
     /// Resolve a model/version approval document within this version.
     /// </summary>
-    public TransparencySoftwareCertificate? GetTransparencySoftwareCertificateById(TransparencySoftwareCertificate_Id id)
+    public ConformityCertificate? GetTransparencySoftwareCertificateById(ConformityCertificate_Id id)
         { EnsureSnapshotProjection(); return projectedCertificateReferences.GetValueOrDefault(id); }
 
     private readonly ConcurrentDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer> projectedManufacturers = [];
@@ -140,7 +140,7 @@ public sealed partial class RoamingNetwork
             document => POI.TransparencySoftware.Parse(POIEnvelope.Content(document)), value => value.Id.ToString());
         projectedSoftwareReferences = projectedTransparencySoftware.ToImmutableDictionary(value => value.Id);
         projectedTransparencySoftwareCertificates = POIGraphJSON.Read(json, InfrastructureEntityType.TransparencySoftwareCertificate,
-            document => TransparencySoftwareCertificate.Parse(document, this), value => value.Id.ToString());
+            document => ConformityCertificate.Parse(document, this), value => value.Id.ToString());
         projectedCertificateReferences = projectedTransparencySoftwareCertificates.ToImmutableDictionary(value => value.Id);
     }
 

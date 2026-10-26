@@ -84,8 +84,8 @@ internal static class POIElementSchema
             (nameof(ParkingSpaceGroup), "parkingSpaceIds") => Reference(InfrastructureEntityType.ParkingSpace),
             (nameof(ParkingSpace), "parkingGarageId") => Reference(InfrastructureEntityType.ParkingGarage, false),
             (nameof(ParkingGarage) or nameof(ParkingSpace) or nameof(ParkingSpaceGroup), "parkingProductIds") => Reference(InfrastructureEntityType.ParkingProduct),
-            (nameof(TransparencySoftwareCertificate), "verifiedTransparencySoftwareIds" or "compatibleTransparencySoftwareIds") => Reference(InfrastructureEntityType.TransparencySoftware),
-            (nameof(TransparencySoftwareCertificate), "chargingStationManufacturerId") => Reference(InfrastructureEntityType.ChargingStationManufacturer, false),
+            (nameof(InfrastructureEntityType.TransparencySoftwareCertificate), "verifiedTransparencySoftwareIds" or "compatibleTransparencySoftwareIds") => Reference(InfrastructureEntityType.TransparencySoftware),
+            (nameof(InfrastructureEntityType.TransparencySoftwareCertificate), "chargingStationManufacturerId") => Reference(InfrastructureEntityType.ChargingStationManufacturer, false),
             (nameof(ParkingOperator), "localParkingSpaceIds" or "invalidParkingSpaceIds") => Reference(InfrastructureEntityType.ParkingSpace),
             (nameof(RoamingNetwork) or nameof(ChargingStationOperator) or nameof(EMobilityProvider) or
              nameof(ChargingPool) or nameof(ChargingStation) or nameof(EVSE) or nameof(Brand) or nameof(GridOperator) or nameof(ParkingOperator) or

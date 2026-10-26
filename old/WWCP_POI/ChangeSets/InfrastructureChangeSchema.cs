@@ -98,7 +98,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 InfrastructureEntityType.ParkingSpaceGroup        => ParkingSpaceGroup_Id.Parse(text).ToString(),
                 InfrastructureEntityType.ParkingProduct           => ParkingProduct_Id.Parse(text).ToString(),
                 InfrastructureEntityType.TransparencySoftware     => TransparencySoftware_Id.Parse(text).ToString(),
-                InfrastructureEntityType.TransparencySoftwareCertificate => TransparencySoftwareCertificate_Id.Parse(text).ToString(),
+                InfrastructureEntityType.TransparencySoftwareCertificate => ConformityCertificate_Id.Parse(text).ToString(),
                 _                                                => throw new ArgumentOutOfRangeException(nameof(type))
             };
 
