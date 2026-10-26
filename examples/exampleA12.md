@@ -215,7 +215,7 @@ Checkpoint 0 of epoch 2 holds runtime status: False
   open.
 - A verifier of commit signatures is given the commit and the signature, not the version it is checked in; before the
   mirror has a history of its own, e.g. for the head commit of the snapshot it starts from, it checks the signing keys of
-  `OCC` in `QA` as published.
+  `OCC` in `QA` as published, whose key statement it verifies against the trust anchor of epoch 2 first.
 - A token per operator is the simplest login; a server may as well use client certificates
   (`RoamingNetworkPeerOptions.ConfigureWebSocket`, `AuthenticateWebSocketClient`).
 - The hub serves its roaming networks by the same `POI_API`, with their WebSockets; it lets nobody set a status over

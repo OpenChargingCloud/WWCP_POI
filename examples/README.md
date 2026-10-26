@@ -37,6 +37,12 @@ What each way needs:
 | HTTP, as an administrator | `POST /api/v1/poi/RNs`, with an API key | `POST /api/v1/poi/RNs/QA/CSOs`, `202` | - | - |
 | HTTP, by anybody | - | `POST /poi/RNs/QA/history/changeSets/pending/{id}/signatures`, the signatures of `DE*GEF`'s identity keys | `COMMIT /poi/RNs/QA/history/changeSets`, a change set `DE*GEF` signs | reads: `GET /poi/RNs/QA/history/checkpoints`, their snapshots and proofs; witnesses: `POST …/checkpoints/{checkpointId}/signatures`; `GET /poi/RNs/QA/history/archive`; `POST /poi/RNs/QA/history/priceStatements`; the app: `GET /poi/RNs/QA/EVSEs/{EVSE_Id}/proof` and `…/priceStatements`; `GET /poi/RNs/QA/history/epoch` and `…/epochs`; the WebSocket `/poi/RNs/QA/history/ws`, without `setStatus`; `GET /poi/RNs/QA/TSMs` and `…/CABs`; the hub makes no checkpoints yet |
 
+The examples reference [Hermod](https://github.com/Vanaheimr/Hermod), [Styx](https://github.com/Vanaheimr/Styx) and
+[WWCP_Node](https://github.com/OpenChargingCloud/WWCP_Node) as checkouts next to WWCP_POI, and WWCP_Node needs
+[Norn](https://github.com/Vanaheimr/Norn) and [Urdr](https://github.com/Vanaheimr/Urdr) there as well, at the commits
+the [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI) pins: its `libs/` holds them all. On Windows,
+a checkout below a long path needs `git config core.longpaths true`. Example A12 opens two servers on `127.0.0.1`.
+
 Run the examples in [csharp/](csharp/), where their output stays:
 
 ```

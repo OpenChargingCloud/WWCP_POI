@@ -17,8 +17,9 @@ names it as its `legislation`; one the body is not notified for is refused.
 it, not that it is true; whoever doubts it asks the body, e.g. by its `documentURL`. A body not taking part (yet) is
 added **without keys**: then the RNO adds, changes and removes its certificates in its place, with a signing key that
 may sign `party`, as its keys do, or `certificates`, and they are statements of the RNO, not of the body, until the RNO
-gives the body keys with one of its identity keys. A reader tells them apart:
-a body without keys signed none of its certificates.
+gives the body keys with one of its identity keys. They say so: their `statedBy` is `roamingNetworkOperator`, by
+which a reader of a proof tells them apart, also once the body has keys; the body changes one of them only by removing
+it, stating it itself (SPECIFICATION.md, 4.1).
 
 The identification is a `ConformityAssessmentBody_Id`, any nonempty text, trimmed, compared case-insensitively, e.g.
 `PTB` or `BSI`. It is unique within the roaming network.
@@ -101,6 +102,7 @@ versions.
 | `documentURL` | URL | update/remove | Absolute; where the body publishes the document. |
 | `notBefore` | timestamp | update/remove | Start of validity, in UTC to the millisecond like every timestamp of the content, e.g. `2026-01-01T00:00:00.000Z`. |
 | `notAfter` | timestamp | update/remove | End of validity; not before `notBefore`. |
+| `statedBy` | string | update/remove | `roamingNetworkOperator` where the RNO adds or changes it in place of the body without signing keys; omitted where the body signs it (`StatedByRoamingNetworkOperator`). A change set adding or changing a certificate is refused unless it says who signs it. |
 
 - For exactly one model: `chargingStationManufacturerId` and `chargingStationModel`, or `energyMeterManufacturerId` and
   `energyMeterModel`, each with its manufacturer.
@@ -112,7 +114,8 @@ versions.
   station naming it is one of them, of its model, revision and firmware. The `transparencySoftwareStatus` of a meter
   names no certificate: a certificate of the meter or of its station naming the release among its components proves
   its legal status.
-- `RoamingNetworkChange.Add(certificate, bodyId)`: the parent of the `Add` is its body, which signs it.
+- `RoamingNetworkChange.Add(certificate, bodyId)`: the parent of the `Add` is its body, which signs it; the RNO in place
+  of a body without signing keys, the certificate made with `StatedByRoamingNetworkOperator: true`.
 - `RoamingNetworkChange.Remove(certificateId)`, `UpdateProperty(certificate, …)`/`RemoveProperty(certificate, …)`:
   signed by the body embedding it, or the RNO in its place; a change naming another parent is refused.
 - A certificate still named by a charging station, an energy meter or one of their templates can not be removed, nor

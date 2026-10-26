@@ -41,9 +41,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Data
 
-        private          RoamingNetworkEpoch       epoch           = RoamingNetworkEpoch.First;
-        private          RoamingNetworkEpochLink?  previousEpoch;
-        private volatile Boolean                   nextEpochStarted;
+        private          RoamingNetworkEpoch           epoch           = RoamingNetworkEpoch.First;
+        private          RoamingNetworkEpochLink?      previousEpoch;
+        private          RoamingNetworkEpochProfiles?  previousProfiles;
+        private volatile Boolean                       nextEpochStarted;
 
         #endregion
 
@@ -61,6 +62,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public RoamingNetworkEpochLink?   PreviousEpoch
             => previousEpoch;
+
+        /// <summary>
+        /// The profiles of the epoch before, if they are known: the first checkpoint of this epoch is signed with the
+        /// algorithms of both (SPECIFICATION.md, section 11.3). Those of the first epoch are the default ones; those of a
+        /// later one this history knows from the epoch it was started from, or from the snapshot it started from.
+        /// </summary>
+        public RoamingNetworkEpochProfiles? PreviousEpochProfiles
+            => epoch.Number switch {
+                   1  => null,
+                   2  => RoamingNetworkEpochProfiles.Default,
+                   _  => previousProfiles
+               };
 
         /// <summary>
         /// The final checkpoint of this epoch, once there is one: this history takes no commits any more.
@@ -156,7 +169,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     var signers                      = CheckpointSigners;
 
                     foreach (var signer in signers.IsDefault ? [] : signers.AsEnumerable())
-                        if (SignatureAlgorithmError(signer.Algorithm.Name, $"the checkpoint signer {signer}") is String signerError)
+                        if (CheckpointSignatureAlgorithmError(latest is null && epoch.Number > 1, signer.Algorithm.Name, $"the checkpoint signer {signer}") is String signerError)
                         {
                             ErrorResponse = signerError;
                             return false;
@@ -185,8 +198,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Start the next epoch from the final checkpoint of this one (SPECIFICATION.md, section 11): nothing is applied, its
         /// genesis has the version of the commit of the final checkpoint, identified with the profiles of the next epoch, and
-        /// leads to the ETags of the final checkpoint; the runtime status and the current price statements are taken along.
-        /// Every server starting it from the same final checkpoint makes the same genesis. This history stays readable.
+        /// leads to the ETags of the final checkpoint; the runtime status and the current price statements are taken along,
+        /// and the profiles of this epoch, for the signatures of its first checkpoint. Every server starting it from the same
+        /// final checkpoint makes the same genesis. This history stays readable.
         /// </summary>
         /// <param name="Next">The history of the next epoch.</param>
         /// <param name="ErrorResponse">Why it was not started.</param>
@@ -248,7 +262,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     snapshot.Add(PropertyKeys.EffectiveLastChanges, effectiveLastChanges);
 
                 snapshot.Add(PropertyKeys.RuntimeStatus, new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON(Embedded: true))));
-                snapshot.Add(EpochJSONProperty, EpochJSON(nextEpoch, RoamingNetworkEpochLink.To(finalCheckpoint)));
+                snapshot.Add(EpochJSONProperty, EpochJSON(nextEpoch, RoamingNetworkEpochLink.To(finalCheckpoint), epoch.Profiles));
 
                 if (!TryFromSnapshot(snapshot, out var nextHistory, out var snapshotError))
                 {
@@ -283,24 +297,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (internal) EpochJSONProperty / EpochJSON(Epoch, PreviousEpoch)
+        #region (internal) EpochJSONProperty / EpochJSON(Epoch, PreviousEpoch, PreviousProfiles)
 
         /// <summary>
         /// The JSON key of the epoch of a snapshot.
         /// </summary>
-        internal const String EpochJSONProperty = "epoch";
+        internal const String EpochJSONProperty             = "epoch";
 
         /// <summary>
-        /// The epoch of a snapshot: { epoch, profiles, previous? }.
+        /// The JSON key of the profiles of the epoch before, in the epoch of a snapshot.
         /// </summary>
-        internal static JObject EpochJSON(RoamingNetworkEpoch       Epoch,
-                                          RoamingNetworkEpochLink?  PreviousEpoch)
+        internal const String PreviousProfilesJSONProperty  = "previousProfiles";
+
+        /// <summary>
+        /// The epoch of a snapshot: { epoch, profiles, previous?, previousProfiles? }, the profiles of the epoch before from
+        /// the third epoch on: those of the first one are the default ones.
+        /// </summary>
+        internal static JObject EpochJSON(RoamingNetworkEpoch           Epoch,
+                                          RoamingNetworkEpochLink?      PreviousEpoch,
+                                          RoamingNetworkEpochProfiles?  PreviousProfiles)
         {
 
             var json = Epoch.ToJSON(Embedded: true);
 
             if (PreviousEpoch is not null)
                 json.Add(RoamingNetworkEpochLink.JSONProperty, PreviousEpoch.ToJSON(Embedded: true));
+
+            if (PreviousProfiles is not null && Epoch.Number > 2)
+                json.Add(PreviousProfilesJSONProperty, PreviousProfiles.ToJSON(Embedded: true));
 
             return json;
 
@@ -383,15 +407,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) CheckpointSignatureAlgorithmError(Checkpoint, Signature)
 
         /// <summary>
-        /// Why the given signature of the given checkpoint is not taken for its algorithm, if it is not: the first checkpoint
-        /// of an epoch after the first one is signed with the algorithms of both epochs.
+        /// Why the given signature of the given checkpoint is not taken for its algorithm, if it is not.
         /// </summary>
         private String? CheckpointSignatureAlgorithmError(RoamingNetworkCheckpoint       Checkpoint,
                                                           RoamingNetworkCommitSignature  Signature)
 
-            => Checkpoint.PreviousEpoch is not null
-                   ? null
-                   : SignatureAlgorithmError(Signature.Algorithm, $"a signature of the checkpoint '{Checkpoint.Id}'");
+            => CheckpointSignatureAlgorithmError(Checkpoint.PreviousEpoch is not null,
+                                                 Signature.Algorithm,
+                                                 $"a signature of the checkpoint '{Checkpoint.Id}'");
+
+        #endregion
+
+        #region (private) CheckpointSignatureAlgorithmError(FirstOfAnEpoch, Algorithm, What)
+
+        /// <summary>
+        /// Why a signature of a checkpoint of the given algorithm is not taken, if it is not (SPECIFICATION.md, section 11.3):
+        /// the first checkpoint of an epoch after the first one is signed with the algorithms of both epochs, every later one
+        /// with those of its own. Without the profiles of the epoch before, only those of its own are taken.
+        /// </summary>
+        private String? CheckpointSignatureAlgorithmError(Boolean  FirstOfAnEpoch,
+                                                          String   Algorithm,
+                                                          String   What)
+        {
+
+            if (!FirstOfAnEpoch || epoch.Profiles.AllowsSignatureAlgorithm(Algorithm))
+                return SignatureAlgorithmError(Algorithm, What);
+
+            var before = PreviousEpochProfiles;
+
+            return before is null
+                       ? $"The signature algorithm '{Algorithm}' of {What} is not one of the epoch {epoch.Number}, {String.Join(", ", epoch.Profiles.SignatureAlgorithms)}, and the profiles of the epoch {epoch.Number - 1} are not known here!"
+                       : before.AllowsSignatureAlgorithm(Algorithm)
+                             ? null
+                             : $"The signature algorithm '{Algorithm}' of {What} is neither one of the epoch {epoch.Number}, {String.Join(", ", epoch.Profiles.SignatureAlgorithms)}, nor of the epoch {epoch.Number - 1}, {String.Join(", ", before.SignatureAlgorithms)}!";
+
+        }
 
         #endregion
 

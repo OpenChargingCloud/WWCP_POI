@@ -314,6 +314,61 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
         #endregion
 
+        #region A_proof_takes_no_key_statement_and_no_certificate_of_another_operator()
+
+        /// <summary>
+        /// The key statement and the certificates of signing keys a proof gives are those of the roaming network operator it
+        /// gives: a statement or a certificate its holders made for another operator, e.g. of another roaming network sharing
+        /// them, is none of it (csharp-review 19, WWCPPOIConformanceTests D6). Each proof here is attested anew over what it
+        /// gives, by the signing key of the operator.
+        /// </summary>
+        [Test]
+        public void A_proof_takes_no_key_statement_and_no_certificate_of_another_operator()
+        {
+
+            var history              = Attested(T0, T0.AddDays(30), T0.AddDays(1));
+            var network              = history.Head.RoamingNetwork;
+            var (signing, identity)  = Keys(network);
+            var at                   = T0.AddDays(1).AddMinutes(1);
+            var other                = RoamingNetworkOperator_Id.Parse("DE*XYZ");
+            var signer               = new RoamingNetworkCommitSigner(signing.Private, signing.Public.Id, COSEAlgorithm.ES256, RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator);
+
+            Assert.That(history.TryGetChargingStationProof(S1, out var proof, out var error, At: at), Is.True, error);
+
+            RoamingNetworkProof With(RoamingNetworkKeyStatement Statement, RoamingNetworkSigningKeyCertificate Certificate)
+            {
+
+                var json = (JObject) proof!.RoamingNetwork.DeepClone();
+
+                json["operator"]![RoamingNetworkKeyStatement.JSONProperty]           = Statement.ToJSON();
+                json["operator"]![RoamingNetworkSigningKeyCertificate.JSONProperty]  = new JArray(Certificate.ToJSON(Embedded: true));
+
+                Assert.That(new RoamingNetworkProof(proof.HashAlgorithm, json, proof.CommitId, proof.Revision).TryCalculateETag(out var eTag, out var eTagError), Is.True, eTagError);
+
+                return new RoamingNetworkProof(proof.HashAlgorithm, json, proof.CommitId, proof.Revision,
+                                               [ signer.Attest(history.RoamingNetworkId, history.Head.Commit.Id, history.Head.Commit.Revision, eTag, T0.AddDays(1), T0.AddDays(1).AddMinutes(15)) ]);
+
+            }
+
+            var ofOther  = RoamingNetworkKeyStatement.Create(identity.Private, COSEAlgorithm.ES512, 1, network.Id, other, [ identity.Public ], T0, T0.AddDays(30));
+            var forOther = RoamingNetworkSigningKeyCertificate.Create(identity.Private, COSEAlgorithm.ES512, other, signing.Public, T0);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(With(Statement(network, T0, T0.AddDays(30)), Certificate(network, T0)).Verify([ identity.Public.Id ], out _, out error, at),  Is.True, error);
+
+                Assert.That(With(ofOther, Certificate(network, T0)).Verify([ identity.Public.Id ], out _, out error, at),                                   Is.False);
+                Assert.That(error,                                                                                                                         Is.EqualTo($"The key statement is one of the roaming network operator 'DE*XYZ', not of '{network.Operator!.Id}'!"));
+
+                Assert.That(With(Statement(network, T0, T0.AddDays(30)), forOther).Verify([ identity.Public.Id ], out _, out error, at),                    Is.False, "a signing key certified for another operator");
+
+            }
+
+        }
+
+        #endregion
+
         #region An_attestation_counts_while_its_key_is_valid()
 
         /// <summary>

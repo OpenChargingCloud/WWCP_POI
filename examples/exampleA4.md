@@ -137,7 +137,10 @@ the trust anchor, the roaming network, its key statement and certificates, and t
 
 b) The checkpoint: `TryParse` calculates its `@id` from its content and refuses it when it differs. It must be of `QA`
 and signed as the roaming network operator by signing keys of as many holders as the quorum requires, each certified
-by a trusted identity key of its holder, as A1 checks the signatures of a commit (`SigningKeyOf`):
+by a trusted identity key of its holder, as A1 checks the signatures of a commit (`SigningKeyOf`). The identity keys
+trusted are those of the trust anchor and those the key statement of the version names, once it is verified against
+the trust anchor: a key statement nobody checked names no key to trust. A verifier following the history follows the key
+statement by succession, through the versions it checked (`Followed`, as the witnesses of [example A6](exampleA6.md) do):
 
 ```csharp
 foreach (var signature in checkpoint.Signatures.Where(signature => signature.Role == RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator))

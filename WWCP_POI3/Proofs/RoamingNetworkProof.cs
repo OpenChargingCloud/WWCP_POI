@@ -461,6 +461,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var identityKeys  = keyStatement.IdentityKeys.Concat(operatorIdentityKeys).ToArray();
             var trustedIds    = holderOf.Keys.ToHashSet(StringComparer.Ordinal);
 
+            // Of the operator the proof gives: a statement or a certificate its holders made for another one, e.g. of another
+            // roaming network sharing them, is none of it (csharp-review 19, WWCPPOIConformanceTests D6).
+            var operatorId    = RoamingNetwork[POI.RoamingNetwork.PropertyKeys.Operator]?[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>();
+
             // The signing key of an attestation, certified by a trusted identity key of its holder, and that holder. Valid
             // when the attestation was signed and at the time it is verified: its signedAt is the signer's choice.
             (POIPublicKey SigningKey, String Holder)? CertifiedSigningKeyOf(RoamingNetworkAttestation Attestation)
@@ -468,6 +472,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 foreach (var certificate in certificates)
                     if (certificate.SigningKey.Id == Attestation.KeyId              &&
+                        certificate.RoamingNetworkOperatorId.ToString() == operatorId &&
                         certificate.SigningKey.IsValidAt(Attestation.SignedAt)      &&
                         certificate.SigningKey.IsValidAt(at)                        &&
                         certificate.SigningKey.MaySign(POIKeyUsages.Party)          &&
@@ -483,6 +488,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (keyStatement.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
             {
                 ErrorResponse = $"The key statement is one of the roaming network '{keyStatement.RoamingNetworkId}'!";
+                return false;
+            }
+
+            if (keyStatement.RoamingNetworkOperatorId.ToString() != operatorId)
+            {
+                ErrorResponse = $"The key statement is one of the roaming network operator '{keyStatement.RoamingNetworkOperatorId}', not of '{operatorId}'!";
                 return false;
             }
 

@@ -141,18 +141,18 @@ The station proof of DE*GEF*E1*1, revision 7: 142 KiB
 `DE*GEF*E1*1` and its energy meter, each with its model as its manufacturer stated it and none of its other models,
 the certificates they name with their body, and the release of the meter with its manufacturer. Each certificate is for
 the model, the hardware revision and the firmware version of what names it, and names its components; the legal status
-of Chargy is proven by both certificates, which name it. The PTB has keys of its own, so it signed its certificates
-itself; the BSI is not given, as neither the station nor its meter names a certificate of it. A certificate for another
+of Chargy is proven by both certificates, which name it. The PTB has keys of its own and states its certificates
+itself, so they name no `statedBy`; the BSI is not given, as neither the station nor its meter names a certificate of it. A certificate for another
 model changes the leaves of the proof: they no longer lead to the root its attestations attest.
 
 ```
 The station proof, revision 7, by its attestations: valid
 The charging station DE*GEF*S1: a GD-DC300 of GraphDefined, GraphDefined DC 300, hardware 1.0, firmware 2.5.0
-  PTB-2026-0042, under the MID, by the PTB, notified body 0102 for MID; signed by itself: yes, it has keys of its own
+  PTB-2026-0042, under the MID, by the PTB, notified body 0102 for MID; stated by itself
     for the GD-DC300 of GraphDefined, hardware 1.0, firmware 2.5.0: the model, hardware revision and firmware version of the charging station
     with chargy-1.5.0 verified, the KDM-500 of KERNBERG, hardware 2.1, firmware 3.2
 The energy meter DE*GEF*M1*1: a KDM-500 of KERNBERG, Kernberg DC meter 500 A, hardware 2.1, firmware 3.2
-  PTB-2026-0017, by the PTB, notified body 0102 for MID; signed by itself: yes, it has keys of its own
+  PTB-2026-0017, by the PTB, notified body 0102 for MID; stated by itself
     for the KDM-500 of KERNBERG, hardware 2.1, firmware 3.2: the model, hardware revision and firmware version of the energy meter
     with chargy-1.5.0 verified
 DE*GEF*M1*1, the energy meter of DE*GEF*E1*1: Chargy Transparency Software 1.5.0, germanCalibrationLaw, as PTB-2026-0042 and PTB-2026-0017 name it
@@ -172,6 +172,6 @@ The certificate for another model: roamingNetwork.conformityAssessmentBodies.@le
   itself, which no certificate is for. So the BSI issues none here.
 - `PTB-2026-0017` names no legislation: a DC meter is no measuring instrument of the MID, and the legislation it is
   certified under is not one the PTB names in `notifiedFor` in this example.
-- Whether the PTB has keys tells whether it signed its certificates itself; which key of it signed which commit, the
-  commits tell, not the station proof.
+- A certificate tells who states it: one the roaming network operator states in place of a body without keys names
+  `statedBy`, also once the body has keys; which key signed which commit, the commits tell, not the station proof.
 - The transparency software checking the meter values the meter signs is not part of the example.

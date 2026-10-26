@@ -366,6 +366,74 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region The_first_checkpoint_of_a_later_epoch_takes_the_algorithms_of_both_epochs_alone()
+
+        /// <summary>
+        /// The first checkpoint of the epoch 3 is signed with the algorithms of the epochs 2 and 3 alone (SPECIFICATION.md,
+        /// section 11.3): the epoch 2 takes ES256 and ML-DSA-65, the epoch 3 ML-DSA-65 alone; Ed25519, which only the first
+        /// epoch took, is refused. A snapshot of the epoch 3 names the profiles of the epoch 2; a history started from one
+        /// without them takes the signatures of the first checkpoint with the algorithms of the epoch 3 alone.
+        /// </summary>
+        [Test]
+        public void The_first_checkpoint_of_a_later_epoch_takes_the_algorithms_of_both_epochs_alone()
+        {
+
+            RoamingNetworkEpochProfiles  middle          = new (ETagHashAlgorithm.SHA512, [ "ES256", "ML-DSA-65" ]);
+            RoamingNetworkEpochProfiles  postQuantum     = new (ETagHashAlgorithm.SHA512, [ "ML-DSA-65" ]);
+            var                          es256           = Proofs.PriceStatementTests.Signer(ChargingStationOperator_Id.Parse("DE*GEF"));
+
+            // The keys are not what this test is about.
+            VerifyCheckpointSignatureDelegate  anyKey    = (checkpoint, signature) => true;
+
+            var (history, _)  = Close(middle);
+
+            Assert.That(history.TryStartNextEpoch(out var second, out var secondError),  Is.True, secondError);
+            second!.CheckpointSigners = [ es256 ];
+            Assert.That(second.TryCloseEpoch(postQuantum, out _, out var closeError, T0.AddMinutes(6)),  Is.True, closeError);
+            Assert.That(second.TryStartNextEpoch(out var third, out var thirdError),  Is.True, thirdError);
+
+            third!.CheckpointSigners  = [ PostQuantum, CheckpointTests.RNOSigner ];
+            var withEd25519           = third.TryMakeCheckpoint(out _, out var ed25519SignerError, CreatedAt: T0.AddMinutes(7));
+
+            third.CheckpointSigners   = [ PostQuantum, es256 ];
+            Assert.That(third.TryMakeCheckpoint(out var first, out var firstError, CreatedAt: T0.AddMinutes(7)),  Is.True, firstError);
+
+            var addedEd25519          = third.TryAddCheckpointSignatures(first!.Id, [ CheckpointTests.RNOSigner.Sign(first) ], anyKey, out _, out _, out var ed25519Error);
+
+            var snapshot              = third.ToSnapshotJSON(IncludeRuntimeStatus: false);
+            var withoutProfiles       = (JObject) snapshot.DeepClone();
+            ((JObject) withoutProfiles["epoch"]!).Remove("previousProfiles");
+
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(snapshot.       ToString(), out var joined,   out var joinError),    Is.True, joinError);
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(withoutProfiles.ToString(), out var unknowing, out var unknowError), Is.True, unknowError);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(third.PreviousEpochProfiles,                                           Is.EqualTo(middle));
+                Assert.That(second.PreviousEpochProfiles,                                          Is.EqualTo(RoamingNetworkEpochProfiles.Default));
+                Assert.That(second.ToSnapshotJSON(IncludeRuntimeStatus: false)["epoch"]?["previousProfiles"],  Is.Null, "Those of the first epoch are the default ones.");
+
+                Assert.That(withEd25519,                                                           Is.False);
+                Assert.That(ed25519SignerError,                                                    Does.Contain("The signature algorithm 'Ed25519' of the checkpoint signer").And.EndWith("is neither one of the epoch 3, ML-DSA-65, nor of the epoch 2, ES256, ML-DSA-65!"));
+                Assert.That(first.Signatures.Select(signature => signature.Algorithm),            Is.EquivalentTo(new[] { "ML-DSA-65", "ES256" }));
+
+                Assert.That(addedEd25519,                                                          Is.False);
+                Assert.That(ed25519Error,                                                          Is.EqualTo($"The signature algorithm 'Ed25519' of a signature of the checkpoint '{first.Id}' is neither one of the epoch 3, ML-DSA-65, nor of the epoch 2, ES256, ML-DSA-65!"));
+
+                Assert.That(joined!.PreviousEpochProfiles,                                         Is.EqualTo(middle));
+                Assert.That(joined.TryAddCheckpoint(first, out var joinedError, anyKey),           Is.True, joinedError);
+
+                Assert.That(unknowing!.PreviousEpochProfiles,                                      Is.Null);
+                Assert.That(unknowing.TryAddCheckpoint(first, out var unknowingError, anyKey),     Is.False);
+                Assert.That(unknowingError,                                                        Is.EqualTo($"The signature algorithm 'ES256' of a signature of the checkpoint '{first.Id}' is not one of the epoch 3, ML-DSA-65, and the profiles of the epoch 2 are not known here!"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Commits_and_checkpoints_of_another_epoch_are_refused()
 
         [Test]

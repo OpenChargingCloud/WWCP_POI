@@ -180,15 +180,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var signers                      = CheckpointSigners;
 
                 // Signed with the algorithms of this epoch; the first one of an epoch also with those of the one before.
-                var firstOfAnEpoch               = latest is null && epoch.Number > 1;
-
-                if (!firstOfAnEpoch && !signers.IsDefaultOrEmpty)
-                    foreach (var signer in signers)
-                        if (SignatureAlgorithmError(signer.Algorithm.Name, $"the checkpoint signer {signer}") is String signerError)
-                        {
-                            ErrorResponse = signerError;
-                            return false;
-                        }
+                foreach (var signer in signers.IsDefault ? [] : signers.AsEnumerable())
+                    if (CheckpointSignatureAlgorithmError(latest is null && epoch.Number > 1, signer.Algorithm.Name, $"the checkpoint signer {signer}") is String signerError)
+                    {
+                        ErrorResponse = signerError;
+                        return false;
+                    }
 
                 // The price statements stay locked until the checkpoint is kept: it names those taken before it.
                 lock (priceStatementLock)

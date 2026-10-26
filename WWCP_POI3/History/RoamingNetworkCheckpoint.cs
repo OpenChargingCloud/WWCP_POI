@@ -37,6 +37,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A delegate verifying one signature of a checkpoint with a trusted key,
     /// e.g. by resolving the key of its key identification and calling VerifySignature.
+    /// The key must be one trusted for the role and the signer the signature names, e.g. that of the witness it names:
+    /// the roles a checkpoint must be signed in are counted as its verified signatures name them (examples A4 and A6).
     /// </summary>
     /// <param name="Checkpoint">The signed checkpoint.</param>
     /// <param name="Signature">One of its signatures.</param>

@@ -285,7 +285,7 @@ public static class ExampleA13
 
                 certified.Add(cert["@id"]!.ToString());
 
-                Console.WriteLine($"  {cert["@id"]}{(cert["legislation"] is JToken legislation ? $", under the {legislation}" : "")}, by the {body["@id"]}, notified body {body["notifiedBodyNumber"]} for {String.Join(", ", body["notifiedFor"]!.Values<String>())}; signed by itself: {(body["signingKeys"] is JArray { Count: > 0 } ? "yes, it has keys of its own" : "no, the roaming network operator in its place")}");
+                Console.WriteLine($"  {cert["@id"]}{(cert["legislation"] is JToken legislation ? $", under the {legislation}" : "")}, by the {body["@id"]}, notified body {body["notifiedBodyNumber"]} for {String.Join(", ", body["notifiedFor"]!.Values<String>())}; stated by {(cert["statedBy"]?.Value<String>() == ConformityCertificate.RoamingNetworkOperator ? "the roaming network operator in its place" : "itself")}");
                 Console.WriteLine($"    for the {cert[modelKey]} of {cert[makerKey]}, hardware {String.Join("/", cert["hardwareRevisions"]!.Values<String>())}, firmware {String.Join("/", cert["firmwareVersions"]!.Values<String>())}: " +
                                   (cert[modelKey]?.Value<String>() == model["@id"]?.Value<String>() && cert[makerKey]?.Value<String>() == maker["@id"]?.Value<String>() &&
                                    cert["hardwareRevisions"]!.Values<String>().Contains(revision) && cert["firmwareVersions"]!.Values<String>().Contains(firmware)

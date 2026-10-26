@@ -48,6 +48,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/certificate/v1";
 
+        /// <summary>
+        /// Who states a certificate the roaming network operator adds or changes in place of a conformity assessment body
+        /// without signing keys: the value of its statedBy.
+        /// </summary>
+        public const String RoamingNetworkOperator = "roamingNetworkOperator";
+
         #endregion
 
         #region Properties
@@ -139,6 +145,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// The property of its end of validity.
             /// </summary>
             public const String  NotAfter                            = "notAfter";
+
+            /// <summary>
+            /// The property of who states it, when it is not its conformity assessment body.
+            /// </summary>
+            public const String  StatedBy                            = "statedBy";
 
         }
 
@@ -241,6 +252,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         [Optional]
         public DateTimeOffset?                          NotAfter                             { get; }
 
+        /// <summary>
+        /// Whether the roaming network operator states it, in place of its conformity assessment body without signing keys
+        /// (statedBy, "roamingNetworkOperator"), else the body itself: what a reader of a proof tells them apart by, also
+        /// once the body has keys.
+        /// </summary>
+        [Optional]
+        public Boolean                                  StatedByRoamingNetworkOperator       { get; }
+
 
         /// <summary>
         /// Whether it is for a charging station model, else for an energy meter model.
@@ -279,6 +298,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="NotAfter">The optional end of the validity of this document.</param>
         /// <param name="Legislation">The optional legislation it is issued under, e.g. MID.</param>
         /// <param name="EnergyMeters">The energy meters of the model it was issued with.</param>
+        /// <param name="StatedByRoamingNetworkOperator">Whether the roaming network operator states it, in place of its body without signing keys.</param>
         public ConformityCertificate(ConformityCertificate_Id               Id,
                                      ChargingStationManufacturer_Id         ChargingStationManufacturerId,
                                      ChargingStationModel_Id                ChargingStationModel,
@@ -291,7 +311,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      DateTimeOffset?                        NotBefore                           = null,
                                      DateTimeOffset?                        NotAfter                            = null,
                                      String?                                Legislation                         = null,
-                                     IEnumerable<CertifiedEnergyMeter>?     EnergyMeters                        = null)
+                                     IEnumerable<CertifiedEnergyMeter>?     EnergyMeters                        = null,
+                                     Boolean                                StatedByRoamingNetworkOperator      = false)
 
             : this(Id,
                    ChargingStationManufacturerId,
@@ -307,7 +328,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    DocumentURL,
                    NotBefore,
                    NotAfter,
-                   Legislation)
+                   Legislation,
+                   StatedByRoamingNetworkOperator)
 
         { }
 
@@ -331,6 +353,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="NotBefore">The optional start of the validity of this document.</param>
         /// <param name="NotAfter">The optional end of the validity of this document.</param>
         /// <param name="Legislation">The optional legislation it is issued under, e.g. MID.</param>
+        /// <param name="StatedByRoamingNetworkOperator">Whether the roaming network operator states it, in place of its body without signing keys.</param>
         public ConformityCertificate(ConformityCertificate_Id               Id,
                                      EnergyMeterManufacturer_Id             EnergyMeterManufacturerId,
                                      EnergyMeterModel_Id                    EnergyMeterModel,
@@ -342,7 +365,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      URL?                                   DocumentURL                         = null,
                                      DateTimeOffset?                        NotBefore                           = null,
                                      DateTimeOffset?                        NotAfter                            = null,
-                                     String?                                Legislation                         = null)
+                                     String?                                Legislation                         = null,
+                                     Boolean                                StatedByRoamingNetworkOperator      = false)
 
             : this(Id,
                    null,
@@ -358,7 +382,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    DocumentURL,
                    NotBefore,
                    NotAfter,
-                   Legislation)
+                   Legislation,
+                   StatedByRoamingNetworkOperator)
 
         { }
 
@@ -380,7 +405,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       URL?                                   DocumentURL,
                                       DateTimeOffset?                        NotBefore,
                                       DateTimeOffset?                        NotAfter,
-                                      String?                                Legislation)
+                                      String?                                Legislation,
+                                      Boolean                                StatedByRoamingNetworkOperator)
         {
 
             if (Id.IsNullOrEmpty)
@@ -459,6 +485,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // To the millisecond, as their representations keep them.
             this.NotBefore                          = NotBefore.HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(NotBefore.Value.ToUnixTimeMilliseconds()) : null;
             this.NotAfter                           = NotAfter. HasValue ? DateTimeOffset.FromUnixTimeMilliseconds(NotAfter. Value.ToUnixTimeMilliseconds()) : null;
+            this.StatedByRoamingNetworkOperator     = StatedByRoamingNetworkOperator;
 
         }
 
@@ -510,13 +537,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 PropertyKeys.HardwareRevisions, PropertyKeys.FirmwareVersions,
                                                 PropertyKeys.VerifiedTransparencySoftwareIds, PropertyKeys.CompatibleTransparencySoftwareIds,
                                                 PropertyKeys.EnergyMeters, PropertyKeys.DocumentNumber, PropertyKeys.DocumentURL,
-                                                PropertyKeys.NotBefore, PropertyKeys.NotAfter);
+                                                PropertyKeys.NotBefore, PropertyKeys.NotAfter, PropertyKeys.StatedBy);
 
                 if (JSON[PropertyKeys.Context] is JToken context &&
                     !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
                 {
                     throw new ArgumentException($"The JSON-LD context of the certificate must be '{JSONLDContext}'!");
                 }
+
+                var statedBy = StrictJSON.Text(JSON, PropertyKeys.StatedBy);
+
+                if (statedBy is not (null or RoamingNetworkOperator))
+                    throw new ArgumentException($"The certificate '{JSON[PropertyKeys.Id]}' is stated by its conformity assessment body, or by the roaming network operator in its place, '{RoamingNetworkOperator}', not by '{statedBy}'!");
 
                 Certificate = new ConformityCertificate(
                                   Id:                                 ConformityCertificate_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.Id)),
@@ -535,7 +567,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   DocumentURL:                        StrictJSON.Link(JSON, PropertyKeys.DocumentURL),
                                   NotBefore:                          StrictJSON.Date(JSON, PropertyKeys.NotBefore),
                                   NotAfter:                           StrictJSON.Date(JSON, PropertyKeys.NotAfter),
-                                  Legislation:                        StrictJSON.Text(JSON, PropertyKeys.Legislation)
+                                  Legislation:                        StrictJSON.Text(JSON, PropertyKeys.Legislation),
+                                  StatedByRoamingNetworkOperator:     statedBy is not null
                               );
 
                 return true;
@@ -615,6 +648,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                            Legislation is not null
                                ? new JProperty(PropertyKeys.Legislation,                         Legislation)
+                               : null,
+
+                           StatedByRoamingNetworkOperator
+                               ? new JProperty(PropertyKeys.StatedBy,                            RoamingNetworkOperator)
                                : null
 
                        );

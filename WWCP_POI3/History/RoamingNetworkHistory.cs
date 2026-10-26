@@ -263,10 +263,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Constructor(s)
 
-        private RoamingNetworkHistory(RoamingNetworkCommit      Root,
-                                      RoamingNetwork            RoamingNetwork,
-                                      RoamingNetworkEpoch?      Epoch           = null,
-                                      RoamingNetworkEpochLink?  PreviousEpoch   = null)
+        private RoamingNetworkHistory(RoamingNetworkCommit          Root,
+                                      RoamingNetwork                RoamingNetwork,
+                                      RoamingNetworkEpoch?          Epoch              = null,
+                                      RoamingNetworkEpochLink?      PreviousEpoch      = null,
+                                      RoamingNetworkEpochProfiles?  PreviousProfiles   = null)
         {
 
             this.RoamingNetworkId  = RoamingNetwork.Id;
@@ -274,6 +275,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.RuntimeStatus     = new RoamingNetworkRuntimeStatus(this);
             this.epoch             = Epoch ?? (Root.Profiles is not null ? new RoamingNetworkEpoch(Root.Epoch, Root.Profiles) : RoamingNetworkEpoch.First);
             this.previousEpoch     = PreviousEpoch;
+            this.previousProfiles  = PreviousProfiles;
 
             if (Root.Epoch != epoch.Number || Root.IdentificationHash != epoch.Profiles.IdentificationHash)
                 throw new ArgumentException($"The root '{Root.Id}' is no commit of the epoch {epoch.Number}.", nameof(Root));
@@ -373,9 +375,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                // The epoch of a history after the first one: { epoch, profiles, previous? }.
-                RoamingNetworkEpoch?      epoch          = null;
-                RoamingNetworkEpochLink?  previousEpoch  = null;
+                // The epoch of a history after the first one: { epoch, profiles, previous?, previousProfiles? }.
+                RoamingNetworkEpoch?          epoch             = null;
+                RoamingNetworkEpochLink?      previousEpoch     = null;
+                RoamingNetworkEpochProfiles?  previousProfiles  = null;
 
                 if (Snapshot[EpochJSONProperty] is JToken epochJSON)
                 {
@@ -393,6 +396,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
+                    if (epochJSON[PreviousProfilesJSONProperty] is JToken previousProfilesJSON &&
+                        !RoamingNetworkEpochProfiles.TryParse(previousProfilesJSON, out previousProfiles, out var previousProfilesError))
+                    {
+                        ErrorResponse = "Invalid epoch of the snapshot: " + previousProfilesError;
+                        return false;
+                    }
+
                 }
 
                 return TryFromSnapshot(roamingNetwork,
@@ -400,7 +410,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        out History,
                                        out ErrorResponse,
                                        epoch,
-                                       previousEpoch) &&
+                                       previousEpoch,
+                                       previousProfiles) &&
 
                        TryTakeRuntimeStatus(ref History,
                                             Snapshot[PropertyKeys.RuntimeStatus],
@@ -457,7 +468,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) TryFromSnapshot(RoamingNetwork, Commit, out History, out ErrorResponse, Epoch = null, PreviousEpoch = null)
+        #region (static) TryFromSnapshot(RoamingNetwork, Commit, out History, out ErrorResponse, Epoch = null, PreviousEpoch = null, PreviousProfiles = null)
 
         /// <summary>
         /// Try to start a history from the given version of a roaming network and the commit leading to it.
@@ -469,12 +480,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ErrorResponse">An optional error response.</param>
         /// <param name="Epoch">The epoch of the history, unless the first one or the one its genesis names.</param>
         /// <param name="PreviousEpoch">The final checkpoint of the epoch before, if known.</param>
+        /// <param name="PreviousProfiles">The profiles of the epoch before, if known, from the third epoch on: those of the first one are the default ones.</param>
         public static Boolean TryFromSnapshot(RoamingNetwork                                   RoamingNetwork,
                                               RoamingNetworkCommit                             Commit,
                                               [NotNullWhen(true)]  out RoamingNetworkHistory?  History,
                                               [NotNullWhen(false)] out String?                 ErrorResponse,
-                                              RoamingNetworkEpoch?                             Epoch           = null,
-                                              RoamingNetworkEpochLink?                         PreviousEpoch   = null)
+                                              RoamingNetworkEpoch?                             Epoch              = null,
+                                              RoamingNetworkEpochLink?                         PreviousEpoch      = null,
+                                              RoamingNetworkEpochProfiles?                     PreviousProfiles   = null)
         {
 
             History = null;
@@ -506,11 +519,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
+            if (PreviousProfiles is not null && epoch.Number <= 2)
+            {
+                ErrorResponse = epoch.Number == 1
+                                    ? "The first epoch has no epoch before, nor its profiles!"
+                                    : "The epoch before the epoch 2 is the first one, of the default profiles: they are not given!";
+                return false;
+            }
+
             // A copy, when it needs another revision: the given version stays as it is.
             var roamingNetwork = RoamingNetwork.WithRevision(Commit.Revision);
             roamingNetwork.CalcETags();
 
-            History        = new RoamingNetworkHistory(Commit, roamingNetwork, epoch, PreviousEpoch);
+            History        = new RoamingNetworkHistory(Commit, roamingNetwork, epoch, PreviousEpoch, PreviousProfiles);
             ErrorResponse  = null;
             return true;
 
@@ -543,7 +564,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(PropertyKeys.EffectiveLastChanges, effectiveLastChanges);
 
             if (epoch.Number > 1)
-                json.Add(EpochJSONProperty, EpochJSON(epoch, previousEpoch));
+                json.Add(EpochJSONProperty, EpochJSON(epoch, previousEpoch, PreviousEpochProfiles));
 
             if (IncludeRuntimeStatus)
                 json.Add(PropertyKeys.RuntimeStatus, new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON(Embedded: true))));

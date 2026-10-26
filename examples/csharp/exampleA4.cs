@@ -257,22 +257,40 @@ public static class ExampleA4
 
     // The certificate of the signing key of the roaming network operator a signature names, as example A1 checks those of a
     // commit: by a trusted identity key of its holder, the key valid when it signed, and one that may sign for the party.
+    // The identity keys trusted are those of the trust anchor and those the key statement of the version names, once it is
+    // verified against the trust anchor: a key statement nobody checked names no key to trust (csharp-review 19).
     private static RoamingNetworkSigningKeyCertificate? CertificateOf(RoamingNetworkTrustAnchor Anchor, RoamingNetwork Network, RoamingNetworkCommitSignature Signature)
     {
 
-        var statement     = Network.Operator!.KeyStatement!;
-        var trustedIds    = Anchor.Keys.Concat(statement.IdentityKeys.Select(identityKey => identityKey.Id)).ToHashSet();
-        var identityPool  = statement.IdentityKeys.Concat(Network.Operator.IdentityKeys).ToArray();
+        var networkOperator = Network.Operator!;
 
-        return Signature.Role != RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator
-                   ? null
-                   : Network.Operator.SigningKeyCertificates.
-                         FirstOrDefault(certificate => certificate.SigningKey.Id == Signature.KeyId         &&
-                                                       certificate.SigningKey.IsValidAt(Signature.SignedAt) &&
-                                                       certificate.SigningKey.MaySign(POIKeyUsages.Party)   &&
-                                                       certificate.TryVerify(identityPool, out _, out _, trustedIds));
+        if (Signature.Role != RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ||
+            networkOperator.KeyStatement is not RoamingNetworkKeyStatement statement    ||
+            !statement.TryVerify(Anchor.Holders, networkOperator.IdentityKeys, out var holderOf, out _, Anchor.MinConsensus))
+        {
+            return null;
+        }
+
+        var trustedIds    = holderOf.Keys.ToHashSet();
+        var identityPool  = statement.IdentityKeys.Concat(networkOperator.IdentityKeys).ToArray();
+
+        return networkOperator.SigningKeyCertificates.
+                   FirstOrDefault(certificate => certificate.SigningKey.Id == Signature.KeyId         &&
+                                                 certificate.SigningKey.IsValidAt(Signature.SignedAt) &&
+                                                 certificate.SigningKey.MaySign(POIKeyUsages.Party)   &&
+                                                 certificate.TryVerify(identityPool, out _, out _, trustedIds));
 
     }
+
+    // The trust anchor a verifier following the history holds after the given version: once the key statement of the version
+    // is verified against the given one, the one that statement states, its keys, their holders and its quorum; else the
+    // given one. So it follows the key statement by succession, only through versions it checked (SPECIFICATION.md, 8.6).
+    internal static RoamingNetworkTrustAnchor Followed(RoamingNetworkTrustAnchor Anchor, RoamingNetwork Network)
+
+        => Network.Operator?.KeyStatement is RoamingNetworkKeyStatement statement &&
+           statement.TryVerify(Anchor.Holders, Network.Operator.IdentityKeys, out _, out _, Anchor.MinConsensus)
+               ? Network.CreateTrustAnchor(statement, Anchor.URLs)
+               : Anchor;
 
     // The signing key of the roaming network operator a signature names, as example A1 checks those of a commit: certified
     // by a trusted identity key of its holder, valid when it signed, and one that may sign for the party.

@@ -757,7 +757,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             json.Add(PropertyKeys.RuntimeStatus, new JArray(RoamingNetworkRuntimeStatus.Of(StatusOf).Select(status => status.ToJSON(Embedded: true))));
 
             if (epoch.Number > 1)
-                json.Add(EpochJSONProperty, EpochJSON(epoch, previousEpoch));
+                json.Add(EpochJSONProperty, EpochJSON(epoch, previousEpoch, PreviousEpochProfiles));
 
             return json;
 

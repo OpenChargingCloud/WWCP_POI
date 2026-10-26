@@ -322,17 +322,24 @@ public static class ExampleA6
 
     // The commits of the given file, appended to the history of a witness, each checked as every commit is: its change set
     // signed by its owners and leading to its ETags, the commit signed as the roaming network operator by its signing keys
-    // in the version the witness holds.
+    // in the version the witness holds. It trusts the key statement of each version by the one of the version before,
+    // from the trust anchor on: so it follows new identity keys of the operator the old ones stated.
     internal static void AppendCommits(RoamingNetworkHistory History, String File)
     {
 
         var anchor = Anchor();
+        var before = (RoamingNetwork?) null;
 
         foreach (var json in Helpers.ReadJSONArray(File).Cast<JObject>())
         {
 
             if (!RoamingNetworkCommit.TryParse(json, out var commit, out var error))
                 Helpers.Fail(error);
+
+            if (before is not null)
+                anchor = ExampleA4.Followed(anchor, before);
+
+            before = History.Head.RoamingNetwork;
 
             if (!History.TryAppend([ commit ],
                                    out _,

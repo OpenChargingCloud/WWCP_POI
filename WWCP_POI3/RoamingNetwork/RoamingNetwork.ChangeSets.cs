@@ -1210,6 +1210,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+            // Who states a certificate the change set adds or changes: the body itself, or the roaming network operator in its place.
+            if (CertificateStatedByError(ChangeSet, bodies) is String statedByError)
+            {
+                ErrorResponse = statedByError;
+                return false;
+            }
+
             // Every manufacturer and model a charging station names, every grid connection point a charging pool names,
             // and every maintainer of a grid connection point must still be one of the network;
             // grid connection points, energy meters, and energy meter templates and groups must be unique within the network.

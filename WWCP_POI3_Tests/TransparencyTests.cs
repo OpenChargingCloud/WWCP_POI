@@ -501,7 +501,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                     [ FirmwareVersion. Parse("1.0.0") ],
                                                                     [ Chargy11 ],
                                                                     [],
-                                                                    Legislation: ConformityAssessmentBody.Legislations.CRA);
+                                                                    Legislation:                     ConformityAssessmentBody.Legislations.CRA,
+                                                                    StatedByRoamingNetworkOperator:  true);
 
             using (Assert.EnterMultipleScope())
             {
@@ -539,6 +540,76 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region Who_states_a_certificate_its_body_or_the_roaming_network_operator_in_its_place()
+
+        /// <summary>
+        /// A certificate the roaming network operator adds or changes in place of a body without keys says so, as its
+        /// statedBy, "roamingNetworkOperator"; one of a body with keys names none (SPECIFICATION.md 4.1, csharp-review 15).
+        /// Once the body has keys, it changes a certificate the roaming network operator stated only by stating it itself.
+        /// </summary>
+        [Test]
+        public void Who_states_a_certificate_its_body_or_the_roaming_network_operator_in_its_place()
+        {
+
+            var withBSI   = Apply(NewNetwork(), RoamingNetworkChange.Add(NewBody(BSI, [ ConformityAssessmentBody.Legislations.CRA ])));
+            var rno       = TestParties.Party(withBSI);
+            var craId     = ConformityCertificate_Id.Parse("cra-1");
+
+            ConformityCertificate CRACertificate(Boolean StatedByRoamingNetworkOperator)
+                => new (craId, ACME, Wallbox22.Id, [ HardwareRevision.Parse("1.0") ], [ FirmwareVersion.Parse("1.0.0") ], [ Chargy11 ], [],
+                        Legislation: ConformityAssessmentBody.Legislations.CRA, StatedByRoamingNetworkOperator: StatedByRoamingNetworkOperator);
+
+            var byPTB     = new ConformityCertificate(ConformityCertificate_Id.Parse("cert-2"), ACME, Wallbox22.Id, [ HardwareRevision.Parse("1.0") ], [ FirmwareVersion.Parse("1.0.0") ], [ Chargy11 ], [],
+                                                      StatedByRoamingNetworkOperator: true);
+
+            Assert.That(withBSI.TryApplyChangeSet(SignedBy(withBSI, rno, RoamingNetworkChange.Add(CRACertificate(true), BSI)), out var withCRA, out var addError),  Is.True, addError);
+
+            var otherStatement  = CRACertificate(true).ToJSON();
+            otherStatement["statedBy"] = "BSI";
+
+            // The BSI got keys since.
+            var json      = withCRA!.ToJSON(IncludeETags: false);
+            var bodies    = (JArray) json["conformityAssessmentBodies"]!;
+            var bsiIndex  = bodies.IndexOf(bodies.Single(body => body["@id"]?.Value<String>() == BSI.ToString()));
+
+            Assert.That(withCRA.TryGetConformityAssessmentBodyById(BSI, out var bsi), Is.True);
+            bodies[bsiIndex] = bsi!.WithKeys().ToJSON(Embedded: true);
+            Assert.That(RoamingNetwork.TryParse(json, out var keyed, out var keyedError), Is.True, keyedError);
+            Assert.That(keyed!.TryGetConformityCertificateById(craId, out var stated), Is.True);
+
+            var newNumber = RoamingNetworkChange.UpdateProperty(stated!, "documentNumber", null, "BSI-2026-1");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(withCRA.TryGetConformityCertificateById(craId, out var added),                         Is.True);
+                Assert.That(added!.StatedByRoamingNetworkOperator,                                                  Is.True);
+                Assert.That(added.ToJSON()["statedBy"]?.Value<String>(),                                            Is.EqualTo("roamingNetworkOperator"));
+
+                Assert.That(() => SignedBy(withBSI, rno, RoamingNetworkChange.Add(CRACertificate(false), BSI)),
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'cra-1' of the conformity assessment body 'BSI' without signing keys is stated by the roaming network operator in its place: its statedBy is 'roamingNetworkOperator'!"));
+
+                Assert.That(() => SignedBy(withBSI, TestParties.Party(PTB), RoamingNetworkChange.Add(byPTB, PTB)),
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'cert-2' of the conformity assessment body 'PTB' is stated by the body itself, with its keys: it names no statedBy!"));
+
+                Assert.That(ConformityCertificate.TryParse(otherStatement, out _, out var otherError),              Is.False);
+                Assert.That(otherError,                                                                             Does.Contain("is stated by its conformity assessment body, or by the roaming network operator in its place, 'roamingNetworkOperator', not by 'BSI'!"));
+
+                Assert.That(() => SignedBy(keyed, TestParties.Party(BSI), newNumber),
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'cra-1' of the conformity assessment body 'BSI' is stated by the body itself, with its keys: it names no statedBy!"));
+
+                Assert.That(keyed.TryApplyChangeSet(SignedBy(keyed, TestParties.Party(BSI), newNumber, RoamingNetworkChange.RemoveProperty(stated!, "statedBy", "roamingNetworkOperator")),
+                                                    out var restated, out var restateError),                       Is.True, restateError);
+                Assert.That(restated!.TryGetConformityCertificateById(craId, out var itsOwn),                       Is.True);
+                Assert.That(itsOwn!.StatedByRoamingNetworkOperator,                                                 Is.False);
+                Assert.That(itsOwn.DocumentNumber,                                                                  Is.EqualTo("BSI-2026-1"));
+
+            }
+
+        }
+
+        #endregion
+
         #region The_roaming_network_operator_signs_in_place_of_a_body_by_a_key_that_may_sign_party()
 
         /// <summary>
@@ -553,7 +624,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var withBSI  = Apply(NewNetwork(), RoamingNetworkChange.Add(NewBody(BSI, [ ConformityAssessmentBody.Legislations.CRA ])));
             var rno      = TestParties.Party(withBSI);
             var craCert  = ConformityCertificate_Id.Parse("cra-1");
-            var addCert  = RoamingNetworkChange.Add(new ConformityCertificate(craCert, ACME, Wallbox22.Id, [ HardwareRevision.Parse("1.0") ], [ FirmwareVersion.Parse("1.0.0") ], [ Chargy11 ], [], Legislation: ConformityAssessmentBody.Legislations.CRA), BSI);
+            var addCert  = RoamingNetworkChange.Add(new ConformityCertificate(craCert, ACME, Wallbox22.Id, [ HardwareRevision.Parse("1.0") ], [ FirmwareVersion.Parse("1.0.0") ], [ Chargy11 ], [], Legislation: ConformityAssessmentBody.Legislations.CRA, StatedByRoamingNetworkOperator: true), BSI);
 
             // The network with the signing key of the roaming network operator certified for the given usage alone.
             RoamingNetwork CertifiedFor(String Usage)

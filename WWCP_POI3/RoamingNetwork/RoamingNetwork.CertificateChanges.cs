@@ -54,8 +54,49 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ConformityCertificate.PropertyKeys.VerifiedTransparencySoftwareIds,
             ConformityCertificate.PropertyKeys.CompatibleTransparencySoftwareIds,
             ConformityCertificate.PropertyKeys.NotBefore,
-            ConformityCertificate.PropertyKeys.NotAfter
+            ConformityCertificate.PropertyKeys.NotAfter,
+            ConformityCertificate.PropertyKeys.StatedBy
         ];
+
+        #endregion
+
+
+        #region (private) CertificateStatedByError(ChangeSet, Bodies)
+
+        /// <summary>
+        /// Why a certificate the given change set adds or changes does not say who states it, if one does not
+        /// (SPECIFICATION.md, section 4.1): the roaming network operator, signing it in place of a conformity assessment body
+        /// without signing keys in this version, names itself as its statedBy; a body signing it itself, with its keys, names
+        /// none. So a change of a certificate of a body that got its keys since changes its statedBy as well, and the other way
+        /// round.
+        /// </summary>
+        private String? CertificateStatedByError(RoamingNetworkChangeSet                                                     ChangeSet,
+                                                 IReadOnlyDictionary<ConformityAssessmentBody_Id, ConformityAssessmentBody>  Bodies)
+        {
+
+            foreach (var change in ChangeSet.Changes)
+            {
+
+                if (change.EntityType != nameof(ConformityCertificate) || change.Kind == RoamingNetworkChangeKind.Remove ||
+                    !ConformityCertificate_Id.TryParse(change.EntityId, out var certificateId) ||
+                    ConformityAssessmentBodyOf(Bodies.Values, certificateId) is not ConformityAssessmentBody body ||
+                    !body.TryGetConformityCertificate(certificateId, out var certificate))
+                {
+                    continue;
+                }
+
+                var byOperator = conformityAssessmentBodies.TryGet(body.Id, out var before) && before.SigningKeys.IsDefaultOrEmpty;
+
+                if (certificate.StatedByRoamingNetworkOperator != byOperator)
+                    return byOperator
+                               ? $"The certificate '{certificate.Id}' of the conformity assessment body '{body.Id}' without signing keys is stated by the roaming network operator in its place: its statedBy is '{ConformityCertificate.RoamingNetworkOperator}'!"
+                               : $"The certificate '{certificate.Id}' of the conformity assessment body '{body.Id}' is stated by the body itself, with its keys: it names no statedBy!";
+
+            }
+
+            return null;
+
+        }
 
         #endregion
 

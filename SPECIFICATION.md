@@ -341,6 +341,13 @@ or the RNO in its place while it has none. A
 grid connection point's `maintainedBy` names a charging station operator or parking operator of
 the network; its identification is unique within the network.
 
+**Who states a certificate:** a certificate the RNO adds or changes in place of a conformity assessment
+body without signing keys says so, `"statedBy": "roamingNetworkOperator"`; one the body signs itself
+names no `statedBy`. A change set adding or changing a certificate whose `statedBy` does not say who
+signs it, as the version before has the keys of the body, MUST be refused: a body that got its keys
+since changes a certificate the RNO stated only by removing its `statedBy`, stating it itself. So a
+reader of a proof tells the statements of a body from those of the RNO, also once the body has keys.
+
 **Within a change set**, a change is owned as applying it decides, after the changes before it: what an earlier
 change of the change set added is owned by the parent of that `Add`, a grid connection point an earlier change handed
 on by its new maintainer; what an earlier change removed, alone or with the party embedding it, by nobody, and a change
@@ -357,7 +364,7 @@ its `createdAt`: a signing key for data, one that may sign its usage; for the `s
 keys; for its `identityKeys` one of its identity keys. For recovery, an
 identity key of the RNO also counts for both kinds of keys of every other party. Every signature
 MUST be by a key of a party, or by a new identity key of one of its changes (proof of possession, below). A party is added with at least one key of each kind, a grid operator
-also with none, and without embedded children, and keeps at least one of each once it has them. The RNO decides who is a member: removing a
+or a conformity assessment body also with none, and without embedded children, and keeps at least one of each once it has them. The RNO decides who is a member: removing a
 party removes everything it embeds, and needs no signature of the party. The RNO itself is
 neither added nor removed: a change set that does MUST be refused. A roaming network without an
 RNO can not be changed where only the RNO may.
@@ -1664,7 +1671,12 @@ one epoch is one of another, and commits of different epochs are never merged.
 The first checkpoint of the epoch (sequence 0) names the final checkpoint of the one before,
 `"previous": {"epoch": 1, "checkpointId": "…", "eTags": [ … ]}`, and is signed with the algorithms of
 both epochs, so that a verifier trusting only the old ones follows into the new epoch. Its signatures
-are accepted with the algorithms of either epoch, every later one only with those of its own.
+are accepted with the algorithms of either epoch, every later one only with those of its own; a
+signature of an algorithm neither epoch accepts MUST be refused. A server knows the profiles of the
+epoch before from the epoch it closed, those of the first epoch are the default ones, and a snapshot of
+an epoch after the second names them: its `epoch` is `{epoch, profiles, previous?, previousProfiles?}`.
+A server not knowing them accepts the signatures of the first checkpoint only with the algorithms of
+its own epoch.
 
 ### 11.4 Moving on
 
