@@ -153,72 +153,72 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The identification of the model, assigned by its manufacturer, e.g. "KDM-500".
         /// </summary>
-        public EnergyMeterModel_Id              Id                 { get; }
+        public EnergyMeterModel_Id               Id                   { get; }
 
         /// <summary>
         /// The multi-language name.
         /// </summary>
-        public ImmutableI18NString?             Name               { get; }
+        public ImmutableI18NString?              Name                 { get; }
 
         /// <summary>
         /// The multi-language description.
         /// </summary>
-        public ImmutableI18NString?             Description        { get; }
+        public ImmutableI18NString?              Description          { get; }
 
         /// <summary>
         /// The hardware revisions it was built in, each once, in their given order.
         /// </summary>
-        public ImmutableArray<HardwareRevision> HardwareRevisions  { get; }
+        public ImmutableArray<HardwareRevision>  HardwareRevisions    { get; }
 
         /// <summary>
         /// The firmware versions it ran, each once, in their given order.
         /// </summary>
-        public ImmutableArray<FirmwareVersion>  FirmwareVersions   { get; }
+        public ImmutableArray<FirmwareVersion>   FirmwareVersions     { get; }
 
         /// <summary>
         /// The URL of its product page.
         /// </summary>
-        public URL?                             ProductURL         { get; }
+        public URL?                              ProductURL           { get; }
 
         /// <summary>
         /// The URL of its datasheet.
         /// </summary>
-        public URL?                             DatasheetURL       { get; }
+        public URL?                              DatasheetURL         { get; }
 
         /// <summary>
         /// Images of it, e.g. photos, each URL once, in their given order.
         /// </summary>
-        public ImmutableArray<Image>            Images             { get; }
+        public ImmutableArray<Image>             Images               { get; }
 
         /// <summary>
         /// Its current types.
         /// </summary>
-        public CurrentTypes?                    CurrentTypes       { get; }
+        public CurrentTypes?                     CurrentTypes         { get; }
 
         /// <summary>
         /// The maximum current it measures.
         /// </summary>
-        public Ampere?                          MaxCurrent         { get; }
+        public Ampere?                           MaxCurrent           { get; }
 
         /// <summary>
         /// Its accuracy class, e.g. "B".
         /// </summary>
-        public String?                          AccuracyClass      { get; }
+        public String?                           AccuracyClass        { get; }
 
         /// <summary>
         /// What it measures, e.g. OBIS codes as "1-0:1.8.0", each once, ordered ordinally.
         /// </summary>
-        public ImmutableArray<String>           Measurands         { get; }
+        public ImmutableArray<String>            Measurands           { get; }
 
         /// <summary>
         /// How its meters sign their measurements, ordered by their identifications.
         /// </summary>
-        public ImmutableArray<SignatureMethod>  SignatureMethods   { get; }
+        public ImmutableArray<SignatureMethod>   SignatureMethods     { get; }
 
         /// <summary>
         /// Custom data.
         /// </summary>
-        public CustomDataNew?                   CustomData         { get; }
+        public CustomDataNew?                    CustomData           { get; }
 
         #endregion
 

@@ -68,6 +68,7 @@ See [common properties](README.md#common-properties). An EVSE does not write `eT
 | `standards` | `Standards` | `ImmutableArray<Standard>` | update/remove | The standards it conforms to, e.g. `PAS 1899:2022`; a set of names, each once, in their ordinal order. |
 | `floorLevel` | `FloorLevel` | `String?` | update/remove | The floor level it is on, e.g. in a car park, in the numbering shown there, e.g. `"-1"` or `"2B"`. |
 | `acceptedEMobilityProviderIds` | `AcceptedEMobilityProviderIds` | `ImmutableArray<EMobilityProvider_Id>` | update/remove | The [e-mobility providers](EMobilityProvider.md) whose contracts it accepts, e.g. `DE-GDF`, each once, in their ordinal order; they need not be in the roaming network. None: unknown. |
+| `iso15118Certificate` | `ISO15118Certificate` | `String?` | update/remove | Its ISO 15118 certificate, e.g. the PEM of the certificate its charging controller (SECC) proves itself with to vehicles for Plug & Charge, as it is given. It belongs to the single EVSE: no [template](EVSETemplate.md) gives it. |
 
 Absent values are left out; empty arrays and empty flags are not written.
 

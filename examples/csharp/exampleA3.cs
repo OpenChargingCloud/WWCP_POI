@@ -254,7 +254,7 @@ public static class ExampleA3
 
         return new (EnergyMeter_Id.Parse($"DE*GEF*M{S}*{E}"),
                     SerialNumber:  SerialNumber.Parse($"{Kind}M-2026-{S:D3}-{E}"),
-                    PublicKeys:    [ new EnergyMeterPublicKey(meterKey.ExportSubjectPublicKeyInfo()) ],
+                    PublicKeys:    [ new MeasurementPublicKey(meterKey.ExportSubjectPublicKeyInfo()) ],
                     TemplateIds:   [ EnergyMeterTemplate_Id.Parse($"DE*GEF*EMT_{Kind}") ]);
 
     }

@@ -212,6 +212,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  AcceptedEMobilityProviderIds   = "acceptedEMobilityProviderIds";
 
             /// <summary>
+            /// The property of its ISO 15118 certificate.
+            /// </summary>
+            public const String  ISO15118Certificate            = "iso15118Certificate";
+
+            /// <summary>
             /// The property of the identifications of its templates.
             /// </summary>
             public const String  TemplateIds                    = "templateIds";
@@ -327,6 +332,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<EMobilityProvider_Id>  AcceptedEMobilityProviderIds  { get; }
 
         /// <summary>
+        /// Its ISO 15118 certificate, e.g. the PEM of the certificate its charging controller (SECC) proves itself with to
+        /// vehicles for Plug &amp; Charge, as it is given. It belongs to the single EVSE: no template gives it.
+        /// </summary>
+        public String?                               ISO15118Certificate           { get; }
+
+        /// <summary>
         /// The EVSE templates it takes, each once, in its order: of every property they give, the first one giving it
         /// decides, unless it has its own. It names them; they do not name their members.
         /// </summary>
@@ -361,6 +372,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     IEnumerable<Standard>?               Standards                    = null,
                     String?                              FloorLevel                   = null,
                     IEnumerable<EMobilityProvider_Id>?   AcceptedEMobilityProviderIds = null,
+                    String?                              ISO15118Certificate          = null,
 
                     IEnumerable<EVSETemplate_Id>?        TemplateIds                  = null,
 
@@ -440,6 +452,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Standards                 = POIJSON.OrderedIds(Standards, $"standard of the EVSE '{Id}'");
             this.FloorLevel                = FloorLevel;
             this.AcceptedEMobilityProviderIds  = POIJSON.OrderedIds(AcceptedEMobilityProviderIds, $"accepted e-mobility provider of the EVSE '{Id}'");
+            this.ISO15118Certificate           = ISO15118Certificate;
             this.energyStatus        = new EnergyStatusRuntime(RaiseEnergyStatusChanged);
             this.priceStatus         = new PriceStatusRuntime (RaisePriceStatusChanged);
 
@@ -729,6 +742,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (AcceptedEMobilityProviderIds.Length > 0)
                 json.Add(PropertyKeys.AcceptedEMobilityProviderIds,  POIJSON.IdsToJSON(AcceptedEMobilityProviderIds));
 
+            if (ISO15118Certificate is not null)
+                json.Add(PropertyKeys.ISO15118Certificate,           ISO15118Certificate);
+
             if (TemplateIds.Length > 0)
                 json.Add(PropertyKeys.TemplateIds,                   POIJSON.IdsToJSON(TemplateIds));
 
@@ -832,7 +848,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseIds        (JSON, PropertyKeys.Standards, "standard", Standard.TryParse, out ImmutableArray<Standard> standards, out ErrorResponse) ||
                     !POIJSON.TryParseString     (JSON, PropertyKeys.FloorLevel,           "floor level",                  out var floorLevel,              out ErrorResponse) ||
                     !POIJSON.TryParseIds        (JSON, PropertyKeys.AcceptedEMobilityProviderIds, "accepted e-mobility provider identification",
-                                                 EMobilityProvider_Id.TryParse, out ImmutableArray<EMobilityProvider_Id> acceptedEMobilityProviderIds, out ErrorResponse))
+                                                 EMobilityProvider_Id.TryParse, out ImmutableArray<EMobilityProvider_Id> acceptedEMobilityProviderIds, out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, PropertyKeys.ISO15118Certificate,  "ISO 15118 certificate",        out var iso15118Certificate,     out ErrorResponse))
                 {
                     return false;
                 }
@@ -874,6 +891,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 standards,
                                 floorLevel,
                                 acceptedEMobilityProviderIds,
+                                iso15118Certificate,
                                 TemplateIds:  templateIds,
                                 DataSource:  dataSource,
                                 Created:     created,

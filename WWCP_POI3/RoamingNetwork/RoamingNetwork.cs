@@ -2358,8 +2358,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The error, when a certificate names an unknown release, manufacturer or model, or a hardware revision or firmware
-        /// version its model does not have, also of the energy meters it was issued with; when an energy meter names an
-        /// unknown release; or when a charging station, an energy meter or a charging station template names a certificate
+        /// version its model does not have, also of the energy meters it was issued with; when an energy meter, a charging
+        /// station or a charging station template names an unknown release; or when a charging station, an energy meter or a
+        /// charging station template names a certificate
         /// unknown or of the other kind, or a station or a meter one for another model or not covering its hardware revision
         /// and firmware version, or a meter of a station is none of the energy meters a certificate of the station was
         /// issued with: stations and meters as they are at runtime, with what their templates give them.
@@ -2383,6 +2384,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var assignment in energyMeter.TransparencySoftwareStatus)
                     if (!TransparencySoftware.ContainsKey(assignment.TransparencySoftwareId))
                         return $"The transparency software release '{assignment.TransparencySoftwareId}' of the energy meter '{energyMeter.Id}' is unknown in the roaming network!";
+
+            foreach (var chargingStationTemplate in chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationTemplates))
+                foreach (var assignment in chargingStationTemplate.TransparencySoftwareStatus)
+                    if (!TransparencySoftware.ContainsKey(assignment.TransparencySoftwareId))
+                        return $"The transparency software release '{assignment.TransparencySoftwareId}' of the charging station template '{chargingStationTemplate.Id}' is unknown in the roaming network!";
+
+            foreach (var chargingStation in chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EffectiveChargingStations))
+                foreach (var assignment in chargingStation.TransparencySoftwareStatus)
+                    if (!TransparencySoftware.ContainsKey(assignment.TransparencySoftwareId))
+                        return $"The transparency software release '{assignment.TransparencySoftwareId}' of the charging station '{chargingStation.Id}' is unknown in the roaming network!";
 
             foreach (var chargingStationTemplate in chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationTemplates))
                 foreach (var certificateId in chargingStationTemplate.CertificateIds)

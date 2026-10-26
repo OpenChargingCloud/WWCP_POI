@@ -631,6 +631,60 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region What_another_party_names_is_withdrawn_only_with_it()
+
+        /// <summary>
+        /// A manufacturer does not remove a model a charging station names, nor the roaming network operator the manufacturer:
+        /// the refusal says the change set withdraws what is still named. In one change set with the change of the charging
+        /// station operator naming it, which both sign, it is withdrawn (SPECIFICATION.md 4.1).
+        /// </summary>
+        [Test]
+        public void What_another_party_names_is_withdrawn_only_with_it()
+        {
+
+            var rn1        = NewNetwork();
+            var station    = rn1.ChargingStationOperators.Single().ChargingStations.Single();
+            var rno        = TestParties.Party(rn1);
+            var withdraws  = ": the change set withdraws it while it is still named; the party naming it changes first, or both sign one change set!";
+
+            var unnamed    = RoamingNetworkChange.Remove(ACME);
+            var together   = rn1.CreateChangeSet([ RoamingNetworkChange.RemoveProperty(station, "firmwareVersion"),
+                                                   RoamingNetworkChange.RemoveProperty(station, "hardwareRevision"),
+                                                   RoamingNetworkChange.RemoveProperty(station, "modelId"),
+                                                   RoamingNetworkChange.RemoveProperty(station, "manufacturerId"),
+                                                   unnamed ],
+                                                 CreatedAt: T0);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                // The model and the manufacturer the station names.
+                Assert.That(ErrorOf(rn1, TestParties.Party(ACME), RoamingNetworkChange.Remove(DC300, ACME)),
+                            Does.Contain("The model 'DC-300' of the charging station 'DE*GEF*S1' is unknown at its manufacturer 'ACME'" + withdraws));
+                Assert.That(ErrorOf(rn1, rno, unnamed),
+                            Does.Contain("The manufacturer 'ACME' of the charging station 'DE*GEF*S1' is unknown in the roaming network" + withdraws));
+
+                // A firmware version of the model the station runs.
+                Assert.That(ErrorOf(rn1, TestParties.Party(ACME), RoamingNetworkChange.UpdateProperty(rn1.ChargingStationManufacturers.Single().Models.Index[DC300], ACME, "firmwareVersions", new JArray("4.2", "4.3"), new JArray("4.2"))),
+                            Does.Contain("The firmware version '4.3' of the charging station 'DE*GEF*S1' is no firmware version of its model 'DC-300' of 'ACME'" + withdraws));
+
+                // What nobody names is withdrawn; a station naming what never was is refused, but withdraws nothing.
+                Assert.That(ErrorOf(rn1, TestParties.Party(ACME), RoamingNetworkChange.Remove(AC22, ACME)),  Is.Null);
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.UpdateProperty(station, "modelId", "DC-300", "DC-999")),
+                            Throws.ArgumentException.With.Message.Contains("is unknown at its manufacturer").And.Message.Not.Contains("withdraws"));
+
+                // With the change of the charging station operator, both signing it.
+                Assert.That(rn1.TryApplyChangeSet(together.SignedBy(rno),                               out _,      out var alone),  Is.False);
+                Assert.That(rn1.TryApplyChangeSet(together.SignedBy(rno).SignedBy(TestParties.Party(GEF)), out var rn2, out var error), Is.True, error);
+                Assert.That(rn2!.ChargingStationManufacturers.Ids,                                                                 Is.Empty);
+                Assert.That(rn2. ChargingStationOperators.Single().ChargingStations.Single().ManufacturerId,                         Is.Null);
+
+            }
+
+        }
+
+        #endregion
+
         #region Models_need_a_key_that_may_sign_models()
 
         [Test]

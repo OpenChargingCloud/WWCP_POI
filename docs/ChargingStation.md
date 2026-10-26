@@ -57,8 +57,13 @@ See [common properties](README.md#common-properties). A charging station does no
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | The hotline phone number, e.g. `"+49 3641 123456"`. |
 | `manufacturerId` | `ManufacturerId` | `ChargingStationManufacturer_Id?` | update/remove | A [ChargingStationManufacturer](ChargingStationManufacturer.md) of the roaming network; see [Manufacturer and model](#manufacturer-and-model). |
 | `modelId` | `ModelId` | `ChargingStationModel_Id?` | update/remove | A model of its manufacturer, e.g. `"Wallbox-22"`; only with its `manufacturerId`, see [Manufacturer and model](#manufacturer-and-model). |
-| `hardwareRevision` | `HardwareRevision` | `String?` | update/remove | The hardware revision it was built in: one of the `hardwareRevisions` of its model, only with its `modelId`, see [Manufacturer and model](#manufacturer-and-model). |
-| `firmwareVersion` | `FirmwareVersion` | `String?` | update/remove | The firmware version it runs: one of the `firmwareVersions` of its model, only with its `modelId`; a firmware update is a change of it its operator signs. |
+| `modelURL` | `ModelURL` | `URL?` | update/remove | The homepage of its model, e.g. with its data sheet. |
+| `serialNumber` | `SerialNumber` | `SerialNumber?` | update/remove | Its serial number, as its manufacturer marked it: taken as given, not trimmed and compared ordinally, case included; not empty and neither beginning nor ending with whitespace. It belongs to the single station: no [template](ChargingStationTemplate.md) gives it. |
+| `hardwareRevision` | `HardwareRevision` | `HardwareRevision?` | update/remove | The hardware revision it was built in: one of the `hardwareRevisions` of its model, only with its `modelId`, see [Manufacturer and model](#manufacturer-and-model). |
+| `firmwareVersion` | `FirmwareVersion` | `FirmwareVersion?` | update/remove | The firmware version it runs: one of the `firmwareVersions` of its model, only with its `modelId`; a firmware update is a change of it its operator signs. |
+| `transparencySoftwareStatus` | `TransparencySoftwareStatus` | [TransparencySoftwareAssignment](EnergyMeter.md#transparencysoftwarestatus)[] | update/remove | The transparency software releases for the measurements it signs, with their legal status, as an [energy meter](EnergyMeter.md#transparencysoftwarestatus) names them; ordered by `transparencySoftwareId` (ordinal), at most one per release, each a release of the roaming network. A [station proof](../SPECIFICATION.md#84-proofs) carries the releases it and its meters name. Omitted when empty. |
+| `signatureMethods` | `SignatureMethods` | [SignatureMethod](EnergyMeter.md#signaturemethods)[] | update/remove | How it signs measurements, e.g. `OCMF`; ordered by name (ordinal), each once. Omitted when empty. |
+| `publicKeys` | `PublicKeys` | [MeasurementPublicKey](EnergyMeter.md#publickeys)[] | update/remove | The public keys it signs measurements with, with their certificate chains, as an energy meter names its own; ordered by `@id` (ordinal), each once. They belong to the single station: no template gives them. Omitted when empty. |
 | `energyMeters` | `EnergyMeters` | `ImmutableArray<EnergyMeter>` | update/remove | Its own energy meters, not those of its EVSEs; see [energyMeters](#energymeters). |
 | `EVSEs` | `EVSEs` | `POICollection<EVSE_Id, EVSE>` | add/remove | Its EVSEs, embedded completely; see [EVSEs](#evses). |
 | `brands` | `Brands` | `POICollection<Brand_Id, Brand>` | update/remove | Brands it also appears under; see [brands](#brands). |
@@ -276,7 +281,10 @@ The station's status is set on its own; it is not calculated from the status of 
   pools; its EVSEs' `chargingTariffIds` must be tariffs of the operator; a [ChargingStationGroup](ChargingStationGroup.md)
   may only name stations of the operator.
 - In its roaming network: `manufacturerId` must name a manufacturer, `modelId` one of its models,
-  `hardwareRevision` and `firmwareVersion` one of the model's, and `parkingSpaceIds` parking spaces of the network.
+  `hardwareRevision` and `firmwareVersion` one of the model's, `parkingSpaceIds` parking spaces of the network, and
+  `transparencySoftwareStatus` releases of the network, at most one assignment per release.
+- `signatureMethods` and `publicKeys` must not name a value twice; a public key is read as an
+  [energy meter's](EnergyMeter.md#publickeys) is.
 - With the properties its templates give it, it must be valid as well, e.g. their `maxPower`; see
   [templates and effective members](README.md#templates-and-effective-members). Its `templateIds` must name charging
   station templates of the operator.

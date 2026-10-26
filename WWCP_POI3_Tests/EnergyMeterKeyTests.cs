@@ -137,10 +137,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var (key, certificate, ca) = CertifiedKey();
 
             var keys   = new[] {
-                             new EnergyMeterPublicKey(key, [ certificate, ca ]),
-                             new EnergyMeterPublicKey(KeyOf(SecObjectIdentifiers.SecP192r1)),
-                             new EnergyMeterPublicKey(KeyOf(SecObjectIdentifiers.SecP224k1)),
-                             new EnergyMeterPublicKey(KeyOf(TeleTrusTObjectIdentifiers.BrainpoolP256R1))
+                             new MeasurementPublicKey(key, [ certificate, ca ]),
+                             new MeasurementPublicKey(KeyOf(SecObjectIdentifiers.SecP192r1)),
+                             new MeasurementPublicKey(KeyOf(SecObjectIdentifiers.SecP224k1)),
+                             new MeasurementPublicKey(KeyOf(TeleTrusTObjectIdentifiers.BrainpoolP256R1))
                          };
 
             var rn1    = NewNetwork(new EnergyMeter(Meter1,
@@ -228,7 +228,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             String? Refused(JObject JSON)
             {
-                Assert.That(EnergyMeterPublicKey.TryParse(JSON, out _, out var error), Is.False, JSON.ToString());
+                Assert.That(MeasurementPublicKey.TryParse(JSON, out _, out var error), Is.False, JSON.ToString());
                 return error;
             }
 
@@ -243,7 +243,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(EnergyMeterPublicKey.TryParse(KeyJSON(keyId, key, certificate, ca), out var valid, out var error), Is.True, error);
+                Assert.That(MeasurementPublicKey.TryParse(KeyJSON(keyId, key, certificate, ca), out var valid, out var error), Is.True, error);
                 Assert.That(valid!.ToJSON(Embedded: true).ToString(),                                                Is.EqualTo(KeyJSON(keyId, key, certificate, ca).ToString()));
 
                 Assert.That(Refused(KeyJSON(new String('0', 64), key)),                               Does.Contain("is not the SHA-256"));
@@ -273,7 +273,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void Element_changes_add_a_key_and_a_signature_method_to_the_meter_of_an_EVSE()
         {
 
-            var key   = new EnergyMeterPublicKey(KeyOf(SecObjectIdentifiers.SecP192r1));
+            var key   = new MeasurementPublicKey(KeyOf(SecObjectIdentifiers.SecP192r1));
 
             var rn1   = NewNetwork(new EnergyMeter(Meter1, SignatureMethods: [ SignatureMethod.OCMF ], Created: Created));
             var rn2   = rn1.ApplyChangeSet(rn1.CreateSignedChangeSet([

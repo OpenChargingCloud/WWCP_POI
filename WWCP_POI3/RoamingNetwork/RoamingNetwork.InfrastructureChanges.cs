@@ -100,8 +100,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ChargingStation.PropertyKeys.HotlinePhoneNumber,
             ChargingStation.PropertyKeys.ManufacturerId,
             ChargingStation.PropertyKeys.ModelId,
+            ChargingStation.PropertyKeys.ModelURL,
+            ChargingStation.PropertyKeys.SerialNumber,
             ChargingStation.PropertyKeys.HardwareRevision,
             ChargingStation.PropertyKeys.FirmwareVersion,
+            ChargingStation.PropertyKeys.TransparencySoftwareStatus,
+            ChargingStation.PropertyKeys.SignatureMethods,
+            ChargingStation.PropertyKeys.PublicKeys,
             ChargingStation.PropertyKeys.EnergyMeters,
             ChargingStation.PropertyKeys.Brands,
             ChargingStation.PropertyKeys.OpeningTimes,
@@ -145,6 +150,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             EVSE.PropertyKeys.Standards,
             EVSE.PropertyKeys.FloorLevel,
             EVSE.PropertyKeys.AcceptedEMobilityProviderIds,
+            EVSE.PropertyKeys.ISO15118Certificate,
             EVSE.PropertyKeys.TemplateIds,
             EVSE.BasePropertyKeys.CustomData
         ];
@@ -166,7 +172,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The properties of a charging station a charging station template can give its members:
-        /// all but its identification, name, description, data source, custom data, templates, EVSEs and energy meters.
+        /// all but its identification, name, description, data source, custom data, templates, EVSEs, energy meters, serial
+        /// number and public keys.
         /// </summary>
         internal static readonly ImmutableArray<String> ChargingStationTemplateStationProperties = [
             ChargingStation.PropertyKeys.PhysicalReference,
@@ -175,8 +182,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ChargingStation.PropertyKeys.HotlinePhoneNumber,
             ChargingStation.PropertyKeys.ManufacturerId,
             ChargingStation.PropertyKeys.ModelId,
+            ChargingStation.PropertyKeys.ModelURL,
             ChargingStation.PropertyKeys.HardwareRevision,
             ChargingStation.PropertyKeys.FirmwareVersion,
+            ChargingStation.PropertyKeys.TransparencySoftwareStatus,
+            ChargingStation.PropertyKeys.SignatureMethods,
             ChargingStation.PropertyKeys.Brands,
             ChargingStation.PropertyKeys.OpeningTimes,
             ChargingStation.PropertyKeys.Images,
@@ -193,7 +203,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The properties of an EVSE an EVSE template can give its members:
-        /// all but its identification, name, description, data source, custom data, templates, energy meter and charging tariffs.
+        /// all but its identification, name, description, data source, custom data, templates, energy meter, charging tariffs
+        /// and ISO 15118 certificate.
         /// </summary>
         internal static readonly ImmutableArray<String> EVSETemplateEVSEProperties = [
             EVSE.PropertyKeys.PhysicalReference,

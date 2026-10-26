@@ -327,7 +327,7 @@ public static class ExampleA10
         String NameOf(String ChildArray, JToken? Id)
             => Proof.Given(ChildArray).SingleOrDefault(json => json["@id"]?.Value<String>() == Id?.Value<String>())?["name"]?["en"]?.Value<String>() ?? "an unknown manufacturer";
 
-        if (!EnergyMeterPublicKey.TryParse((JObject) meter["publicKeys"]![0]!, out var publicKey, out var error))
+        if (!MeasurementPublicKey.TryParse((JObject) meter["publicKeys"]![0]!, out var publicKey, out var error))
             Helpers.Fail(error);
 
         Console.WriteLine($"{station["@id"]}: {NameOf(RoamingNetwork.PropertyKeys.ChargingStationManufacturers, station["manufacturerId"])} {station["modelId"]}");

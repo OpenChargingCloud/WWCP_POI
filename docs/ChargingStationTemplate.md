@@ -55,8 +55,11 @@ The properties of a charging station it gives its members, each written and read
 | `hotline` | `HotlinePhoneNumber` | unless they have their own |
 | `manufacturerId` | `ManufacturerId` | unless they have their own; a manufacturer of the network |
 | `modelId` | `ModelId` | unless they have their own; a model of the manufacturer, named with it |
+| `modelURL` | `ModelURL` | unless they have their own |
 | `hardwareRevision` | `HardwareRevision` | unless they have their own; one of the `hardwareRevisions` of the model of the template, where it names one, and of each station |
 | `firmwareVersion` | `FirmwareVersion` | unless they have their own; one of the `firmwareVersions` of the model, as `hardwareRevision` |
+| `transparencySoftwareStatus` | `TransparencySoftwareStatus` | besides their own; of the same release their own; releases of the network |
+| `signatureMethods` | `SignatureMethods` | besides their own |
 | `openingTimes` | `OpeningTimes` | unless they have their own |
 | `accessibility` | `Accessibility` | unless they have their own |
 | `calibrationInfo` | `CalibrationInfo` | unless they have their own |
@@ -113,7 +116,8 @@ A template a station names can not be removed: update the station first, in the 
   twice; `chargingTariffId` must be a tariff of the operator; every effective charging station naming it must be valid.
 - In its roaming network: `manufacturerId` must name a manufacturer, `modelId` one of its models, `hardwareRevision`
   and `firmwareVersion`, where it names a model, one of the model's, and `parkingSpaceIds` parking spaces of the
-  network. Without a model, it gives a hardware revision or firmware version to stations of their own model.
+  network. Without a model, it gives a hardware revision or firmware version to stations of their own model. Its
+  `transparencySoftwareStatus` must name releases of the network, at most one assignment per release.
 - A change set applies each change to the embedded JSON of the operator and reads the operator again, so these
   rules hold after every single change.
 - `Add(chargingStationTemplate)` refuses a parent other than the operator; the template must not exist yet. It gets

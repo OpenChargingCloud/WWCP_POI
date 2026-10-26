@@ -150,64 +150,64 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// What it measures, e.g. the grid, a PV system or a battery.
         /// </summary>
-        public EnergyMeterRole?             Role            { get; }
+        public EnergyMeterRole?                                Role                          { get; }
 
         /// <summary>
         /// Its manufacturer, one of its roaming network.
         /// </summary>
-        public EnergyMeterManufacturer_Id?  ManufacturerId  { get; }
+        public EnergyMeterManufacturer_Id?                     ManufacturerId                { get; }
 
         /// <summary>
         /// Its model, as its manufacturer names it.
         /// </summary>
-        public EnergyMeterModel_Id?         ModelId         { get; }
+        public EnergyMeterModel_Id?                            ModelId                       { get; }
 
         /// <summary>
         /// The homepage of its model, e.g. with its data sheet.
         /// </summary>
-        public URL?     ModelURL           { get; }
+        public URL?                                            ModelURL                      { get; }
 
         /// <summary>
         /// Its serial number, as its manufacturer marked it.
         /// </summary>
-        public SerialNumber?  SerialNumber      { get; }
+        public SerialNumber?                                   SerialNumber                  { get; }
 
         /// <summary>
         /// The hardware revision it was built in, one of its model.
         /// </summary>
-        public HardwareRevision?  HardwareRevision  { get; }
+        public HardwareRevision?                               HardwareRevision              { get; }
 
         /// <summary>
         /// The firmware version it runs, one of its model.
         /// </summary>
-        public FirmwareVersion?   FirmwareVersion   { get; }
+        public FirmwareVersion?                                FirmwareVersion               { get; }
 
         /// <summary>
         /// The transparency software releases for its measurements, with their legal status, at most one per release.
         /// </summary>
-        public ImmutableArray<TransparencySoftwareAssignment>  TransparencySoftwareStatus  { get; }
+        public ImmutableArray<TransparencySoftwareAssignment>  TransparencySoftwareStatus    { get; }
 
         /// <summary>
         /// How it signs its measurements, e.g. OCMF; in the order of their names, each once.
         /// </summary>
-        public ImmutableArray<SignatureMethod>                 SignatureMethods            { get; }
+        public ImmutableArray<SignatureMethod>                 SignatureMethods              { get; }
 
         /// <summary>
         /// The public keys it signs its measurements with, with their certificate chains; in the order of their identifications.
         /// </summary>
-        public ImmutableArray<EnergyMeterPublicKey>            PublicKeys                  { get; }
+        public ImmutableArray<MeasurementPublicKey>            PublicKeys                    { get; }
 
         /// <summary>
         /// The certificates of conformity of its model, in its hardware revision and firmware version, of the roaming
         /// network, in the order of their identifications.
         /// </summary>
-        public ImmutableArray<ConformityCertificate_Id>        CertificateIds              { get; }
+        public ImmutableArray<ConformityCertificate_Id>        CertificateIds                { get; }
 
         /// <summary>
         /// The energy meter templates it takes, each once, in its order: of every property they give, the first one giving it
         /// decides, unless it has its own. It names them; they do not name their members.
         /// </summary>
-        public ImmutableArray<EnergyMeterTemplate_Id>          TemplateIds                 { get; }
+        public ImmutableArray<EnergyMeterTemplate_Id>          TemplateIds                   { get; }
 
         #endregion
 
@@ -216,34 +216,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Create a new energy meter.
         /// </summary>
-        public EnergyMeter(EnergyMeter_Id                              Id,
-                           I18NString?                                 Name                         = null,
-                           I18NString?                                 Description                  = null,
-                           EnergyMeterRole?                            Role                         = null,
-                           EnergyMeterManufacturer_Id?                 ManufacturerId               = null,
-                           EnergyMeterModel_Id?                        ModelId                      = null,
-                           URL?                                        ModelURL                     = null,
-                           SerialNumber?                               SerialNumber                 = null,
-                           HardwareRevision?                           HardwareRevision             = null,
-                           FirmwareVersion?                            FirmwareVersion              = null,
-                           IEnumerable<TransparencySoftwareAssignment>? TransparencySoftwareStatus  = null,
-                           IEnumerable<SignatureMethod>?               SignatureMethods             = null,
-                           IEnumerable<EnergyMeterPublicKey>?          PublicKeys                   = null,
-                           IEnumerable<ConformityCertificate_Id>?      CertificateIds               = null,
+        public EnergyMeter(EnergyMeter_Id                                Id,
+                           ImmutableI18NString?                          Name                         = null,
+                           ImmutableI18NString?                          Description                  = null,
+                           EnergyMeterRole?                              Role                         = null,
+                           EnergyMeterManufacturer_Id?                   ManufacturerId               = null,
+                           EnergyMeterModel_Id?                          ModelId                      = null,
+                           URL?                                          ModelURL                     = null,
+                           SerialNumber?                                 SerialNumber                 = null,
+                           HardwareRevision?                             HardwareRevision             = null,
+                           FirmwareVersion?                              FirmwareVersion              = null,
+                           IEnumerable<TransparencySoftwareAssignment>?  TransparencySoftwareStatus   = null,
+                           IEnumerable<SignatureMethod>?                 SignatureMethods             = null,
+                           IEnumerable<MeasurementPublicKey>?            PublicKeys                   = null,
+                           IEnumerable<ConformityCertificate_Id>?        CertificateIds               = null,
 
-                           IEnumerable<EnergyMeterTemplate_Id>?        TemplateIds                  = null,
+                           IEnumerable<EnergyMeterTemplate_Id>?          TemplateIds                  = null,
 
-                           Timestamped<EnergyMeterAdminStatusType>?    InitialAdminStatus           = null,
-                           Timestamped<EnergyMeterStatusType>?         InitialStatus                = null,
-                           UInt16?                                     MaxAdminStatusScheduleSize   = null,
-                           UInt16?                                     MaxStatusScheduleSize        = null,
+                           Timestamped<EnergyMeterAdminStatusType>?      InitialAdminStatus           = null,
+                           Timestamped<EnergyMeterStatusType>?           InitialStatus                = null,
+                           UInt16?                                       MaxAdminStatusScheduleSize   = null,
+                           UInt16?                                       MaxStatusScheduleSize        = null,
 
-                           String?                                     DataSource                   = null,
-                           DateTimeOffset?                             Created                      = null,
-                           DateTimeOffset?                             LastChange                   = null,
+                           String?                                       DataSource                   = null,
+                           DateTimeOffset?                               Created                      = null,
+                           DateTimeOffset?                               LastChange                   = null,
 
-                           CustomDataNew?                              CustomData                   = null,
-                           UserDefinedDictionary?                      InternalData                 = null)
+                           CustomDataNew?                                CustomData                   = null,
+                           UserDefinedDictionary?                        InternalData                 = null)
 
             : base(Id,
                    Name,
@@ -275,7 +275,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.FirmwareVersion  = FirmwareVersion;
             this.TransparencySoftwareStatus = TransparencySoftwareAssignment.Checked(TransparencySoftwareStatus, $"the energy meter '{Id}'");
             this.SignatureMethods = POIJSON.OrderedIds(SignatureMethods, $"signature method of the energy meter '{Id}'");
-            this.PublicKeys       = EnergyMeterPublicKey.Ordered(PublicKeys, $"public key of the energy meter '{Id}'");
+            this.PublicKeys       = MeasurementPublicKey.Ordered(PublicKeys, $"public key of the energy meter '{Id}'");
             this.CertificateIds   = POIJSON.OrderedIds(CertificateIds, $"certificate of the energy meter '{Id}'");
 
         }
@@ -468,7 +468,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseText  (JSON, PropertyKeys.HardwareRevision,     "hardware revision",         POI.HardwareRevision.TryParse, out POI.HardwareRevision? hardwareRevision, out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, PropertyKeys.FirmwareVersion,      "firmware version",          POI.FirmwareVersion. TryParse, out POI.FirmwareVersion?  firmwareVersion,  out ErrorResponse) ||
                     !POIJSON.TryParseIds<SignatureMethod>(JSON, PropertyKeys.SignatureMethods, "signature method",          SignatureMethod.TryParse,      out var signatureMethods, out ErrorResponse) ||
-                    !POIJSON.TryParseObjects<EnergyMeterPublicKey>(JSON, PropertyKeys.PublicKeys,      "public key",                EnergyMeterPublicKey.TryParse, out var publicKeys,       out ErrorResponse) ||
+                    !POIJSON.TryParseObjects<MeasurementPublicKey>(JSON, PropertyKeys.PublicKeys,      "public key",                MeasurementPublicKey.TryParse, out var publicKeys,       out ErrorResponse) ||
                     !POIJSON.TryParseIds    (JSON, PropertyKeys.CertificateIds,  "certificate identification", ConformityCertificate_Id.TryParse, out ImmutableArray<ConformityCertificate_Id> certificateIds, out ErrorResponse))
                 {
                     return false;
@@ -515,25 +515,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                EnergyMeter = new EnergyMeter(id,
-                                              name,
-                                              description,
-                                              role,
-                                              manufacturerId,
-                                              modelId,
-                                              modelURL,
-                                              serialNumber,
-                                              hardwareRevision,
-                                              firmwareVersion,
-                                              transparencySoftwareStatus,
-                                              signatureMethods,
-                                              publicKeys,
-                                              certificateIds,
-                                              TemplateIds:  templateIds,
-                                              DataSource:  dataSource,
-                                              Created:     created,
-                                              LastChange:  lastChange,
-                                              CustomData:  customData);
+                EnergyMeter = new EnergyMeter(
+                                  id,
+                                  name,
+                                  description,
+                                  role,
+                                  manufacturerId,
+                                  modelId,
+                                  modelURL,
+                                  serialNumber,
+                                  hardwareRevision,
+                                  firmwareVersion,
+                                  transparencySoftwareStatus,
+                                  signatureMethods,
+                                  publicKeys,
+                                  certificateIds,
+                                  TemplateIds:  templateIds,
+                                  DataSource:   dataSource,
+                                  Created:      created,
+                                  LastChange:   lastChange,
+                                  CustomData:   customData
+                              );
 
                 if (!TryCheckETagsOf(JSON, EnergyMeter, out ErrorResponse))
                 {

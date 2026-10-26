@@ -270,7 +270,9 @@ Checked by the constructor (so by `TryParse`) and again on the result of every c
   the releases of an energy meter's `transparencySoftwareStatus`;
   the `certificateIds` of charging stations and energy meters, each for their model, covering their hardware revision
   and firmware version, and every energy meter of a station one a certificate of the station names, where it names any.
-  So a referenced entity can not be removed.
+  So a referenced entity can not be removed, nor a party embedding it, also not by the RNO, while what names it stays:
+  the change set is refused, saying that it withdraws what is still named (SPECIFICATION.md 4.1). The party naming it
+  changes first, or both sign one change set with both changes.
 
 Checked when a change set is applied:
 

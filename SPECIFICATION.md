@@ -362,6 +362,13 @@ party removes everything it embeds, and needs no signature of the party. The RNO
 neither added nor removed: a change set that does MUST be refused. A roaming network without an
 RNO can not be changed where only the RNO may.
 
+**What another party names** is not withdrawn while it names it: a version MUST NOT name a party, a model, a hardware
+revision or a firmware version of a model, a transparency software release, a certificate, a grid connection point, a
+charging station or a parking space it does not hold, so a change set removing one of them, or a party embedding it,
+while another party still names it MUST be refused, also one of the RNO. The party naming it changes its data first, or
+both change it in one change set, which then needs the signatures of both: so the RNO removes a party another one still
+names only together with that party. A reader SHOULD say so when it refuses a change set for it.
+
 **When a server takes a change set**, to commit it or to let it wait (4.2), every key it counts MUST also be valid
 when the server takes it, by its clock, and its `createdAt` MUST NOT be later than then, a few minutes of clock skew
 aside: a `createdAt` chosen before lets no key sign once it expired. Made for another version than the head, it MUST

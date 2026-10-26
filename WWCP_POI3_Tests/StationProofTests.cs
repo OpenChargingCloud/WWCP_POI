@@ -362,6 +362,38 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
         #endregion
 
+        #region A_station_proof_gives_the_releases_the_station_names_itself()
+
+        [Test]
+        public void A_station_proof_gives_the_releases_the_station_names_itself()
+        {
+
+            var history  = RoamingNetworkHistory.Start(NewNetwork());
+            var station  = history.Head.RoamingNetwork.GetChargingStationOperatorById(GEF)!.ChargingStations.Single(chargingStation => chargingStation.Id == S1);
+
+            // The station signs measurements itself, displayed by Chargy 1.1; its energy meter names Chargy 1.0.
+            var result   = history.Commit(history.Head.RoamingNetwork.CreateSignedChangeSet(
+                                              [ RoamingNetworkChange.UpdateProperty(station, "transparencySoftwareStatus", null,
+                                                                                    new JArray(new TransparencySoftwareAssignment(Chargy11, LegalStatus.GermanCalibrationLaw).ToJSON(Embedded: true))) ],
+                                              CreatedAt: T0));
+
+            Assert.That(result.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), result.ErrorResponse);
+
+            Assert.That(history.TryGetChargingStationProof(S1, out var proof, out var error), Is.True, error);
+            Assert.That(proof!.TryCalculateETag(out var eTag, out error),                    Is.True, error);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(Ids(proof.Given("transparencySoftwareManufacturers", "transparencySoftware")), Is.EqualTo(new[] { "chargy-1.0", "chargy-1.1" }));
+                Assert.That(proof.Given("chargingStationOperators", "chargingPools", "chargingStations").Single()["transparencySoftwareStatus"]![0]!["transparencySoftwareId"]!.Value<String>(),
+                                                                                                           Is.EqualTo("chargy-1.1"));
+                Assert.That(proof.Verify(eTag, out error),                                                Is.True, error);
+            }
+
+        }
+
+        #endregion
+
         #region The_proof_of_an_EVSE_is_the_proof_of_its_station()
 
         [Test]

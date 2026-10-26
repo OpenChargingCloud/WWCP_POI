@@ -57,7 +57,7 @@ is replaced or removed as a whole ([below](#change-sets)).
 | `firmwareVersion` | `FirmwareVersion` | `FirmwareVersion` | via parent | The firmware version it runs: one of the `firmwareVersions` of its model, as `hardwareRevision`. |
 | `transparencySoftwareStatus` | `TransparencySoftwareStatus` | [TransparencySoftwareAssignment](#transparencysoftwarestatus)[] | via parent | The transparency software releases for its measurements, with their legal status; ordered by `transparencySoftwareId` (ordinal), at most one per release. Omitted when empty. |
 | `signatureMethods` | `SignatureMethods` | [SignatureMethod](#signaturemethods)[] | via parent | How it signs its measurements, e.g. `OCMF`; ordered by name (ordinal), each once. Omitted when empty. |
-| `publicKeys` | `PublicKeys` | [EnergyMeterPublicKey](#publickeys)[] | via parent | The public keys it signs its measurements with, with their certificate chains; ordered by `@id` (ordinal), each once. Omitted when empty. |
+| `publicKeys` | `PublicKeys` | [MeasurementPublicKey](#publickeys)[] | via parent | The public keys it signs its measurements with, with their certificate chains; ordered by `@id` (ordinal), each once. Omitted when empty. |
 | `certificateIds` | `CertificateIds` | `ImmutableArray<ConformityCertificate_Id>` | via parent | The [certificates](ConformityAssessmentBody.md#certificates) of its model of the network it names, each for its manufacturer and model and covering its `hardwareRevision` and `firmwareVersion`; ordered by identification (ordinal), each once. Omitted when empty. |
 | `templateIds` | `TemplateIds` | `ImmutableArray<EnergyMeterTemplate_Id>` | via parent | The [energy meter templates](EnergyMeterTemplate.md) it takes, each once, in its order, the first deciding; see [templates and groups](#templates-and-groups). |
 
@@ -161,7 +161,7 @@ knows yet. Two that differ in case only are the same.
 
 ## publicKeys
 
-`EnergyMeterPublicKey` ([source](../WWCP_POI3/RoamingNetwork/EnergyMeterManufacturer/EnergyMeter/EnergyMeterPublicKey.cs)):
+`MeasurementPublicKey` ([source](../WWCP_POI3/DataStructures/MeasurementPublicKey.cs)):
 a public key the meter signs with. Unlike the keys of the parties, it is not a COSE key: energy meters sign with
 curves COSE does not know, e.g. secp192r1 or secp224k1. It is the DER encoded SubjectPublicKeyInfo [RFC 5280],
 which names its algorithm and curve itself; an app or a transparency software shows it as the meter shows it, e.g.

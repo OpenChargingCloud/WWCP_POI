@@ -1239,9 +1239,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  UnknownEnergyMeterTemplateReference(allEnergyMeterTemplates, meterManufacturers, softwares, certificates) ??
                  UnknownEnergyMeterManufacturer(AllEffectiveEnergyMeters(operators.Values, gridOps.Values), meterManufacturers)) is String referenceError)
             {
-                ErrorResponse = referenceError;
+
+                // What the change set withdrew while another party still names it, a party, a model, a hardware revision or
+                // a firmware version of it, a release, a certificate, a grid connection point, a charging station or a parking
+                // space (SPECIFICATION.md 4.1): the references the change set leaves were resolved by the version before it,
+                // with the certificates it removed. The party naming it changes its data first, or both sign one change set.
+                var certificatesBefore = new Dictionary<ConformityCertificate_Id, ConformityCertificate>(this.certificates);
+
+                foreach (var (certificateId, certificate) in certificates)
+                    certificatesBefore[certificateId] = certificate;
+
+                ErrorResponse = referenceError == UnknownReference(manufacturers, gridOps.Values, operators, parkingOps, softwares, certificates, meterManufacturers) &&
+                                UnknownReference(chargingStationManufacturers.Index, gridOperators, chargingStationOperators.Index, parkingOperators.Index,
+                                                 this.transparencySoftware, certificatesBefore, energyMeterManufacturers.Index) is null
+
+                                    ? $"{referenceError.TrimEnd('!')}: the change set withdraws it while it is still named; the party naming it changes first, or both sign one change set!"
+                                    : referenceError;
+
                 return false;
+
             }
+
+            // The first reference of what the change set leaves the given entities do not resolve, in the order of the
+            // checks above.
+            String? UnknownReference(IReadOnlyDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>  Manufacturers,
+                                     IEnumerable<GridOperator>                                                         GridOperators,
+                                     IReadOnlyDictionary<ChargingStationOperator_Id,     ChargingStationOperator>      Operators,
+                                     IReadOnlyDictionary<ParkingOperator_Id,             ParkingOperator>              ParkingOperators,
+                                     IReadOnlyDictionary<TransparencySoftware_Id,        TransparencySoftware>         Softwares,
+                                     IReadOnlyDictionary<ConformityCertificate_Id,       ConformityCertificate>        Certificates,
+                                     IReadOnlyDictionary<EnergyMeterManufacturer_Id,     EnergyMeterManufacturer>      MeterManufacturers)
+
+                => UnknownManufacturer                (operators.Values, Manufacturers) ??
+                   UnknownGridConnectionPoint         (operators.Values, GridOperators) ??
+                   UnknownMaintainer                  (gridOps.Values,   Operators, ParkingOperators) ??
+                   UnknownChargingStation             (parkingOps.Values, Operators) ??
+                   UnknownParkingSpace                (operators.Values, ParkingOperators.Values) ??
+                   UnknownCertificateReference        (operators.Values, gridOps.Values, Softwares, Certificates, Manufacturers, MeterManufacturers) ??
+                   UnknownEnergyMeterTemplateReference(allEnergyMeterTemplates, MeterManufacturers, Softwares, Certificates) ??
+                   UnknownEnergyMeterManufacturer     (AllEffectiveEnergyMeters(operators.Values, gridOps.Values), MeterManufacturers);
 
             RoamingNetwork = new RoamingNetwork(
                                  Id,

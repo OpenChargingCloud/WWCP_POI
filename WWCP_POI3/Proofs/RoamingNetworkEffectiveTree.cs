@@ -287,9 +287,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region The transparency software releases its energy meters name, in their manufacturers
+            #region The transparency software releases it and its energy meters name, in their manufacturers
 
             var releaseIds     = energyMeters.SelectMany(energyMeter => energyMeter.TransparencySoftwareStatus).
+                                              Concat  (chargingStation.TransparencySoftwareStatus).
                                               Select  (assignment  => assignment.TransparencySoftwareId).
                                               ToHashSet();
 

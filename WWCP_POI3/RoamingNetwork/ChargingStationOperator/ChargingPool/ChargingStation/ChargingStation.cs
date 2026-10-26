@@ -134,6 +134,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  ModelId               = "modelId";
 
             /// <summary>
+            /// The property of the homepage of its model.
+            /// </summary>
+            public const String  ModelURL              = "modelURL";
+
+            /// <summary>
+            /// The property of its serial number.
+            /// </summary>
+            public const String  SerialNumber          = "serialNumber";
+
+            /// <summary>
             /// The property of its hardware revision.
             /// </summary>
             public const String  HardwareRevision      = "hardwareRevision";
@@ -142,6 +152,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// The property of its firmware version.
             /// </summary>
             public const String  FirmwareVersion       = "firmwareVersion";
+
+            /// <summary>
+            /// The property of its transparency software releases with their legal status.
+            /// </summary>
+            public const String  TransparencySoftwareStatus  = "transparencySoftwareStatus";
+
+            /// <summary>
+            /// The property of its signature methods.
+            /// </summary>
+            public const String  SignatureMethods      = "signatureMethods";
+
+            /// <summary>
+            /// The property of its public keys.
+            /// </summary>
+            public const String  PublicKeys            = "publicKeys";
 
             /// <summary>
             /// The property of its own energy meters.
@@ -241,57 +266,83 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The reference printed on the charging station, e.g. "Station 2".
         /// </summary>
-        public String?               PhysicalReference     { get; }
+        public String?                                         PhysicalReference             { get; }
 
         /// <summary>
         /// The address, when it differs from the one of its charging pool.
         /// </summary>
-        public Address?              Address               { get; }
+        public Address?                                        Address                       { get; }
 
         /// <summary>
         /// The geographical location, when it differs from the one of its charging pool.
         /// </summary>
-        public GeoCoordinate?        GeoLocation           { get; }
+        public GeoCoordinate?                                  GeoLocation                   { get; }
 
         /// <summary>
         /// The hotline phone number.
         /// </summary>
-        public PhoneNumber?          HotlinePhoneNumber    { get; }
+        public PhoneNumber?                                    HotlinePhoneNumber            { get; }
 
         /// <summary>
         /// The manufacturer, one of its roaming network.
         /// </summary>
-        public ChargingStationManufacturer_Id?  ManufacturerId  { get; }
+        public ChargingStationManufacturer_Id?                 ManufacturerId                { get; }
 
         /// <summary>
         /// The model, as its manufacturer names it.
         /// </summary>
-        public ChargingStationModel_Id?         ModelId         { get; }
+        public ChargingStationModel_Id?                        ModelId                       { get; }
+
+        /// <summary>
+        /// The homepage of its model, e.g. with its data sheet.
+        /// </summary>
+        public URL?                                            ModelURL                      { get; }
+
+        /// <summary>
+        /// Its serial number, as its manufacturer marked it. It belongs to the single charging station: no template gives it.
+        /// </summary>
+        public SerialNumber?                                   SerialNumber                  { get; }
 
         /// <summary>
         /// The hardware revision it was built in, one of its model, as a certificate names those it covers.
         /// </summary>
-        public HardwareRevision?                HardwareRevision { get; }
+        public HardwareRevision?                               HardwareRevision              { get; }
 
         /// <summary>
         /// The firmware version it runs, one of its model, as a certificate names those it covers.
         /// </summary>
-        public FirmwareVersion?                 FirmwareVersion { get; }
+        public FirmwareVersion?                                FirmwareVersion               { get; }
+
+        /// <summary>
+        /// The transparency software releases for the measurements it signs, with their legal status, at most one per release.
+        /// </summary>
+        public ImmutableArray<TransparencySoftwareAssignment>  TransparencySoftwareStatus    { get; }
+
+        /// <summary>
+        /// How it signs measurements, e.g. OCMF; in the order of their names, each once.
+        /// </summary>
+        public ImmutableArray<SignatureMethod>                 SignatureMethods              { get; }
+
+        /// <summary>
+        /// The public keys it signs measurements with, with their certificate chains; in the order of their identifications.
+        /// They belong to the single charging station: no template gives them.
+        /// </summary>
+        public ImmutableArray<MeasurementPublicKey>            PublicKeys                    { get; }
 
         /// <summary>
         /// The EVSEs, in the order of their identifications.
         /// </summary>
-        public POICollection<EVSE_Id, EVSE>  EVSEs         { get; }
+        public POICollection<EVSE_Id, EVSE>                    EVSEs                         { get; }
 
         /// <summary>
         /// Its own energy meters, in the order of their identifications; not those of its EVSEs.
         /// </summary>
-        public ImmutableArray<EnergyMeter>  EnergyMeters  { get; }
+        public ImmutableArray<EnergyMeter>                     EnergyMeters                  { get; }
 
         /// <summary>
         /// Its own energy meters and those of its EVSEs.
         /// </summary>
-        public IEnumerable<EnergyMeter>     AllEnergyMeters
+        public IEnumerable<EnergyMeter>                        AllEnergyMeters
             => EnergyMeters.Concat(EVSEs.SelectMany(evse => evse.AllEnergyMeters));
 
 
@@ -299,72 +350,72 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The brands it also appears under: its own, embedded completely, in the order of their identifications.
         /// Not those of its operator or of what it embeds; every level has brands of its own.
         /// </summary>
-        public POICollection<Brand_Id, Brand>  Brands  { get; }
+        public POICollection<Brand_Id, Brand>                  Brands                        { get; }
 
         /// <summary>
         /// When it is open; always, unless given.
         /// </summary>
-        public ImmutableOpeningTimes?  OpeningTimes  { get; }
+        public ImmutableOpeningTimes?                          OpeningTimes                  { get; }
 
 
         /// <summary>
         /// Its images, in their given order.
         /// </summary>
-        public ImmutableArray<Image>  Images  { get; }
+        public ImmutableArray<Image>                           Images                        { get; }
 
 
         /// <summary>
         /// The types of vehicles it charges, e.g. motorcycles, in the order of their names.
         /// </summary>
-        public ImmutableArray<VehicleType>             VehicleTypes          { get; }
+        public ImmutableArray<VehicleType>                     VehicleTypes                  { get; }
 
         /// <summary>
         /// The EU vehicle categories it charges, e.g. M1 for passenger cars, in the order of their names.
         /// </summary>
-        public ImmutableArray<EUVehicleCategory>       EUVehicleCategories   { get; }
+        public ImmutableArray<EUVehicleCategory>               EUVehicleCategories           { get; }
 
         /// <summary>
         /// Who may use it, when it differs from its charging pool, e.g. FreePubliclyAccessible.
         /// </summary>
-        public AccessibilityType?                      Accessibility         { get; }
+        public AccessibilityType?                              Accessibility                 { get; }
 
         /// <summary>
         /// Its features, in the order of their names.
         /// </summary>
-        public ImmutableArray<ChargingStationFeature>  Features              { get; }
+        public ImmutableArray<ChargingStationFeature>          Features                      { get; }
 
         /// <summary>
         /// Where to find information on the calibration of its energy meters.
         /// </summary>
-        public URL?                                    CalibrationInfo       { get; }
+        public URL?                                            CalibrationInfo               { get; }
 
         /// <summary>
         /// Where to find information on its certification, e.g. its conformity with calibration law.
         /// </summary>
-        public URL?                                    CertificationInfo     { get; }
+        public URL?                                            CertificationInfo             { get; }
 
         /// <summary>
         /// The power it can deliver at once, to all its EVSEs together: with load management often
         /// less than the sum of theirs, never more.
         /// </summary>
-        public Watt?                                   MaxPower              { get; }
+        public Watt?                                           MaxPower                      { get; }
 
         /// <summary>
         /// The parking spaces of the roaming network it charges at, in the order of their identifications.
         /// </summary>
-        public ImmutableArray<ParkingSpace_Id>         ParkingSpaceIds       { get; }
+        public ImmutableArray<ParkingSpace_Id>                 ParkingSpaceIds               { get; }
 
         /// <summary>
         /// The certificates of conformity of its model, in its hardware revision and firmware version, of the roaming
         /// network, in the order of their identifications.
         /// </summary>
-        public ImmutableArray<ConformityCertificate_Id> CertificateIds       { get; }
+        public ImmutableArray<ConformityCertificate_Id>        CertificateIds                { get; }
 
         /// <summary>
         /// The charging station templates it takes, each once, in its order: of every property they give, the first one giving it
         /// decides, unless it has its own. It names them; they do not name their members.
         /// </summary>
-        public ImmutableArray<ChargingStationTemplate_Id>  TemplateIds  { get; }
+        public ImmutableArray<ChargingStationTemplate_Id>      TemplateIds                   { get; }
 
         #endregion
 
@@ -373,45 +424,50 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Create a new charging station.
         /// </summary>
-        public ChargingStation(ChargingStation_Id                              Id,
-                               I18NString?                                     Name                         = null,
-                               I18NString?                                     Description                  = null,
-                               String?                                         PhysicalReference            = null,
-                               Address?                                        Address                      = null,
-                               GeoCoordinate?                                  GeoLocation                  = null,
-                               PhoneNumber?                                    HotlinePhoneNumber           = null,
-                               ChargingStationManufacturer_Id?                 ManufacturerId               = null,
-                               ChargingStationModel_Id?                        ModelId                      = null,
-                               HardwareRevision?                               HardwareRevision             = null,
-                               FirmwareVersion?                                FirmwareVersion              = null,
-                               IEnumerable<EVSE>?                              EVSEs                        = null,
-                               IEnumerable<EnergyMeter>?                       EnergyMeters                 = null,
-                               IEnumerable<Brand>?                             Brands                       = null,
-                               ImmutableOpeningTimes?                          OpeningTimes                 = null,
-                               IEnumerable<Image>?                             Images                       = null,
-                               IEnumerable<VehicleType>?                       VehicleTypes                 = null,
-                               AccessibilityType?                              Accessibility                = null,
-                               IEnumerable<ChargingStationFeature>?            Features                     = null,
-                               URL?                                            CalibrationInfo              = null,
-                               URL?                                            CertificationInfo            = null,
-                               Watt?                                           MaxPower                     = null,
-                               IEnumerable<ParkingSpace_Id>?                   ParkingSpaceIds              = null,
-                               IEnumerable<EUVehicleCategory>?                 EUVehicleCategories          = null,
-                               IEnumerable<ConformityCertificate_Id>?          CertificateIds               = null,
+        public ChargingStation(ChargingStation_Id                            Id,
+                               I18NString?                                   Name                         = null,
+                               I18NString?                                   Description                  = null,
+                               String?                                       PhysicalReference            = null,
+                               Address?                                      Address                      = null,
+                               GeoCoordinate?                                GeoLocation                  = null,
+                               PhoneNumber?                                  HotlinePhoneNumber           = null,
+                               ChargingStationManufacturer_Id?               ManufacturerId               = null,
+                               ChargingStationModel_Id?                      ModelId                      = null,
+                               URL?                                          ModelURL                     = null,
+                               SerialNumber?                                 SerialNumber                 = null,
+                               HardwareRevision?                             HardwareRevision             = null,
+                               FirmwareVersion?                              FirmwareVersion              = null,
+                               IEnumerable<TransparencySoftwareAssignment>?  TransparencySoftwareStatus   = null,
+                               IEnumerable<SignatureMethod>?                 SignatureMethods             = null,
+                               IEnumerable<MeasurementPublicKey>?            PublicKeys                   = null,
+                               IEnumerable<EVSE>?                            EVSEs                        = null,
+                               IEnumerable<EnergyMeter>?                     EnergyMeters                 = null,
+                               IEnumerable<Brand>?                           Brands                       = null,
+                               ImmutableOpeningTimes?                        OpeningTimes                 = null,
+                               IEnumerable<Image>?                           Images                       = null,
+                               IEnumerable<VehicleType>?                     VehicleTypes                 = null,
+                               AccessibilityType?                            Accessibility                = null,
+                               IEnumerable<ChargingStationFeature>?          Features                     = null,
+                               URL?                                          CalibrationInfo              = null,
+                               URL?                                          CertificationInfo            = null,
+                               Watt?                                         MaxPower                     = null,
+                               IEnumerable<ParkingSpace_Id>?                 ParkingSpaceIds              = null,
+                               IEnumerable<EUVehicleCategory>?               EUVehicleCategories          = null,
+                               IEnumerable<ConformityCertificate_Id>?        CertificateIds               = null,
 
-                               IEnumerable<ChargingStationTemplate_Id>?        TemplateIds                  = null,
+                               IEnumerable<ChargingStationTemplate_Id>?      TemplateIds                  = null,
 
-                               Timestamped<ChargingStationAdminStatusType>?    InitialAdminStatus           = null,
-                               Timestamped<ChargingStationStatusType>?         InitialStatus                = null,
-                               UInt16?                                         MaxAdminStatusScheduleSize   = null,
-                               UInt16?                                         MaxStatusScheduleSize        = null,
+                               Timestamped<ChargingStationAdminStatusType>?  InitialAdminStatus           = null,
+                               Timestamped<ChargingStationStatusType>?       InitialStatus                = null,
+                               UInt16?                                       MaxAdminStatusScheduleSize   = null,
+                               UInt16?                                       MaxStatusScheduleSize        = null,
 
-                               String?                                         DataSource                   = null,
-                               DateTimeOffset?                                 Created                      = null,
-                               DateTimeOffset?                                 LastChange                   = null,
+                               String?                                       DataSource                   = null,
+                               DateTimeOffset?                               Created                      = null,
+                               DateTimeOffset?                               LastChange                   = null,
 
-                               CustomDataNew?                                  CustomData                   = null,
-                               UserDefinedDictionary?                          InternalData                 = null)
+                               CustomDataNew?                                CustomData                   = null,
+                               UserDefinedDictionary?                        InternalData                 = null)
 
             : base(Id,
                    Name,
@@ -457,30 +513,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            this.PhysicalReference   = PhysicalReference;
-            this.Address             = Address;
-            this.GeoLocation         = GeoLocation;
-            this.HotlinePhoneNumber  = HotlinePhoneNumber;
-            this.ManufacturerId      = ManufacturerId;
-            this.ModelId             = ModelId;
-            this.HardwareRevision    = HardwareRevision;
-            this.FirmwareVersion     = FirmwareVersion;
-            this.EVSEs               = new (evses, evse => evse.Id, "EVSE", $"the charging station '{Id}'");
-            this.EnergyMeters        = EnergyMeter.Ordered(EnergyMeters, $"the charging station '{Id}'");
-            this.Brands              = new (Brands, brand => brand.Id, "brand", $"the charging station '{Id}'");
-            this.OpeningTimes        = OpeningTimes;
-            this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the charging station '{Id}'");
-            this.VehicleTypes        = POIJSON.OrderedIds(VehicleTypes,    $"vehicle type of the charging station '{Id}'");
-            this.EUVehicleCategories = POIJSON.OrderedIds(EUVehicleCategories, $"EU vehicle category of the charging station '{Id}'");
-            this.Accessibility       = Accessibility;
-            this.Features            = POIJSON.OrderedIds(Features,        $"feature of the charging station '{Id}'");
-            this.CalibrationInfo     = CalibrationInfo;
-            this.CertificationInfo   = CertificationInfo;
-            this.MaxPower            = MaxPower;
-            this.ParkingSpaceIds     = POIJSON.OrderedIds(ParkingSpaceIds, $"parking space of the charging station '{Id}'");
-            this.CertificateIds      = POIJSON.OrderedIds(CertificateIds,  $"certificate of the charging station '{Id}'");
-            this.energyStatus        = new EnergyStatusRuntime(RaiseEnergyStatusChanged);
-            this.priceStatus         = new PriceStatusRuntime (RaisePriceStatusChanged);
+            this.PhysicalReference           = PhysicalReference;
+            this.Address                     = Address;
+            this.GeoLocation                 = GeoLocation;
+            this.HotlinePhoneNumber          = HotlinePhoneNumber;
+            this.ManufacturerId              = ManufacturerId;
+            this.ModelId                     = ModelId;
+            this.ModelURL                    = ModelURL;
+            this.SerialNumber                = SerialNumber;
+            this.HardwareRevision            = HardwareRevision;
+            this.FirmwareVersion             = FirmwareVersion;
+            this.TransparencySoftwareStatus  = TransparencySoftwareAssignment.Checked(TransparencySoftwareStatus, $"the charging station '{Id}'");
+            this.SignatureMethods            = POIJSON.OrderedIds(SignatureMethods, $"signature method of the charging station '{Id}'");
+            this.PublicKeys                  = MeasurementPublicKey.Ordered(PublicKeys, $"public key of the charging station '{Id}'");
+            this.EVSEs                       = new (evses,  evse  => evse.Id,  "EVSE",  $"the charging station '{Id}'");
+            this.EnergyMeters                = EnergyMeter.Ordered(EnergyMeters,        $"the charging station '{Id}'");
+            this.Brands                      = new (Brands, brand => brand.Id, "brand", $"the charging station '{Id}'");
+            this.OpeningTimes                = OpeningTimes;
+            this.Images                      = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the charging station '{Id}'");
+            this.VehicleTypes                = POIJSON.OrderedIds(VehicleTypes,        $"vehicle type of the charging station '{Id}'");
+            this.EUVehicleCategories         = POIJSON.OrderedIds(EUVehicleCategories, $"EU vehicle category of the charging station '{Id}'");
+            this.Accessibility               = Accessibility;
+            this.Features                    = POIJSON.OrderedIds(Features,            $"feature of the charging station '{Id}'");
+            this.CalibrationInfo             = CalibrationInfo;
+            this.CertificationInfo           = CertificationInfo;
+            this.MaxPower                    = MaxPower;
+            this.ParkingSpaceIds             = POIJSON.OrderedIds(ParkingSpaceIds,     $"parking space of the charging station '{Id}'");
+            this.CertificateIds              = POIJSON.OrderedIds(CertificateIds,      $"certificate of the charging station '{Id}'");
+            this.energyStatus                = new EnergyStatusRuntime(RaiseEnergyStatusChanged);
+            this.priceStatus                 = new PriceStatusRuntime (RaisePriceStatusChanged);
 
         }
 
@@ -774,11 +835,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ModelId.HasValue)
                 json.Add(PropertyKeys.ModelId,              ModelId.Value.ToString());
 
+            if (ModelURL.HasValue)
+                json.Add(PropertyKeys.ModelURL,             ModelURL.Value.ToString());
+
+            if (SerialNumber.HasValue)
+                json.Add(PropertyKeys.SerialNumber,         SerialNumber.Value.ToString());
+
             if (HardwareRevision.HasValue)
                 json.Add(PropertyKeys.HardwareRevision,     HardwareRevision.Value.ToString());
 
             if (FirmwareVersion.HasValue)
                 json.Add(PropertyKeys.FirmwareVersion,      FirmwareVersion.Value.ToString());
+
+            if (TransparencySoftwareStatus.Length > 0)
+                json.Add(PropertyKeys.TransparencySoftwareStatus,  new JArray(TransparencySoftwareStatus.Select(assignment => assignment.ToJSON(Embedded: true))));
+
+            if (SignatureMethods.Length > 0)
+                json.Add(PropertyKeys.SignatureMethods,     POIJSON.IdsToJSON(SignatureMethods));
+
+            if (PublicKeys.Length > 0)
+                json.Add(PropertyKeys.PublicKeys,           new JArray(PublicKeys.Select(publicKey => publicKey.ToJSON(Embedded: true))));
 
             if (EnergyMeters.Length > 0)
                 json.Add(PropertyKeys.EnergyMeters,         new JArray(EnergyMeters.Select(energyMeter => energyMeter.ToJSON(Embedded: true))));
@@ -881,8 +957,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseText       (JSON, PropertyKeys.HotlinePhoneNumber, "hotline phone number",          PhoneNumber.TryParse,       out PhoneNumber? hotline,  out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.ManufacturerId,     "manufacturer identification",   ChargingStationManufacturer_Id.TryParse, out ChargingStationManufacturer_Id? manufacturerId, out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.ModelId,            "model identification",          ChargingStationModel_Id.       TryParse, out ChargingStationModel_Id?        modelId,        out ErrorResponse) ||
+                    !POIJSON.TryParseText       (JSON, PropertyKeys.ModelURL,           "model URL",                     URL.                           TryParse, out URL?                            modelURL,       out ErrorResponse) ||
+                    !POIJSON.TryParseText       (JSON, PropertyKeys.SerialNumber,       "serial number",                 POI.SerialNumber.              TryParse, out POI.SerialNumber?               serialNumber,   out ErrorResponse) ||
                     !POIJSON.TryParseText     (JSON, PropertyKeys.HardwareRevision,   "hardware revision", POI.HardwareRevision.TryParse, out POI.HardwareRevision? hardwareRevision,   out ErrorResponse) ||
-                    !POIJSON.TryParseText     (JSON, PropertyKeys.FirmwareVersion,    "firmware version", POI.FirmwareVersion.TryParse, out POI.FirmwareVersion?  firmwareVersion,    out ErrorResponse))
+                    !POIJSON.TryParseText     (JSON, PropertyKeys.FirmwareVersion,    "firmware version", POI.FirmwareVersion.TryParse, out POI.FirmwareVersion?  firmwareVersion,    out ErrorResponse) ||
+                    !POIJSON.TryParseObjects<TransparencySoftwareAssignment>(JSON, PropertyKeys.TransparencySoftwareStatus, "transparency software status", TransparencySoftwareAssignment.TryParse, out var transparencySoftwareStatus, out ErrorResponse) ||
+                    !POIJSON.TryParseIds<SignatureMethod>                   (JSON, PropertyKeys.SignatureMethods,           "signature method",             SignatureMethod.               TryParse, out var signatureMethods,           out ErrorResponse) ||
+                    !POIJSON.TryParseObjects<MeasurementPublicKey>          (JSON, PropertyKeys.PublicKeys,                 "public key",                   MeasurementPublicKey.          TryParse, out var publicKeys,                 out ErrorResponse))
                 {
                     return false;
                 }
@@ -954,8 +1035,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       hotline,
                                                       manufacturerId,
                                                       modelId,
+                                                      modelURL,
+                                                      serialNumber,
                                                       hardwareRevision,
                                                       firmwareVersion,
+                                                      transparencySoftwareStatus,
+                                                      signatureMethods,
+                                                      publicKeys,
                                                       evses,
                                                       energyMeters,
                                                       brands,

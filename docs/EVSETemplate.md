@@ -66,6 +66,8 @@ reads it, and each updated or removed by a change set:
 | `floorLevel` | `FloorLevel` | unless they have their own |
 | `acceptedEMobilityProviderIds` | `AcceptedEMobilityProviderIds` | besides their own |
 
+An EVSE's `iso15118Certificate` belongs to the single EVSE: no template gives it.
+
 "Unless they have their own": of the first of their templates giving one. "Besides their own": of all their templates;
 of elements with the same key the first template's. Absent values are left out, nor are an empty array or unspecified
 flags written.

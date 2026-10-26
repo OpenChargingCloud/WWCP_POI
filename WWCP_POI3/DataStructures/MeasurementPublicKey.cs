@@ -39,15 +39,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// A public key an energy meter signs its measurements with: its DER encoded SubjectPublicKeyInfo [RFC 5280],
+    /// A public key an energy meter or a charging station signs its measurements with: its DER encoded SubjectPublicKeyInfo [RFC 5280],
     /// identified by its SHA-256, and optionally the certificate chain of the key.
     /// </summary>
     /// <remarks>
-    /// Not a COSE key, as the keys of the parties are: energy meters sign with curves COSE does not know, e.g.
+    /// Not a COSE key, as the keys of the parties are: energy meters and charging stations sign with curves COSE does not know, e.g.
     /// secp192r1 or secp224k1. A SubjectPublicKeyInfo names its algorithm and curve itself, and a transparency
-    /// software, or an app, shows it as the meter shows it, e.g. as hexadecimal coordinates.
+    /// software, or an app, shows it as the meter or the station shows it, e.g. as hexadecimal coordinates.
     /// </remarks>
-    public sealed class EnergyMeterPublicKey : IEquatable<EnergyMeterPublicKey>
+    public sealed class MeasurementPublicKey : IEquatable<MeasurementPublicKey>
     {
 
         #region Data
@@ -55,7 +55,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The JSON-LD context of the object.
         /// </summary>
-        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/energyMeterPublicKey/v1";
+        public const String JSONLDContext = "https://open.charging.cloud/contexts/wwcp/roamingNetwork/measurementPublicKey/v1";
 
         #endregion
 
@@ -121,18 +121,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Constructor(s)
 
         /// <summary>
-        /// Create a new public key of an energy meter.
+        /// Create a new measurement public key.
         /// </summary>
         /// <param name="Key">The DER encoded SubjectPublicKeyInfo of the key.</param>
         /// <param name="CertificateChain">The optional certificate chain of the key, each certificate DER encoded, the one of the key first.</param>
-        public EnergyMeterPublicKey(IEnumerable<Byte>                 Key,
+        public MeasurementPublicKey(IEnumerable<Byte>                 Key,
                                     IEnumerable<IEnumerable<Byte>>?   CertificateChain   = null)
         {
 
-            var key = Key?.ToArray() ?? throw new ArgumentNullException(nameof(Key), "The public key of an energy meter must not be null!");
+            var key = Key?.ToArray() ?? throw new ArgumentNullException(nameof(Key), "A measurement public key must not be null!");
 
             if (!TryCheck(key,
-                          [.. (CertificateChain ?? []).Select(certificate => certificate?.ToArray() ?? throw new ArgumentException("A certificate of the public key of an energy meter must not be null!"))],
+                          [.. (CertificateChain ?? []).Select(certificate => certificate?.ToArray() ?? throw new ArgumentException("A certificate of a measurement public key must not be null!"))],
                           out var algorithm,
                           out var errorResponse))
             {
@@ -170,10 +170,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 subjectPublicKeyInfo = SubjectPublicKeyInfo.GetInstance(Asn1Object.FromByteArray(Key));
 
-                // Only DER, so that a key has one representation, one identification, and one ETag of its meter.
+                // Only DER, so that a key has one representation, one identification, and one ETag of its meter or station.
                 if (!subjectPublicKeyInfo.GetDerEncoded().AsSpan().SequenceEqual(Key))
                 {
-                    ErrorResponse = "The public key of an energy meter must be DER encoded!";
+                    ErrorResponse = "A measurement public key must be DER encoded!";
                     return false;
                 }
 
@@ -183,7 +183,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
             catch (Exception e)
             {
-                ErrorResponse = "The public key of an energy meter must be a SubjectPublicKeyInfo: " + e.Message;
+                ErrorResponse = "A measurement public key must be a SubjectPublicKeyInfo: " + e.Message;
                 return false;
             }
 
@@ -199,7 +199,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (certificate is null || !certificate.GetEncoded().AsSpan().SequenceEqual(CertificateChain[i]))
                     {
-                        ErrorResponse = $"The certificate {i + 1} of the public key of an energy meter must be DER encoded!";
+                        ErrorResponse = $"The certificate {i + 1} of a measurement public key must be DER encoded!";
                         return false;
                     }
 
@@ -208,7 +208,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
                 catch (Exception e)
                 {
-                    ErrorResponse = $"The certificate {i + 1} of the public key of an energy meter is invalid: " + e.Message;
+                    ErrorResponse = $"The certificate {i + 1} of a measurement public key is invalid: " + e.Message;
                     return false;
                 }
 
@@ -217,7 +217,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (certificates.Count > 0 &&
                 !certificates[0].SubjectPublicKeyInfo.GetDerEncoded().AsSpan().SequenceEqual(Key))
             {
-                ErrorResponse = "The first certificate of the public key of an energy meter must be the one of the key!";
+                ErrorResponse = "The first certificate of a measurement public key must be the one of the key!";
                 return false;
             }
 
@@ -229,7 +229,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
                 catch
                 {
-                    ErrorResponse = $"The certificate {i + 1} of the public key of an energy meter is not issued by the certificate {i + 2}!";
+                    ErrorResponse = $"The certificate {i + 1} of a measurement public key is not issued by the certificate {i + 2}!";
                     return false;
                 }
             }
@@ -254,9 +254,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
                 // The names of SEC 2 and of the Brainpool curves, as meters and transparency software name them,
                 // e.g. secp256r1 rather than prime256v1.
-                return SecNamedCurves.     GetName(curve) ??
+                return SecNamedCurves.      GetName(curve) ??
                        TeleTrusTNamedCurves.GetName(curve) ??
-                       ECNamedCurveTable.  GetName(curve) ??
+                       ECNamedCurveTable.   GetName(curve) ??
                        curve.Id;
             }
 
@@ -272,16 +272,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToJSON(Embedded = false, CustomEnergyMeterPublicKeySerializer = null)
+        #region ToJSON(Embedded = false, CustomMeasurementPublicKeySerializer = null)
 
         /// <summary>
         /// Return the JSON representation of this public key: its identification, its key as Base64 of its
         /// DER encoded SubjectPublicKeyInfo, and its certificate chain as Base64 of each DER encoded certificate.
         /// </summary>
         /// <param name="Embedded">Whether this data structure is embedded into another data structure.</param>
-        /// <param name="CustomEnergyMeterPublicKeySerializer">A delegate to serialize custom public key JSON objects.</param>
+        /// <param name="CustomMeasurementPublicKeySerializer">A delegate to serialize custom public key JSON objects.</param>
         public JObject ToJSON(Boolean                                                 Embedded                               = false,
-                              CustomJObjectSerializerDelegate<EnergyMeterPublicKey>?  CustomEnergyMeterPublicKeySerializer   = null)
+                              CustomJObjectSerializerDelegate<MeasurementPublicKey>?  CustomMeasurementPublicKeySerializer   = null)
         {
 
             var json = new JObject(
@@ -296,8 +296,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (CertificateChain.Length > 0)
                 json.Add(PropertyKeys.CertificateChain,  new JArray(CertificateChain.Select(certificate => Convert.ToBase64String(certificate.AsSpan()))));
 
-            return CustomEnergyMeterPublicKeySerializer is not null
-                       ? CustomEnergyMeterPublicKeySerializer(this, json)
+            return CustomMeasurementPublicKeySerializer is not null
+                       ? CustomMeasurementPublicKeySerializer(this, json)
                        : json;
 
         }
@@ -307,11 +307,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (static) TryParse(JSON, out PublicKey, out ErrorResponse)
 
         /// <summary>
-        /// Try to parse the given JSON representation of a public key of an energy meter.
+        /// Try to parse the given JSON representation of a measurement public key.
         /// Its identification must be the SHA-256 of its key, the key and the certificates canonical Base64 of DER.
         /// </summary>
         public static Boolean TryParse(JObject                                         JSON,
-                                       [NotNullWhen(true)]  out EnergyMeterPublicKey?  PublicKey,
+                                       [NotNullWhen(true)]  out MeasurementPublicKey?  PublicKey,
                                        [NotNullWhen(false)] out String?                ErrorResponse)
         {
 
@@ -323,7 +323,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (JSON[PropertyKeys.Context] is JToken context &&
                     !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
                 {
-                    ErrorResponse = $"The JSON-LD context of the public key of an energy meter must be '{JSONLDContext}'!";
+                    ErrorResponse = $"The JSON-LD context of a measurement public key must be '{JSONLDContext}'!";
                     return false;
                 }
 
@@ -336,7 +336,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (id is null || key is null)
                 {
-                    ErrorResponse = "A public key of an energy meter needs its identification and its key!";
+                    ErrorResponse = "A measurement public key needs its identification and its key!";
                     return false;
                 }
 
@@ -355,11 +355,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                EnergyMeterPublicKey publicKey;
+                MeasurementPublicKey publicKey;
 
                 try
                 {
-                    publicKey = new EnergyMeterPublicKey(keyBytes, certificates);
+                    publicKey = new MeasurementPublicKey(keyBytes, certificates);
                 }
                 catch (ArgumentException e)
                 {
@@ -369,7 +369,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (publicKey.Id != id)
                 {
-                    ErrorResponse = $"The identification '{id}' of a public key of an energy meter is not the SHA-256 '{publicKey.Id}' of its key!";
+                    ErrorResponse = $"The identification '{id}' of a measurement public key is not the SHA-256 '{publicKey.Id}' of its key!";
                     return false;
                 }
 
@@ -381,7 +381,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             catch (Exception e)
             {
                 PublicKey      = null;
-                ErrorResponse  = "Invalid public key of an energy meter: " + e.Message;
+                ErrorResponse  = "Invalid measurement public key: " + e.Message;
                 return false;
             }
 
@@ -402,7 +402,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (Convert.ToBase64String(bytes) != Text)
                 {
-                    ErrorResponse = $"The {Description} of an energy meter must be given as canonical Base64!";
+                    ErrorResponse = $"The {Description} of a measurement public key must be given as canonical Base64!";
                     return false;
                 }
 
@@ -413,7 +413,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
             catch (FormatException)
             {
-                ErrorResponse = $"The {Description} of an energy meter must be given as Base64!";
+                ErrorResponse = $"The {Description} of a measurement public key must be given as Base64!";
                 return false;
             }
 
@@ -427,7 +427,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The given keys in the order of their identifications, without one given twice.
         /// </summary>
-        internal static ImmutableArray<EnergyMeterPublicKey> Ordered(IEnumerable<EnergyMeterPublicKey>?  Keys,
+        internal static ImmutableArray<MeasurementPublicKey> Ordered(IEnumerable<MeasurementPublicKey>?  Keys,
                                                                      String                              Description)
 
             => [.. POIJSON.Distinct(Keys, key => key.Id, Description).
@@ -441,13 +441,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <inheritdoc/>
         public override Boolean Equals(Object? Object)
 
-            => Object is EnergyMeterPublicKey publicKey &&
+            => Object is MeasurementPublicKey publicKey &&
                Equals(publicKey);
 
         /// <summary>
         /// Compares two public keys by their JSON representations: the key and its certificate chain.
         /// </summary>
-        public Boolean Equals(EnergyMeterPublicKey? PublicKey)
+        public Boolean Equals(MeasurementPublicKey? PublicKey)
 
             => PublicKey is not null &&
                POIJSON.SameValue(ToJSON(Embedded: true), PublicKey.ToJSON(Embedded: true));

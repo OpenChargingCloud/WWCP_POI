@@ -148,67 +148,67 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The identification of the model, assigned by its manufacturer, e.g. "GD-DC300".
         /// </summary>
-        public ChargingStationModel_Id               Id                { get; }
+        public ChargingStationModel_Id                Id                   { get; }
 
         /// <summary>
         /// The multi-language name.
         /// </summary>
-        public ImmutableI18NString?                  Name              { get; }
+        public ImmutableI18NString?                   Name                 { get; }
 
         /// <summary>
         /// The multi-language description.
         /// </summary>
-        public ImmutableI18NString?                  Description       { get; }
+        public ImmutableI18NString?                   Description          { get; }
 
         /// <summary>
         /// The hardware revisions it was built in, each once, in their given order.
         /// </summary>
-        public ImmutableArray<HardwareRevision>      HardwareRevisions { get; }
+        public ImmutableArray<HardwareRevision>       HardwareRevisions    { get; }
 
         /// <summary>
         /// The firmware versions it ran, each once, in their given order.
         /// </summary>
-        public ImmutableArray<FirmwareVersion>       FirmwareVersions  { get; }
+        public ImmutableArray<FirmwareVersion>        FirmwareVersions     { get; }
 
         /// <summary>
         /// The URL of its product page.
         /// </summary>
-        public URL?                                  ProductURL        { get; }
+        public URL?                                   ProductURL           { get; }
 
         /// <summary>
         /// The URL of its datasheet.
         /// </summary>
-        public URL?                                  DatasheetURL      { get; }
+        public URL?                                   DatasheetURL         { get; }
 
         /// <summary>
         /// Images of it, e.g. photos, each URL once, in their given order.
         /// </summary>
-        public ImmutableArray<Image>                 Images            { get; }
+        public ImmutableArray<Image>                  Images               { get; }
 
         /// <summary>
         /// The maximum power of a charging station of it.
         /// </summary>
-        public Watt?                                 MaxPower          { get; }
+        public Watt?                                  MaxPower             { get; }
 
         /// <summary>
         /// Its current types.
         /// </summary>
-        public CurrentTypes?                         CurrentTypes      { get; }
+        public CurrentTypes?                          CurrentTypes         { get; }
 
         /// <summary>
         /// The types of its charging connectors, ordered by their identifications.
         /// </summary>
-        public ImmutableArray<ChargingConnectorType> ConnectorTypes    { get; }
+        public ImmutableArray<ChargingConnectorType>  ConnectorTypes       { get; }
 
         /// <summary>
         /// The number of EVSEs of a charging station of it.
         /// </summary>
-        public Int32?                                NumberOfEVSEs     { get; }
+        public Int32?                                 NumberOfEVSEs        { get; }
 
         /// <summary>
         /// Custom data.
         /// </summary>
-        public CustomDataNew?                        CustomData        { get; }
+        public CustomDataNew?                         CustomData           { get; }
 
         #endregion
 

@@ -71,22 +71,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The manufacturer of the energy meter model, as energy meters name it by their manufacturerId.
         /// </summary>
-        public EnergyMeterManufacturer_Id  ManufacturerId     { get; }
+        public EnergyMeterManufacturer_Id        ManufacturerId       { get; }
 
         /// <summary>
         /// The energy meter model, one of its manufacturer, as energy meters name it by their modelId.
         /// </summary>
-        public EnergyMeterModel_Id         ModelId            { get; }
+        public EnergyMeterModel_Id               ModelId              { get; }
 
         /// <summary>
         /// The hardware revisions of the model, each one of its model, in their given order.
         /// </summary>
-        public ImmutableArray<HardwareRevision>  HardwareRevisions  { get; }
+        public ImmutableArray<HardwareRevision>  HardwareRevisions    { get; }
 
         /// <summary>
         /// The firmware versions of the model, each one of its model, in their given order.
         /// </summary>
-        public ImmutableArray<FirmwareVersion>   FirmwareVersions   { get; }
+        public ImmutableArray<FirmwareVersion>   FirmwareVersions     { get; }
 
         #endregion
 

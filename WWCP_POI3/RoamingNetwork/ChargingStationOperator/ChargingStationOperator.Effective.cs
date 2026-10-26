@@ -1016,6 +1016,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     FloorLevel:                Templates.Single(EVSE.FloorLevel,                template => template.FloorLevel),
                                     AcceptedEMobilityProviderIds:  Templates.Union (EVSE.AcceptedEMobilityProviderIds, template => template.AcceptedEMobilityProviderIds),
 
+                                    // Its own ISO 15118 certificate, which no template gives.
+                                    ISO15118Certificate:       EVSE.ISO15118Certificate,
+
                                     // Its own tariffs, else the one of its templates; its energy meter is a device of its own,
                                     // with the properties of its energy meter templates.
                                     ChargingTariffIds:         Tariff.HasValue ? [ Tariff.Value.Id ] : EVSE.ChargingTariffIds,
@@ -1071,6 +1074,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     HotlinePhoneNumber:   Templates.Single(ChargingStation.HotlinePhoneNumber,  template => template.HotlinePhoneNumber),
                                     ManufacturerId:       Templates.Single(ChargingStation.ManufacturerId,      template => template.ManufacturerId),
                                     ModelId:              Templates.Single(ChargingStation.ModelId,             template => template.ModelId),
+                                    ModelURL:             Templates.Single(ChargingStation.ModelURL,            template => template.ModelURL),
                                     HardwareRevision:     Templates.Single(ChargingStation.HardwareRevision,    template => template.HardwareRevision),
                                     FirmwareVersion:      Templates.Single(ChargingStation.FirmwareVersion,     template => template.FirmwareVersion),
                                     OpeningTimes:         Templates.Single(ChargingStation.OpeningTimes,        template => template.OpeningTimes),
@@ -1087,6 +1091,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     Features:             Templates.Union (ChargingStation.Features,            template => template.Features),
                                     ParkingSpaceIds:      Templates.Union (ChargingStation.ParkingSpaceIds,     template => template.ParkingSpaceIds),
                                     CertificateIds:       Templates.Union (ChargingStation.CertificateIds,      template => template.CertificateIds),
+                                    SignatureMethods:     Templates.Union (ChargingStation.SignatureMethods,    template => template.SignatureMethods),
+                                    TransparencySoftwareStatus:  Templates.Union (ChargingStation.TransparencySoftwareStatus, template => template.TransparencySoftwareStatus,
+                                                                                  assignment => assignment.TransparencySoftwareId),
+
+                                    // Its own serial number and public keys, which no template gives.
+                                    SerialNumber:         ChargingStation.SerialNumber,
+                                    PublicKeys:           ChargingStation.PublicKeys,
 
                                     // Its effective EVSEs, and its very energy meters, with the properties of their templates.
                                     EVSEs:                EVSEs,

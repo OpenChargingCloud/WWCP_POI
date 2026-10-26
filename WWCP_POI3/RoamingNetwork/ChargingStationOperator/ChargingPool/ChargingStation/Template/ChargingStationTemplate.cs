@@ -124,6 +124,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  ModelId               = ChargingStation.PropertyKeys.ModelId;
 
             /// <summary>
+            /// The property of the homepage of the model of its members.
+            /// </summary>
+            public const String  ModelURL              = ChargingStation.PropertyKeys.ModelURL;
+
+            /// <summary>
             /// The property of the hardware revision of its members.
             /// </summary>
             public const String  HardwareRevision      = ChargingStation.PropertyKeys.HardwareRevision;
@@ -132,6 +137,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// The property of the firmware version of its members.
             /// </summary>
             public const String  FirmwareVersion       = ChargingStation.PropertyKeys.FirmwareVersion;
+
+            /// <summary>
+            /// The property of the transparency software releases of its members with their legal status.
+            /// </summary>
+            public const String  TransparencySoftwareStatus  = ChargingStation.PropertyKeys.TransparencySoftwareStatus;
+
+            /// <summary>
+            /// The property of the signature methods of its members.
+            /// </summary>
+            public const String  SignatureMethods      = ChargingStation.PropertyKeys.SignatureMethods;
 
             /// <summary>
             /// The property of the brands of its members.
@@ -256,6 +271,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ChargingStationModel_Id?                ModelId              { get; }
 
         /// <summary>
+        /// The homepage of the model of its members, unless they have their own.
+        /// </summary>
+        public URL?                                    ModelURL             { get; }
+
+        /// <summary>
         /// The hardware revision of its members, one of their model, unless they have their own.
         /// </summary>
         public HardwareRevision?                       HardwareRevision     { get; }
@@ -264,6 +284,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The firmware version of its members, one of their model, unless they have their own.
         /// </summary>
         public FirmwareVersion?                        FirmwareVersion      { get; }
+
+        /// <summary>
+        /// The transparency software releases of its members, with their legal status, at most one per release; besides
+        /// their own, theirs deciding for a release they name too.
+        /// </summary>
+        public ImmutableArray<TransparencySoftwareAssignment>  TransparencySoftwareStatus  { get; }
+
+        /// <summary>
+        /// How its members sign measurements, besides their own; in the order of their names, each once.
+        /// </summary>
+        public ImmutableArray<SignatureMethod>         SignatureMethods     { get; }
 
         /// <summary>
         /// Brands its members also appear under, besides their own, in the order of their identifications.
@@ -344,8 +375,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     PhoneNumber?                                        HotlinePhoneNumber           = null,
                                     ChargingStationManufacturer_Id?                     ManufacturerId               = null,
                                     ChargingStationModel_Id?                            ModelId                      = null,
+                                    URL?                                                ModelURL                     = null,
                                     HardwareRevision?                                   HardwareRevision             = null,
                                     FirmwareVersion?                                    FirmwareVersion              = null,
+                                    IEnumerable<TransparencySoftwareAssignment>?        TransparencySoftwareStatus   = null,
+                                    IEnumerable<SignatureMethod>?                       SignatureMethods             = null,
                                     IEnumerable<Brand>?                                 Brands                       = null,
                                     ImmutableOpeningTimes?                              OpeningTimes                 = null,
                                     IEnumerable<Image>?                                 Images                       = null,
@@ -387,8 +421,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.HotlinePhoneNumber   = HotlinePhoneNumber;
             this.ManufacturerId       = ManufacturerId;
             this.ModelId              = ModelId;
+            this.ModelURL             = ModelURL;
             this.HardwareRevision     = HardwareRevision;
             this.FirmwareVersion      = FirmwareVersion;
+            this.TransparencySoftwareStatus  = TransparencySoftwareAssignment.Checked(TransparencySoftwareStatus, $"the charging station template '{Id}'");
+            this.SignatureMethods     = POIJSON.OrderedIds(SignatureMethods, $"signature method of the charging station template '{Id}'");
             this.Brands               = new (Brands, brand => brand.Id, "brand", $"the charging station template '{Id}'");
             this.OpeningTimes         = OpeningTimes;
             this.Images               = POIJSON.Distinct  (Images, image => image.URL.ToString(), $"image of the charging station template '{Id}'");
@@ -465,11 +502,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ModelId.HasValue)
                 json.Add(PropertyKeys.ModelId,              ModelId.Value.ToString());
 
+            if (ModelURL.HasValue)
+                json.Add(PropertyKeys.ModelURL,             ModelURL.Value.ToString());
+
             if (HardwareRevision.HasValue)
                 json.Add(PropertyKeys.HardwareRevision,     HardwareRevision.Value.ToString());
 
             if (FirmwareVersion.HasValue)
                 json.Add(PropertyKeys.FirmwareVersion,      FirmwareVersion.Value.ToString());
+
+            if (TransparencySoftwareStatus.Length > 0)
+                json.Add(PropertyKeys.TransparencySoftwareStatus,  new JArray(TransparencySoftwareStatus.Select(assignment => assignment.ToJSON(Embedded: true))));
+
+            if (SignatureMethods.Length > 0)
+                json.Add(PropertyKeys.SignatureMethods,     POIJSON.IdsToJSON(SignatureMethods));
 
             if (Brands.Count > 0)
                 json.Add(PropertyKeys.Brands,               new JArray(Brands.Select(brand => brand.ToJSON(Embedded: true))));
@@ -566,8 +612,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseText       (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",          PhoneNumber.TryParse,       out PhoneNumber? hotline,  out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.ManufacturerId,      "manufacturer identification",   ChargingStationManufacturer_Id.TryParse, out ChargingStationManufacturer_Id? manufacturerId, out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.ModelId,             "model identification",          ChargingStationModel_Id.       TryParse, out ChargingStationModel_Id?        modelId,        out ErrorResponse) ||
+                    !POIJSON.TryParseText       (JSON, PropertyKeys.ModelURL,            "model URL",                     URL.                           TryParse, out URL?                            modelURL,       out ErrorResponse) ||
                     !POIJSON.TryParseText     (JSON, PropertyKeys.HardwareRevision,    "hardware revision", POI.HardwareRevision.TryParse, out POI.HardwareRevision? hardwareRevision,   out ErrorResponse) ||
-                    !POIJSON.TryParseText     (JSON, PropertyKeys.FirmwareVersion,     "firmware version", POI.FirmwareVersion.TryParse, out POI.FirmwareVersion?  firmwareVersion,    out ErrorResponse))
+                    !POIJSON.TryParseText     (JSON, PropertyKeys.FirmwareVersion,     "firmware version", POI.FirmwareVersion.TryParse, out POI.FirmwareVersion?  firmwareVersion,    out ErrorResponse) ||
+                    !POIJSON.TryParseObjects<TransparencySoftwareAssignment>(JSON, PropertyKeys.TransparencySoftwareStatus, "transparency software status", TransparencySoftwareAssignment.TryParse, out var transparencySoftwareStatus, out ErrorResponse) ||
+                    !POIJSON.TryParseIds<SignatureMethod>                   (JSON, PropertyKeys.SignatureMethods,           "signature method",             SignatureMethod.               TryParse, out var signatureMethods,           out ErrorResponse))
                 {
                     return false;
                 }
@@ -615,8 +664,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                 hotline,
                                                                 manufacturerId,
                                                                 modelId,
+                                                                modelURL,
                                                                 hardwareRevision,
                                                                 firmwareVersion,
+                                                                transparencySoftwareStatus,
+                                                                signatureMethods,
                                                                 brands,
                                                                 openingTimes,
                                                                 images,
