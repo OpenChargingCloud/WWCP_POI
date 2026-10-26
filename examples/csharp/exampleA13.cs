@@ -136,7 +136,8 @@ public static class ExampleA13
             => new (certificateId,
                     ExampleA2.stationMakerId,
                     ChargingStationModel_Id.Parse("GD-DC300"),
-                    "1.0",
+                    [ "1.0" ],
+                    [ "2.5.0" ],
                     [ chargyId ],
                     [],
                     DocumentURL:                    URL.Parse("https://www.ptb.example/certificates/PTB-2026-0042.pdf"),
@@ -237,16 +238,18 @@ public static class ExampleA13
 
             Console.WriteLine($"{meter["@id"]}, the energy meter of {ExampleA10.EVSEId}: {assignment["legalStatus"]}");
             Console.WriteLine($"  {release["name"]!["en"]} {release["version"]}, by {maker["name"]!["en"]}, {maker["craRole"]}, supported until {release["supportUntil"]}, vulnerabilities to {maker["vulnerabilityContact"]}, bill of materials {release["softwareBillOfMaterials"]}");
-            Console.WriteLine($"  {cert["@id"]} for the {cert["chargingStationModel"]} {cert["chargingStationModelVersion"]}, under the {cert["legislation"]}, by the {body["@id"]}, notified body {body["notifiedBodyNumber"]} for {String.Join(", ", body["notifiedFor"]!.Values<String>())}; signed by itself: {(body["signingKeys"] is JArray { Count: > 0 } ? "yes, it has keys of its own" : "no, the roaming network operator in its place")}");
+            Console.WriteLine($"  {cert["@id"]} for the {cert["chargingStationModel"]} {String.Join("/", cert["hardwareRevisions"]!.Values<String>())}, firmware {String.Join("/", cert["firmwareVersions"]!.Values<String>())}, under the {cert["legislation"]}, by the {body["@id"]}, notified body {body["notifiedBodyNumber"]} for {String.Join(", ", body["notifiedFor"]!.Values<String>())}; signed by itself: {(body["signingKeys"] is JArray { Count: > 0 } ? "yes, it has keys of its own" : "no, the roaming network operator in its place")}");
             // The model of the station, as its manufacturer states it, given by the proof with its manufacturer.
             var stationMaker  = proof.Given(RoamingNetwork.PropertyKeys.ChargingStationManufacturers).Single(json => json["@id"]?.Value<String>() == station["manufacturerId"]?.Value<String>());
             var model         = proof.GivenBelow(stationMaker, ChargingStationManufacturer.PropertyKeys.Models).Single(json => json["@id"]?.Value<String>() == station["modelId"]?.Value<String>());
-            var versions      = model["versions"]?.Values<String>().ToArray() ?? [];
+            var revision      = station["hardwareRevision"]?.Value<String>();
+            var firmware      = station["firmwareVersion"]?. Value<String>();
 
-            Console.WriteLine($"  the station {station["@id"]} is a {model["@id"]} of {stationMaker["@id"]}, {model["name"]?["en"]}, versions {String.Join("/", versions)}: " +
-                              (cert["chargingStationModel"]?.Value<String>() == model["@id"]?.Value<String>() && cert["chargingStationManufacturerId"]?.Value<String>() == stationMaker["@id"]?.Value<String>() && versions.Contains(cert["chargingStationModelVersion"]?.Value<String>())
-                                   ? "the model the certificate is for, in one of its versions"
-                                   : "another model"));
+            Console.WriteLine($"  the station {station["@id"]} is a {model["@id"]} of {stationMaker["@id"]}, {model["name"]?["en"]}, hardware {revision}, firmware {firmware}: " +
+                              (cert["chargingStationModel"]?.Value<String>() == model["@id"]?.Value<String>() && cert["chargingStationManufacturerId"]?.Value<String>() == stationMaker["@id"]?.Value<String>() &&
+                               cert["hardwareRevisions"]!.Values<String>().Contains(revision) && cert["firmwareVersions"]!.Values<String>().Contains(firmware)
+                                   ? "the model, hardware revision and firmware version the certificate is for"
+                                   : "another model, hardware revision or firmware version"));
 
         }
 

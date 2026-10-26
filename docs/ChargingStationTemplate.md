@@ -55,6 +55,8 @@ The properties of a charging station it gives its members, each written and read
 | `hotline` | `HotlinePhoneNumber` | unless they have their own |
 | `manufacturerId` | `ManufacturerId` | unless they have their own; a manufacturer of the network |
 | `modelId` | `ModelId` | unless they have their own; a model of the manufacturer, named with it |
+| `hardwareRevision` | `HardwareRevision` | unless they have their own; one of the `hardwareRevisions` of the model of the template, where it names one, and of each station |
+| `firmwareVersion` | `FirmwareVersion` | unless they have their own; one of the `firmwareVersions` of the model, as `hardwareRevision` |
 | `openingTimes` | `OpeningTimes` | unless they have their own |
 | `accessibility` | `Accessibility` | unless they have their own |
 | `calibrationInfo` | `CalibrationInfo` | unless they have their own |
@@ -108,8 +110,9 @@ A template a station names can not be removed: update the station first, in the 
   must not name a value twice, an image URL must not be given twice; `brandIds` are refused.
 - In its operator: the template belongs to the operator its identification names; a template must not be given
   twice; `chargingTariffId` must be a tariff of the operator; every effective charging station naming it must be valid.
-- In its roaming network: `manufacturerId` must name a manufacturer, `modelId` one of its models, and `parkingSpaceIds`
-  parking spaces of the network.
+- In its roaming network: `manufacturerId` must name a manufacturer, `modelId` one of its models, `hardwareRevision`
+  and `firmwareVersion`, where it names a model, one of the model's, and `parkingSpaceIds` parking spaces of the
+  network. Without a model, it gives a hardware revision or firmware version to stations of their own model.
 - A change set applies each change to the embedded JSON of the operator and reads the operator again, so these
   rules hold after every single change.
 - `Add(chargingStationTemplate)` refuses a parent other than the operator; the template must not exist yet. It gets
@@ -124,6 +127,7 @@ A template a station names can not be removed: update the station first, in the 
   "name":           { "en": "ACME Wallbox-22" },
   "manufacturerId": "ACME",
   "modelId":        "Wallbox-22",
+  "firmwareVersion": "1.0.0",
   "hotline":        "+49 800 4242424",
   "features":       [ "StatusInfoAvailable" ],
   "maxPower":       22000,

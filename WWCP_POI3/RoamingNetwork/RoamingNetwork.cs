@@ -2356,8 +2356,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => transparencySoftwareCertificates.TryGetValue(CertificateId, out Certificate);
 
         /// <summary>
-        /// The error, when a certificate names an unknown release, manufacturer, model or version of its model,
-        /// or an energy meter an unknown release, an unknown certificate, or a certificate not covering its release.
+        /// The error, when a certificate names an unknown release, manufacturer, model, or hardware revision or firmware
+        /// version of its model, or an energy meter an unknown release, an unknown certificate, or a certificate not
+        /// covering its release.
         /// </summary>
         internal static String? UnknownTransparencyReference(IEnumerable<EnergyMeter>                                                                EnergyMeters,
                                                              IReadOnlyDictionary<TransparencySoftware_Id,            TransparencySoftware>             TransparencySoftware,
@@ -2378,8 +2379,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!manufacturer.TryGetModel(certificate.ChargingStationModel, out var model))
                     return $"The charging station model '{certificate.ChargingStationModel}' of the certificate '{certificate.Id}' is unknown at its manufacturer '{manufacturer.Id}'!";
 
-                if (!model.HasVersion(certificate.ChargingStationModelVersion))
-                    return $"The version '{certificate.ChargingStationModelVersion}' of the certificate '{certificate.Id}' is no version of the charging station model '{model.Id}' of '{manufacturer.Id}'!";
+                foreach (var hardwareRevision in certificate.HardwareRevisions)
+                    if (!model.HasHardwareRevision(hardwareRevision))
+                        return $"The hardware revision '{hardwareRevision}' of the certificate '{certificate.Id}' is no hardware revision of the charging station model '{model.Id}' of '{manufacturer.Id}'!";
+
+                foreach (var firmwareVersion in certificate.FirmwareVersions)
+                    if (!model.HasFirmwareVersion(firmwareVersion))
+                        return $"The firmware version '{firmwareVersion}' of the certificate '{certificate.Id}' is no firmware version of the charging station model '{model.Id}' of '{manufacturer.Id}'!";
 
             }
 
@@ -2679,9 +2685,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => energyMeterManufacturers.TryGet(EnergyMeterManufacturerId, out EnergyMeterManufacturer);
 
         /// <summary>
-        /// The error, when an energy meter of the given operators names a manufacturer not among the given ones, or a
-        /// model without its manufacturer or one its manufacturer does not have: as it is at runtime, with what its
-        /// templates give it.
+        /// The error, when an energy meter of the given operators names a manufacturer not among the given ones, a model
+        /// without its manufacturer or one its manufacturer does not have, or a hardware revision or firmware version
+        /// without its model or one its model does not have: as it is at runtime, with what its templates give it.
         /// </summary>
         internal static String? UnknownEnergyMeterManufacturer(IEnumerable<EnergyMeter>                                                  EnergyMeters,
                                                                IReadOnlyDictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>  EnergyMeterManufacturers)
@@ -2691,6 +2697,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (UnknownEnergyMeterModel($"The energy meter '{energyMeter.Id}'",
                                             energyMeter.ManufacturerId,
                                             energyMeter.ModelId,
+                                            energyMeter.HardwareRevision,
+                                            energyMeter.FirmwareVersion,
                                             EnergyMeterManufacturers) is String error)
                 {
                     return error;
@@ -2701,15 +2709,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The error, when what is given names an unknown energy meter manufacturer, or a model without its manufacturer
-        /// or one its manufacturer does not have.
+        /// The error, when what is given names an unknown energy meter manufacturer, a model without its manufacturer or
+        /// one its manufacturer does not have, or a hardware revision or firmware version without its model or one its
+        /// model does not have.
         /// </summary>
         /// <param name="Named">What names them, in words, e.g. "The energy meter 'M1'".</param>
         private static String? UnknownEnergyMeterModel(String                                                                    Named,
                                                        EnergyMeterManufacturer_Id?                                               ManufacturerId,
                                                        EnergyMeterModel_Id?                                                      ModelId,
+                                                       String?                                                                   HardwareRevision,
+                                                       String?                                                                   FirmwareVersion,
                                                        IReadOnlyDictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>  EnergyMeterManufacturers)
         {
+
+            if (!ModelId.HasValue)
+            {
+
+                if (HardwareRevision is not null)
+                    return $"{Named} names the hardware revision '{HardwareRevision}' without its model!";
+
+                if (FirmwareVersion is not null)
+                    return $"{Named} names the firmware version '{FirmwareVersion}' without its model!";
+
+            }
 
             if (!ManufacturerId.HasValue)
                 return ModelId.HasValue
@@ -2719,8 +2741,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!EnergyMeterManufacturers.TryGetValue(ManufacturerId.Value, out var manufacturer))
                 return $"{Named} names the unknown energy meter manufacturer '{ManufacturerId}'!";
 
-            if (ModelId.HasValue && !manufacturer.TryGetModel(ModelId.Value, out _))
+            if (!ModelId.HasValue)
+                return null;
+
+            if (!manufacturer.TryGetModel(ModelId.Value, out var model))
                 return $"{Named} names the model '{ModelId}', unknown at its manufacturer '{manufacturer.Id}'!";
+
+            if (HardwareRevision is not null && !model.HasHardwareRevision(HardwareRevision))
+                return $"{Named} names the hardware revision '{HardwareRevision}', no hardware revision of its model '{model.Id}' of '{manufacturer.Id}'!";
+
+            if (FirmwareVersion is not null && !model.HasFirmwareVersion(FirmwareVersion))
+                return $"{Named} names the firmware version '{FirmwareVersion}', no firmware version of its model '{model.Id}' of '{manufacturer.Id}'!";
 
             return null;
 
@@ -2911,8 +2942,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The error, when an energy meter template gives its members an unknown manufacturer or model, an unknown
-        /// transparency software release or certificate, or a certificate not covering its release.
+        /// The error, when an energy meter template gives its members an unknown manufacturer or model, a hardware revision
+        /// or firmware version the model it gives them does not have, an unknown transparency software release or
+        /// certificate, or a certificate not covering its release. A revision or firmware version without a model it gives
+        /// members of their own model: they are checked as they are at runtime.
         /// </summary>
         internal static String? UnknownEnergyMeterTemplateReference(IEnumerable<EnergyMeterTemplate>                                                     EnergyMeterTemplates,
                                                                  IReadOnlyDictionary<EnergyMeterManufacturer_Id,         EnergyMeterManufacturer>          EnergyMeterManufacturers,
@@ -2926,6 +2959,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (UnknownEnergyMeterModel($"The energy meter template '{energyMeterTemplate.Id}'",
                                             energyMeterTemplate.ManufacturerId,
                                             energyMeterTemplate.ModelId,
+                                            energyMeterTemplate.ModelId.HasValue ? energyMeterTemplate.HardwareRevision : null,
+                                            energyMeterTemplate.ModelId.HasValue ? energyMeterTemplate.FirmwareVersion  : null,
                                             EnergyMeterManufacturers) is String modelError)
                 {
                     return modelError;
@@ -2981,8 +3016,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The error, when a charging station or a charging station template names a manufacturer the given ones do not
-        /// have, or a model without its manufacturer or one its manufacturer does not have: a charging station as it is at
-        /// runtime, with what its templates give it.
+        /// have, a model without its manufacturer or one its manufacturer does not have, or a hardware revision or firmware
+        /// version without its model or one its model does not have: a charging station as it is at runtime, with what its
+        /// templates give it. A template giving a revision or firmware version without a model gives it to stations of
+        /// their own model.
         /// </summary>
         internal static String? UnknownManufacturer(IEnumerable<ChargingStationOperator>                                              ChargingStationOperators,
                                                     IReadOnlyDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>  ChargingStationManufacturers)
@@ -2992,6 +3029,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (UnknownChargingStationModel($"the charging station template '{chargingStationTemplate.Id}'",
                                                 chargingStationTemplate.ManufacturerId,
                                                 chargingStationTemplate.ModelId,
+                                                chargingStationTemplate.ModelId.HasValue ? chargingStationTemplate.HardwareRevision : null,
+                                                chargingStationTemplate.ModelId.HasValue ? chargingStationTemplate.FirmwareVersion  : null,
                                                 ChargingStationManufacturers) is String error)
                 {
                     return error;
@@ -3001,6 +3040,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (UnknownChargingStationModel($"the charging station '{chargingStation.Id}'",
                                                 chargingStation.ManufacturerId,
                                                 chargingStation.ModelId,
+                                                chargingStation.HardwareRevision,
+                                                chargingStation.FirmwareVersion,
                                                 ChargingStationManufacturers) is String error)
                 {
                     return error;
@@ -3011,15 +3052,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The error, when what is given names an unknown charging station manufacturer, or a model without its
-        /// manufacturer or one its manufacturer does not have.
+        /// The error, when what is given names an unknown charging station manufacturer, a model without its manufacturer
+        /// or one its manufacturer does not have, or a hardware revision or firmware version without its model or one its
+        /// model does not have.
         /// </summary>
         /// <param name="Named">What names them, in words, e.g. "the charging station 'DE*GEF*S1'".</param>
         private static String? UnknownChargingStationModel(String                                                                            Named,
                                                            ChargingStationManufacturer_Id?                                                   ManufacturerId,
                                                            ChargingStationModel_Id?                                                          ModelId,
+                                                           String?                                                                           HardwareRevision,
+                                                           String?                                                                           FirmwareVersion,
                                                            IReadOnlyDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>  ChargingStationManufacturers)
         {
+
+            if (!ModelId.HasValue)
+            {
+
+                if (HardwareRevision is not null)
+                    return $"The hardware revision '{HardwareRevision}' of {Named} is named without its model!";
+
+                if (FirmwareVersion is not null)
+                    return $"The firmware version '{FirmwareVersion}' of {Named} is named without its model!";
+
+            }
 
             if (!ManufacturerId.HasValue)
                 return ModelId.HasValue
@@ -3029,8 +3084,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!ChargingStationManufacturers.TryGetValue(ManufacturerId.Value, out var manufacturer))
                 return $"The manufacturer '{ManufacturerId}' of {Named} is unknown in the roaming network!";
 
-            if (ModelId.HasValue && !manufacturer.TryGetModel(ModelId.Value, out _))
+            if (!ModelId.HasValue)
+                return null;
+
+            if (!manufacturer.TryGetModel(ModelId.Value, out var model))
                 return $"The model '{ModelId}' of {Named} is unknown at its manufacturer '{manufacturer.Id}'!";
+
+            if (HardwareRevision is not null && !model.HasHardwareRevision(HardwareRevision))
+                return $"The hardware revision '{HardwareRevision}' of {Named} is no hardware revision of its model '{model.Id}' of '{manufacturer.Id}'!";
+
+            if (FirmwareVersion is not null && !model.HasFirmwareVersion(FirmwareVersion))
+                return $"The firmware version '{FirmwareVersion}' of {Named} is no firmware version of its model '{model.Id}' of '{manufacturer.Id}'!";
 
             return null;
 

@@ -76,11 +76,12 @@ Committed, revision 5 of epoch 2: Chargy 1.5.0
 
 ## 3. The PTB certifies Chargy for the DC stations of GraphDefined
 
-The certificate `PTB-2026-0042` verifies Chargy 1.5.0 for the charging station model `GD-DC300`, version 1.0, of the
-charging station manufacturer `GraphDefined`, under the `MID`, with the URL of its document. It names the manufacturer,
-the model and the version: the network checks that `GraphDefined` stated the model with that version, as it did in
-[example A2](exampleA2.md#4-the-manufacturers-state-their-models); a certificate for a model or a version its
-manufacturer does not have is refused. Under the `CRA`, which the PTB is not notified for, it is refused before
+The certificate `PTB-2026-0042` verifies Chargy 1.5.0 for the charging station model `GD-DC300`, in its hardware
+revision 1.0 with the firmware version 2.5.0, of the charging station manufacturer `GraphDefined`, under the `MID`, with
+the URL of its document. It names the manufacturer, the model and the hardware revisions and firmware versions it
+covers: the network checks that `GraphDefined` stated the model with them, as it did in
+[example A2](exampleA2.md#4-the-manufacturers-state-their-models); a certificate for a model, a revision or a firmware
+version its manufacturer does not have is refused. Under the `CRA`, which the PTB is not notified for, it is refused before
 anybody signs it.
 
 ```
@@ -120,7 +121,7 @@ The station proof of DE*GEF*E1*1, revision 7: 139 KiB
 `Validate()` checks the proof against the trust anchor of epoch 2 and reads, for the energy meter of `DE*GEF*E1*1`, the
 release and its manufacturer, the certificate and its body, from the proof alone. The proof gives the manufacturer
 of the station with its model, as `GraphDefined` stated it, and none of its other models: the certificate is for that
-model, in one of its versions. The PTB has keys of its own, so it signed its certificate itself; the BSI is not given, as no meter of the
+model, in the hardware revision and the firmware version the station names. The PTB has keys of its own, so it signed its certificate itself; the BSI is not given, as no meter of the
 station names a certificate of it. A certificate for another model changes the root of the proof: its attestations no
 longer attest it.
 
@@ -128,8 +129,8 @@ longer attest it.
 The station proof, revision 7, by its attestations: valid
 DE*GEF*M1*1, the energy meter of DE*GEF*E1*1: germanCalibrationLaw
   Chargy Transparency Software 1.5.0, by GraphDefined GmbH, manufacturer, supported until 2031-10-24T13:37:35.335Z, vulnerabilities to security@graphdefined.example, bill of materials https://www.graphdefined.example/chargy/1.5.0/sbom.cdx.json
-  PTB-2026-0042 for the GD-DC300 1.0, under the MID, by the PTB, notified body 0102 for MID; signed by itself: yes, it has keys of its own
-  the station DE*GEF*S1 is a GD-DC300 of GraphDefined, GraphDefined DC 300, versions 1.0/1.1: the model the certificate is for, in one of its versions
+  PTB-2026-0042 for the GD-DC300 1.0, firmware 2.5.0, under the MID, by the PTB, notified body 0102 for MID; signed by itself: yes, it has keys of its own
+  the station DE*GEF*S1 is a GD-DC300 of GraphDefined, GraphDefined DC 300, hardware 1.0, firmware 2.5.0: the model, hardware revision and firmware version the certificate is for
 Conformity assessment bodies the proof gives: PTB
 The certificate for another model: Valid attestations of trusted keys of 0 holders attest the root effectiveTree:sha256:hex:b96df761… of the proof, not of 2!
 ```

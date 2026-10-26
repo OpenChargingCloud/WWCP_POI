@@ -62,7 +62,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
         private static readonly ChargingTariff_Id                   T3          = ChargingTariff_Id.                 Parse("DE*GEF*T3");
         private static readonly EVSETemplate_Id                     ET1         = EVSETemplate_Id.                   Parse("DE*GEF*ET1");
         private static readonly ChargingStationManufacturer_Id      ACME        = ChargingStationManufacturer_Id.    Parse("ACME");
-        private static readonly ChargingStationModel                Wallbox22   = new (ChargingStationModel_Id.Parse("Wallbox-22"), Versions: [ "1.0" ]);
+        private static readonly ChargingStationModel                Wallbox22   = new (ChargingStationModel_Id.Parse("Wallbox-22"), HardwareRevisions: [ "1.0" ], FirmwareVersions: [ "1.0.0" ]);
         private static readonly ChargingStationModel                Wallbox11   = new (ChargingStationModel_Id.Parse("Wallbox-11"));
         private static readonly EnergyMeterModel                    M500        = new (EnergyMeterModel_Id.Parse("M-500"), SignatureMethods: [ SignatureMethod.OCMF ]);
         private static readonly EnergyMeterModel                    M300        = new (EnergyMeterModel_Id.Parse("M-300"));
@@ -115,7 +115,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                                                                                      TransparencySoftwareCertificates:  [ new TransparencySoftwareCertificate(Cert1,
                                                                                                                                                               ACME,
                                                                                                                                                               Wallbox22.Id,
-                                                                                                                                                              "1.0",
+                                                                                                                                                              [ "1.0" ],
+                                                                                                                                                              [ "1.0.0" ],
                                                                                                                                                               [ Chargy10 ],
                                                                                                                                                               [ Chargy11 ],
                                                                                                                                                               DocumentNumber:                 "DE-123",

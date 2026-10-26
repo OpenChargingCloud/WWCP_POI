@@ -3,8 +3,9 @@
 A charging station manufacturer builds charging stations, e.g. wallboxes or DC chargers. In POI 3 it is a **party**:
 the roaming network operator (RNO) adds and removes it, with its keys; it changes its own properties and its
 **models** with its own keys. A charging station and a charging station template name their manufacturer
-(`manufacturerId`) and their model (`modelId`), a transparency software certificate the manufacturer, the model and
-the version of the model it was issued for. It is described by its name, its contact data and data licenses, as a
+(`manufacturerId`), their model (`modelId`) and its hardware revision and firmware version (`hardwareRevision`,
+`firmwareVersion`), a transparency software certificate the manufacturer, the model and the hardware revisions and
+firmware versions of the model it was issued for. It is described by its name, its contact data and data licenses, as a
 charging station operator is.
 
 The identification is a `ChargingStationManufacturer_Id`, any nonempty text, trimmed, compared case-insensitively,
@@ -93,7 +94,8 @@ ratings of the model; a charging station of it may have less, its EVSEs say what
 | `@id` | string | — | `ChargingStationModel_Id`: any nonempty text, trimmed, compared case-insensitively; unique within its manufacturer, so that two manufacturers may have models of the same identification. |
 | `name` | I18N text | update/remove | Its name. |
 | `description` | I18N text | update/remove | |
-| `versions` | string[] | update/remove | Its versions, e.g. hardware revisions, each once, none empty or beginning or ending with whitespace, in their given order. A certificate names one of them. |
+| `hardwareRevisions` | string[] | update/remove | The hardware revisions it was built in, each once, none empty or beginning or ending with whitespace, in their given order. A station names one of them, a certificate those it covers. |
+| `firmwareVersions` | string[] | update/remove | The firmware versions it ran, as `hardwareRevisions`. A station names one of them, a certificate those it covers. |
 | `productURL` | URL | update/remove | Its product page. |
 | `datasheetURL` | URL | update/remove | Its datasheet. |
 | `images` | object[] | update/remove | Images of it, as of a charging station; each URL once. |
@@ -108,7 +110,8 @@ ratings of the model; a charging station of it may have less, its EVSEs say what
   manufacturer as its parent, as its identification is unique within it only; one without is refused. Signed by the
   manufacturer, with a signing key that may sign `models`.
 - A model still named by a charging station, a charging station template or a certificate can not be removed, nor its
-  manufacturer.
+  manufacturer; nor a hardware revision or firmware version of it one of them names. `versions`, one list of before,
+  is no property of a model.
 
 
 ## Keys
@@ -123,12 +126,12 @@ names `models`, its own properties only when it names `party` (SPECIFICATION.md,
 
 | Who | JSON key | Rule |
 |---|---|---|
-| [ChargingStation](ChargingStation.md) | `manufacturerId`, `modelId` | `manufacturerId` names a manufacturer of the network; `modelId` a model of it, and only with its manufacturer: as the station is at runtime, with what its templates give it. |
-| [ChargingStationTemplate](ChargingStationTemplate.md) | `manufacturerId`, `modelId` | the same, of the template. |
-| transparency software certificate ([ConformityAssessmentBody](ConformityAssessmentBody.md#transparencysoftwarecertificates)) | `chargingStationManufacturerId`, `chargingStationModel`, `chargingStationModelVersion` | the manufacturer, mandatory, names a manufacturer of the network, the model one of its models, the version one of its `versions`. |
+| [ChargingStation](ChargingStation.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | `manufacturerId` names a manufacturer of the network; `modelId` a model of it, and only with its manufacturer; `hardwareRevision` one of the `hardwareRevisions` of the model, `firmwareVersion` one of its `firmwareVersions`, each only with the model: as the station is at runtime, with what its templates give it. |
+| [ChargingStationTemplate](ChargingStationTemplate.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | the same, of the template; a hardware revision or firmware version without a model it gives to stations of their own model, checked at them. |
+| transparency software certificate ([ConformityAssessmentBody](ConformityAssessmentBody.md#transparencysoftwarecertificates)) | `chargingStationManufacturerId`, `chargingStationModel`, `hardwareRevisions`, `firmwareVersions` | the manufacturer, mandatory, names a manufacturer of the network, the model one of its models, each hardware revision one of its `hardwareRevisions`, each firmware version one of its `firmwareVersions`. |
 
-The references are checked after every change set: a manufacturer or a model still named can not be removed, and a
-station, template or certificate can not name an unknown one.
+The references are checked after every change set: a manufacturer, a model, a hardware revision or a firmware version
+still named can not be removed, and a station, template or certificate can not name an unknown one.
 
 
 ## Change sets
@@ -171,8 +174,8 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Charging
   `uri` of its logo URLs; `telephone` and `hotline` phone numbers; `eMailAddress` an e-mail address; `logos` an
   array of at most one logo; `dataLicenses` licenses given completely, none twice; keys as of a party; a model `@id`
   only once.
-- Network level: every manufacturer and model a charging station, a charging station template or a certificate names
-  is one of the network, see [References](#references).
+- Network level: every manufacturer, model, hardware revision and firmware version a charging station, a charging
+  station template or a certificate names is one of the network, see [References](#references).
 
 
 ## Example
@@ -186,7 +189,8 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Charging
     {
       "@id": "GD-DC300",
       "name": { "en": "GraphDefined DC 300" },
-      "versions": [ "1.0", "1.1" ],
+      "hardwareRevisions": [ "1.0", "1.1" ],
+      "firmwareVersions": [ "2.4.0", "2.5.0" ],
       "datasheetURL": "https://stations.graphdefined.example/gd-dc300/datasheet.pdf",
       "maxPower": 300000,
       "currentTypes": [ "DC" ],

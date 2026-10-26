@@ -46,7 +46,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         private static readonly ChargingStationOperator_Id           GEF         = ChargingStationOperator_Id.         Parse("DE*GEF");
         private static readonly ChargingStationManufacturer_Id       ACME        = ChargingStationManufacturer_Id.     Parse("ACME");
-        private static readonly ChargingStationModel                 Wallbox22   = new (ChargingStationModel_Id.Parse("Wallbox-22"), Versions: [ "1.0" ]);
+        private static readonly ChargingStationModel                 Wallbox22   = new (ChargingStationModel_Id.Parse("Wallbox-22"), HardwareRevisions: [ "1.0" ], FirmwareVersions: [ "1.0.0" ]);
         private static readonly TransparencySoftwareManufacturer_Id  OCC         = TransparencySoftwareManufacturer_Id.Parse("OpenChargingCloud");
         private static readonly TransparencySoftwareManufacturer_Id  Other       = TransparencySoftwareManufacturer_Id.Parse("Other");
         private static readonly TransparencySoftware_Id              Chargy10    = TransparencySoftware_Id.            Parse("chargy-1.0");
@@ -100,7 +100,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             => new (Id,
                     ACME,
                     Wallbox22.Id,
-                    "1.0",
+                    [ "1.0" ],
+                    [ "1.0.0" ],
                     Verified,
                     Compatible,
                     DocumentNumber:                 "DE-123",
@@ -249,7 +250,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var certificate  = new TransparencySoftwareCertificate(Cert1,
                                                                    ACME,
                                                                    Wallbox22.Id,
-                                                                   "1.0",
+                                                                   [ "1.0" ],
+                                                                   [ "1.0.0" ],
                                                                    [ Chargy10 ],
                                                                    [],
                                                                    NotBefore:  DateTimeOffset.Parse("2026-01-01T01:00:00.1234567+01:00"),
@@ -494,7 +496,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var craCert       = new TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id.Parse("cra-1"),
                                                                     ACME,
                                                                     Wallbox22.Id,
-                                                                    "1.0",
+                                                                    [ "1.0" ],
+                                                                    [ "1.0.0" ],
                                                                     [ Chargy11 ],
                                                                     [],
                                                                     Legislation: ConformityAssessmentBody.Legislations.CRA);
@@ -549,7 +552,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var withBSI  = Apply(NewNetwork(), RoamingNetworkChange.Add(NewBody(BSI, [ ConformityAssessmentBody.Legislations.CRA ])));
             var rno      = TestParties.Party(withBSI);
             var craCert  = TransparencySoftwareCertificate_Id.Parse("cra-1");
-            var addCert  = RoamingNetworkChange.Add(new TransparencySoftwareCertificate(craCert, ACME, Wallbox22.Id, "1.0", [ Chargy11 ], [], Legislation: ConformityAssessmentBody.Legislations.CRA), BSI);
+            var addCert  = RoamingNetworkChange.Add(new TransparencySoftwareCertificate(craCert, ACME, Wallbox22.Id, [ "1.0" ], [ "1.0.0" ], [ Chargy11 ], [], Legislation: ConformityAssessmentBody.Legislations.CRA), BSI);
 
             // The network with the signing key of the roaming network operator certified for the given usage alone.
             RoamingNetwork CertifiedFor(String Usage)

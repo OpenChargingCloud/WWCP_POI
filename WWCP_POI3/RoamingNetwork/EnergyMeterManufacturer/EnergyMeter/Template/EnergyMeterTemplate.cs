@@ -109,9 +109,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  ModelURL                     = EnergyMeter.PropertyKeys.ModelURL;
 
             /// <summary>
-            /// The property of the hardware version of its members, as an energy meter writes it.
+            /// The property of the hardware revision of its members, as an energy meter writes it.
             /// </summary>
-            public const String  HardwareVersion              = EnergyMeter.PropertyKeys.HardwareVersion;
+            public const String  HardwareRevision             = EnergyMeter.PropertyKeys.HardwareRevision;
 
             /// <summary>
             /// The property of the firmware version of its members, as an energy meter writes it.
@@ -169,9 +169,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public URL?                                            ModelURL                    { get; }
 
         /// <summary>
-        /// The hardware version of its members, unless they have their own.
+        /// The hardware revision of its members, unless they have their own.
         /// </summary>
-        public String?                                         HardwareVersion             { get; }
+        public String?                                         HardwareRevision            { get; }
 
         /// <summary>
         /// The firmware version of its members, unless they have their own.
@@ -204,7 +204,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 EnergyMeterManufacturer_Id?                      ManufacturerId               = null,
                                 EnergyMeterModel_Id?                             ModelId                      = null,
                                 URL?                                             ModelURL                     = null,
-                                String?                                          HardwareVersion              = null,
+                                String?                                          HardwareRevision             = null,
                                 String?                                          FirmwareVersion              = null,
                                 IEnumerable<TransparencySoftwareAssignment>?     TransparencySoftwareStatus   = null,
                                 IEnumerable<SignatureMethod>?                    SignatureMethods             = null,
@@ -231,7 +231,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ManufacturerId              = ManufacturerId;
             this.ModelId                     = ModelId;
             this.ModelURL                    = ModelURL;
-            this.HardwareVersion             = HardwareVersion;
+            this.HardwareRevision            = HardwareRevision;
             this.FirmwareVersion             = FirmwareVersion;
             this.TransparencySoftwareStatus  = TransparencySoftwareAssignment.Checked(TransparencySoftwareStatus, $"the energy meter template '{Id}'");
             this.SignatureMethods            = POIJSON.OrderedIds(SignatureMethods,  $"signature method of the energy meter template '{Id}'");
@@ -290,8 +290,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ModelURL.HasValue)
                 json.Add(PropertyKeys.ModelURL,                    ModelURL.Value.ToString());
 
-            if (HardwareVersion is not null)
-                json.Add(PropertyKeys.HardwareVersion,             HardwareVersion);
+            if (HardwareRevision is not null)
+                json.Add(PropertyKeys.HardwareRevision,             HardwareRevision);
 
             if (FirmwareVersion is not null)
                 json.Add(PropertyKeys.FirmwareVersion,             FirmwareVersion);
@@ -358,7 +358,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseText  (JSON, PropertyKeys.ManufacturerId,   "manufacturer identification", EnergyMeterManufacturer_Id.TryParse, out EnergyMeterManufacturer_Id? manufacturerId, out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, PropertyKeys.ModelId,          "model identification",        EnergyMeterModel_Id.       TryParse, out EnergyMeterModel_Id?        modelId,        out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, PropertyKeys.ModelURL,         "model URL",                   URL.                       TryParse, out URL?                        modelURL,       out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, PropertyKeys.HardwareVersion,  "hardware version",            out var hardwareVersion,  out ErrorResponse) ||
+                    !POIJSON.TryParseString(JSON, PropertyKeys.HardwareRevision,  "hardware revision",            out var hardwareRevision,  out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, PropertyKeys.FirmwareVersion,  "firmware version",            out var firmwareVersion,  out ErrorResponse) ||
                     !POIJSON.TryParseObjects<TransparencySoftwareAssignment>(JSON, PropertyKeys.TransparencySoftwareStatus, "transparency software status", TransparencySoftwareAssignment.TryParse, out var transparencySoftwareStatus, out ErrorResponse) ||
                     !POIJSON.TryParseIds<SignatureMethod>                   (JSON, PropertyKeys.SignatureMethods,           "signature method",             SignatureMethod.               TryParse, out var signatureMethods,           out ErrorResponse))
@@ -382,7 +382,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         manufacturerId,
                                                         modelId,
                                                         modelURL,
-                                                        hardwareVersion,
+                                                        hardwareRevision,
                                                         firmwareVersion,
                                                         transparencySoftwareStatus,
                                                         signatureMethods,
@@ -434,7 +434,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     ManufacturerId:              Templates.Single(EnergyMeter.ManufacturerId,   template => template.ManufacturerId),
                                     ModelId:                     Templates.Single(EnergyMeter.ModelId,          template => template.ModelId),
                                     ModelURL:                    Templates.Single(EnergyMeter.ModelURL,         template => template.ModelURL),
-                                    HardwareVersion:             Templates.Single(EnergyMeter.HardwareVersion,  template => template.HardwareVersion),
+                                    HardwareRevision:             Templates.Single(EnergyMeter.HardwareRevision,  template => template.HardwareRevision),
                                     FirmwareVersion:             Templates.Single(EnergyMeter.FirmwareVersion,  template => template.FirmwareVersion),
 
                                     TransparencySoftwareStatus:  Templates.Union (EnergyMeter.TransparencySoftwareStatus, template => template.TransparencySoftwareStatus,

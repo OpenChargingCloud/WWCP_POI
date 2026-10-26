@@ -43,7 +43,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static readonly ImmutableHashSet<String> ChangeableTransparencySoftwareCertificateProperties = [
             TransparencySoftwareCertificate.PropertyKeys.Legislation,
             TransparencySoftwareCertificate.PropertyKeys.ChargingStationModel,
-            TransparencySoftwareCertificate.PropertyKeys.ChargingStationModelVersion,
+            TransparencySoftwareCertificate.PropertyKeys.HardwareRevisions,
+            TransparencySoftwareCertificate.PropertyKeys.FirmwareVersions,
             TransparencySoftwareCertificate.PropertyKeys.ChargingStationManufacturerId,
             TransparencySoftwareCertificate.PropertyKeys.DocumentNumber,
             TransparencySoftwareCertificate.PropertyKeys.DocumentURL,

@@ -38,9 +38,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// and its identification, which is unique within its manufacturer.
     /// </summary>
     /// <remarks>
-    /// Its manufacturer states it and signs its changes. Its versions are the hardware versions it was built in, as a
-    /// certificate names the one it covers. Its technical data are the ratings of the model in their base units: maxPower
-    /// in W. A charging station of it may have less, its EVSEs name what they have.
+    /// Its manufacturer states it and signs its changes. Its hardware revisions are those it was built in, its firmware
+    /// versions those it ran: a charging station of it names one of each, a certificate those it covers. Its technical
+    /// data are the ratings of the model in their base units: maxPower in W. A charging station of it may have less, its
+    /// EVSEs name what they have.
     /// </remarks>
     public sealed class ChargingStationModel
     {
@@ -85,9 +86,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  Description       = "description";
 
             /// <summary>
-            /// The property of its versions.
+            /// The property of its hardware revisions.
             /// </summary>
-            public const String  Versions          = "versions";
+            public const String  HardwareRevisions = "hardwareRevisions";
+
+            /// <summary>
+            /// The property of its firmware versions.
+            /// </summary>
+            public const String  FirmwareVersions  = "firmwareVersions";
 
             /// <summary>
             /// The property of the URL of its product page.
@@ -155,9 +161,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableI18NString?                  Description       { get; }
 
         /// <summary>
-        /// Its versions, e.g. hardware revisions, each once, in their given order.
+        /// The hardware revisions it was built in, each once, in their given order.
         /// </summary>
-        public ImmutableArray<String>                Versions          { get; }
+        public ImmutableArray<String>                HardwareRevisions { get; }
+
+        /// <summary>
+        /// The firmware versions it ran, each once, in their given order.
+        /// </summary>
+        public ImmutableArray<String>                FirmwareVersions  { get; }
 
         /// <summary>
         /// The URL of its product page.
@@ -209,7 +220,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Id">The identification of the model, unique within its manufacturer.</param>
         /// <param name="Name">The multi-language name.</param>
         /// <param name="Description">The multi-language description.</param>
-        /// <param name="Versions">Its versions, e.g. hardware revisions.</param>
+        /// <param name="HardwareRevisions">The hardware revisions it was built in.</param>
+        /// <param name="FirmwareVersions">The firmware versions it ran.</param>
         /// <param name="ProductURL">The URL of its product page.</param>
         /// <param name="DatasheetURL">The URL of its datasheet.</param>
         /// <param name="Images">Images of it, e.g. photos.</param>
@@ -219,17 +231,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="NumberOfEVSEs">The number of EVSEs of a charging station of it.</param>
         /// <param name="CustomData">Custom data.</param>
         public ChargingStationModel(ChargingStationModel_Id              Id,
-                                    ImmutableI18NString?                 Name             = null,
-                                    ImmutableI18NString?                 Description      = null,
-                                    IEnumerable<String>?                 Versions         = null,
-                                    URL?                                 ProductURL       = null,
-                                    URL?                                 DatasheetURL     = null,
-                                    IEnumerable<Image>?                  Images           = null,
-                                    Watt?                                MaxPower         = null,
-                                    CurrentTypes?                        CurrentTypes     = null,
-                                    IEnumerable<ChargingConnectorType>?  ConnectorTypes   = null,
-                                    Int32?                               NumberOfEVSEs    = null,
-                                    CustomDataNew?                       CustomData       = null)
+                                    ImmutableI18NString?                 Name              = null,
+                                    ImmutableI18NString?                 Description       = null,
+                                    IEnumerable<String>?                 HardwareRevisions = null,
+                                    IEnumerable<String>?                 FirmwareVersions  = null,
+                                    URL?                                 ProductURL        = null,
+                                    URL?                                 DatasheetURL      = null,
+                                    IEnumerable<Image>?                  Images            = null,
+                                    Watt?                                MaxPower          = null,
+                                    CurrentTypes?                        CurrentTypes      = null,
+                                    IEnumerable<ChargingConnectorType>?  ConnectorTypes    = null,
+                                    Int32?                               NumberOfEVSEs     = null,
+                                    CustomDataNew?                       CustomData        = null)
         {
 
             if (MaxPower?.Value <= 0)
@@ -238,32 +251,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (NumberOfEVSEs < 1)
                 throw new ArgumentException($"The number of EVSEs of the charging station model '{Id}' must be at least one!", nameof(NumberOfEVSEs));
 
-            this.Id              = Id;
-            this.Name            = Name;
-            this.Description     = Description;
-            this.Versions        = ModelVersions.Of(Versions, $"the charging station model '{Id}'");
-            this.ProductURL      = ProductURL;
-            this.DatasheetURL    = DatasheetURL;
-            this.Images          = POIJSON.Distinct  (Images, image => image.URL.ToString(), $"image of the charging station model '{Id}'");
-            this.MaxPower        = MaxPower;
-            this.CurrentTypes    = CurrentTypes == POI.CurrentTypes.Unspecified ? null : CurrentTypes;
-            this.ConnectorTypes  = POIJSON.OrderedIds(ConnectorTypes, $"connector type of the charging station model '{Id}'");
-            this.NumberOfEVSEs   = NumberOfEVSEs;
-            this.CustomData      = CustomData;
+            this.Id                = Id;
+            this.Name              = Name;
+            this.Description       = Description;
+            this.HardwareRevisions = ModelVersions.Of(HardwareRevisions, "hardware revision", $"the charging station model '{Id}'");
+            this.FirmwareVersions  = ModelVersions.Of(FirmwareVersions,  "firmware version",  $"the charging station model '{Id}'");
+            this.ProductURL        = ProductURL;
+            this.DatasheetURL      = DatasheetURL;
+            this.Images            = POIJSON.Distinct  (Images, image => image.URL.ToString(), $"image of the charging station model '{Id}'");
+            this.MaxPower          = MaxPower;
+            this.CurrentTypes      = CurrentTypes == POI.CurrentTypes.Unspecified ? null : CurrentTypes;
+            this.ConnectorTypes    = POIJSON.OrderedIds(ConnectorTypes, $"connector type of the charging station model '{Id}'");
+            this.NumberOfEVSEs     = NumberOfEVSEs;
+            this.CustomData        = CustomData;
 
         }
 
         #endregion
 
 
-        #region HasVersion(Version)
+        #region HasHardwareRevision(HardwareRevision)
 
         /// <summary>
-        /// Whether the given version is one of its versions.
+        /// Whether the given hardware revision is one of its hardware revisions.
         /// </summary>
-        public Boolean HasVersion(String Version)
+        public Boolean HasHardwareRevision(String HardwareRevision)
 
-            => Versions.Contains(Version, StringComparer.Ordinal);
+            => HardwareRevisions.Contains(HardwareRevision, StringComparer.Ordinal);
+
+        #endregion
+
+        #region HasFirmwareVersion(FirmwareVersion)
+
+        /// <summary>
+        /// Whether the given firmware version is one of its firmware versions.
+        /// </summary>
+        public Boolean HasFirmwareVersion(String FirmwareVersion)
+
+            => FirmwareVersions.Contains(FirmwareVersion, StringComparer.Ordinal);
 
         #endregion
 
@@ -292,8 +317,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Description.IsNotNullOrEmpty())
                 json.Add(PropertyKeys.Description,     Description.ToJSON());
 
-            if (Versions.Length > 0)
-                json.Add(PropertyKeys.Versions,        new JArray(Versions));
+            if (HardwareRevisions.Length > 0)
+                json.Add(PropertyKeys.HardwareRevisions, new JArray(HardwareRevisions));
+
+            if (FirmwareVersions.Length > 0)
+                json.Add(PropertyKeys.FirmwareVersions,  new JArray(FirmwareVersions));
 
             if (ProductURL.HasValue)
                 json.Add(PropertyKeys.ProductURL,      ProductURL.Value.ToString());
@@ -369,7 +397,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!POIJSON.TryParseI18N                     (JSON, PropertyKeys.Name,            "charging station model name",         out var name,                      out ErrorResponse) ||
                     !POIJSON.TryParseI18N                     (JSON, PropertyKeys.Description,     "charging station model description",  out var description,               out ErrorResponse) ||
-                    !POIJSON.TryParseStrings                  (JSON, PropertyKeys.Versions,        "versions",                            out var versions,                  out ErrorResponse) ||
+                    !POIJSON.TryParseStrings                  (JSON, PropertyKeys.HardwareRevisions, "hardware revisions",                out var hardwareRevisions,         out ErrorResponse) ||
+                    !POIJSON.TryParseStrings                  (JSON, PropertyKeys.FirmwareVersions,  "firmware versions",                 out var firmwareVersions,          out ErrorResponse) ||
                     !POIJSON.TryParseText                     (JSON, PropertyKeys.ProductURL,      "product URL",    URL.TryParse,        out URL? productURL,               out ErrorResponse) ||
                     !POIJSON.TryParseText                     (JSON, PropertyKeys.DatasheetURL,    "datasheet URL",  URL.TryParse,        out URL? datasheetURL,             out ErrorResponse) ||
                     !POIJSON.TryParseObjects<Image>           (JSON, PropertyKeys.Images,          "images",         Image.TryParse,      out var images,                    out ErrorResponse) ||
@@ -393,7 +422,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ChargingStationModel = new ChargingStationModel(id,
                                                                 name,
                                                                 description,
-                                                                versions,
+                                                                hardwareRevisions,
+                                                                firmwareVersions,
                                                                 productURL,
                                                                 datasheetURL,
                                                                 images,

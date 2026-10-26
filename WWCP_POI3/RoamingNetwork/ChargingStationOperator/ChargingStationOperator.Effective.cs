@@ -1071,6 +1071,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     HotlinePhoneNumber:   Templates.Single(ChargingStation.HotlinePhoneNumber,  template => template.HotlinePhoneNumber),
                                     ManufacturerId:       Templates.Single(ChargingStation.ManufacturerId,      template => template.ManufacturerId),
                                     ModelId:              Templates.Single(ChargingStation.ModelId,             template => template.ModelId),
+                                    HardwareRevision:     Templates.Single(ChargingStation.HardwareRevision,    template => template.HardwareRevision),
+                                    FirmwareVersion:      Templates.Single(ChargingStation.FirmwareVersion,     template => template.FirmwareVersion),
                                     OpeningTimes:         Templates.Single(ChargingStation.OpeningTimes,        template => template.OpeningTimes),
                                     Accessibility:        Templates.Single(ChargingStation.Accessibility,       template => template.Accessibility),
                                     CalibrationInfo:      Templates.Single(ChargingStation.CalibrationInfo,     template => template.CalibrationInfo),

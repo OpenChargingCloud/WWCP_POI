@@ -84,12 +84,13 @@ A [charging station template](../docs/ChargingStationTemplate.md) has the proper
 template names no members: a station, an EVSE or an energy meter names the templates it takes, so they come first. Each
 charging station template here gives its stations their power together, `maxPower`: a station takes it unless it has
 its own, and never above the one of all its EVSEs together; and their manufacturer, `GraphDefined` of
-[example A2](exampleA2.md), and one of its models, `GD-DC300` or `GD-AC44`: a model is named with its manufacturer,
-and only one it stated. Each EVSE template gives its EVSEs their connector: a CCS cable to the DC EVSEs,
+[example A2](exampleA2.md), and one of its models, `GD-DC300` or `GD-AC44`, in a hardware revision and a firmware
+version of it: a model is named with its manufacturer, and only one it stated, a revision and a firmware version with
+the model, and only one of it. Each EVSE template gives its EVSEs their connector: a CCS cable to the DC EVSEs,
 a type 2 socket to the AC EVSEs; an EVSE takes the connectors of its templates besides its own, of the same
 identification its own. An [energy meter template](../docs/EnergyMeterTemplate.md) gives its meters what a series has in
-common: their role, `evse`, their manufacturer, `KERNBERG` for the DC meters, `SAALE` for the AC meters, its model and
-their signature method, `OCMF`; its identification is free text, here `{operatorId}*EMT{suffix}`, unique in the network,
+common: their role, `evse`, their manufacturer, `KERNBERG` for the DC meters, `SAALE` for the AC meters, its model, a
+hardware revision and a firmware version of it, and their signature method, `OCMF`; its identification is free text, here `{operatorId}*EMT{suffix}`, unique in the network,
 and it is embedded in its operator as `energyMeterTemplates`, added with its operator as the parent.
 
 ```csharp
@@ -98,11 +99,15 @@ Commit("The templates of the DC and the AC stations, EVSEs and energy meters",
                                                                   Name:                I18NString.Create(Languages.en, "DC charging station"),
                                                                   ManufacturerId:      ExampleA2.stationMakerId,
                                                                   ModelId:             ChargingStationModel_Id.Parse("GD-DC300"),
+                                                                  HardwareRevision:    "1.0",
+                                                                  FirmwareVersion:     "2.5.0",
                                                                   MaxPower:            Watt.FromKW(300))),
              RoamingNetworkChange.Add(new ChargingStationTemplate(ChargingStationTemplate_Id.Parse("DE*GEF*ST_AC"),
                                                                   Name:                I18NString.Create(Languages.en, "AC charging station"),
                                                                   ManufacturerId:      ExampleA2.stationMakerId,
                                                                   ModelId:             ChargingStationModel_Id.Parse("GD-AC44"),
+                                                                  HardwareRevision:    "1.0",
+                                                                  FirmwareVersion:     "1.8.2",
                                                                   MaxPower:            Watt.FromKW(44))),
              RoamingNetworkChange.Add(new EVSETemplate(EVSETemplate_Id.Parse("DE*GEF*ET_DC"),
                                                        Name:                I18NString.Create(Languages.en, "DC EVSE"),
@@ -115,6 +120,8 @@ Commit("The templates of the DC and the AC stations, EVSEs and energy meters",
                                                               Role:                EnergyMeterRole.EVSE,
                                                               ManufacturerId:      ExampleA2.dcMeterMakerId,
                                                               ModelId:             EnergyMeterModel_Id.Parse("KDM-500"),
+                                                              HardwareRevision:    "2.1",
+                                                              FirmwareVersion:     "3.2",
                                                               SignatureMethods:    [ SignatureMethod.OCMF ]),
                                       ExampleA2.gefId),
              RoamingNetworkChange.Add(new EnergyMeterTemplate(EnergyMeterTemplate_Id.Parse("DE*GEF*EMT_AC"),
@@ -122,6 +129,8 @@ Commit("The templates of the DC and the AC stations, EVSEs and energy meters",
                                                               Role:                EnergyMeterRole.EVSE,
                                                               ManufacturerId:      ExampleA2.acMeterMakerId,
                                                               ModelId:             EnergyMeterModel_Id.Parse("SM-3"),
+                                                              HardwareRevision:    "1.4",
+                                                              FirmwareVersion:     "1.0.7",
                                                               SignatureMethods:    [ SignatureMethod.OCMF ]),
                                       ExampleA2.gefId));
 ```
@@ -136,22 +145,26 @@ as the operator embeds them:
 ```json
 [
   {
-    "@id":            "DE*GEF*ST_AC",
-    "created":        "…",
-    "lastChange":     "…",
-    "manufacturerId": "GraphDefined",
-    "maxPower":       44000,
-    "modelId":        "GD-AC44",
-    "name":           { "en": "AC charging station" }
+    "@id":              "DE*GEF*ST_AC",
+    "created":          "…",
+    "firmwareVersion":  "1.8.2",
+    "hardwareRevision": "1.0",
+    "lastChange":       "…",
+    "manufacturerId":   "GraphDefined",
+    "maxPower":         44000,
+    "modelId":          "GD-AC44",
+    "name":             { "en": "AC charging station" }
   },
   {
-    "@id":            "DE*GEF*ST_DC",
-    "created":        "…",
-    "lastChange":     "…",
-    "manufacturerId": "GraphDefined",
-    "maxPower":       300000,
-    "modelId":        "GD-DC300",
-    "name":           { "en": "DC charging station" }
+    "@id":              "DE*GEF*ST_DC",
+    "created":          "…",
+    "firmwareVersion":  "2.5.0",
+    "hardwareRevision": "1.0",
+    "lastChange":       "…",
+    "manufacturerId":   "GraphDefined",
+    "maxPower":         300000,
+    "modelId":          "GD-DC300",
+    "name":             { "en": "DC charging station" }
   }
 ]
 ```
@@ -174,6 +187,8 @@ and `GET ~/RNs/QA/CSOs/DE*GEF/EMTs` the energy meter templates, the DC one of th
 {
   "@id":              "DE*GEF*EMT_DC",
   "created":          "…",
+  "firmwareVersion":  "3.2",
+  "hardwareRevision": "2.1",
   "lastChange":       "…",
   "manufacturerId":   "KERNBERG",
   "modelId":          "KDM-500",

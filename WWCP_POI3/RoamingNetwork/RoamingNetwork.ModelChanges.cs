@@ -77,7 +77,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static readonly ImmutableHashSet<String> ChangeableChargingStationModelProperties = [
             ChargingStationModel.PropertyKeys.Name,
             ChargingStationModel.PropertyKeys.Description,
-            ChargingStationModel.PropertyKeys.Versions,
+            ChargingStationModel.PropertyKeys.HardwareRevisions,
+            ChargingStationModel.PropertyKeys.FirmwareVersions,
             ChargingStationModel.PropertyKeys.ProductURL,
             ChargingStationModel.PropertyKeys.DatasheetURL,
             ChargingStationModel.PropertyKeys.Images,
@@ -94,7 +95,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static readonly ImmutableHashSet<String> ChangeableEnergyMeterModelProperties = [
             EnergyMeterModel.PropertyKeys.Name,
             EnergyMeterModel.PropertyKeys.Description,
-            EnergyMeterModel.PropertyKeys.Versions,
+            EnergyMeterModel.PropertyKeys.HardwareRevisions,
+            EnergyMeterModel.PropertyKeys.FirmwareVersions,
             EnergyMeterModel.PropertyKeys.ProductURL,
             EnergyMeterModel.PropertyKeys.DatasheetURL,
             EnergyMeterModel.PropertyKeys.Images,

@@ -245,8 +245,9 @@ signatures, by the two identity keys of `DE*GEF`, the identity keys of the three
 The models the stations and meters of `DE*GEF` are, each stated by its manufacturer
 ([ChargingStationManufacturer](../docs/ChargingStationManufacturer.md#chargingstationmodels),
 [EnergyMeterManufacturer](../docs/EnergyMeterManufacturer.md#energymetermodels)): a station or a meter names a model
-of its manufacturer, which knows its versions and its ratings; a certificate of a conformity assessment body names one
-of its versions, see [example A13](exampleA13.md). A model is unique within its manufacturer only, so every change of
+of its manufacturer, which knows its hardware revisions, its firmware versions and its ratings, and one hardware
+revision and one firmware version of it; a certificate of a conformity assessment body names those it covers, see
+[example A13](exampleA13.md). A model is unique within its manufacturer only, so every change of
 it names its manufacturer. One change set with the models of all three, signed by each with its key for its models; the
 roaming network operator signs none of them.
 
@@ -254,22 +255,24 @@ roaming network operator signs none of them.
 var models                = new[] {
                                 RoamingNetworkChange.Add(new ChargingStationModel(ChargingStationModel_Id.Parse("GD-DC300"),
                                                          ImmutableI18NString.Create(Languages.en, "GraphDefined DC 300"),
-                                                         Versions:        [ "1.0", "1.1" ],
-                                                         DatasheetURL:    URL.Parse("https://stations.graphdefined.example/gd-dc300/datasheet.pdf"),
-                                                         MaxPower:        Watt.FromKW(300),
-                                                         CurrentTypes:    CurrentTypes.DC,
-                                                         ConnectorTypes:  [ ChargingConnectorType.IEC_62196_T2_COMBO ],
-                                                         NumberOfEVSEs:   2),
+                                                         HardwareRevisions:  [ "1.0", "1.1" ],
+                                                         FirmwareVersions:   [ "2.4.0", "2.5.0" ],
+                                                         DatasheetURL:       URL.Parse("https://stations.graphdefined.example/gd-dc300/datasheet.pdf"),
+                                                         MaxPower:           Watt.FromKW(300),
+                                                         CurrentTypes:       CurrentTypes.DC,
+                                                         ConnectorTypes:     [ ChargingConnectorType.IEC_62196_T2_COMBO ],
+                                                         NumberOfEVSEs:      2),
                                 stationMakerId),
                                 …                                                 // GD-AC44 of GraphDefined
                                 RoamingNetworkChange.Add(new EnergyMeterModel(EnergyMeterModel_Id.Parse("KDM-500"),
                                                          ImmutableI18NString.Create(Languages.en, "Kernberg DC meter 500 A"),
-                                                         Versions:          [ "2.1" ],
-                                                         CurrentTypes:      CurrentTypes.DC,
-                                                         MaxCurrent:        Ampere.FromA(500),
-                                                         AccuracyClass:     "B",
-                                                         Measurands:        [ "1-0:1.8.0", "1-0:2.8.0" ],
-                                                         SignatureMethods:  [ SignatureMethod.OCMF ]),
+                                                         HardwareRevisions:  [ "2.1" ],
+                                                         FirmwareVersions:   [ "3.2" ],
+                                                         CurrentTypes:       CurrentTypes.DC,
+                                                         MaxCurrent:         Ampere.FromA(500),
+                                                         AccuracyClass:      "B",
+                                                         Measurands:         [ "1-0:1.8.0", "1-0:2.8.0" ],
+                                                         SignatureMethods:   [ SignatureMethod.OCMF ]),
                                 dcMeterMakerId),
                                 …                                                 // SM-3 of SAALE
                             };
@@ -302,10 +305,10 @@ Signed by the three manufacturers: Committed, revision 2
   "name": { "en": "GraphDefined Charging Stations" },
   "homepage": "https://stations.graphdefined.example",
   "chargingStationModels": [
-    { "@id": "GD-AC44", "name": { "en": "GraphDefined AC 44" }, "versions": [ "1.0" ], "datasheetURL": "https://stations.graphdefined.example/gd-ac44/datasheet.pdf",
-      "maxPower": 44000, "currentTypes": [ "AC_ThreePhases" ], "connectorTypes": [ "IEC_62196_T2" ], "numberOfEVSEs": 2 },
-    { "@id": "GD-DC300", "name": { "en": "GraphDefined DC 300" }, "versions": [ "1.0", "1.1" ], "datasheetURL": "https://stations.graphdefined.example/gd-dc300/datasheet.pdf",
-      "maxPower": 300000, "currentTypes": [ "DC" ], "connectorTypes": [ "IEC_62196_T2_COMBO" ], "numberOfEVSEs": 2 }
+    { "@id": "GD-AC44", "name": { "en": "GraphDefined AC 44" }, "hardwareRevisions": [ "1.0" ], "firmwareVersions": [ "1.8.2" ],
+      "datasheetURL": "https://stations.graphdefined.example/gd-ac44/datasheet.pdf", "maxPower": 44000, "currentTypes": [ "AC_ThreePhases" ], "connectorTypes": [ "IEC_62196_T2" ], "numberOfEVSEs": 2 },
+    { "@id": "GD-DC300", "name": { "en": "GraphDefined DC 300" }, "hardwareRevisions": [ "1.0", "1.1" ], "firmwareVersions": [ "2.4.0", "2.5.0" ],
+      "datasheetURL": "https://stations.graphdefined.example/gd-dc300/datasheet.pdf", "maxPower": 300000, "currentTypes": [ "DC" ], "connectorTypes": [ "IEC_62196_T2_COMBO" ], "numberOfEVSEs": 2 }
   ],
   "signingKeys": [
     { "@id": "7b140b74…", "key": "pAECIAEh…", "notAfter": "2027-10-24T15:12:04.800Z", "usages": [ "models" ] },
@@ -360,7 +363,7 @@ DE*GEF is a member of QA with its keys:
   identity key 1922a7fb7e73a4f45962ec1c35e3647476e6b1b16f9ceb47439dbf9b2a1ca1df
   identity key 5fc456af8ade7749b0e7049a5f2920c4db48eca829c74e414367cdd45f720590
 
-Charging station manufacturer GraphDefined: GraphDefined Charging Stations, models GD-AC44 (44 kW, versions 1.0), GD-DC300 (300 kW, versions 1.0/1.1)
+Charging station manufacturer GraphDefined: GraphDefined Charging Stations, models GD-AC44 (44 kW, hardware 1.0, firmware 1.8.2), GD-DC300 (300 kW, hardware 1.0/1.1, firmware 2.4.0/2.5.0)
 Energy meter manufacturer     KERNBERG: Kernberg DC Metering, models KDM-500 (class B, OCMF)
 Energy meter manufacturer     SAALE: Saale Metering, models SM-3 (class B, OCMF)
 ```

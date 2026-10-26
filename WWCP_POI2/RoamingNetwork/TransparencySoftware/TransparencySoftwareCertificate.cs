@@ -31,8 +31,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// An approval or compatibility document for a charging station model/version
-    /// and the transparency software releases it names, embedded in the conformity assessment body issuing it,
+    /// An approval or compatibility document for a charging station model, in the hardware revisions and firmware versions
+    /// it covers, and the transparency software releases it names, embedded in the conformity assessment body issuing it,
     /// e.g. under the legislation it is a notified body for.
     /// This is a domain document, not a cryptographic certificate.
     /// </summary>
@@ -79,9 +79,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  ChargingStationModel                = "chargingStationModel";
 
             /// <summary>
-            /// The property of its charging station model version.
+            /// The property of the hardware revisions of its charging station model it covers.
             /// </summary>
-            public const String  ChargingStationModelVersion         = "chargingStationModelVersion";
+            public const String  HardwareRevisions                   = "hardwareRevisions";
+
+            /// <summary>
+            /// The property of the firmware versions of its charging station model it covers.
+            /// </summary>
+            public const String  FirmwareVersions                    = "firmwareVersions";
 
             /// <summary>
             /// The property of its verified transparency software identifications.
@@ -148,10 +153,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ChargingStationModel_Id                  ChargingStationModel                 { get; }
 
         /// <summary>
-        /// The charging station model version to which this document applies, one of the versions of its model.
+        /// The hardware revisions of its charging station model to which this document applies, each one of its model,
+        /// in their given order.
         /// </summary>
         [Mandatory]
-        public String                                   ChargingStationModelVersion          { get; }
+        public ImmutableArray<String>                   HardwareRevisions                    { get; }
+
+        /// <summary>
+        /// The firmware versions of its charging station model to which this document applies, each one of its model, in
+        /// their given order.
+        /// </summary>
+        [Mandatory]
+        public ImmutableArray<String>                   FirmwareVersions                     { get; }
 
         /// <summary>
         /// The transparency software releases officially checked with this model/version.
@@ -194,13 +207,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Constructor(s)
 
         /// <summary>
-        /// Create a new approval or compatibility document for a charging station model/version.
+        /// Create a new approval or compatibility document for a charging station model, in the given hardware revisions
+        /// and firmware versions.
         /// </summary>
         /// <param name="Id">The stable identity of this document.</param>
         /// <param name="ChargingStationManufacturerId">The manufacturer of the charging station model.</param>
         /// <param name="ChargingStationModel">The charging station model to which this document applies.</param>
-        /// <param name="ChargingStationModelVersion">The charging station model version to which this document applies.</param>
-        /// <param name="VerifiedTransparencySoftwareIds">The transparency software releases officially checked with this model/version.</param>
+        /// <param name="HardwareRevisions">The hardware revisions of the model to which this document applies.</param>
+        /// <param name="FirmwareVersions">The firmware versions of the model to which this document applies.</param>
+        /// <param name="VerifiedTransparencySoftwareIds">The transparency software releases officially checked with this model.</param>
         /// <param name="CompatibleTransparencySoftwareIds">Compatible additional releases, without a claim of official verification.</param>
         /// <param name="DocumentNumber">The optional document number of the issuer.</param>
         /// <param name="DocumentURL">The optional location of the document.</param>
@@ -210,7 +225,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id     Id,
                                                ChargingStationManufacturer_Id         ChargingStationManufacturerId,
                                                ChargingStationModel_Id                ChargingStationModel,
-                                               String                                 ChargingStationModelVersion,
+                                               IEnumerable<String>                    HardwareRevisions,
+                                               IEnumerable<String>                    FirmwareVersions,
                                                IEnumerable<TransparencySoftware_Id>?  VerifiedTransparencySoftwareIds     = null,
                                                IEnumerable<TransparencySoftware_Id>?  CompatibleTransparencySoftwareIds   = null,
                                                String?                                DocumentNumber                      = null,
@@ -226,7 +242,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChargingStationModel.IsNullOrEmpty)
                 throw new ArgumentException("A charging station model is required.", nameof(ChargingStationModel));
 
-            ArgumentException.ThrowIfNullOrWhiteSpace(ChargingStationModelVersion);
+            var hardwareRevisions  = ModelVersions.Of(HardwareRevisions, "hardware revision", $"the certificate '{Id}'");
+            var firmwareVersions   = ModelVersions.Of(FirmwareVersions,  "firmware version",  $"the certificate '{Id}'");
+
+            if (hardwareRevisions.IsEmpty)
+                throw new ArgumentException($"The certificate '{Id}' must name at least one hardware revision of its model!", nameof(HardwareRevisions));
+
+            if (firmwareVersions.IsEmpty)
+                throw new ArgumentException($"The certificate '{Id}' must name at least one firmware version of its model!", nameof(FirmwareVersions));
 
             if (ChargingStationManufacturerId.IsNullOrEmpty)
                 throw new ArgumentException("The manufacturer of the charging station model is required.", nameof(ChargingStationManufacturerId));
@@ -252,7 +275,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Id                                 = Id;
             this.Legislation                        = Legislation;
             this.ChargingStationModel               = ChargingStationModel;
-            this.ChargingStationModelVersion        = ChargingStationModelVersion;
+            this.HardwareRevisions                  = hardwareRevisions;
+            this.FirmwareVersions                   = firmwareVersions;
             this.VerifiedTransparencySoftwareIds    = verifiedIds;
             this.CompatibleTransparencySoftwareIds  = compatibleIds;
             this.ChargingStationManufacturerId      = ChargingStationManufacturerId;
@@ -305,7 +329,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 StrictJSON.OnlyProperties(JSON, PropertyKeys.Id, PropertyKeys.Context, PropertyKeys.Legislation, PropertyKeys.ChargingStationModel,
-                                                PropertyKeys.ChargingStationModelVersion, PropertyKeys.ChargingStationManufacturerId,
+                                                PropertyKeys.HardwareRevisions, PropertyKeys.FirmwareVersions, PropertyKeys.ChargingStationManufacturerId,
                                                 PropertyKeys.DocumentNumber, PropertyKeys.DocumentURL,
                                                 PropertyKeys.VerifiedTransparencySoftwareIds, PropertyKeys.CompatibleTransparencySoftwareIds,
                                                 PropertyKeys.NotBefore, PropertyKeys.NotAfter);
@@ -320,7 +344,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   Id:                                 TransparencySoftwareCertificate_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.Id)),
                                   ChargingStationManufacturerId:      ChargingStationManufacturer_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.ChargingStationManufacturerId)),
                                   ChargingStationModel:               ChargingStationModel_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.ChargingStationModel)),
-                                  ChargingStationModelVersion:        StrictJSON.RequiredText(JSON, PropertyKeys.ChargingStationModelVersion),
+                                  HardwareRevisions:                  StrictJSON.Array(JSON, PropertyKeys.HardwareRevisions, StrictJSON.Identifier),
+                                  FirmwareVersions:                   StrictJSON.Array(JSON, PropertyKeys.FirmwareVersions,  StrictJSON.Identifier),
                                   VerifiedTransparencySoftwareIds:    StrictJSON.Array(JSON, PropertyKeys.VerifiedTransparencySoftwareIds,
                                                                                              token => TransparencySoftware_Id.Parse(StrictJSON.Identifier(token))),
                                   CompatibleTransparencySoftwareIds:  StrictJSON.Array(JSON, PropertyKeys.CompatibleTransparencySoftwareIds,
@@ -368,7 +393,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                  new JProperty(PropertyKeys.ChargingStationManufacturerId,       ChargingStationManufacturerId.ToString()),
                                  new JProperty(PropertyKeys.ChargingStationModel,                ChargingStationModel.ToString()),
-                                 new JProperty(PropertyKeys.ChargingStationModelVersion,         ChargingStationModelVersion),
+                                 new JProperty(PropertyKeys.HardwareRevisions,                   new JArray(HardwareRevisions)),
+                                 new JProperty(PropertyKeys.FirmwareVersions,                    new JArray(FirmwareVersions)),
                                  new JProperty(PropertyKeys.VerifiedTransparencySoftwareIds,     new JArray(VerifiedTransparencySoftwareIds.  Select(id => id.ToString()).Order(StringComparer.Ordinal))),
                                  new JProperty(PropertyKeys.CompatibleTransparencySoftwareIds,   new JArray(CompatibleTransparencySoftwareIds.Select(id => id.ToString()).Order(StringComparer.Ordinal))),
 
@@ -441,7 +467,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public override String ToString()
 
-            => $"{Id}: {ChargingStationModel} {ChargingStationModelVersion}";
+            => $"{Id}: {ChargingStationModel} {String.Join("/", HardwareRevisions)}";
 
         #endregion
 

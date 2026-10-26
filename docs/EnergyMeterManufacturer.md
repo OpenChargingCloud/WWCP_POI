@@ -3,7 +3,8 @@
 An energy meter manufacturer builds energy meters, e.g. the calibrated meters of charging stations. In POI 3 it is a
 **party**: the roaming network operator (RNO) adds and removes it, with its keys; it changes its own properties and
 its **models** with its own keys. An energy meter and an energy meter template name their manufacturer
-(`manufacturerId`) and their model (`modelId`). It is described by its name, its contact data and data licenses, as a
+(`manufacturerId`), their model (`modelId`) and its hardware revision and firmware version (`hardwareRevision`,
+`firmwareVersion`). It is described by its name, its contact data and data licenses, as a
 charging station operator is.
 
 The identification is an `EnergyMeterManufacturer_Id`, any nonempty text, trimmed, compared case-insensitively,
@@ -62,7 +63,8 @@ names who made it, so it names none (`manufacturerId` is refused).
 | `@id` | string | — | `EnergyMeterModel_Id`: any nonempty text, trimmed, compared case-insensitively; unique within its manufacturer. |
 | `name` | I18N text | update/remove | Its name. |
 | `description` | I18N text | update/remove | |
-| `versions` | string[] | update/remove | Its versions, e.g. hardware or firmware versions, each once, none empty or beginning or ending with whitespace, in their given order. |
+| `hardwareRevisions` | string[] | update/remove | The hardware revisions it was built in, each once, none empty or beginning or ending with whitespace, in their given order. A meter names one of them. |
+| `firmwareVersions` | string[] | update/remove | The firmware versions it ran, as `hardwareRevisions`. A meter names one of them. |
 | `productURL` | URL | update/remove | Its product page. |
 | `datasheetURL` | URL | update/remove | Its datasheet. |
 | `images` | object[] | update/remove | Images of it; each URL once. |
@@ -77,7 +79,9 @@ names who made it, so it names none (`manufacturerId` is refused).
   `UpdateProperty(model, manufacturerId, …)`/`RemoveProperty(model, manufacturerId, …)`: every change names its
   manufacturer as its parent, as its identification is unique within it only; one without is refused. Signed by the
   manufacturer, with a signing key that may sign `models`.
-- A model still named by an energy meter or an energy meter template can not be removed, nor its manufacturer.
+- A model still named by an energy meter or an energy meter template can not be removed, nor its manufacturer; nor a
+  hardware revision or firmware version of it one of them names. `versions`, one list of before, is no property of a
+  model.
 
 
 ## Keys
@@ -91,11 +95,11 @@ it names `models`.
 
 | Who | JSON key | Rule |
 |---|---|---|
-| [EnergyMeter](EnergyMeter.md) | `manufacturerId`, `modelId` | `manufacturerId` names a manufacturer of the network; `modelId` a model of it, and only with its manufacturer: as the meter is at runtime, with what its templates give it. |
-| [EnergyMeterTemplate](EnergyMeterTemplate.md) | `manufacturerId`, `modelId` | the same, of the template. |
+| [EnergyMeter](EnergyMeter.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | `manufacturerId` names a manufacturer of the network; `modelId` a model of it, and only with its manufacturer; `hardwareRevision` one of the `hardwareRevisions` of the model, `firmwareVersion` one of its `firmwareVersions`, each only with the model: as the meter is at runtime, with what its templates give it. |
+| [EnergyMeterTemplate](EnergyMeterTemplate.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | the same, of the template; a hardware revision or firmware version without a model it gives to meters of their own model, checked at them. |
 
-The references are checked after every change set: a manufacturer or a model still named can not be removed, and a
-meter or template can not name an unknown one.
+The references are checked after every change set: a manufacturer, a model, a hardware revision or a firmware version
+still named can not be removed, and a meter or template can not name an unknown one.
 
 
 ## Change sets
@@ -145,7 +149,8 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `EnergyMe
     {
       "@id": "KDM-500",
       "name": { "en": "Kernberg DC meter 500 A" },
-      "versions": [ "2.1" ],
+      "hardwareRevisions": [ "2.1" ],
+      "firmwareVersions": [ "3.2" ],
       "currentTypes": [ "DC" ],
       "maxCurrent": 500,
       "accuracyClass": "B",

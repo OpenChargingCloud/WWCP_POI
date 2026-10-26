@@ -134,6 +134,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  ModelId               = "modelId";
 
             /// <summary>
+            /// The property of its hardware revision.
+            /// </summary>
+            public const String  HardwareRevision      = "hardwareRevision";
+
+            /// <summary>
+            /// The property of its firmware version.
+            /// </summary>
+            public const String  FirmwareVersion       = "firmwareVersion";
+
+            /// <summary>
             /// The property of its own energy meters.
             /// </summary>
             public const String  EnergyMeters          = "energyMeters";
@@ -254,6 +264,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ChargingStationModel_Id?         ModelId         { get; }
 
         /// <summary>
+        /// The hardware revision it was built in, one of its model, as a certificate names those it covers.
+        /// </summary>
+        public String?                          HardwareRevision { get; }
+
+        /// <summary>
+        /// The firmware version it runs, one of its model, as a certificate names those it covers.
+        /// </summary>
+        public String?                          FirmwareVersion { get; }
+
+        /// <summary>
         /// The EVSEs, in the order of their identifications.
         /// </summary>
         public POICollection<EVSE_Id, EVSE>  EVSEs         { get; }
@@ -351,6 +371,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                PhoneNumber?                                    HotlinePhoneNumber           = null,
                                ChargingStationManufacturer_Id?                 ManufacturerId               = null,
                                ChargingStationModel_Id?                        ModelId                      = null,
+                               String?                                         HardwareRevision             = null,
+                               String?                                         FirmwareVersion              = null,
                                IEnumerable<EVSE>?                              EVSEs                        = null,
                                IEnumerable<EnergyMeter>?                       EnergyMeters                 = null,
                                IEnumerable<Brand>?                             Brands                       = null,
@@ -429,6 +451,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.HotlinePhoneNumber  = HotlinePhoneNumber;
             this.ManufacturerId      = ManufacturerId;
             this.ModelId             = ModelId;
+            this.HardwareRevision    = HardwareRevision;
+            this.FirmwareVersion     = FirmwareVersion;
             this.EVSEs               = new (evses, evse => evse.Id, "EVSE", $"the charging station '{Id}'");
             this.EnergyMeters        = EnergyMeter.Ordered(EnergyMeters, $"the charging station '{Id}'");
             this.Brands              = new (Brands, brand => brand.Id, "brand", $"the charging station '{Id}'");
@@ -737,6 +761,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ModelId.HasValue)
                 json.Add(PropertyKeys.ModelId,              ModelId.Value.ToString());
 
+            if (HardwareRevision is not null)
+                json.Add(PropertyKeys.HardwareRevision,     HardwareRevision);
+
+            if (FirmwareVersion is not null)
+                json.Add(PropertyKeys.FirmwareVersion,      FirmwareVersion);
+
             if (EnergyMeters.Length > 0)
                 json.Add(PropertyKeys.EnergyMeters,         new JArray(EnergyMeters.Select(energyMeter => energyMeter.ToJSON(Embedded: true))));
 
@@ -834,7 +864,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseGeoLocation(JSON, PropertyKeys.GeoLocation,        "geo location",                  out var geoLocation,        out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.HotlinePhoneNumber, "hotline phone number",          PhoneNumber.TryParse,       out PhoneNumber? hotline,  out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.ManufacturerId,     "manufacturer identification",   ChargingStationManufacturer_Id.TryParse, out ChargingStationManufacturer_Id? manufacturerId, out ErrorResponse) ||
-                    !POIJSON.TryParseText       (JSON, PropertyKeys.ModelId,            "model identification",          ChargingStationModel_Id.       TryParse, out ChargingStationModel_Id?        modelId,        out ErrorResponse))
+                    !POIJSON.TryParseText       (JSON, PropertyKeys.ModelId,            "model identification",          ChargingStationModel_Id.       TryParse, out ChargingStationModel_Id?        modelId,        out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, PropertyKeys.HardwareRevision,   "hardware revision",             out var hardwareRevision,   out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, PropertyKeys.FirmwareVersion,    "firmware version",              out var firmwareVersion,    out ErrorResponse))
                 {
                     return false;
                 }
@@ -905,6 +937,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       hotline,
                                                       manufacturerId,
                                                       modelId,
+                                                      hardwareRevision,
+                                                      firmwareVersion,
                                                       evses,
                                                       energyMeters,
                                                       brands,

@@ -207,44 +207,49 @@ public static class ExampleA2
         #region 4. The manufacturers state their models
 
         // The models DE*GEF's stations and meters are, each stated by its manufacturer: a station or meter names a model of
-        // its manufacturer, which knows its versions and ratings; a certificate names one of its versions. One change set,
+        // its manufacturer, which knows its hardware revisions, firmware versions and ratings, and one revision and one
+        // firmware version of it; a certificate names those it covers. One change set,
         // signed by each manufacturer with its key for its models; the roaming network operator signs none of them.
         var models                = new[] {
                                         RoamingNetworkChange.Add(new ChargingStationModel(ChargingStationModel_Id.Parse("GD-DC300"),
                                                                  ImmutableI18NString.Create(Languages.en, "GraphDefined DC 300"),
-                                                                 Versions:        [ "1.0", "1.1" ],
-                                                                 DatasheetURL:    URL.Parse("https://stations.graphdefined.example/gd-dc300/datasheet.pdf"),
-                                                                 MaxPower:        Watt.FromKW(300),
-                                                                 CurrentTypes:    CurrentTypes.DC,
-                                                                 ConnectorTypes:  [ ChargingConnectorType.IEC_62196_T2_COMBO ],
-                                                                 NumberOfEVSEs:   2),
+                                                                 HardwareRevisions:  [ "1.0", "1.1" ],
+                                                                 FirmwareVersions:   [ "2.4.0", "2.5.0" ],
+                                                                 DatasheetURL:       URL.Parse("https://stations.graphdefined.example/gd-dc300/datasheet.pdf"),
+                                                                 MaxPower:           Watt.FromKW(300),
+                                                                 CurrentTypes:       CurrentTypes.DC,
+                                                                 ConnectorTypes:     [ ChargingConnectorType.IEC_62196_T2_COMBO ],
+                                                                 NumberOfEVSEs:      2),
                                         stationMakerId),
                                         RoamingNetworkChange.Add(new ChargingStationModel(ChargingStationModel_Id.Parse("GD-AC44"),
                                                                  ImmutableI18NString.Create(Languages.en, "GraphDefined AC 44"),
-                                                                 Versions:        [ "1.0" ],
-                                                                 DatasheetURL:    URL.Parse("https://stations.graphdefined.example/gd-ac44/datasheet.pdf"),
-                                                                 MaxPower:        Watt.FromKW(44),
-                                                                 CurrentTypes:    CurrentTypes.AC_ThreePhases,
-                                                                 ConnectorTypes:  [ ChargingConnectorType.IEC_62196_T2 ],
-                                                                 NumberOfEVSEs:   2),
+                                                                 HardwareRevisions:  [ "1.0" ],
+                                                                 FirmwareVersions:   [ "1.8.2" ],
+                                                                 DatasheetURL:       URL.Parse("https://stations.graphdefined.example/gd-ac44/datasheet.pdf"),
+                                                                 MaxPower:           Watt.FromKW(44),
+                                                                 CurrentTypes:       CurrentTypes.AC_ThreePhases,
+                                                                 ConnectorTypes:     [ ChargingConnectorType.IEC_62196_T2 ],
+                                                                 NumberOfEVSEs:      2),
                                         stationMakerId),
                                         RoamingNetworkChange.Add(new EnergyMeterModel(EnergyMeterModel_Id.Parse("KDM-500"),
                                                                  ImmutableI18NString.Create(Languages.en, "Kernberg DC meter 500 A"),
-                                                                 Versions:          [ "2.1" ],
-                                                                 CurrentTypes:      CurrentTypes.DC,
-                                                                 MaxCurrent:        Ampere.FromA(500),
-                                                                 AccuracyClass:     "B",
-                                                                 Measurands:        [ "1-0:1.8.0", "1-0:2.8.0" ],
-                                                                 SignatureMethods:  [ SignatureMethod.OCMF ]),
+                                                                 HardwareRevisions:  [ "2.1" ],
+                                                                 FirmwareVersions:   [ "3.2" ],
+                                                                 CurrentTypes:       CurrentTypes.DC,
+                                                                 MaxCurrent:         Ampere.FromA(500),
+                                                                 AccuracyClass:      "B",
+                                                                 Measurands:         [ "1-0:1.8.0", "1-0:2.8.0" ],
+                                                                 SignatureMethods:   [ SignatureMethod.OCMF ]),
                                         dcMeterMakerId),
                                         RoamingNetworkChange.Add(new EnergyMeterModel(EnergyMeterModel_Id.Parse("SM-3"),
                                                                  ImmutableI18NString.Create(Languages.en, "Saale three-phase meter"),
-                                                                 Versions:          [ "1.4" ],
-                                                                 CurrentTypes:      CurrentTypes.AC_ThreePhases,
-                                                                 MaxCurrent:        Ampere.FromA(63),
-                                                                 AccuracyClass:     "B",
-                                                                 Measurands:        [ "1-0:1.8.0" ],
-                                                                 SignatureMethods:  [ SignatureMethod.OCMF ]),
+                                                                 HardwareRevisions:  [ "1.4" ],
+                                                                 FirmwareVersions:   [ "1.0.7" ],
+                                                                 CurrentTypes:       CurrentTypes.AC_ThreePhases,
+                                                                 MaxCurrent:         Ampere.FromA(63),
+                                                                 AccuracyClass:      "B",
+                                                                 Measurands:         [ "1-0:1.8.0" ],
+                                                                 SignatureMethods:   [ SignatureMethod.OCMF ]),
                                         acMeterMakerId)
                                     };
 
@@ -323,7 +328,7 @@ public static class ExampleA2
         Console.WriteLine();
 
         foreach (var manufacturer in qa.ChargingStationManufacturers)
-            Console.WriteLine($"Charging station manufacturer {manufacturer.Id}: {manufacturer.Name.FirstText()}, models {String.Join(", ", manufacturer.Models.Select(model => $"{model.Id} ({model.MaxPower?.kW} kW, versions {String.Join("/", model.Versions)})"))}");
+            Console.WriteLine($"Charging station manufacturer {manufacturer.Id}: {manufacturer.Name.FirstText()}, models {String.Join(", ", manufacturer.Models.Select(model => $"{model.Id} ({model.MaxPower?.kW} kW, hardware {String.Join("/", model.HardwareRevisions)}, firmware {String.Join("/", model.FirmwareVersions)})"))}");
 
         foreach (var manufacturer in qa.EnergyMeterManufacturers)
             Console.WriteLine($"Energy meter manufacturer     {manufacturer.Id}: {manufacturer.Name.FirstText()}, models {String.Join(", ", manufacturer.Models.Select(model => $"{model.Id} (class {model.AccuracyClass}, {String.Join(", ", model.SignatureMethods)})"))}");

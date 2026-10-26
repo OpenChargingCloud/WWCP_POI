@@ -38,8 +38,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// within its manufacturer.
     /// </summary>
     /// <remarks>
-    /// Its manufacturer states it and signs its changes. Its versions are the hardware or firmware versions it was built
-    /// in. Its technical data are the ratings of the model in their base units: maxCurrent in A. Its signature methods are
+    /// Its manufacturer states it and signs its changes. Its hardware revisions are those it was built in, its firmware
+    /// versions those it ran: an energy meter of it names one of each. Its technical data are the ratings of the model in their base units: maxCurrent in A. Its signature methods are
     /// how its meters sign their measurements, as a transparency software verifies them; its accuracy class is the one of
     /// its type examination, e.g. "A", "B" or "C" of the Measuring Instruments Directive (2014/32/EU, Annex V).
     /// </remarks>
@@ -86,9 +86,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  Description        = "description";
 
             /// <summary>
-            /// The property of its versions.
+            /// The property of its hardware revisions.
             /// </summary>
-            public const String  Versions           = "versions";
+            public const String  HardwareRevisions  = "hardwareRevisions";
+
+            /// <summary>
+            /// The property of its firmware versions.
+            /// </summary>
+            public const String  FirmwareVersions   = "firmwareVersions";
 
             /// <summary>
             /// The property of the URL of its product page.
@@ -161,9 +166,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableI18NString?             Description        { get; }
 
         /// <summary>
-        /// Its versions, e.g. hardware or firmware versions, each once, in their given order.
+        /// The hardware revisions it was built in, each once, in their given order.
         /// </summary>
-        public ImmutableArray<String>           Versions           { get; }
+        public ImmutableArray<String>           HardwareRevisions  { get; }
+
+        /// <summary>
+        /// The firmware versions it ran, each once, in their given order.
+        /// </summary>
+        public ImmutableArray<String>           FirmwareVersions   { get; }
 
         /// <summary>
         /// The URL of its product page.
@@ -220,7 +230,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Id">The identification of the model, unique within its manufacturer.</param>
         /// <param name="Name">The multi-language name.</param>
         /// <param name="Description">The multi-language description.</param>
-        /// <param name="Versions">Its versions, e.g. hardware or firmware versions.</param>
+        /// <param name="HardwareRevisions">The hardware revisions it was built in.</param>
+        /// <param name="FirmwareVersions">The firmware versions it ran.</param>
         /// <param name="ProductURL">The URL of its product page.</param>
         /// <param name="DatasheetURL">The URL of its datasheet.</param>
         /// <param name="Images">Images of it, e.g. photos.</param>
@@ -233,7 +244,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public EnergyMeterModel(EnergyMeterModel_Id            Id,
                                 ImmutableI18NString?           Name               = null,
                                 ImmutableI18NString?           Description        = null,
-                                IEnumerable<String>?           Versions           = null,
+                                IEnumerable<String>?           HardwareRevisions  = null,
+                                IEnumerable<String>?           FirmwareVersions   = null,
                                 URL?                           ProductURL         = null,
                                 URL?                           DatasheetURL       = null,
                                 IEnumerable<Image>?            Images             = null,
@@ -262,7 +274,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Id                = Id;
             this.Name              = Name;
             this.Description       = Description;
-            this.Versions          = ModelVersions.Of(Versions, $"the energy meter model '{Id}'");
+            this.HardwareRevisions = ModelVersions.Of(HardwareRevisions, "hardware revision", $"the energy meter model '{Id}'");
+            this.FirmwareVersions  = ModelVersions.Of(FirmwareVersions,  "firmware version",  $"the energy meter model '{Id}'");
             this.ProductURL        = ProductURL;
             this.DatasheetURL      = DatasheetURL;
             this.Images            = POIJSON.Distinct  (Images, image => image.URL.ToString(), $"image of the energy meter model '{Id}'");
@@ -278,14 +291,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region HasVersion(Version)
+        #region HasHardwareRevision(HardwareRevision)
 
         /// <summary>
-        /// Whether the given version is one of its versions.
+        /// Whether the given hardware revision is one of its hardware revisions.
         /// </summary>
-        public Boolean HasVersion(String Version)
+        public Boolean HasHardwareRevision(String HardwareRevision)
 
-            => Versions.Contains(Version, StringComparer.Ordinal);
+            => HardwareRevisions.Contains(HardwareRevision, StringComparer.Ordinal);
+
+        #endregion
+
+        #region HasFirmwareVersion(FirmwareVersion)
+
+        /// <summary>
+        /// Whether the given firmware version is one of its firmware versions.
+        /// </summary>
+        public Boolean HasFirmwareVersion(String FirmwareVersion)
+
+            => FirmwareVersions.Contains(FirmwareVersion, StringComparer.Ordinal);
 
         #endregion
 
@@ -314,8 +338,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Description.IsNotNullOrEmpty())
                 json.Add(PropertyKeys.Description,       Description.ToJSON());
 
-            if (Versions.Length > 0)
-                json.Add(PropertyKeys.Versions,          new JArray(Versions));
+            if (HardwareRevisions.Length > 0)
+                json.Add(PropertyKeys.HardwareRevisions, new JArray(HardwareRevisions));
+
+            if (FirmwareVersions.Length > 0)
+                json.Add(PropertyKeys.FirmwareVersions,  new JArray(FirmwareVersions));
 
             if (ProductURL.HasValue)
                 json.Add(PropertyKeys.ProductURL,        ProductURL.Value.ToString());
@@ -394,7 +421,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!POIJSON.TryParseI18N                (JSON, PropertyKeys.Name,              "energy meter model name",         out var name,                   out ErrorResponse) ||
                     !POIJSON.TryParseI18N                (JSON, PropertyKeys.Description,       "energy meter model description",  out var description,            out ErrorResponse) ||
-                    !POIJSON.TryParseStrings             (JSON, PropertyKeys.Versions,          "versions",                        out var versions,               out ErrorResponse) ||
+                    !POIJSON.TryParseStrings             (JSON, PropertyKeys.HardwareRevisions, "hardware revisions",              out var hardwareRevisions,      out ErrorResponse) ||
+                    !POIJSON.TryParseStrings             (JSON, PropertyKeys.FirmwareVersions,  "firmware versions",               out var firmwareVersions,       out ErrorResponse) ||
                     !POIJSON.TryParseText                (JSON, PropertyKeys.ProductURL,        "product URL",    URL.TryParse,    out URL? productURL,            out ErrorResponse) ||
                     !POIJSON.TryParseText                (JSON, PropertyKeys.DatasheetURL,      "datasheet URL",  URL.TryParse,    out URL? datasheetURL,          out ErrorResponse) ||
                     !POIJSON.TryParseObjects<Image>      (JSON, PropertyKeys.Images,            "images",         Image.TryParse,  out var images,                 out ErrorResponse) ||
@@ -419,7 +447,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 EnergyMeterModel = new EnergyMeterModel(id,
                                                         name,
                                                         description,
-                                                        versions,
+                                                        hardwareRevisions,
+                                                        firmwareVersions,
                                                         productURL,
                                                         datasheetURL,
                                                         images,

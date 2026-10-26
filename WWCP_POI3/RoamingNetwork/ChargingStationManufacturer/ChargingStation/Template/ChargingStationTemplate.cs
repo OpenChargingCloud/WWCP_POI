@@ -124,6 +124,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  ModelId               = ChargingStation.PropertyKeys.ModelId;
 
             /// <summary>
+            /// The property of the hardware revision of its members.
+            /// </summary>
+            public const String  HardwareRevision      = ChargingStation.PropertyKeys.HardwareRevision;
+
+            /// <summary>
+            /// The property of the firmware version of its members.
+            /// </summary>
+            public const String  FirmwareVersion       = ChargingStation.PropertyKeys.FirmwareVersion;
+
+            /// <summary>
             /// The property of the brands of its members.
             /// </summary>
             public const String  Brands                = ChargingStation.PropertyKeys.Brands;
@@ -241,6 +251,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ChargingStationModel_Id?                ModelId              { get; }
 
         /// <summary>
+        /// The hardware revision of its members, one of their model, unless they have their own.
+        /// </summary>
+        public String?                                 HardwareRevision     { get; }
+
+        /// <summary>
+        /// The firmware version of its members, one of their model, unless they have their own.
+        /// </summary>
+        public String?                                 FirmwareVersion      { get; }
+
+        /// <summary>
         /// Brands its members also appear under, besides their own, in the order of their identifications.
         /// </summary>
         public POICollection<Brand_Id, Brand>          Brands               { get; }
@@ -314,6 +334,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     PhoneNumber?                                        HotlinePhoneNumber           = null,
                                     ChargingStationManufacturer_Id?                     ManufacturerId               = null,
                                     ChargingStationModel_Id?                            ModelId                      = null,
+                                    String?                                             HardwareRevision             = null,
+                                    String?                                             FirmwareVersion              = null,
                                     IEnumerable<Brand>?                                 Brands                       = null,
                                     ImmutableOpeningTimes?                              OpeningTimes                 = null,
                                     IEnumerable<Image>?                                 Images                       = null,
@@ -354,6 +376,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.HotlinePhoneNumber   = HotlinePhoneNumber;
             this.ManufacturerId       = ManufacturerId;
             this.ModelId              = ModelId;
+            this.HardwareRevision     = HardwareRevision;
+            this.FirmwareVersion      = FirmwareVersion;
             this.Brands               = new (Brands, brand => brand.Id, "brand", $"the charging station template '{Id}'");
             this.OpeningTimes         = OpeningTimes;
             this.Images               = POIJSON.Distinct  (Images, image => image.URL.ToString(), $"image of the charging station template '{Id}'");
@@ -428,6 +452,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (ModelId.HasValue)
                 json.Add(PropertyKeys.ModelId,              ModelId.Value.ToString());
+
+            if (HardwareRevision is not null)
+                json.Add(PropertyKeys.HardwareRevision,     HardwareRevision);
+
+            if (FirmwareVersion is not null)
+                json.Add(PropertyKeys.FirmwareVersion,      FirmwareVersion);
 
             if (Brands.Count > 0)
                 json.Add(PropertyKeys.Brands,               new JArray(Brands.Select(brand => brand.ToJSON(Embedded: true))));
@@ -520,7 +550,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseGeoLocation(JSON, PropertyKeys.GeoLocation,         "geo location",                  out var geoLocation,        out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",          PhoneNumber.TryParse,       out PhoneNumber? hotline,  out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.ManufacturerId,      "manufacturer identification",   ChargingStationManufacturer_Id.TryParse, out ChargingStationManufacturer_Id? manufacturerId, out ErrorResponse) ||
-                    !POIJSON.TryParseText       (JSON, PropertyKeys.ModelId,             "model identification",          ChargingStationModel_Id.       TryParse, out ChargingStationModel_Id?        modelId,        out ErrorResponse))
+                    !POIJSON.TryParseText       (JSON, PropertyKeys.ModelId,             "model identification",          ChargingStationModel_Id.       TryParse, out ChargingStationModel_Id?        modelId,        out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, PropertyKeys.HardwareRevision,    "hardware revision",             out var hardwareRevision,   out ErrorResponse) ||
+                    !POIJSON.TryParseString     (JSON, PropertyKeys.FirmwareVersion,     "firmware version",              out var firmwareVersion,    out ErrorResponse))
                 {
                     return false;
                 }
@@ -567,6 +599,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                 hotline,
                                                                 manufacturerId,
                                                                 modelId,
+                                                                hardwareRevision,
+                                                                firmwareVersion,
                                                                 brands,
                                                                 openingTimes,
                                                                 images,

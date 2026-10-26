@@ -1,7 +1,7 @@
 # ChargingStation
 
-A charging station (EVCS, "charger") is one device at a charging location: it has a manufacturer and a model,
-its own energy meters and the EVSEs that charge one vehicle each. It is embedded completely in a
+A charging station (EVCS, "charger") is one device at a charging location: it has a manufacturer and a model, in a
+hardware revision and with a firmware version of it, its own energy meters and the EVSEs that charge one vehicle each. It is embedded completely in a
 [ChargingPool](ChargingPool.md) of a [ChargingStationOperator](ChargingStationOperator.md), under `chargingStations`.
 Its source lives under `RoamingNetwork/ChargingStationManufacturer/` for historical reasons only: a station
 belongs to its operator, it is not embedded in its [ChargingStationManufacturer](ChargingStationManufacturer.md),
@@ -57,6 +57,8 @@ See [common properties](README.md#common-properties). A charging station does no
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | The hotline phone number, e.g. `"+49 3641 123456"`. |
 | `manufacturerId` | `ManufacturerId` | `ChargingStationManufacturer_Id?` | update/remove | A [ChargingStationManufacturer](ChargingStationManufacturer.md) of the roaming network; see [Manufacturer and model](#manufacturer-and-model). |
 | `modelId` | `ModelId` | `ChargingStationModel_Id?` | update/remove | A model of its manufacturer, e.g. `"Wallbox-22"`; only with its `manufacturerId`, see [Manufacturer and model](#manufacturer-and-model). |
+| `hardwareRevision` | `HardwareRevision` | `String?` | update/remove | The hardware revision it was built in: one of the `hardwareRevisions` of its model, only with its `modelId`, see [Manufacturer and model](#manufacturer-and-model). |
+| `firmwareVersion` | `FirmwareVersion` | `String?` | update/remove | The firmware version it runs: one of the `firmwareVersions` of its model, only with its `modelId`; a firmware update is a change of it its operator signs. |
 | `energyMeters` | `EnergyMeters` | `ImmutableArray<EnergyMeter>` | update/remove | Its own energy meters, not those of its EVSEs; see [energyMeters](#energymeters). |
 | `EVSEs` | `EVSEs` | `POICollection<EVSE_Id, EVSE>` | add/remove | Its EVSEs, embedded completely; see [EVSEs](#evses). |
 | `brands` | `Brands` | `POICollection<Brand_Id, Brand>` | update/remove | Brands it also appears under; see [brands](#brands). |
@@ -140,9 +142,13 @@ In a history, it is set and read by `history.RuntimeStatus` with the kind `energ
 
 `manufacturerId` names a [ChargingStationManufacturer](ChargingStationManufacturer.md) embedded in the roaming
 network, `modelId` one of its [models](ChargingStationManufacturer.md#chargingstationmodels): a model is unique within
-its manufacturer only, so a station names it only with its manufacturer. The network refuses a station naming an
-unknown manufacturer or model, or a model without a manufacturer, as the station is at runtime, with what its
-templates give it; and a manufacturer or a model can not be removed while a station names it.
+its manufacturer only, so a station names it only with its manufacturer. `hardwareRevision` names one of the
+`hardwareRevisions` of the model, `firmwareVersion` one of its `firmwareVersions`: what a certificate of the model
+covers is told by them (see [ConformityAssessmentBody](ConformityAssessmentBody.md#transparencysoftwarecertificates)).
+The network refuses a station naming an unknown manufacturer, model, hardware revision or firmware version, a model
+without a manufacturer, or a hardware revision or firmware version without a model, as the station is at runtime,
+with what its templates give it; and a manufacturer, a model, a hardware revision or a firmware version can not be
+removed while a station names it.
 
 
 ## parkingSpaceIds
@@ -259,8 +265,8 @@ The station's status is set on its own; it is not calculated from the status of 
 - In its operator: the station belongs to the operator of its pool, and is unique within the operator across all
   pools; its EVSEs' `chargingTariffIds` must be tariffs of the operator; a [ChargingStationGroup](ChargingStationGroup.md)
   may only name stations of the operator.
-- In its roaming network: `manufacturerId` must name a manufacturer, `modelId` one of its models, and
-  `parkingSpaceIds` parking spaces of the network.
+- In its roaming network: `manufacturerId` must name a manufacturer, `modelId` one of its models,
+  `hardwareRevision` and `firmwareVersion` one of the model's, and `parkingSpaceIds` parking spaces of the network.
 - With the properties its templates give it, it must be valid as well, e.g. their `maxPower`; see
   [templates and effective members](README.md#templates-and-effective-members). Its `templateIds` must name charging
   station templates of the operator.
@@ -283,6 +289,8 @@ The station's status is set on its own; it is not calculated from the status of 
   "hotline":           "+49 3641 123456",
   "manufacturerId":    "ACME",
   "modelId":           "Wallbox-22",
+  "hardwareRevision":  "1.0",
+  "firmwareVersion":   "1.0.0",
   "EVSEs": [
     {
       "@id":                "DE*GEF*E1*1",

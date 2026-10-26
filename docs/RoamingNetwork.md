@@ -338,7 +338,8 @@ Checked when a change set is applied:
       "transparencySoftwareCertificates": [
         { "@id": "PTB-2026-0042",
           "chargingStationModel": "Wallbox 22",
-          "chargingStationModelVersion": "2.1",
+          "hardwareRevisions": [ "2.1" ],
+          "firmwareVersions": [ "4.7.1" ],
           "verifiedTransparencySoftwareIds":   [ "chargy-desktop-1.4.0" ],
           "compatibleTransparencySoftwareIds": [],
           "notBefore": "2026-01-01T00:00:00.000Z" }

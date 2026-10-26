@@ -221,8 +221,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(stored.StatusCode,                                                           Is.EqualTo(HttpStatusCode.OK));
                 Assert.That(storedJSON!["energyMeter"]!["manufacturerId"],                               Is.Null);
                 Assert.That(HeaderOf(stored, "ETag"),                                                    Is.EqualTo(HeaderOf(stored, "X-Stored-ETag")));
-                Assert.That(points!.Single()["energyMeter"]!["hardwareVersion"]!.Value<String>(),        Is.EqualTo("2.0"));
-                Assert.That(storedPoints!.Single()["energyMeter"]!["hardwareVersion"],                   Is.Null);
+                Assert.That(points!.Single()["energyMeter"]!["hardwareRevision"]!.Value<String>(),        Is.EqualTo("2.0"));
+                Assert.That(storedPoints!.Single()["energyMeter"]!["hardwareRevision"],                   Is.Null);
 
                 // Embedded in its charging pool as the pool is: at runtime, or as given.
                 Assert.That(expanded!["gridConnectionPoint"]!["energyMeter"]!["manufacturerId"]!.Value<String>(),  Is.EqualTo("ZAP"));

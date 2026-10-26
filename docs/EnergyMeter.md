@@ -2,9 +2,9 @@
 
 An energy meter measures the energy of what embeds it: a whole charging pool, a grid connection point
 (e.g. the grid meter), a charging station, or a single EVSE (e.g. the calibration-law meter of a charge point).
-It is described by its role, its manufacturer and model, serial number and versions, by how it signs its
-measurements and the public keys it signs them with, and by the transparency software releases that can verify its
-signed measurements, with their legal status.
+It is described by its role, its manufacturer and model, serial number, hardware revision and firmware version, by
+how it signs its measurements and the public keys it signs them with, and by the transparency software releases that
+can verify its signed measurements, with their legal status.
 
 An energy meter is an entity with admin status and status, but it is **not addressed by change sets on its own**:
 it is embedded completely in what it measures and changes as a property of that ([below](#where-energy-meters-live)).
@@ -53,8 +53,8 @@ is replaced or removed as a whole ([below](#change-sets)).
 | `modelId` | `ModelId` | `EnergyMeterModel_Id` | via parent | A model of its manufacturer ([below](#manufacturerid)); only with its `manufacturerId`, its own or one of its templates. |
 | `modelURL` | `ModelURL` | URL | via parent | The homepage of its model, e.g. with its data sheet. |
 | `serialNumber` | `SerialNumber` | string | via parent | |
-| `hardwareVersion` | `HardwareVersion` | string | via parent | |
-| `firmwareVersion` | `FirmwareVersion` | string | via parent | |
+| `hardwareRevision` | `HardwareRevision` | string | via parent | The hardware revision it was built in: one of the `hardwareRevisions` of its model ([below](#manufacturerid)), only with its `modelId`, its own or one of its templates. |
+| `firmwareVersion` | `FirmwareVersion` | string | via parent | The firmware version it runs: one of the `firmwareVersions` of its model, as `hardwareRevision`. |
 | `transparencySoftwareStatus` | `TransparencySoftwareStatus` | [TransparencySoftwareAssignment](#transparencysoftwarestatus)[] | via parent | The transparency software releases for its measurements, with their legal status; ordered by `transparencySoftwareId` (ordinal), at most one per release. Omitted when empty. |
 | `signatureMethods` | `SignatureMethods` | [SignatureMethod](#signaturemethods)[] | via parent | How it signs its measurements, e.g. `OCMF`; ordered by name (ordinal), each once. Omitted when empty. |
 | `publicKeys` | `PublicKeys` | [EnergyMeterPublicKey](#publickeys)[] | via parent | The public keys it signs its measurements with, with their certificate chains; ordered by `@id` (ordinal), each once. Omitted when empty. |
@@ -87,7 +87,7 @@ stations' and EVSEs'), `ChargingStation.AllEnergyMeters`, `EVSE.AllEnergyMeters`
 
 An energy meter names [energy meter templates](EnergyMeterTemplate.md) in `templateIds`: of the charging station
 operator of its pool, station or EVSE, or, of a grid connection point, of its grid operator. A template may give it
-`role`, `manufacturerId`, `modelId`, `modelURL`, `hardwareVersion`, `firmwareVersion`, `transparencySoftwareStatus`
+`role`, `manufacturerId`, `modelId`, `modelURL`, `hardwareRevision`, `firmwareVersion`, `transparencySoftwareStatus`
 and `signatureMethods`, but never `serialNumber` or `publicKeys`: a value of its own wins, else the first template's;
 arrays are united. The meter keeps only its own; it takes the others at runtime, as the effective energy meter the
 effective EVSEs, charging stations, charging pools and grid connection points embed.
@@ -122,9 +122,10 @@ changes.
 
 A reference to an `EnergyMeterManufacturer` of the roaming network (its `energyMeterManufacturers`, owned by the
 RNO; documented in [RoamingNetwork](RoamingNetwork.md#energymetermanufacturers)), a party; its `modelId` one of the
-[models](EnergyMeterManufacturer.md#energymetermodels) of that manufacturer. Both must exist in the version the meter
-is in, as the meter is at runtime, with what its templates give it; a manufacturer or a model still named by a meter
-can not be removed.
+[models](EnergyMeterManufacturer.md#energymetermodels) of that manufacturer; its `hardwareRevision` one of the
+`hardwareRevisions` of that model, its `firmwareVersion` one of its `firmwareVersions`. All must exist in the version
+the meter is in, as the meter is at runtime, with what its templates give it; a manufacturer, a model, a hardware
+revision or a firmware version still named by a meter can not be removed.
 
 
 ## transparencySoftwareStatus
@@ -196,8 +197,10 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `EnergyMe
 - Within one pool's or one station's `energyMeters`: no null entries, no identification twice.
 - Network level: an identification at most once in the whole roaming network, across all pools, grid connection
   points, stations and EVSEs of all operators.
-- `manufacturerId`, when given, names an energy meter manufacturer of the network, `modelId` one of its models; a
-  `modelId` without a manufacturer, its own or one of its templates, is refused.
+- `manufacturerId`, when given, names an energy meter manufacturer of the network, `modelId` one of its models,
+  `hardwareRevision` and `firmwareVersion` one of the model's; a `modelId` without a manufacturer, or a
+  `hardwareRevision` or `firmwareVersion` without a model, its own or one of its templates, is refused.
+  `hardwareVersion`, its name of before, is no property of a meter.
 - `transparencySoftwareStatus`: a JSON array of objects, each with `transparencySoftwareId` and `legalStatus`;
   a release at most once; every release and certificate exists in the network; a given certificate covers its release.
 - `signatureMethods`: an array of nonempty texts, none twice, in any case.
@@ -219,7 +222,7 @@ An EVSE's meter, as `energyMeter`:
   "modelId": "ACME-3000",
   "modelURL": "https://meters.example.org/acme-3000",
   "serialNumber": "1ESY1161229886",
-  "hardwareVersion": "1.2",
+  "hardwareRevision": "1.2",
   "firmwareVersion": "4.7.1",
   "transparencySoftwareStatus": [
     { "transparencySoftwareId": "chargy-1.5.0", "legalStatus": "germanCalibrationLaw", "certificateId": "PTB-2026-001" }

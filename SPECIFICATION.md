@@ -85,9 +85,9 @@ A version of a roaming network is identified by its **content**: its JSON repres
       description, their URLs; `daysOfWeek` Monday first; `currentTypes` and `chargingModes` in the order of their
       definition;
     - as given: the `elements` of a tariff and their `priceComponents`, `images`, `relatedLocations`, `templateIds`,
-      `locationLanguages`, the `versions` of a model, regular openings and exceptional periods, `energySources`,
-      `environmentalImpacts`, `marketLocationIds`, `meteringLocationIds`, `officialLanguages`, `treeHashAlgorithms`,
-      certificate chains, and the arrays of custom data.
+      `locationLanguages`, the `hardwareRevisions` and `firmwareVersions` of a model and of a certificate, regular
+      openings and exceptional periods, `energySources`, `environmentalImpacts`, `marketLocationIds`,
+      `meteringLocationIds`, `officialLanguages`, `treeHashAlgorithms`, certificate chains, and the arrays of custom data.
   - **Identifications** trimmed, as their type writes them: of charging station operators and grid operators in upper
     case with `*` (`DE*GEF`), of charging pools, stations, EVSEs, tariffs, groups and templates with their operator so,
     of e-mobility providers in upper case with the separator given, every other one as given. Predefined values of

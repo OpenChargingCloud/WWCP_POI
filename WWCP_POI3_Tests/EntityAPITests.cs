@@ -123,7 +123,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                     Created:                   Created,
                     ChargingStationManufacturers:  [ new ChargingStationManufacturer(ChargingStationManufacturer_Id.Parse("ACME"),
                                                                                      I18NString.Create(Languages.en, "ACME Chargers"),
-                                                                                     Models:   [ new ChargingStationModel(ChargingStationModel_Id.Parse("Wallbox-22"), Versions: [ "1.0" ]),
+                                                                                     Models:   [ new ChargingStationModel(ChargingStationModel_Id.Parse("Wallbox-22"), HardwareRevisions: [ "1.0" ], FirmwareVersions: [ "1.0.0" ]),
                                                                                                  new ChargingStationModel(ChargingStationModel_Id.Parse("Wallbox-11")) ],
                                                                                      Created:  Created) ],
                     EnergyMeterManufacturers:  [ new EnergyMeterManufacturer(EnergyMeterManufacturer_Id.Parse("METERS"),
@@ -630,7 +630,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                 Assert.That(HeaderOf(list, "X-Total-Count"),                           Is.EqualTo("2"));
 
                 Assert.That(model.StatusCode,                                          Is.EqualTo(HttpStatusCode.OK));
-                Assert.That(ParseJSON(modelContent)["versions"]![0]!.Value<String>(), Is.EqualTo("1.0"));
+                Assert.That(ParseJSON(modelContent)["hardwareRevisions"]![0]!.Value<String>(), Is.EqualTo("1.0"));
                 Assert.That(missing.StatusCode,                                        Is.EqualTo(HttpStatusCode.NotFound));
 
                 Assert.That(JArray.Parse(System.Text.Encoding.UTF8.GetString(metersContent)).Single()["@id"]!.Value<String>(),  Is.EqualTo("M-500"));

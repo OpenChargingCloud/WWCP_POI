@@ -48,19 +48,23 @@ public static class ExampleA3
         #region 2. The templates: DC and AC
 
         // A template names no members: a station, an EVSE or an energy meter names the templates it takes, so they come
-        // first. Each charging station template gives its stations their power together, their manufacturer and model,
-        // each EVSE template its EVSEs their connector, each energy meter template its meters their manufacturer, model and
-        // how they sign their measurements.
+        // first. Each charging station template gives its stations their power together, their manufacturer and model, in
+        // its hardware revision and firmware version, each EVSE template its EVSEs their connector, each energy meter
+        // template its meters their manufacturer, model, revision and firmware and how they sign their measurements.
         Commit("The templates of the DC and the AC stations, EVSEs and energy meters",
                RoamingNetworkChange.Add(new ChargingStationTemplate(ChargingStationTemplate_Id.Parse("DE*GEF*ST_DC"),
                                                                     Name:                I18NString.Create(Languages.en, "DC charging station"),
                                                                     ManufacturerId:      ExampleA2.stationMakerId,
                                                                     ModelId:             ChargingStationModel_Id.Parse("GD-DC300"),
+                                                                    HardwareRevision:    "1.0",
+                                                                    FirmwareVersion:     "2.5.0",
                                                                     MaxPower:            Watt.FromKW(300))),
                RoamingNetworkChange.Add(new ChargingStationTemplate(ChargingStationTemplate_Id.Parse("DE*GEF*ST_AC"),
                                                                     Name:                I18NString.Create(Languages.en, "AC charging station"),
                                                                     ManufacturerId:      ExampleA2.stationMakerId,
                                                                     ModelId:             ChargingStationModel_Id.Parse("GD-AC44"),
+                                                                    HardwareRevision:    "1.0",
+                                                                    FirmwareVersion:     "1.8.2",
                                                                     MaxPower:            Watt.FromKW(44))),
                RoamingNetworkChange.Add(new EVSETemplate(EVSETemplate_Id.Parse("DE*GEF*ET_DC"),
                                                          Name:                I18NString.Create(Languages.en, "DC EVSE"),
@@ -73,6 +77,8 @@ public static class ExampleA3
                                                                 Role:                EnergyMeterRole.EVSE,
                                                                 ManufacturerId:      ExampleA2.dcMeterMakerId,
                                                                 ModelId:             EnergyMeterModel_Id.Parse("KDM-500"),
+                                                                HardwareRevision:    "2.1",
+                                                                FirmwareVersion:     "3.2",
                                                                 SignatureMethods:    [ SignatureMethod.OCMF ]),
                                         ExampleA2.gefId),
                RoamingNetworkChange.Add(new EnergyMeterTemplate(EnergyMeterTemplate_Id.Parse("DE*GEF*EMT_AC"),
@@ -80,6 +86,8 @@ public static class ExampleA3
                                                                 Role:                EnergyMeterRole.EVSE,
                                                                 ManufacturerId:      ExampleA2.acMeterMakerId,
                                                                 ModelId:             EnergyMeterModel_Id.Parse("SM-3"),
+                                                                HardwareRevision:    "1.4",
+                                                                FirmwareVersion:     "1.0.7",
                                                                 SignatureMethods:    [ SignatureMethod.OCMF ]),
                                         ExampleA2.gefId));
 

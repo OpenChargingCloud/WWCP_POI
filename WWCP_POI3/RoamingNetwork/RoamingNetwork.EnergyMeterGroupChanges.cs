@@ -54,7 +54,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             EnergyMeter.PropertyKeys.ManufacturerId,
             EnergyMeter.PropertyKeys.ModelId,
             EnergyMeter.PropertyKeys.ModelURL,
-            EnergyMeter.PropertyKeys.HardwareVersion,
+            EnergyMeter.PropertyKeys.HardwareRevision,
             EnergyMeter.PropertyKeys.FirmwareVersion,
             EnergyMeter.PropertyKeys.TransparencySoftwareStatus,
             EnergyMeter.PropertyKeys.SignatureMethods

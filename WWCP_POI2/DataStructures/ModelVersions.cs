@@ -25,32 +25,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// The versions of a model of charging stations or energy meters.
+    /// The hardware revisions or firmware versions of a model of charging stations or energy meters, or those a
+    /// certificate covers.
     /// </summary>
-    internal static class ModelVersions
+    public static class ModelVersions
     {
 
-        #region Of(Versions, Model)
+        #region Of(Versions, Kind, Model)
 
         /// <summary>
-        /// The given versions, each once and none empty, in their given order: a certificate names one of them exactly.
+        /// The given versions, each once and none empty, in their given order: a station, a meter or a certificate names
+        /// them exactly.
         /// </summary>
-        /// <param name="Versions">The versions of a model.</param>
-        /// <param name="Model">The model in words, e.g. "the charging station model 'GD-DC300'".</param>
+        /// <param name="Versions">The hardware revisions or firmware versions.</param>
+        /// <param name="Kind">What they are, in words, e.g. "hardware revision".</param>
+        /// <param name="Model">Whose they are, in words, e.g. "the charging station model 'GD-DC300'".</param>
         public static ImmutableArray<String> Of(IEnumerable<String>?  Versions,
+                                                String                Kind,
                                                 String                Model)
         {
 
             var versions = (Versions ?? []).ToArray();
 
             if (versions.Any(String.IsNullOrWhiteSpace))
-                throw new ArgumentException($"A version of {Model} must not be empty!", nameof(Versions));
+                throw new ArgumentException($"A {Kind} of {Model} must not be empty!", nameof(Versions));
 
             if (versions.Any(version => version != version.Trim()))
-                throw new ArgumentException($"A version of {Model} must not begin or end with whitespace!", nameof(Versions));
+                throw new ArgumentException($"A {Kind} of {Model} must not begin or end with whitespace!", nameof(Versions));
 
             if (versions.Distinct(StringComparer.Ordinal).Count() != versions.Length)
-                throw new ArgumentException($"A version of {Model} must not be given twice!", nameof(Versions));
+                throw new ArgumentException($"A {Kind} of {Model} must not be given twice!", nameof(Versions));
 
             return [ .. versions ];
 

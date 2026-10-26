@@ -45,8 +45,10 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 
 The properties of an energy meter it gives its members, each written and read as an
 [energy meter](EnergyMeter.md#properties) writes and reads it, and each updated or removed by a change set. Of `role`,
-`manufacturerId` (an energy meter manufacturer of the network), `modelId` (one of its models), `modelURL`, `hardwareVersion` and
-`firmwareVersion` its members take the value of the first of their templates giving one, unless they have their own.
+`manufacturerId` (an energy meter manufacturer of the network), `modelId` (one of its models), `modelURL`,
+`hardwareRevision` and `firmwareVersion` (one of the model's) its members take the value of the first of their
+templates giving one, unless they have their own. A hardware revision or firmware version is checked against the
+model of the template, where it gives one, and against the model of each member, as it is at runtime.
 Of `transparencySoftwareStatus` (releases and certificates of the network) and `signatureMethods` they take those of
 all their templates besides their own; of the status of the same transparency software release their own, else the
 first template's. Its `serialNumber` and its `publicKeys` belong to the single device: no template gives them.

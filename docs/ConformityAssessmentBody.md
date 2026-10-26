@@ -75,10 +75,10 @@ All are optional and omitted when absent.
 
 `TransparencySoftwareCertificate` ([source](../WWCP_POI2/RoamingNetwork/TransparencySoftware/TransparencySoftwareCertificate.cs)),
 context `https://open.charging.cloud/contexts/wwcp/roamingNetwork/transparencySoftwareCertificate/v1`: an approval or
-compatibility document for a charging station model and version, naming the transparency software releases it
-verifies or finds compatible. A domain document, not a cryptographic certificate. Without runtime status, timestamps
-and custom data; the body embedding it is its issuer. Read strictly: an unknown property is an error, also the `issuer`
-of earlier versions.
+compatibility document for a charging station model, in the hardware revisions and firmware versions it covers, naming
+the transparency software releases it verifies or finds compatible. A domain document, not a cryptographic
+certificate. Without runtime status, timestamps and custom data; the body embedding it is its issuer. Read strictly:
+an unknown property is an error, also the `issuer` and the `chargingStationModelVersion` of earlier versions.
 
 | JSON key | Type | Change set | Description |
 |---|---|---|---|
@@ -86,8 +86,9 @@ of earlier versions.
 | `legislation` | string | update/remove | The legislation it is issued under, e.g. `MID`: one its body is `notifiedFor`. |
 | `chargingStationManufacturerId` | string | update | Mandatory: a [ChargingStationManufacturer](ChargingStationManufacturer.md) of the network, the manufacturer of the model. |
 | `chargingStationModel` | string | update | Mandatory: a `ChargingStationModel_Id`, one of the [models](ChargingStationManufacturer.md#chargingstationmodels) of the manufacturer, as charging stations name their model by `modelId`, compared case-insensitively. |
-| `chargingStationModelVersion` | string | update | Mandatory: one of the `versions` of the model, compared ordinally. |
-| `verifiedTransparencySoftwareIds` | string[] | update/remove | Releases officially checked with this model/version; always written, ordered (ordinal). |
+| `hardwareRevisions` | string[] | update | Mandatory, at least one: the hardware revisions of the model it covers, each one of the `hardwareRevisions` of the model, compared ordinally; each once, in their given order. |
+| `firmwareVersions` | string[] | update | Mandatory, at least one: the firmware versions of the model it covers, each one of its `firmwareVersions`, as `hardwareRevisions`; an amendment adds one by an update of its body. |
+| `verifiedTransparencySoftwareIds` | string[] | update/remove | Releases officially checked with this model; always written, ordered (ordinal). |
 | `compatibleTransparencySoftwareIds` | string[] | update/remove | Further compatible releases, without a claim of verification; always written, ordered (ordinal). |
 | `documentNumber` | string | update/remove | The body's number of the document, if it differs from `@id`. |
 | `documentURL` | URL | update/remove | Absolute; where the body publishes the document. |
@@ -160,7 +161,8 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Conformi
       "legislation": "MID",
       "chargingStationManufacturerId": "ACME",
       "chargingStationModel": "Wallbox 22",
-      "chargingStationModelVersion": "2.1",
+      "hardwareRevisions": [ "2.1" ],
+      "firmwareVersions": [ "4.7.1" ],
       "verifiedTransparencySoftwareIds":   [ "chargy-1.5.0" ],
       "compatibleTransparencySoftwareIds": [],
       "notBefore": "2026-01-01T00:00:00.000Z"

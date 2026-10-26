@@ -47,7 +47,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly EVSE_Id                         E1        = EVSE_Id.                       Parse("DE*GEF*E1*1");
         private static readonly EVSE_Id                         E2        = EVSE_Id.                       Parse("DE*GEF*E1*2");
         private static readonly ChargingStationManufacturer_Id  ACME      = ChargingStationManufacturer_Id.Parse("ACME");
-        private static readonly ChargingStationModel            Wallbox22 = new (ChargingStationModel_Id.Parse("Wallbox-22"), Versions: [ "1.0" ]);
+        private static readonly ChargingStationModel            Wallbox22 = new (ChargingStationModel_Id.Parse("Wallbox-22"), HardwareRevisions: [ "1.0" ], FirmwareVersions: [ "1.0.0" ]);
 
         #endregion
 

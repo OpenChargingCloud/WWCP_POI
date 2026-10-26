@@ -83,7 +83,7 @@ flowchart TD
     EVSE -. templateIds .-> Templates
     ChargingTariffOffer -. groupIds .-> Groups
     EnergyMeter -. manufacturerId, modelId .-> EnergyMeterModel
-    TransparencySoftwareCertificate -. manufacturer, model, version .-> ChargingStationModel
+    TransparencySoftwareCertificate -. manufacturer, model, revisions, firmware .-> ChargingStationModel
     EnergyMeter -. transparencySoftwareStatus .-> TransparencySoftware
     TransparencySoftwareCertificate -. verified/compatible .-> TransparencySoftware
     RoamingNetwork -. dataLicenses .-> DataLicense
@@ -119,7 +119,8 @@ parking product ids compare case-sensitively.
   `PAS 1899:2022`), sets of names, and `assistanceServiceDetails`. The NUTS regions it is in: `nutsCodes`, e.g. `DEG`.
 - **Charging station:** `address` and `geoLocation` when they differ from its pool's, `accessibility`, `vehicleTypes`,
   `euVehicleCategories` (e.g. `M1`) and `features` (sets of names), `calibrationInfo`/`certificationInfo` (URLs), `maxPower` (W) it delivers at once, at most that of its EVSEs together,
-  `manufacturerId`/`modelId`, a model of its manufacturer, and the `parkingSpaceIds` of the network it charges at.
+  `manufacturerId`/`modelId`, a model of its manufacturer, its `hardwareRevision` and `firmwareVersion`, one of the
+  model's each, and the `parkingSpaceIds` of the network it charges at.
 - **EVSE:** `currentTypes`, `chargingModes` (arrays of names), `maxVoltage` (V), `maxCurrent` (A),
   `maxPower` (W), `geoLocation` when it differs from its station's, `maxReservationDuration` (s),
   `physicalReference` and `chargingConnectors` (`{@id, type, lockable?, format?, cableLength?, cableWeight?,
@@ -134,18 +135,20 @@ parking product ids compare case-sensitively.
   operator or parking operator; absent: the grid operator). Missing values are unknown; active power must not
   exceed apparent power.
 - **Energy meter:** `role` (e.g. `grid`, `pv`, `battery`), `manufacturerId`, `modelId`, `modelURL`,
-  `serialNumber`, `hardwareVersion`, `firmwareVersion`; with admin status and status. How it signs its
+  `serialNumber`, `hardwareRevision`, `firmwareVersion`; with admin status and status. How it signs its
   measurements, `signatureMethods` (predefined the formats Chargy verifies, e.g. `OCMF`, `EDL40`), and the
   `publicKeys` it signs them with: `{@id, key, certificateChain?}`, the DER encoded SubjectPublicKeyInfo as Base64,
   identified by its SHA-256, of any curve, e.g. secp192r1 as well, with the certificates of the key.
-  Its manufacturer is an energy meter manufacturer of the network, its `modelId` one of its models.
+  Its manufacturer is an energy meter manufacturer of the network, its `modelId` one of its models, its
+  `hardwareRevision` and `firmwareVersion` one of the model's each.
 - **Manufacturers and models:** charging station and energy meter manufacturers are parties, as the operators are:
   added and removed by the RNO with their keys, they state their models themselves, with a key that may sign
   `models`. A model (`ChargingStationModel`, `EnergyMeterModel`) is unique within its manufacturer only, so every change
-  of it names its manufacturer as its parent; it names its `versions`, a product page and datasheet, images and its
-  ratings: of a charging station model `maxPower`, `currentTypes`, `connectorTypes` and `numberOfEVSEs`, of an energy
-  meter model `currentTypes`, `maxCurrent`, `accuracyClass`, `measurands` and `signatureMethods`. A station, a meter or
-  a template names a model only with its manufacturer, and only one of it.
+  of it names its manufacturer as its parent; it names its `hardwareRevisions` and `firmwareVersions`, a product page
+  and datasheet, images and its ratings: of a charging station model `maxPower`, `currentTypes`, `connectorTypes` and
+  `numberOfEVSEs`, of an energy meter model `currentTypes`, `maxCurrent`, `accuracyClass`, `measurands` and
+  `signatureMethods`. A station, a meter or a template names a model only with its manufacturer, and only one of it,
+  a hardware revision and a firmware version only with the model, and only one of it.
 - **Parking:** a parking operator owns its garages, spaces and sensors directly. A space may name a
   `parkingGarageId` and `parkingSensorIds` of the same operator, and who (`parkingRestrictions`, e.g. `DISABLED`) and which
   vehicles (`euVehicleCategories`) may park there; garages, spaces and sensors may name
@@ -213,7 +216,8 @@ parking product ids compare case-sensitively.
   key that may sign `certificates`, or the RNO in its place while it has no keys; it names its `notifiedBodyNumber` and
   the legislations it is `notifiedFor`, e.g. `MID` or `CRA`, and a certificate's `legislation` must be one of them).
   Releases and certificates have no status and timestamps. A certificate names the releases it
-  verifies or finds compatible, and the charging station manufacturer, model and version of the model it is for. An energy meter's `transparencySoftwareStatus`
+  verifies or finds compatible, and the charging station manufacturer and model it is for, with the hardware revisions
+  and firmware versions of the model it covers. An energy meter's `transparencySoftwareStatus`
   assigns releases with their `legalStatus`, at most one entry per release; a given `certificateId` must cover it.
 - **ETags:** SHA-256, SHA-384 or SHA-512 over canonical JSON or canonical CBOR.
   They identify a version; `CalcETags()` and `ValidateETags(…)`. Every other entity has the ETags of its content as
