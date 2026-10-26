@@ -80,7 +80,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                     Role:              EnergyMeterRole.EVSE,
                     ManufacturerId:    ACME,
                     ModelId:           ACME3000,
-                    FirmwareVersion:   "4.7.1",
+                    FirmwareVersion:   FirmwareVersion.Parse("4.7.1"),
                     SignatureMethods:  [ SignatureMethod.OCMF ],
                     Created:           Created);
 
@@ -92,7 +92,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             => new (GridMeters,
                     ManufacturerId:    ZAP,
                     ModelId:           EnergyMeterModel_Id.Parse("ZAP-G"),
-                    HardwareRevision:  "2.0",
+                    HardwareRevision:  HardwareRevision.Parse("2.0"),
                     Created:           Created);
 
         #endregion
@@ -100,7 +100,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         /// <summary>
         /// The firmware versions of the models of ACME, those the template of EVSE meters gives one after another.
         /// </summary>
-        private static readonly String[] ACMEFirmware = [ "4.7.1", "4.8.0", "5.0.0" ];
+        private static readonly FirmwareVersion[] ACMEFirmware = [ FirmwareVersion.Parse("4.7.1"), FirmwareVersion.Parse("4.8.0"), FirmwareVersion.Parse("5.0.0") ];
 
         #region NewNetwork(OperatorTemplates = null, GridTemplates = null, Meter2Templates = null)
 
@@ -123,8 +123,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                             Created:  Created),
                                                 new EnergyMeterManufacturer(ZAP,
                                                                             Models:   [ new EnergyMeterModel(EnergyMeterModel_Id.Parse("ZAP-G"),
-                                                                                                             HardwareRevisions:  [ "2.0", "3.0" ],
-                                                                                                             FirmwareVersions:   [ "9.0" ]) ],
+                                                                                                             HardwareRevisions:  [ HardwareRevision.Parse("2.0"), HardwareRevision.Parse("3.0") ],
+                                                                                                             FirmwareVersions:   [ FirmwareVersion.Parse("9.0") ]) ],
                                                                             Created:  Created) ],
                    GridOperators:             [ new GridOperator(NET,
                                                                  GridConnectionPoints:  [ new GridConnectionPoint(GCP,
@@ -256,7 +256,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(meter1.ModelId,                                       Is.EqualTo(ACME1000));
                 Assert.That(meter1.ManufacturerId,                                Is.EqualTo(ACME));
                 Assert.That(meter1.Role,                                          Is.EqualTo(EnergyMeterRole.EVSE));
-                Assert.That(meter1.FirmwareVersion,                               Is.EqualTo("4.7.1"));
+                Assert.That(meter1.FirmwareVersion,                               Is.EqualTo(FirmwareVersion.Parse("4.7.1")));
                 Assert.That(meter1.SignatureMethods,                              Is.EqualTo(new[] { SignatureMethod.OCMF }));
                 Assert.That(meter1.SerialNumber,                                  Is.EqualTo("M-1"));
                 Assert.That(meter1.TemplateIds,                                   Is.EqualTo(new[] { EVSEMeters }));
@@ -275,11 +275,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 // The grid meter takes the properties of the template of its grid operator, but keeps its role.
                 Assert.That(grid.ManufacturerId,                                  Is.EqualTo(ZAP));
-                Assert.That(grid.HardwareRevision,                                 Is.EqualTo("2.0"));
+                Assert.That(grid.HardwareRevision,                                 Is.EqualTo(HardwareRevision.Parse("2.0")));
                 Assert.That(grid.Role,                                            Is.EqualTo(EnergyMeterRole.Grid));
                 Assert.That(net.GridConnectionPoints.Single().EnergyMeter!.ManufacturerId,  Is.Null);
                 Assert.That(net.TryGetEffectiveGridConnectionPoint(GridConnectionPoint_Id.Parse("CONNECTION-42"), out var point),  Is.True);
-                Assert.That(point!.EnergyMeter!.HardwareRevision,                  Is.EqualTo("2.0"));
+                Assert.That(point!.EnergyMeter!.HardwareRevision,                  Is.EqualTo(HardwareRevision.Parse("2.0")));
 
                 // An effective meter has the runtime status of the meter.
                 Assert.That(EffectiveMeterOf(history.Head.RoamingNetwork, E1).Status.Value,  Is.EqualTo(EnergyMeterStatusType.Error));
@@ -401,7 +401,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var template      = gef.EnergyMeterTemplates.Single();
             var gridTemplate  = rn1.GridOperators.Single().EnergyMeterTemplates.Single();
             var poolTemplate  = new EnergyMeterTemplate(EnergyMeterTemplate_Id.Parse("gef-pool-meters"), ManufacturerId: ACME);
-            var moreGrid      = new EnergyMeterTemplate(EnergyMeterTemplate_Id.Parse("net-firmware"),    FirmwareVersion: "9.0");
+            var moreGrid      = new EnergyMeterTemplate(EnergyMeterTemplate_Id.Parse("net-firmware"),    FirmwareVersion: FirmwareVersion.Parse("9.0"));
             var poolMeter     = gef.ChargingPools.Single();
 
             var rn2           = Apply(rn1,
@@ -422,7 +422,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(effectiveE2!.EnergyMeter!.ModelId,                    Is.EqualTo(EnergyMeterModel_Id.Parse("ACME-5000")));
                 Assert.That(gef2.EffectiveChargingPools.Single().EnergyMeters.Single().ManufacturerId,                Is.EqualTo(ACME));
-                Assert.That(rn2.GridOperators.Single().EffectiveGridConnectionPoints.Single().EnergyMeter!.FirmwareVersion,  Is.EqualTo("9.0"));
+                Assert.That(rn2.GridOperators.Single().EffectiveGridConnectionPoints.Single().EnergyMeter!.FirmwareVersion,  Is.EqualTo(FirmwareVersion.Parse("9.0")));
 
                 // The change set's time: of the template, of its owner, and of the members it gives something else, as they
                 // are at runtime; not of the members as they are given.
@@ -490,7 +490,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var left          = Apply(rn1, RoamingNetworkChange.UpdateProperty(template,     "firmwareVersion", "4.7.1", "4.8.0"));
             var right         = Apply(rn1, RoamingNetworkChange.UpdateProperty(gridTemplate, "hardwareRevision", "2.0",   "3.0"),
-                                           RoamingNetworkChange.Add(new EnergyMeterTemplate(EnergyMeterTemplate_Id.Parse("net-firmware"), FirmwareVersion: "9.0"), NET));
+                                           RoamingNetworkChange.Add(new EnergyMeterTemplate(EnergyMeterTemplate_Id.Parse("net-firmware"), FirmwareVersion: FirmwareVersion.Parse("9.0")), NET));
             var other         = Apply(rn1, RoamingNetworkChange.UpdateProperty(template,     "firmwareVersion", "4.7.1", "5.0.0"));
 
             var merged        = RoamingNetwork.TryMerge(rn1, left, right, ChangeSet_Id.Parse("merge-1"), out var merge, out _, out var conflicts1);
@@ -500,8 +500,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             {
 
                 Assert.That(merged,                                                                Is.True, String.Join(" ", conflicts1.Select(conflict => conflict.Description)));
-                Assert.That(EffectiveMeterOf(merge!, E1).FirmwareVersion,                          Is.EqualTo("4.8.0"));
-                Assert.That(merge.GridOperators.Single().EffectiveGridConnectionPoints.Single().EnergyMeter!.HardwareRevision,  Is.EqualTo("3.0"));
+                Assert.That(EffectiveMeterOf(merge!, E1).FirmwareVersion,                          Is.EqualTo(FirmwareVersion.Parse("4.8.0")));
+                Assert.That(merge.GridOperators.Single().EffectiveGridConnectionPoints.Single().EnergyMeter!.HardwareRevision,  Is.EqualTo(HardwareRevision.Parse("3.0")));
                 Assert.That(merge.TryGetEnergyMeterTemplateById(EnergyMeterTemplate_Id.Parse("net-firmware"), out _),           Is.True);
 
                 Assert.That(conflict,                                                              Is.False);

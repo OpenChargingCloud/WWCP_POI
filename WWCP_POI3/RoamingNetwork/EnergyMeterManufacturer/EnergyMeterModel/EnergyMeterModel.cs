@@ -168,12 +168,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The hardware revisions it was built in, each once, in their given order.
         /// </summary>
-        public ImmutableArray<String>           HardwareRevisions  { get; }
+        public ImmutableArray<HardwareRevision> HardwareRevisions  { get; }
 
         /// <summary>
         /// The firmware versions it ran, each once, in their given order.
         /// </summary>
-        public ImmutableArray<String>           FirmwareVersions   { get; }
+        public ImmutableArray<FirmwareVersion>  FirmwareVersions   { get; }
 
         /// <summary>
         /// The URL of its product page.
@@ -244,8 +244,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public EnergyMeterModel(EnergyMeterModel_Id            Id,
                                 ImmutableI18NString?           Name               = null,
                                 ImmutableI18NString?           Description        = null,
-                                IEnumerable<String>?           HardwareRevisions  = null,
-                                IEnumerable<String>?           FirmwareVersions   = null,
+                                IEnumerable<HardwareRevision>? HardwareRevisions  = null,
+                                IEnumerable<FirmwareVersion>?  FirmwareVersions   = null,
                                 URL?                           ProductURL         = null,
                                 URL?                           DatasheetURL       = null,
                                 IEnumerable<Image>?            Images             = null,
@@ -296,9 +296,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Whether the given hardware revision is one of its hardware revisions.
         /// </summary>
-        public Boolean HasHardwareRevision(String HardwareRevision)
+        public Boolean HasHardwareRevision(HardwareRevision HardwareRevision)
 
-            => HardwareRevisions.Contains(HardwareRevision, StringComparer.Ordinal);
+            => HardwareRevisions.Contains(HardwareRevision);
 
         #endregion
 
@@ -307,9 +307,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Whether the given firmware version is one of its firmware versions.
         /// </summary>
-        public Boolean HasFirmwareVersion(String FirmwareVersion)
+        public Boolean HasFirmwareVersion(FirmwareVersion FirmwareVersion)
 
-            => FirmwareVersions.Contains(FirmwareVersion, StringComparer.Ordinal);
+            => FirmwareVersions.Contains(FirmwareVersion);
 
         #endregion
 
@@ -339,10 +339,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add(PropertyKeys.Description,       Description.ToJSON());
 
             if (HardwareRevisions.Length > 0)
-                json.Add(PropertyKeys.HardwareRevisions, new JArray(HardwareRevisions));
+                json.Add(PropertyKeys.HardwareRevisions, POIJSON.IdsToJSON(HardwareRevisions));
 
             if (FirmwareVersions.Length > 0)
-                json.Add(PropertyKeys.FirmwareVersions,  new JArray(FirmwareVersions));
+                json.Add(PropertyKeys.FirmwareVersions,  POIJSON.IdsToJSON(FirmwareVersions));
 
             if (ProductURL.HasValue)
                 json.Add(PropertyKeys.ProductURL,        ProductURL.Value.ToString());
@@ -421,8 +421,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!POIJSON.TryParseI18N                (JSON, PropertyKeys.Name,              "energy meter model name",         out var name,                   out ErrorResponse) ||
                     !POIJSON.TryParseI18N                (JSON, PropertyKeys.Description,       "energy meter model description",  out var description,            out ErrorResponse) ||
-                    !POIJSON.TryParseStrings             (JSON, PropertyKeys.HardwareRevisions, "hardware revisions",              out var hardwareRevisions,      out ErrorResponse) ||
-                    !POIJSON.TryParseStrings             (JSON, PropertyKeys.FirmwareVersions,  "firmware versions",               out var firmwareVersions,       out ErrorResponse) ||
+                    !POIJSON.TryParseIds<HardwareRevision>(JSON, PropertyKeys.HardwareRevisions, "hardware revision", HardwareRevision.TryParse, out var hardwareRevisions, out ErrorResponse) ||
+                    !POIJSON.TryParseIds<FirmwareVersion> (JSON, PropertyKeys.FirmwareVersions,  "firmware version",  FirmwareVersion. TryParse, out var firmwareVersions,  out ErrorResponse) ||
                     !POIJSON.TryParseText                (JSON, PropertyKeys.ProductURL,        "product URL",    URL.TryParse,    out URL? productURL,            out ErrorResponse) ||
                     !POIJSON.TryParseText                (JSON, PropertyKeys.DatasheetURL,      "datasheet URL",  URL.TryParse,    out URL? datasheetURL,          out ErrorResponse) ||
                     !POIJSON.TryParseObjects<Image>      (JSON, PropertyKeys.Images,            "images",         Image.TryParse,  out var images,                 out ErrorResponse) ||

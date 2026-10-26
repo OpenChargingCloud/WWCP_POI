@@ -157,14 +157,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// in their given order.
         /// </summary>
         [Mandatory]
-        public ImmutableArray<String>                   HardwareRevisions                    { get; }
+        public ImmutableArray<HardwareRevision>         HardwareRevisions                    { get; }
 
         /// <summary>
         /// The firmware versions of its charging station model to which this document applies, each one of its model, in
         /// their given order.
         /// </summary>
         [Mandatory]
-        public ImmutableArray<String>                   FirmwareVersions                     { get; }
+        public ImmutableArray<FirmwareVersion>          FirmwareVersions                     { get; }
 
         /// <summary>
         /// The transparency software releases officially checked with this model/version.
@@ -225,8 +225,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id     Id,
                                                ChargingStationManufacturer_Id         ChargingStationManufacturerId,
                                                ChargingStationModel_Id                ChargingStationModel,
-                                               IEnumerable<String>                    HardwareRevisions,
-                                               IEnumerable<String>                    FirmwareVersions,
+                                               IEnumerable<HardwareRevision>          HardwareRevisions,
+                                               IEnumerable<FirmwareVersion>           FirmwareVersions,
                                                IEnumerable<TransparencySoftware_Id>?  VerifiedTransparencySoftwareIds     = null,
                                                IEnumerable<TransparencySoftware_Id>?  CompatibleTransparencySoftwareIds   = null,
                                                String?                                DocumentNumber                      = null,
@@ -344,8 +344,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   Id:                                 TransparencySoftwareCertificate_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.Id)),
                                   ChargingStationManufacturerId:      ChargingStationManufacturer_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.ChargingStationManufacturerId)),
                                   ChargingStationModel:               ChargingStationModel_Id.Parse(StrictJSON.RequiredText(JSON, PropertyKeys.ChargingStationModel)),
-                                  HardwareRevisions:                  StrictJSON.Array(JSON, PropertyKeys.HardwareRevisions, StrictJSON.Identifier),
-                                  FirmwareVersions:                   StrictJSON.Array(JSON, PropertyKeys.FirmwareVersions,  StrictJSON.Identifier),
+                                  HardwareRevisions:                  StrictJSON.Array(JSON, PropertyKeys.HardwareRevisions, token => HardwareRevision.Parse(StrictJSON.Identifier(token))),
+                                  FirmwareVersions:                   StrictJSON.Array(JSON, PropertyKeys.FirmwareVersions,  token => FirmwareVersion. Parse(StrictJSON.Identifier(token))),
                                   VerifiedTransparencySoftwareIds:    StrictJSON.Array(JSON, PropertyKeys.VerifiedTransparencySoftwareIds,
                                                                                              token => TransparencySoftware_Id.Parse(StrictJSON.Identifier(token))),
                                   CompatibleTransparencySoftwareIds:  StrictJSON.Array(JSON, PropertyKeys.CompatibleTransparencySoftwareIds,
@@ -393,8 +393,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                  new JProperty(PropertyKeys.ChargingStationManufacturerId,       ChargingStationManufacturerId.ToString()),
                                  new JProperty(PropertyKeys.ChargingStationModel,                ChargingStationModel.ToString()),
-                                 new JProperty(PropertyKeys.HardwareRevisions,                   new JArray(HardwareRevisions)),
-                                 new JProperty(PropertyKeys.FirmwareVersions,                    new JArray(FirmwareVersions)),
+                                 new JProperty(PropertyKeys.HardwareRevisions,                   new JArray(HardwareRevisions.Select(hardwareRevision => hardwareRevision.ToString()))),
+                                 new JProperty(PropertyKeys.FirmwareVersions,                    new JArray(FirmwareVersions. Select(firmwareVersion  => firmwareVersion. ToString()))),
                                  new JProperty(PropertyKeys.VerifiedTransparencySoftwareIds,     new JArray(VerifiedTransparencySoftwareIds.  Select(id => id.ToString()).Order(StringComparer.Ordinal))),
                                  new JProperty(PropertyKeys.CompatibleTransparencySoftwareIds,   new JArray(CompatibleTransparencySoftwareIds.Select(id => id.ToString()).Order(StringComparer.Ordinal))),
 

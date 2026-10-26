@@ -170,12 +170,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The hardware revision it was built in, one of its model.
         /// </summary>
-        public String?  HardwareRevision   { get; }
+        public HardwareRevision?  HardwareRevision  { get; }
 
         /// <summary>
         /// The firmware version it runs, one of its model.
         /// </summary>
-        public String?  FirmwareVersion    { get; }
+        public FirmwareVersion?   FirmwareVersion   { get; }
 
         /// <summary>
         /// The transparency software releases for its measurements, with their legal status, at most one per release.
@@ -213,8 +213,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            EnergyMeterModel_Id?                        ModelId                      = null,
                            URL?                                        ModelURL                     = null,
                            String?                                     SerialNumber                 = null,
-                           String?                                     HardwareRevision             = null,
-                           String?                                     FirmwareVersion              = null,
+                           HardwareRevision?                           HardwareRevision             = null,
+                           FirmwareVersion?                            FirmwareVersion              = null,
                            IEnumerable<TransparencySoftwareAssignment>? TransparencySoftwareStatus  = null,
                            IEnumerable<SignatureMethod>?               SignatureMethods             = null,
                            IEnumerable<EnergyMeterPublicKey>?          PublicKeys                   = null,
@@ -376,11 +376,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (SerialNumber is not null)
                 json.Add(PropertyKeys.SerialNumber,                SerialNumber);
 
-            if (HardwareRevision is not null)
-                json.Add(PropertyKeys.HardwareRevision,             HardwareRevision);
+            if (HardwareRevision.HasValue)
+                json.Add(PropertyKeys.HardwareRevision,             HardwareRevision.Value.ToString());
 
-            if (FirmwareVersion is not null)
-                json.Add(PropertyKeys.FirmwareVersion,             FirmwareVersion);
+            if (FirmwareVersion.HasValue)
+                json.Add(PropertyKeys.FirmwareVersion,             FirmwareVersion.Value.ToString());
 
             if (TransparencySoftwareStatus.Length > 0)
                 json.Add(PropertyKeys.TransparencySoftwareStatus,  new JArray(TransparencySoftwareStatus.Select(assignment => assignment.ToJSON(Embedded: true))));
@@ -449,8 +449,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseText  (JSON, PropertyKeys.ModelId,              "model identification",        EnergyMeterModel_Id.       TryParse, out EnergyMeterModel_Id?        modelId,        out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, PropertyKeys.ModelURL,             "model URL",                 URL.TryParse, out URL? modelURL,        out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, PropertyKeys.SerialNumber,         "serial number",             out var serialNumber,     out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, PropertyKeys.HardwareRevision,      "hardware revision",          out var hardwareRevision,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, PropertyKeys.FirmwareVersion,      "firmware version",          out var firmwareVersion,  out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, PropertyKeys.HardwareRevision,     "hardware revision",         POI.HardwareRevision.TryParse, out POI.HardwareRevision? hardwareRevision, out ErrorResponse) ||
+                    !POIJSON.TryParseText  (JSON, PropertyKeys.FirmwareVersion,      "firmware version",          POI.FirmwareVersion. TryParse, out POI.FirmwareVersion?  firmwareVersion,  out ErrorResponse) ||
                     !POIJSON.TryParseIds<SignatureMethod>(JSON, PropertyKeys.SignatureMethods, "signature method",          SignatureMethod.TryParse,      out var signatureMethods, out ErrorResponse) ||
                     !POIJSON.TryParseObjects<EnergyMeterPublicKey>(JSON, PropertyKeys.PublicKeys,      "public key",                EnergyMeterPublicKey.TryParse, out var publicKeys,       out ErrorResponse))
                 {

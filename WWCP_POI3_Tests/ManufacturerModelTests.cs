@@ -63,8 +63,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             => new (DC300,
                     ImmutableI18NString.Create(Languages.en, "DC 300 kW"),
-                    HardwareRevisions:  [ "1.0", "1.1" ],
-                    FirmwareVersions:   [ "4.2", "4.3" ],
+                    HardwareRevisions:  [ HardwareRevision.Parse("1.0"), HardwareRevision.Parse("1.1") ],
+                    FirmwareVersions:   [ FirmwareVersion.Parse("4.2"), FirmwareVersion.Parse("4.3") ],
                     ProductURL:         URL.Parse("https://acme.example/dc-300"),
                     DatasheetURL:       URL.Parse("https://acme.example/dc-300/datasheet.pdf"),
                     MaxPower:           Watt.FromW(300000),
@@ -76,8 +76,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             => new (M500,
                     ImmutableI18NString.Create(Languages.en, "DC meter"),
-                    HardwareRevisions:  [ "3.0" ],
-                    FirmwareVersions:   [ "1.7" ],
+                    HardwareRevisions:  [ HardwareRevision.Parse("3.0") ],
+                    FirmwareVersions:   [ FirmwareVersion.Parse("1.7") ],
                     CurrentTypes:       CurrentTypes.DC,
                     MaxCurrent:         Ampere.FromA(500),
                     AccuracyClass:      "B",
@@ -104,15 +104,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                     ChargingStations:  [ new ChargingStation(S1,
                                                                                                                                                              ManufacturerId:    ACME,
                                                                                                                                                              ModelId:           StationModel ?? DC300,
-                                                                                                                                                             HardwareRevision:  StationModel is null ? "1.1"           : null,
-                                                                                                                                                             FirmwareVersion:   StationModel is null ? StationFirmware : null,
+                                                                                                                                                             HardwareRevision:  StationModel is null ? HardwareRevision.Parse("1.1")           : null,
+                                                                                                                                                             FirmwareVersion:   StationModel is null ? FirmwareVersion.Parse(StationFirmware) : null,
                                                                                                                                                              Created:           Created,
                                                                                                                                                              EVSEs:             [ new EVSE(EVSE_Id.Parse("DE*GEF*E1*1"),
                                                                                                                                                                                            EnergyMeter:  new EnergyMeter(Meter1,
                                                                                                                                                                                                                          ManufacturerId:    METERS,
                                                                                                                                                                                                                          ModelId:           MeterModel ?? M500,
-                                                                                                                                                                                                                         HardwareRevision:  MeterModel is null ? MeterRevision : null,
-                                                                                                                                                                                                                         FirmwareVersion:   MeterModel is null ? "1.7"         : null,
+                                                                                                                                                                                                                         HardwareRevision:  MeterModel is null ? HardwareRevision.Parse(MeterRevision) : null,
+                                                                                                                                                                                                                         FirmwareVersion:   MeterModel is null ? FirmwareVersion.Parse("1.7")         : null,
                                                                                                                                                                                                                          Created:           Created),
                                                                                                                                                                                            Created:      Created) ]) ]) ]) ]).WithKeys();
 
@@ -202,10 +202,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(m500["signatureMethods"]![0]!.ToString(),                        Is.EqualTo("OCMF"));
 
                 Assert.That(acme!.TryGetModel(DC300, out var model),                         Is.True);
-                Assert.That(model!.HasHardwareRevision("1.1"),                               Is.True);
-                Assert.That(model. HasHardwareRevision("4.3"),                               Is.False);
-                Assert.That(model. HasFirmwareVersion ("4.3"),                               Is.True);
-                Assert.That(model. HasFirmwareVersion ("1.1"),                               Is.False);
+                Assert.That(model!.HasHardwareRevision(HardwareRevision.Parse("1.1")),                               Is.True);
+                Assert.That(model. HasHardwareRevision(HardwareRevision.Parse("4.3")),                               Is.False);
+                Assert.That(model. HasFirmwareVersion (FirmwareVersion.Parse("4.3")),                               Is.True);
+                Assert.That(model. HasFirmwareVersion (FirmwareVersion.Parse("1.1")),                               Is.False);
                 Assert.That(model.ToJSON()["@context"]!.ToString(),                          Is.EqualTo(ChargingStationModel.JSONLDContext));
 
             }
@@ -229,9 +229,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(ChargingStationModel.TryParse(Model(new JProperty("hardwareRevisions", new JArray("1.0", "1.0"))),  out _, out var error1),  Is.False);
                 Assert.That(error1,                                                                                                 Does.Contain("A hardware revision of the charging station model 'X-1' must not be given twice"));
                 Assert.That(ChargingStationModel.TryParse(Model(new JProperty("firmwareVersions",  new JArray(" 1.0"))),        out _, out var error2),  Is.False);
-                Assert.That(error2,                                                                                                 Does.Contain("A firmware version of the charging station model 'X-1' must not begin or end with whitespace"));
+                Assert.That(error2,                                                                                                 Does.Contain("Invalid firmware version ' 1.0'"));
                 Assert.That(EnergyMeterModel.    TryParse(Model(new JProperty("firmwareVersions",  new JArray(""))),            out _, out var error6),  Is.False);
-                Assert.That(error6,                                                                                                 Does.Contain("A firmware version of the energy meter model 'X-1' must not be empty"));
+                Assert.That(error6,                                                                                                 Does.Contain("Invalid firmware version ''"));
                 Assert.That(ChargingStationModel.TryParse(Model(new JProperty("maxPower",       0)),                         out _, out var error3),  Is.False);
                 Assert.That(error3,                                                                                                 Does.Contain("must be positive"));
                 Assert.That(ChargingStationModel.TryParse(Model(new JProperty("numberOfEVSEs",  0)),                         out _, out _),           Is.False);
@@ -260,7 +260,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var acme        = TestParties.Party(ACME);
             var meters      = TestParties.Party(METERS);
             var rno         = TestParties.Party(rn1);
-            var dc150       = new ChargingStationModel(ChargingStationModel_Id.Parse("DC-150"), HardwareRevisions: [ "1.0" ]);
+            var dc150       = new ChargingStationModel(ChargingStationModel_Id.Parse("DC-150"), HardwareRevisions: [ HardwareRevision.Parse("1.0") ]);
             var addModel    = RoamingNetworkChange.Add(dc150, ACME);
             var addMeter    = RoamingNetworkChange.Add(new EnergyMeterModel(EnergyMeterModel_Id.Parse("M-300")), METERS);
 
@@ -307,7 +307,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         {
 
             var rn1      = Apply(NewNetwork(), RoamingNetworkChange.Add(new ChargingStationManufacturer(ZAP).WithKeys()));
-            var rn2      = rn1.ApplyChangeSet(SignedBy(rn1, TestParties.Party(ZAP), RoamingNetworkChange.Add(new ChargingStationModel(DC300, HardwareRevisions: [ "7" ]), ZAP)));
+            var rn2      = rn1.ApplyChangeSet(SignedBy(rn1, TestParties.Party(ZAP), RoamingNetworkChange.Add(new ChargingStationModel(DC300, HardwareRevisions: [ HardwareRevision.Parse("7") ]), ZAP)));
 
             rn2.TryGetChargingStationManufacturerById(ACME, out var acme);
             rn2.TryGetChargingStationManufacturerById(ZAP,  out var zap);
@@ -325,7 +325,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 // The same identification at another manufacturer is another model.
                 Assert.That(zap!.TryGetModel(DC300, out var zapDC300),                                         Is.True);
-                Assert.That(zapDC300!.HardwareRevisions,                                                       Is.EqualTo(new[] { "7" }));
+                Assert.That(zapDC300!.HardwareRevisions,                                                       Is.EqualTo(new[] { HardwareRevision.Parse("7") }));
 
                 Assert.That(acme3!.Models.Index[DC300].MaxPower,                                              Is.EqualTo(Watt.FromW(350000)));
                 Assert.That(zap3! .Models.Index[DC300].MaxPower,                                              Is.Null);
@@ -413,8 +413,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             using (Assert.EnterMultipleScope())
             {
 
-                Assert.That(station.HardwareRevision,                                        Is.EqualTo("1.1"));
-                Assert.That(station.FirmwareVersion,                                         Is.EqualTo("4.3"));
+                Assert.That(station.HardwareRevision,                                        Is.EqualTo(HardwareRevision.Parse("1.1")));
+                Assert.That(station.FirmwareVersion,                                         Is.EqualTo(FirmwareVersion.Parse("4.3")));
                 Assert.That(station.ToJSON()["hardwareRevision"]!.ToString(),                Is.EqualTo("1.1"));
                 Assert.That(meter.  ToJSON()["hardwareRevision"]!.ToString(),                Is.EqualTo("3.0"));
                 Assert.That(meter.  ToJSON()["hardwareVersion"],                             Is.Null);
@@ -460,7 +460,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                         String                          HardwareRevision,
                                                         String                          FirmwareVersion   = "4.3")
 
-                => new (TransparencySoftwareCertificate_Id.Parse("cert-1"), ManufacturerId, ModelId, [ HardwareRevision ], [ FirmwareVersion ], [ Chargy10 ], []);
+                => new (TransparencySoftwareCertificate_Id.Parse("cert-1"), ManufacturerId, ModelId, [ POI.HardwareRevision.Parse(HardwareRevision) ], [ POI.FirmwareVersion.Parse(FirmwareVersion) ], [ Chargy10 ], []);
 
             RoamingNetwork With(TransparencySoftwareCertificate Certificate)
 
@@ -494,7 +494,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(json["firmwareVersions"]!. Select(version  => version. ToString()),   Is.EqualTo(new[] { "4.3" }));
 
                 // At least one of each, and no longer the one version of before.
-                Assert.That(() => new TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id.Parse("cert-2"), ACME, DC300, [ "1.1" ], [], [ Chargy10 ], []),
+                Assert.That(() => new TransparencySoftwareCertificate(TransparencySoftwareCertificate_Id.Parse("cert-2"), ACME, DC300, [ HardwareRevision.Parse("1.1") ], [], [ Chargy10 ], []),
                             Throws.ArgumentException.With.Message.Contains("The certificate 'cert-2' must name at least one firmware version of its model"));
 
                 var withVersion = Certificate(ACME, DC300, "1.1").ToJSON();
@@ -556,7 +556,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             // The same identification at two manufacturers, changed on both branches.
             var left      = Apply(rn1, RoamingNetworkChange.UpdateProperty(dc300!, ACME, "maxPower", 300000, 350000),
-                                       RoamingNetworkChange.Add(new ChargingStationModel(DC300, HardwareRevisions: [ "7" ]), ZAP));
+                                       RoamingNetworkChange.Add(new ChargingStationModel(DC300, HardwareRevisions: [ HardwareRevision.Parse("7") ]), ZAP));
             var right     = Apply(rn1, RoamingNetworkChange.UpdateProperty(ac22!,  ACME, "numberOfEVSEs", null, 1),
                                        RoamingNetworkChange.UpdateProperty(dc300!, ACME, "datasheetURL", "https://acme.example/dc-300/datasheet.pdf", "https://acme.example/dc-300/v2.pdf"));
             var other     = Apply(rn1, RoamingNetworkChange.UpdateProperty(dc300!, ACME, "maxPower", 300000, 400000));
@@ -575,7 +575,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(acme!.Models.Index[DC300].MaxPower,                                 Is.EqualTo(Watt.FromW(350000)));
                 Assert.That(acme. Models.Index[DC300].DatasheetURL?.ToString(),                 Is.EqualTo("https://acme.example/dc-300/v2.pdf"));
                 Assert.That(acme. Models.Index[AC22]. NumberOfEVSEs,                            Is.EqualTo(1));
-                Assert.That(zap!. Models.Index[DC300].HardwareRevisions,                        Is.EqualTo(new[] { "7" }));
+                Assert.That(zap!. Models.Index[DC300].HardwareRevisions,                        Is.EqualTo(new[] { HardwareRevision.Parse("7") }));
 
                 Assert.That(conflict,                                                            Is.False);
                 Assert.That(conflicts2.Single().PropertyName,                                    Is.EqualTo("maxPower"));

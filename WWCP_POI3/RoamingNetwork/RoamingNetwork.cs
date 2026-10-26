@@ -2717,8 +2717,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static String? UnknownEnergyMeterModel(String                                                                    Named,
                                                        EnergyMeterManufacturer_Id?                                               ManufacturerId,
                                                        EnergyMeterModel_Id?                                                      ModelId,
-                                                       String?                                                                   HardwareRevision,
-                                                       String?                                                                   FirmwareVersion,
+                                                       HardwareRevision?                                                         HardwareRevision,
+                                                       FirmwareVersion?                                                          FirmwareVersion,
                                                        IReadOnlyDictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>  EnergyMeterManufacturers)
         {
 
@@ -2747,10 +2747,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!manufacturer.TryGetModel(ModelId.Value, out var model))
                 return $"{Named} names the model '{ModelId}', unknown at its manufacturer '{manufacturer.Id}'!";
 
-            if (HardwareRevision is not null && !model.HasHardwareRevision(HardwareRevision))
+            if (HardwareRevision.HasValue && !model.HasHardwareRevision(HardwareRevision.Value))
                 return $"{Named} names the hardware revision '{HardwareRevision}', no hardware revision of its model '{model.Id}' of '{manufacturer.Id}'!";
 
-            if (FirmwareVersion is not null && !model.HasFirmwareVersion(FirmwareVersion))
+            if (FirmwareVersion.HasValue && !model.HasFirmwareVersion(FirmwareVersion.Value))
                 return $"{Named} names the firmware version '{FirmwareVersion}', no firmware version of its model '{model.Id}' of '{manufacturer.Id}'!";
 
             return null;
@@ -3060,8 +3060,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private static String? UnknownChargingStationModel(String                                                                            Named,
                                                            ChargingStationManufacturer_Id?                                                   ManufacturerId,
                                                            ChargingStationModel_Id?                                                          ModelId,
-                                                           String?                                                                           HardwareRevision,
-                                                           String?                                                                           FirmwareVersion,
+                                                           HardwareRevision?                                                                 HardwareRevision,
+                                                           FirmwareVersion?                                                                  FirmwareVersion,
                                                            IReadOnlyDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>  ChargingStationManufacturers)
         {
 
@@ -3090,10 +3090,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!manufacturer.TryGetModel(ModelId.Value, out var model))
                 return $"The model '{ModelId}' of {Named} is unknown at its manufacturer '{manufacturer.Id}'!";
 
-            if (HardwareRevision is not null && !model.HasHardwareRevision(HardwareRevision))
+            if (HardwareRevision.HasValue && !model.HasHardwareRevision(HardwareRevision.Value))
                 return $"The hardware revision '{HardwareRevision}' of {Named} is no hardware revision of its model '{model.Id}' of '{manufacturer.Id}'!";
 
-            if (FirmwareVersion is not null && !model.HasFirmwareVersion(FirmwareVersion))
+            if (FirmwareVersion.HasValue && !model.HasFirmwareVersion(FirmwareVersion.Value))
                 return $"The firmware version '{FirmwareVersion}' of {Named} is no firmware version of its model '{model.Id}' of '{manufacturer.Id}'!";
 
             return null;

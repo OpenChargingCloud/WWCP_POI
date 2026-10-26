@@ -19,6 +19,8 @@
 
 using System.Collections.Immutable;
 
+using org.GraphDefined.Vanaheimr.Illias;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -31,7 +33,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public static class ModelVersions
     {
 
-        #region Of(Versions, Kind, Model)
+        #region Of<T>(Versions, Kind, Model)
 
         /// <summary>
         /// The given versions, each once and none empty, in their given order: a station, a meter or a certificate names
@@ -40,20 +42,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Versions">The hardware revisions or firmware versions.</param>
         /// <param name="Kind">What they are, in words, e.g. "hardware revision".</param>
         /// <param name="Model">Whose they are, in words, e.g. "the charging station model 'GD-DC300'".</param>
-        public static ImmutableArray<String> Of(IEnumerable<String>?  Versions,
-                                                String                Kind,
-                                                String                Model)
+        public static ImmutableArray<T> Of<T>(IEnumerable<T>?  Versions,
+                                              String           Kind,
+                                              String           Model)
+
+            where T : struct, IId<T>
+
         {
 
             var versions = (Versions ?? []).ToArray();
 
-            if (versions.Any(String.IsNullOrWhiteSpace))
+            if (versions.Any(version => version.IsNullOrEmpty))
                 throw new ArgumentException($"A {Kind} of {Model} must not be empty!", nameof(Versions));
 
-            if (versions.Any(version => version != version.Trim()))
-                throw new ArgumentException($"A {Kind} of {Model} must not begin or end with whitespace!", nameof(Versions));
-
-            if (versions.Distinct(StringComparer.Ordinal).Count() != versions.Length)
+            if (versions.Distinct().Count() != versions.Length)
                 throw new ArgumentException($"A {Kind} of {Model} must not be given twice!", nameof(Versions));
 
             return [ .. versions ];

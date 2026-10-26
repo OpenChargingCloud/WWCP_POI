@@ -171,12 +171,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The hardware revision of its members, unless they have their own.
         /// </summary>
-        public String?                                         HardwareRevision            { get; }
+        public HardwareRevision?                               HardwareRevision            { get; }
 
         /// <summary>
         /// The firmware version of its members, unless they have their own.
         /// </summary>
-        public String?                                         FirmwareVersion             { get; }
+        public FirmwareVersion?                                FirmwareVersion             { get; }
 
         /// <summary>
         /// Transparency software releases for the measurements of its members, with their legal status, besides their
@@ -204,8 +204,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 EnergyMeterManufacturer_Id?                      ManufacturerId               = null,
                                 EnergyMeterModel_Id?                             ModelId                      = null,
                                 URL?                                             ModelURL                     = null,
-                                String?                                          HardwareRevision             = null,
-                                String?                                          FirmwareVersion              = null,
+                                HardwareRevision?                                HardwareRevision             = null,
+                                FirmwareVersion?                                 FirmwareVersion              = null,
                                 IEnumerable<TransparencySoftwareAssignment>?     TransparencySoftwareStatus   = null,
                                 IEnumerable<SignatureMethod>?                    SignatureMethods             = null,
 
@@ -290,11 +290,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ModelURL.HasValue)
                 json.Add(PropertyKeys.ModelURL,                    ModelURL.Value.ToString());
 
-            if (HardwareRevision is not null)
-                json.Add(PropertyKeys.HardwareRevision,             HardwareRevision);
+            if (HardwareRevision.HasValue)
+                json.Add(PropertyKeys.HardwareRevision,             HardwareRevision.Value.ToString());
 
-            if (FirmwareVersion is not null)
-                json.Add(PropertyKeys.FirmwareVersion,             FirmwareVersion);
+            if (FirmwareVersion.HasValue)
+                json.Add(PropertyKeys.FirmwareVersion,             FirmwareVersion.Value.ToString());
 
             if (TransparencySoftwareStatus.Length > 0)
                 json.Add(PropertyKeys.TransparencySoftwareStatus,  new JArray(TransparencySoftwareStatus.Select(assignment => assignment.ToJSON(Embedded: true))));
@@ -358,8 +358,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseText  (JSON, PropertyKeys.ManufacturerId,   "manufacturer identification", EnergyMeterManufacturer_Id.TryParse, out EnergyMeterManufacturer_Id? manufacturerId, out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, PropertyKeys.ModelId,          "model identification",        EnergyMeterModel_Id.       TryParse, out EnergyMeterModel_Id?        modelId,        out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, PropertyKeys.ModelURL,         "model URL",                   URL.                       TryParse, out URL?                        modelURL,       out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, PropertyKeys.HardwareRevision,  "hardware revision",            out var hardwareRevision,  out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, PropertyKeys.FirmwareVersion,  "firmware version",            out var firmwareVersion,  out ErrorResponse) ||
+                    !POIJSON.TryParseText(JSON, PropertyKeys.HardwareRevision,  "hardware revision", POI.HardwareRevision.TryParse, out POI.HardwareRevision? hardwareRevision,  out ErrorResponse) ||
+                    !POIJSON.TryParseText(JSON, PropertyKeys.FirmwareVersion,  "firmware version", POI.FirmwareVersion.TryParse, out POI.FirmwareVersion?  firmwareVersion,  out ErrorResponse) ||
                     !POIJSON.TryParseObjects<TransparencySoftwareAssignment>(JSON, PropertyKeys.TransparencySoftwareStatus, "transparency software status", TransparencySoftwareAssignment.TryParse, out var transparencySoftwareStatus, out ErrorResponse) ||
                     !POIJSON.TryParseIds<SignatureMethod>                   (JSON, PropertyKeys.SignatureMethods,           "signature method",             SignatureMethod.               TryParse, out var signatureMethods,           out ErrorResponse))
                 {

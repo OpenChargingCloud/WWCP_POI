@@ -123,7 +123,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
                     Created:                   Created,
                     ChargingStationManufacturers:  [ new ChargingStationManufacturer(ChargingStationManufacturer_Id.Parse("ACME"),
                                                                                      I18NString.Create(Languages.en, "ACME Chargers"),
-                                                                                     Models:   [ new ChargingStationModel(ChargingStationModel_Id.Parse("Wallbox-22"), HardwareRevisions: [ "1.0" ], FirmwareVersions: [ "1.0.0" ]),
+                                                                                     Models:   [ new ChargingStationModel(ChargingStationModel_Id.Parse("Wallbox-22"), HardwareRevisions: [ HardwareRevision.Parse("1.0") ], FirmwareVersions: [ FirmwareVersion.Parse("1.0.0") ]),
                                                                                                  new ChargingStationModel(ChargingStationModel_Id.Parse("Wallbox-11")) ],
                                                                                      Created:  Created) ],
                     EnergyMeterManufacturers:  [ new EnergyMeterManufacturer(EnergyMeterManufacturer_Id.Parse("METERS"),

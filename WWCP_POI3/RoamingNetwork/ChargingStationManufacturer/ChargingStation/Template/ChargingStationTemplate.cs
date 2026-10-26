@@ -253,12 +253,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The hardware revision of its members, one of their model, unless they have their own.
         /// </summary>
-        public String?                                 HardwareRevision     { get; }
+        public HardwareRevision?                       HardwareRevision     { get; }
 
         /// <summary>
         /// The firmware version of its members, one of their model, unless they have their own.
         /// </summary>
-        public String?                                 FirmwareVersion      { get; }
+        public FirmwareVersion?                        FirmwareVersion      { get; }
 
         /// <summary>
         /// Brands its members also appear under, besides their own, in the order of their identifications.
@@ -334,8 +334,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     PhoneNumber?                                        HotlinePhoneNumber           = null,
                                     ChargingStationManufacturer_Id?                     ManufacturerId               = null,
                                     ChargingStationModel_Id?                            ModelId                      = null,
-                                    String?                                             HardwareRevision             = null,
-                                    String?                                             FirmwareVersion              = null,
+                                    HardwareRevision?                                   HardwareRevision             = null,
+                                    FirmwareVersion?                                    FirmwareVersion              = null,
                                     IEnumerable<Brand>?                                 Brands                       = null,
                                     ImmutableOpeningTimes?                              OpeningTimes                 = null,
                                     IEnumerable<Image>?                                 Images                       = null,
@@ -453,11 +453,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ModelId.HasValue)
                 json.Add(PropertyKeys.ModelId,              ModelId.Value.ToString());
 
-            if (HardwareRevision is not null)
-                json.Add(PropertyKeys.HardwareRevision,     HardwareRevision);
+            if (HardwareRevision.HasValue)
+                json.Add(PropertyKeys.HardwareRevision,     HardwareRevision.Value.ToString());
 
-            if (FirmwareVersion is not null)
-                json.Add(PropertyKeys.FirmwareVersion,      FirmwareVersion);
+            if (FirmwareVersion.HasValue)
+                json.Add(PropertyKeys.FirmwareVersion,      FirmwareVersion.Value.ToString());
 
             if (Brands.Count > 0)
                 json.Add(PropertyKeys.Brands,               new JArray(Brands.Select(brand => brand.ToJSON(Embedded: true))));
@@ -551,8 +551,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseText       (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",          PhoneNumber.TryParse,       out PhoneNumber? hotline,  out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.ManufacturerId,      "manufacturer identification",   ChargingStationManufacturer_Id.TryParse, out ChargingStationManufacturer_Id? manufacturerId, out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.ModelId,             "model identification",          ChargingStationModel_Id.       TryParse, out ChargingStationModel_Id?        modelId,        out ErrorResponse) ||
-                    !POIJSON.TryParseString     (JSON, PropertyKeys.HardwareRevision,    "hardware revision",             out var hardwareRevision,   out ErrorResponse) ||
-                    !POIJSON.TryParseString     (JSON, PropertyKeys.FirmwareVersion,     "firmware version",              out var firmwareVersion,    out ErrorResponse))
+                    !POIJSON.TryParseText     (JSON, PropertyKeys.HardwareRevision,    "hardware revision", POI.HardwareRevision.TryParse, out POI.HardwareRevision? hardwareRevision,   out ErrorResponse) ||
+                    !POIJSON.TryParseText     (JSON, PropertyKeys.FirmwareVersion,     "firmware version", POI.FirmwareVersion.TryParse, out POI.FirmwareVersion?  firmwareVersion,    out ErrorResponse))
                 {
                     return false;
                 }
