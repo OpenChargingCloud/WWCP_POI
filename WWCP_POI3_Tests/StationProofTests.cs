@@ -515,6 +515,47 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
         #endregion
 
+        #region A_proof_naming_another_revision_than_its_attestations_is_not_attested()
+
+        /// <summary>
+        /// A proof naming another revision than its attestations, of the same commit, is not attested by them: the proof
+        /// shows its revision to whoever checks it, and they did not sign it (SPECIFICATION.md, section 8.4;
+        /// WWCPPOIConformanceTests, D2). A proof naming no revision is attested by those of its commit.
+        /// </summary>
+        [Test]
+        public void A_proof_naming_another_revision_than_its_attestations_is_not_attested()
+        {
+
+            var history = RoamingNetworkHistory.Start(NewNetwork());
+
+            history.AttestationSigners = [ RNOSigner ];
+
+            Assert.That(history.TryAttest(out _, out var error, T0), Is.True, error);
+            Assert.That(history.TryGetChargingStationProof(S1, out var proof, out error, At: T0.AddMinutes(1)), Is.True, error);
+
+            var otherRevision  = new RoamingNetworkProof(proof!.HashAlgorithm, proof.RoamingNetwork, proof.CommitId, proof.Revision + 1, proof.Attestations);
+            var noRevision     = new RoamingNetworkProof(proof.HashAlgorithm,  proof.RoamingNetwork, proof.CommitId, null,                proof.Attestations);
+
+            Assert.That(RoamingNetworkProof.TryParse(otherRevision.ToJSON(), out var parsed, out error), Is.True, error);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(proof.Revision,                                                        Is.EqualTo(history.Head.Commit.Revision));
+                Assert.That(proof.Verify(Trusted, out _, out error, T0.AddMinutes(1)),             Is.True, error);
+
+                Assert.That(otherRevision.Verify(Trusted, out _, out error, T0.AddMinutes(1)),     Is.False, "another revision");
+                Assert.That(error,                                                                 Does.Contain("No valid attestation"));
+                Assert.That(parsed!.Verify(Trusted, out _, out error, T0.AddMinutes(1)),           Is.False, "another revision, read as it is sent");
+
+                Assert.That(noRevision.Verify(Trusted, out _, out error, T0.AddMinutes(1)),        Is.True, error);
+
+            }
+
+        }
+
+        #endregion
+
         #region An_attestation_is_valid_from_its_signing_until_its_validUntil()
 
         /// <summary>

@@ -189,6 +189,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// 1e-30, or with a mantissa above 96 bits, as 7922816251426433759354395033.6. Read as decimals they were 0 and
         /// 7922816251426433759354395034, and a change set with such a value was taken with a content its sender had
         /// not signed. Of a property named twice the last one was taken, where other readers take the first.
+        /// What RFC 8259 does not call JSON is refused as well, which Newtonsoft takes: a trailing comma, a comment,
+        /// single quotes, a name without quotes, 01 and 0x10, a raw control character in a string, and a second value
+        /// after the first, which it dropped. A change set so written was taken here and refused by every reader of JSON.
         /// </remarks>
         /// <param name="Text">The JSON text.</param>
         /// <param name="MaxDepth">The maximum depth of the JSON.</param>
@@ -199,7 +202,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             using var reader = Reader(Text, MaxDepth);
 
-            return ReadFrom(reader, Text);
+            var json = JToken.ReadFrom(reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+
+            Check(Text, MaxDepth, Alone: true);
+
+            return json;
 
         }
 
@@ -208,9 +215,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Read                (Stream, MaxDepth = 64)
 
         /// <summary>
-        /// The first JSON value of the given stream of UTF-8, read as Read(Text) reads it, without making it a string
-        /// first: also a JSON longer than a string may be, e.g. the snapshot of a large roaming network in a store. The
-        /// stream must be seekable, as its numbers are checked in a second pass over it; it is not closed.
+        /// The JSON value of the given stream of UTF-8, read as Read(Text) reads it, without making it a string first:
+        /// also a JSON longer than a string may be, e.g. the snapshot of a large roaming network in a store. The stream
+        /// must be seekable, as it is checked in a second pass over it; it is not closed.
         /// </summary>
         /// <param name="Stream">A seekable stream of UTF-8 JSON.</param>
         /// <param name="MaxDepth">The maximum depth of the JSON.</param>
@@ -232,11 +239,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json = JToken.ReadFrom(reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
             }
 
-            if (HasDecimals(json))
-            {
-                Stream.Position = start;
-                CheckDecimals(Stream, MaxDepth);
-            }
+            Stream.Position = start;
+            Check(Stream, MaxDepth);
 
             return json;
 
@@ -265,7 +269,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region ReadFrom            (Reader, Text)
 
         /// <summary>
-        /// The next JSON value of the given reader of the given JSON text, as Read() reads it, for a reader that goes on
+        /// The first JSON value of the given reader of the given JSON text, as Read() reads it, for a reader that goes on
         /// after it, e.g. to find out whether there is more.
         /// </summary>
         /// <param name="Reader">A reader of the JSON text, from Reader().</param>
@@ -277,8 +281,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var json = JToken.ReadFrom(Reader, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
 
-            if (HasDecimals(json))
-                CheckDecimals(Text, Reader.MaxDepth ?? 64);
+            Check(Text, Reader.MaxDepth ?? 64, Alone: false);
 
             return json;
 
@@ -286,38 +289,38 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) HasDecimals  (JSON)
-
-        private static Boolean HasDecimals(JToken JSON)
-
-            => JSON.Type == JTokenType.Float ||
-               (JSON is JContainer container && container.Descendants().Any(token => token.Type == JTokenType.Float));
-
-        #endregion
-
-        #region (private static) CheckDecimals(Text, MaxDepth)
+        #region (private static) Check(Text, MaxDepth, Alone)
 
         /// <summary>
-        /// Whether a decimal holds each number of the first JSON value of the given text as written, for Newtonsoft,
-        /// which has read them, does not tell which it has rounded.
+        /// Whether the first JSON value of the given text is JSON as RFC 8259 writes it, alone in the text if so asked,
+        /// and a decimal holds each of its numbers as written: Newtonsoft, which has read it, takes more than JSON and does
+        /// not tell which numbers it has rounded.
         /// </summary>
-        private static void CheckDecimals(String  Text,
-                                          Int32   MaxDepth)
+        private static void Check(String   Text,
+                                  Int32    MaxDepth,
+                                  Boolean  Alone)
         {
 
             var reader = new System.Text.Json.Utf8JsonReader(Encoding.UTF8.GetBytes(Text), CheckOptions(MaxDepth));
 
-            while (reader.Read())
-                if (CheckedToTheEnd(ref reader))
-                    break;
+            try
+            {
+                while (reader.Read())
+                    if (CheckedToTheEnd(ref reader) && !Alone)
+                        return;
+            }
+            catch (System.Text.Json.JsonException e)
+            {
+                throw NoJSON(e);
+            }
 
         }
 
         /// <summary>
-        /// The same for the first JSON value of the given stream, read piece by piece.
+        /// The same for the JSON value of the given stream, alone in it, read piece by piece.
         /// </summary>
-        private static void CheckDecimals(Stream  Stream,
-                                          Int32   MaxDepth)
+        private static void Check(Stream  Stream,
+                                  Int32   MaxDepth)
         {
 
             var buffer  = new Byte[1 << 16];
@@ -339,9 +342,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var reader = new System.Text.Json.Utf8JsonReader(buffer.AsSpan(0, length), final, state);
 
-                while (reader.Read())
-                    if (CheckedToTheEnd(ref reader))
-                        return;
+                try
+                {
+                    while (reader.Read())
+                        CheckedToTheEnd(ref reader);
+                }
+                catch (System.Text.Json.JsonException e)
+                {
+                    throw NoJSON(e);
+                }
 
                 if (final)
                     return;
@@ -362,14 +371,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
+        /// <summary>
+        /// JSON as RFC 8259 writes it: no comments, no trailing commas, and nothing after the first value but whitespace.
+        /// </summary>
         private static System.Text.Json.JsonReaderOptions CheckOptions(Int32 MaxDepth)
 
             => new () {
-                   CommentHandling      = System.Text.Json.JsonCommentHandling.Skip,
-                   AllowTrailingCommas  = true,
-                   AllowMultipleValues  = true,
+                   CommentHandling      = System.Text.Json.JsonCommentHandling.Disallow,
+                   AllowTrailingCommas  = false,
+                   AllowMultipleValues  = false,
                    MaxDepth             = MaxDepth + 1
                };
+
+        /// <summary>
+        /// The error of a text or stream that is no JSON as RFC 8259 writes it, as Newtonsoft tells it of one it refuses.
+        /// </summary>
+        private static JsonReaderException NoJSON(System.Text.Json.JsonException Exception)
+
+            => new ($"No JSON as RFC 8259 writes it: {Exception.Message}", Exception);
 
         /// <summary>
         /// Check the token the given reader is at: whether a decimal holds it, if it is a number, and whether it ends

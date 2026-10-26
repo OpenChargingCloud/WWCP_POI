@@ -25,7 +25,9 @@ POI uses the two byte representations of a JSON document that
 Whoever reads JSON in order to hash it again MUST read numbers with a fraction as decimals and
 strings as strings, never as points in time. A number with a fraction or an exponent that a decimal
 cannot hold as written - more than 28 decimal places, as `1e-30`, or a mantissa above 96 bits -
-MUST be refused, not rounded; so MUST an object that names a property twice.
+MUST be refused, not rounded; so MUST an object that names a property twice. And so MUST what RFC 8259
+does not call JSON, though a lenient reader takes it: a trailing comma, a comment, single quotes, a name
+without quotes, `01` and `0x10`, a raw control character in a string, and a second value after the first.
 
 ### 1.1 JSON-LD contexts
 
@@ -995,8 +997,9 @@ fraction as decimals and strings as strings (section 1).
 ```
 
 `commitId` and `revision` name the proven version, so that the verifier finds the proof of its commit in a
-checkpoint (10.4); they are not part of the tree. The CBOR representation has the keys and values of the
-JSON one.
+checkpoint (10.4); they are not part of the tree. An attestation counts for the proof only where it names the
+same commit and revision, as the proof shows them to whoever checks it, and an attestation of another revision
+did not sign them. The CBOR representation has the keys and values of the JSON one.
 
 A **charging station proof** gives completely:
 

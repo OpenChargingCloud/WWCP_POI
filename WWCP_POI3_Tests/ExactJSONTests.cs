@@ -30,13 +30,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 {
 
     /// <summary>
-    /// JSON text read as it was written: a number a decimal cannot hold as written, and an object naming a property
-    /// twice, are refused instead of being read as something else.
+    /// JSON text read as it was written: a number a decimal cannot hold as written, an object naming a property twice,
+    /// and what RFC 8259 does not call JSON, are refused instead of being read as something else.
     /// </summary>
     /// <remarks>
     /// Read as a decimal, 1e-30 was 0 with 28 decimal places, and 0.1 with 30 zeros after it lost two of them: a
     /// change set with such a value in its custom data was taken, and its content was not the one its sender signed.
-    /// Of a property named twice the last one won, where another reader takes the first.
+    /// Of a property named twice the last one won, where another reader takes the first. Newtonsoft took a trailing
+    /// comma, a comment, 0x10 and more, and dropped a second value after the first: a change set so written was taken
+    /// here and refused by every reader of JSON (WWCPPOIConformanceTests, D1).
     /// </remarks>
     [TestFixture]
     public class ExactJSONTests
@@ -142,6 +144,53 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
         #endregion
 
+        #region A_change_set_refuses_what_is_no_JSON(CustomData, Behind)
+
+        /// <summary>
+        /// A change set whose text is no JSON as RFC 8259 writes it, which Newtonsoft takes, is refused: identified by its
+        /// content as Newtonsoft reads it, it is refused for its text alone.
+        /// </summary>
+        [TestCase("{\"value\":[1,]}",           "")]
+        [TestCase("{\"value\":1,}",             "")]
+        [TestCase("{\"value\":1/* a comment */}", "")]
+        [TestCase("{'value':1}",                "")]
+        [TestCase("{value:1}",                  "")]
+        [TestCase("{\"value\":01}",             "")]
+        [TestCase("{\"value\":0x10}",           "")]
+        [TestCase("{\"value\":\"a\tb\"}",       "")]
+        [TestCase("{\"value\":1}",              " {\"value\":2}")]
+        [TestCase("{\"value\":1}",              " // a comment")]
+        public void A_change_set_refuses_what_is_no_JSON(String CustomData, String Behind)
+        {
+
+            Assert.That(RoamingNetworkChangeSet.TryParse(ChangeSetText(CustomData) + Behind, out var changeSet, out var error),
+                        Is.False,
+                        changeSet is not null ? CanonicalJSON.Serialize(changeSet.Changes[0].NewValue!) : null);
+
+            Assert.That(error, Does.Contain("RFC 8259"));
+
+        }
+
+        #endregion
+
+        #region A_change_set_takes_JSON_as_RFC_8259_writes_it(CustomData, Around)
+
+        /// <summary>
+        /// JSON as RFC 8259 writes it is taken: whitespace around and within it, escapes, also of an unpaired surrogate.
+        /// </summary>
+        [TestCase("{ \"value\" :\r\n\t[ 1 , 2 ] }",  " \r\n\t")]
+        [TestCase("{\"value\":\"a\\tb\\u0000\"}",    "")]
+        [TestCase("{\"value\":\"\\uD800x\"}",         "")]
+        [TestCase("{\"value\":-0.5e-3}",             "\n")]
+        public void A_change_set_takes_JSON_as_RFC_8259_writes_it(String CustomData, String Around)
+        {
+
+            Assert.That(RoamingNetworkChangeSet.TryParse(Around + ChangeSetText(CustomData) + Around, out _, out var error), Is.True, error);
+
+        }
+
+        #endregion
+
         #region A_WebSocket_message_refuses_a_number_a_decimal_cannot_hold_and_a_property_named_twice()
 
         [Test]
@@ -154,6 +203,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(POIWebSocketMessage.TryParse("""[2, "m1", "setStatus", { "value": 1.5 }]""",                out _, out var error1), Is.True,  error1?.ToString());
                 Assert.That(POIWebSocketMessage.TryParse("""[2, "m2", "setStatus", { "value": 1e-30 }]""",              out _, out _),          Is.False);
                 Assert.That(POIWebSocketMessage.TryParse("""[2, "m3", "setStatus", { "value": 1, "value": 2 }]""",      out _, out _),          Is.False);
+
+                // What RFC 8259 does not call JSON, and a second value after the message.
+                Assert.That(POIWebSocketMessage.TryParse("""[2, "m4", "setStatus", { "value": 1, }]""",                 out _, out _),          Is.False);
+                Assert.That(POIWebSocketMessage.TryParse("""[2, "m5", "setStatus", { "value": 0x10 }]""",               out _, out _),          Is.False);
+                Assert.That(POIWebSocketMessage.TryParse("""[2, "m6", "setStatus", { /* a comment */ "value": 1 }]""",  out _, out _),          Is.False);
+                Assert.That(POIWebSocketMessage.TryParse("""[2, "m7", "setStatus", { "value": 1 }] [3, "m7", {}]""",    out _, out _),          Is.False);
 
             }
 
@@ -211,6 +266,47 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                     Assert.That(loaded["value"]!.ToString(Formatting.None), Is.EqualTo(Number));
 
                 }
+
+            }
+            finally
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+
+        }
+
+        #endregion
+
+        #region The_base_of_a_store_is_refused_where_it_is_no_JSON(Last)
+
+        /// <summary>
+        /// The base of a file store that is no JSON as RFC 8259 writes it is refused, also where it shows behind more than
+        /// one buffer of the reader: a trailing comma, a comment, a second value after the first.
+        /// </summary>
+        [TestCase("\"value\":1,}")]
+        [TestCase("\"value\":1/* a comment */}")]
+        [TestCase("\"value\":1} {\"value\":2}")]
+        public void The_base_of_a_store_is_refused_where_it_is_no_JSON(String Last)
+        {
+
+            var directory  = Path.Combine(Path.GetTempPath(), "poi3-base-" + Guid.NewGuid().ToString("N"));
+            var filler     = String.Join(",", Enumerable.Range(0, 30_000).Select(i => $"{{\"name\":\"Ladepark Jena {i}\",\"power\":{i}}}"));
+            var text       = $"{{\"pools\":[{filler}],\"value\":1}}";
+            var snapshot   = (JObject) JToken.ReadFrom(new JsonTextReader(new StringReader(text)) { FloatParseHandling = FloatParseHandling.Decimal,
+                                                                                                     DateParseHandling  = DateParseHandling.None });
+
+            try
+            {
+
+                using (var store = new RoamingNetworkHistoryFileStore(directory))
+                    store.WriteBase(snapshot);
+
+                var baseFile = Path.Combine(directory, File.ReadAllText(Path.Combine(directory, "CURRENT")).Trim(), "base.json");
+
+                File.WriteAllText(baseFile, text.Replace("\"value\":1}", Last));
+
+                using (var store = new RoamingNetworkHistoryFileStore(directory))
+                    Assert.That(() => store.Load(), Throws.InstanceOf<JsonReaderException>().With.Message.Contains("RFC 8259"));
 
             }
             finally

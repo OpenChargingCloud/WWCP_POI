@@ -299,7 +299,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) AttestationsOfThisVersion(At)
 
         /// <summary>
-        /// The attestations of this proof of its roaming network, commit and hash algorithm, valid at the given time.
+        /// The attestations of this proof of its roaming network, commit, revision and hash algorithm, valid at the given
+        /// time: of the commit and the revision the proof names, where it names them, as the proof shows them, and an
+        /// attestation of another revision did not sign them.
         /// </summary>
         private IEnumerable<RoamingNetworkAttestation> AttestationsOfThisVersion(DateTimeOffset At)
         {
@@ -308,6 +310,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             return Attestations.Where(attestation => attestation.RoamingNetworkId.ToString() == roamingNetworkId         &&
                                                      (!CommitId.HasValue || attestation.CommitId == CommitId.Value)      &&
+                                                     (!Revision.HasValue || attestation.Revision == Revision.Value)      &&
                                                      attestation.ETag.HashAlgorithm == HashAlgorithm                     &&
                                                      attestation.IsValidAt(At));
 
