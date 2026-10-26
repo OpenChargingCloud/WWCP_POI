@@ -52,9 +52,9 @@ is replaced or removed as a whole ([below](#change-sets)).
 | `manufacturerId` | `ManufacturerId` | `EnergyMeterManufacturer_Id` | via parent | Its manufacturer, which must be an energy meter manufacturer of the roaming network ([below](#manufacturerid)). |
 | `modelId` | `ModelId` | `EnergyMeterModel_Id` | via parent | A model of its manufacturer ([below](#manufacturerid)); only with its `manufacturerId`, its own or one of its templates. |
 | `modelURL` | `ModelURL` | URL | via parent | The homepage of its model, e.g. with its data sheet. |
-| `serialNumber` | `SerialNumber` | string | via parent | |
-| `hardwareRevision` | `HardwareRevision` | string | via parent | The hardware revision it was built in: one of the `hardwareRevisions` of its model ([below](#manufacturerid)), only with its `modelId`, its own or one of its templates. |
-| `firmwareVersion` | `FirmwareVersion` | string | via parent | The firmware version it runs: one of the `firmwareVersions` of its model, as `hardwareRevision`. |
+| `serialNumber` | `SerialNumber` | `SerialNumber` | via parent | Its serial number, as its manufacturer marked it: taken as given, not trimmed and compared ordinally, case included; not empty and neither beginning nor ending with whitespace. |
+| `hardwareRevision` | `HardwareRevision` | `HardwareRevision` | via parent | The hardware revision it was built in: one of the `hardwareRevisions` of its model ([below](#manufacturerid)), only with its `modelId`, its own or one of its templates. |
+| `firmwareVersion` | `FirmwareVersion` | `FirmwareVersion` | via parent | The firmware version it runs: one of the `firmwareVersions` of its model, as `hardwareRevision`. |
 | `transparencySoftwareStatus` | `TransparencySoftwareStatus` | [TransparencySoftwareAssignment](#transparencysoftwarestatus)[] | via parent | The transparency software releases for its measurements, with their legal status; ordered by `transparencySoftwareId` (ordinal), at most one per release. Omitted when empty. |
 | `signatureMethods` | `SignatureMethods` | [SignatureMethod](#signaturemethods)[] | via parent | How it signs its measurements, e.g. `OCMF`; ordered by name (ordinal), each once. Omitted when empty. |
 | `publicKeys` | `PublicKeys` | [EnergyMeterPublicKey](#publickeys)[] | via parent | The public keys it signs its measurements with, with their certificate chains; ordered by `@id` (ordinal), each once. Omitted when empty. |
@@ -106,7 +106,7 @@ A change of a meter is a change of its embedder, owned and signed by that embedd
 var meter = new EnergyMeter(EnergyMeter_Id.Parse("evse-meter-2"),
                             Role:            EnergyMeterRole.EVSE,
                             ManufacturerId:  EnergyMeterManufacturer_Id.Parse("ACME"),
-                            SerialNumber:    "1ESY1161229886");
+                            SerialNumber:    SerialNumber.Parse("1ESY1161229886"));
 
 var cs = rn1.CreateChangeSet([
              RoamingNetworkChange.UpdateProperty(evse, "energyMeter", null, meter.ToJSON())

@@ -237,7 +237,7 @@ private static EnergyMeter Meter(Int32 S, Int32 E, String Kind)
     using var meterKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
 
     return new (EnergyMeter_Id.Parse($"DE*GEF*M{S}*{E}"),
-                SerialNumber:  $"{Kind}M-2026-{S:D3}-{E}",
+                SerialNumber:  SerialNumber.Parse($"{Kind}M-2026-{S:D3}-{E}"),
                 PublicKeys:    [ new EnergyMeterPublicKey(meterKey.ExportSubjectPublicKeyInfo()) ],
                 TemplateIds:   [ EnergyMeterTemplate_Id.Parse($"DE*GEF*EMT_{Kind}") ]);
 

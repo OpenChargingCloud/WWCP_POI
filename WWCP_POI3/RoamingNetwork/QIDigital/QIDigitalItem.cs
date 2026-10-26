@@ -121,7 +121,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Its serial number, as its manufacturer marked it.
         /// </summary>
-        public String?            SerialNumber        { get; }
+        public SerialNumber?      SerialNumber        { get; }
 
         /// <summary>
         /// The hardware revision it was calibrated in.
@@ -147,13 +147,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               String             Id,
                               String?            ManufacturerId,
                               String?            ModelId,
-                              String?            SerialNumber,
+                              SerialNumber?      SerialNumber,
                               HardwareRevision?  HardwareRevision,
                               FirmwareVersion?   FirmwareVersion)
         {
-
-            if (SerialNumber is not null && (String.IsNullOrWhiteSpace(SerialNumber) || SerialNumber != SerialNumber.Trim()))
-                throw new ArgumentException($"The serial number of the {(Type == ChargingStationType ? "charging station" : "energy meter")} '{Id}' must neither be empty nor begin or end with whitespace!", nameof(SerialNumber));
 
             if (ModelId is not null && ManufacturerId is null)
                 throw new ArgumentException($"The {(Type == ChargingStationType ? "charging station" : "energy meter")} '{Id}' names its model with its manufacturer!", nameof(ManufacturerId));
@@ -182,7 +179,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingStation">A charging station.</param>
         /// <param name="SerialNumber">Its serial number, as its manufacturer marked it.</param>
         public static QIDigitalItem Of(ChargingStation  ChargingStation,
-                                       String?          SerialNumber   = null)
+                                       SerialNumber?    SerialNumber   = null)
 
             => new (ChargingStationType,
                     ChargingStation.Id.ToString(),
@@ -260,7 +257,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             else if (!SameText(ModelId, actual.ModelId, StringComparison.OrdinalIgnoreCase))
                 ErrorResponse = $"The {Text} is one of the model '{actual.ModelId}', not of '{ModelId}'!";
 
-            else if (!SameText(SerialNumber, actual.SerialNumber, StringComparison.Ordinal))
+            else if (SerialNumber != actual.SerialNumber)
                 ErrorResponse = $"The {Text} has the serial number '{actual.SerialNumber}', not '{SerialNumber}'!";
 
             else if (HardwareRevision != actual.HardwareRevision)
@@ -304,7 +301,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!POIJSON.TryParseString(JSON, PropertyKeys.SerialNumber,     "serial number",                                       out var serialNumber,     out ErrorResponse) ||
+                if (!POIJSON.TryParseText  (JSON, PropertyKeys.SerialNumber,     "serial number",     POI.SerialNumber.    TryParse, out SerialNumber?     serialNumber,     out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, PropertyKeys.HardwareRevision, "hardware revision", POI.HardwareRevision.TryParse, out HardwareRevision? hardwareRevision, out ErrorResponse) ||
                     !POIJSON.TryParseText  (JSON, PropertyKeys.FirmwareVersion,  "firmware version",  POI.FirmwareVersion. TryParse, out FirmwareVersion?  firmwareVersion,  out ErrorResponse))
                 {
@@ -378,8 +375,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ModelId is not null)
                 json.Add(PropertyKeys.ModelId,           ModelId);
 
-            if (SerialNumber is not null)
-                json.Add(PropertyKeys.SerialNumber,      SerialNumber);
+            if (SerialNumber.HasValue)
+                json.Add(PropertyKeys.SerialNumber,      SerialNumber.Value.ToString());
 
             if (HardwareRevision.HasValue)
                 json.Add(PropertyKeys.HardwareRevision,  HardwareRevision.Value.ToString());

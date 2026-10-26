@@ -273,7 +273,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         {
 
             static JObject Meter(String Id, String Model)
-                => new EnergyMeter(EnergyMeter_Id.Parse(Id), SerialNumber: Model, Created: Created).ToJSON();
+                => new EnergyMeter(EnergyMeter_Id.Parse(Id), SerialNumber: SerialNumber.Parse(Model), Created: Created).ToJSON();
 
             var rn1      = NewNetwork();
             var rn2      = Apply(rn1, RoamingNetworkChange.AddElement(nameof(EVSE), E2.ToString(), Path("energyMeter", "M1"), Meter("M1", "A")));
@@ -288,7 +288,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(EVSE2(rn2).EnergyMeter?.Id.ToString(),            Is.EqualTo("M1"));
-                Assert.That(EVSE2(rn3).EnergyMeter?.SerialNumber,              Is.EqualTo("B"));
+                Assert.That(EVSE2(rn3).EnergyMeter?.SerialNumber,              Is.EqualTo(SerialNumber.Parse("B")));
                 Assert.That(another!.Message,                                  Does.Contain("must keep its identification 'M1'"));
             }
 

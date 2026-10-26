@@ -90,7 +90,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                              ChargingPools:  [ new ChargingPool(P1,
                                                                                                                 Created:                Created,
                                                                                                                 GridConnectionPointId:  GCP,
-                                                                                                                EnergyMeters:         [ new EnergyMeter(PVMeter, Role: EnergyMeterRole.PV, SerialNumber: "PV-1", Created: Created) ],
+                                                                                                                EnergyMeters:         [ new EnergyMeter(PVMeter, Role: EnergyMeterRole.PV, SerialNumber: SerialNumber.Parse("PV-1"), Created: Created) ],
                                                                                                                 ChargingStations:     [ new ChargingStation(S1,
                                                                                                                                                             Created:  Created,
                                                                                                                                                             EVSEs:    [ new EVSE(E1,

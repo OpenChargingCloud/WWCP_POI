@@ -142,10 +142,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                                     Created:       Created,
                                                                                                                                                                     EnergyMeters:  [ new EnergyMeter(StationMeter, Role: EnergyMeterRole.Station, Created: Created) ],
                                                                                                                                                                     EVSEs:         [ new EVSE(E1,
-                                                                                                                                                                                              EnergyMeter:  new EnergyMeter(Meter1, ModelId: ACME1000, SerialNumber: "M-1", TemplateIds: [ EVSEMeters ], Created: Created),
+                                                                                                                                                                                              EnergyMeter:  new EnergyMeter(Meter1, ModelId: ACME1000, SerialNumber: SerialNumber.Parse("M-1"), TemplateIds: [ EVSEMeters ], Created: Created),
                                                                                                                                                                                               Created:      Created),
                                                                                                                                                                                      new EVSE(E2,
-                                                                                                                                                                                              EnergyMeter:  new EnergyMeter(Meter2, SerialNumber: "M-2", TemplateIds: Meter2Templates ?? [ EVSEMeters ], Created: Created),
+                                                                                                                                                                                              EnergyMeter:  new EnergyMeter(Meter2, SerialNumber: SerialNumber.Parse("M-2"), TemplateIds: Meter2Templates ?? [ EVSEMeters ], Created: Created),
                                                                                                                                                                                               Created:      Created) ]) ]) ],
                                                                             EnergyMeterTemplates:  OperatorTemplates ?? [ OperatorTemplate ],
                                                                             EnergyMeterGroups:     [ new EnergyMeterGroup(AllEVSEMeters, EnergyMeterIds: [ Meter2, Meter1 ], Created: Created) ]) ]).WithKeys();
@@ -258,10 +258,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(meter1.Role,                                          Is.EqualTo(EnergyMeterRole.EVSE));
                 Assert.That(meter1.FirmwareVersion,                               Is.EqualTo(FirmwareVersion.Parse("4.7.1")));
                 Assert.That(meter1.SignatureMethods,                              Is.EqualTo(new[] { SignatureMethod.OCMF }));
-                Assert.That(meter1.SerialNumber,                                  Is.EqualTo("M-1"));
+                Assert.That(meter1.SerialNumber,                                  Is.EqualTo(SerialNumber.Parse("M-1")));
                 Assert.That(meter1.TemplateIds,                                   Is.EqualTo(new[] { EVSEMeters }));
                 Assert.That(meter2.ModelId,                                       Is.EqualTo(ACME3000));
-                Assert.That(meter2.SerialNumber,                                  Is.EqualTo("M-2"));
+                Assert.That(meter2.SerialNumber,                                  Is.EqualTo(SerialNumber.Parse("M-2")));
 
                 // As it is given, it has only its own.
                 Assert.That(storedE1!.EnergyMeter!.ManufacturerId,                Is.Null);

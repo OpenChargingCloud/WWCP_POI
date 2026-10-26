@@ -103,7 +103,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                                                            EnergyMeter:  new EnergyMeter(Meter1,
                                                                                                                                                                                                                          ManufacturerId:    METERS,
                                                                                                                                                                                                                          ModelId:           M500,
-                                                                                                                                                                                                                         SerialNumber:      "M500-000815",
+                                                                                                                                                                                                                         SerialNumber:      SerialNumber.Parse("M500-000815"),
                                                                                                                                                                                                                          HardwareRevision:  R30,
                                                                                                                                                                                                                          FirmwareVersion:   F17,
                                                                                                                                                                                                                          Created:           Created),
@@ -251,7 +251,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(dcc.MainSigner?.Name,                       Is.EqualTo("Dr. Erika Mustermann"));
                 Assert.That(dcc.IsDueAt(T0),                            Is.False);
                 Assert.That(dcc.IsDueAt(dcc.RecalibrationDue!.Value),   Is.True);
-                Assert.That(dcc.Item.SerialNumber,                      Is.EqualTo("M500-000815"));
+                Assert.That(dcc.Item.SerialNumber,                      Is.EqualTo(SerialNumber.Parse("M500-000815")));
                 Assert.That(dcc.Signature!.SignedAt,                    Is.EqualTo(T0));
                 Assert.That(dcc.Digest,                                 Does.Match("^[0-9a-f]{64}$"));
             }
@@ -336,7 +336,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var network      = NewNetwork();
             network.TryGetEnergyMeterById(Meter1, out var meter);
 
-            var otherMeter   = new EnergyMeter(Meter1, ManufacturerId: METERS, ModelId: M500, SerialNumber: "M500-000815", HardwareRevision: R30, FirmwareVersion: F18, Created: Created);
+            var otherMeter   = new EnergyMeter(Meter1, ManufacturerId: METERS, ModelId: M500, SerialNumber: SerialNumber.Parse("M500-000815"), HardwareRevision: R30, FirmwareVersion: F18, Created: Created);
             var newFirmware  = SignedBy(NewDCC(network, QIDigitalItem.Of(otherMeter)), TestParties.Party(LAB));
             var unknown      = SignedBy(NewDCC(network, QIDigitalItem.Of(new EnergyMeter(EnergyMeter_Id.Parse("meter-9"), Created: Created))), TestParties.Party(LAB));
 
@@ -367,7 +367,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             network.TryGetChargingStationOperatorById(GEF, out var gef);
             gef!.TryGetEffectiveChargingStation(S1, out var station);
 
-            var dcc     = SignedBy(NewDCC(network, QIDigitalItem.Of(station!, SerialNumber: "DC300-0001")), TestParties.Party(LAB));
+            var dcc     = SignedBy(NewDCC(network, QIDigitalItem.Of(station!, SerialNumber: SerialNumber.Parse("DC300-0001"))), TestParties.Party(LAB));
 
             using (Assert.EnterMultipleScope())
             {
