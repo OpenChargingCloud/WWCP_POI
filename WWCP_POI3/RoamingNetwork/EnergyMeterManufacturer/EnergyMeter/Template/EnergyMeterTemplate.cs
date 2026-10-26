@@ -129,6 +129,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  SignatureMethods             = EnergyMeter.PropertyKeys.SignatureMethods;
 
             /// <summary>
+            /// The property of the identifications of the certificates its members name, as an energy meter writes it.
+            /// </summary>
+            public const String  CertificateIds               = EnergyMeter.PropertyKeys.CertificateIds;
+
+            /// <summary>
             /// The property of its creation timestamp, as of every entity.
             /// </summary>
             public const String  Created                      = "created";
@@ -189,6 +194,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<SignatureMethod>                 SignatureMethods            { get; }
 
+        /// <summary>
+        /// Certificates of the roaming network its members name, besides their own, in the order of their identifications.
+        /// </summary>
+        public ImmutableArray<ConformityCertificate_Id>        CertificateIds              { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -208,6 +218,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 String?                                          FirmwareVersion              = null,
                                 IEnumerable<TransparencySoftwareAssignment>?     TransparencySoftwareStatus   = null,
                                 IEnumerable<SignatureMethod>?                    SignatureMethods             = null,
+                                IEnumerable<ConformityCertificate_Id>?           CertificateIds               = null,
 
                                 String?                                          DataSource                   = null,
                                 DateTimeOffset?                                  Created                      = null,
@@ -235,6 +246,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.FirmwareVersion             = FirmwareVersion;
             this.TransparencySoftwareStatus  = TransparencySoftwareAssignment.Checked(TransparencySoftwareStatus, $"the energy meter template '{Id}'");
             this.SignatureMethods            = POIJSON.OrderedIds(SignatureMethods,  $"signature method of the energy meter template '{Id}'");
+            this.CertificateIds              = POIJSON.OrderedIds(CertificateIds,    $"certificate of the energy meter template '{Id}'");
 
         }
 
@@ -302,6 +314,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (SignatureMethods.Length > 0)
                 json.Add(PropertyKeys.SignatureMethods,            POIJSON.IdsToJSON(SignatureMethods));
 
+            if (CertificateIds.Length > 0)
+                json.Add(PropertyKeys.CertificateIds,              POIJSON.IdsToJSON(CertificateIds));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             return CustomEnergyMeterTemplateSerializer is not null
@@ -361,7 +376,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseString(JSON, PropertyKeys.HardwareRevision,  "hardware revision",            out var hardwareRevision,  out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, PropertyKeys.FirmwareVersion,  "firmware version",            out var firmwareVersion,  out ErrorResponse) ||
                     !POIJSON.TryParseObjects<TransparencySoftwareAssignment>(JSON, PropertyKeys.TransparencySoftwareStatus, "transparency software status", TransparencySoftwareAssignment.TryParse, out var transparencySoftwareStatus, out ErrorResponse) ||
-                    !POIJSON.TryParseIds<SignatureMethod>                   (JSON, PropertyKeys.SignatureMethods,           "signature method",             SignatureMethod.               TryParse, out var signatureMethods,           out ErrorResponse))
+                    !POIJSON.TryParseIds<SignatureMethod>                   (JSON, PropertyKeys.SignatureMethods,           "signature method",             SignatureMethod.               TryParse, out var signatureMethods,           out ErrorResponse) ||
+                    !POIJSON.TryParseIds<ConformityCertificate_Id>          (JSON, PropertyKeys.CertificateIds,             "certificate identification",   ConformityCertificate_Id.      TryParse, out var certificateIds,             out ErrorResponse))
                 {
                     return false;
                 }
@@ -386,6 +402,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                         firmwareVersion,
                                                         transparencySoftwareStatus,
                                                         signatureMethods,
+                                                        certificateIds,
                                                         DataSource:  dataSource,
                                                         Created:     created,
                                                         LastChange:  lastChange,
@@ -440,6 +457,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     TransparencySoftwareStatus:  Templates.Union (EnergyMeter.TransparencySoftwareStatus, template => template.TransparencySoftwareStatus,
                                                                                   assignment => assignment.TransparencySoftwareId),
                                     SignatureMethods:            Templates.Union (EnergyMeter.SignatureMethods, template => template.SignatureMethods),
+                                    CertificateIds:              Templates.Union (EnergyMeter.CertificateIds,   template => template.CertificateIds),
 
                                     // What belongs to the single device, and the templates it names.
                                     SerialNumber:                EnergyMeter.SerialNumber,

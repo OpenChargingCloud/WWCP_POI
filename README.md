@@ -41,7 +41,7 @@ flowchart TD
     RoamingNetwork --> TransparencySoftwareManufacturer
     TransparencySoftwareManufacturer --> TransparencySoftware
     RoamingNetwork --> ConformityAssessmentBody
-    ConformityAssessmentBody --> TransparencySoftwareCertificate
+    ConformityAssessmentBody --> ConformityCertificate
     RoamingNetwork --> EnergyMeterManufacturer
     EnergyMeterManufacturer --> EnergyMeterModel
     ParkingOperator --> ParkingGarage
@@ -83,16 +83,19 @@ flowchart TD
     EVSE -. templateIds .-> Templates
     ChargingTariffOffer -. groupIds .-> Groups
     EnergyMeter -. manufacturerId, modelId .-> EnergyMeterModel
-    TransparencySoftwareCertificate -. manufacturer, model, revisions, firmware .-> ChargingStationModel
+    ChargingStation -. certificateIds .-> ConformityCertificate
+    EnergyMeter -. certificateIds .-> ConformityCertificate
+    ConformityCertificate -. manufacturer, model, revisions, firmware .-> ChargingStationModel
+    ConformityCertificate -. manufacturer, model, revisions, firmware .-> EnergyMeterModel
     EnergyMeter -. transparencySoftwareStatus .-> TransparencySoftware
-    TransparencySoftwareCertificate -. verified/compatible .-> TransparencySoftware
+    ConformityCertificate -. verified/compatible .-> TransparencySoftware
     RoamingNetwork -. dataLicenses .-> DataLicense
     ChargingStationOperator -. dataLicenses .-> DataLicense
     ChargingPool -. dataLicenses .-> DataLicense
 ```
 
 Solid lines embed completely (`chargingStationOperators`, `chargingStationManufacturers`, `chargingStationModels`, `eMobilityProviders`,
-`gridOperators`, `parkingOperators`, `energyMeterManufacturers`, `energyMeterModels`, `transparencySoftwareManufacturers`, `transparencySoftware`, `conformityAssessmentBodies`, `transparencySoftwareCertificates`, `chargingTariffs`,
+`gridOperators`, `parkingOperators`, `energyMeterManufacturers`, `energyMeterModels`, `transparencySoftwareManufacturers`, `transparencySoftware`, `conformityAssessmentBodies`, `certificates`, `chargingTariffs`,
 `EVSETemplates`, `chargingStationTemplates`, `chargingPoolTemplates`, `chargingTariffTemplates`, `energyMeterTemplates`,
 `EVSEGroups`, `chargingStationGroups`, `chargingPoolGroups`, `chargingTariffGroups`, `energyMeterGroups`, `chargingTariffOffers`,
 `chargingPools`, `chargingStations`, `EVSEs`, `chargingConnectors`, `energyMeters`, `gridConnectionPoints`, `parkingGarages`,
@@ -215,10 +218,14 @@ parking product ids compare case-sensitively.
   the conformity assessment body that issued them (`ConformityAssessmentBody`, a party as well, which signs them with a
   key that may sign `certificates`, or the RNO in its place while it has no keys; it names its `notifiedBodyNumber` and
   the legislations it is `notifiedFor`, e.g. `MID` or `CRA`, and a certificate's `legislation` must be one of them).
-  Releases and certificates have no status and timestamps. A certificate names the releases it
-  verifies or finds compatible, and the charging station manufacturer and model it is for, with the hardware revisions
-  and firmware versions of the model it covers. An energy meter's `transparencySoftwareStatus`
-  assigns releases with their `legalStatus`, at most one entry per release; a given `certificateId` must cover it.
+  Releases and certificates have no status and timestamps. A certificate (`ConformityCertificate`) is for a model of
+  charging stations or of energy meters, with its manufacturer, in the hardware revisions and firmware versions of the
+  model it covers, and names its components: the releases it verifies or finds compatible, and, of a charging station
+  model, the energy meters it was issued with. A charging station and an energy meter name the certificates of their
+  model in `certificateIds`, each covering their revision and firmware; every meter of a station is one of the energy
+  meters a certificate of the station names, where it names any. An energy meter's `transparencySoftwareStatus`
+  assigns releases with their `legalStatus`, at most one entry per release, and names no certificate: a certificate of
+  the meter or of its station naming the release proves it.
 - **ETags:** SHA-256, SHA-384 or SHA-512 over canonical JSON or canonical CBOR.
   They identify a version; `CalcETags()` and `ValidateETags(…)`. Every other entity has the ETags of its content as
   its parent embeds it, `ContentETag(format, algorithm)`, calculated once per entity: the HTTP `ETag` of POI_API and
@@ -268,7 +275,7 @@ a change set can manage:
 | [ChargingPoolGroup](docs/ChargingPoolGroup.md) | Charging pools of one operator, or of any operator for an e-mobility provider; a collection. |
 | [ChargingTariffGroup](docs/ChargingTariffGroup.md) | Charging tariffs of one operator; a collection. |
 | [ChargingTariffOffer](docs/ChargingTariffOffer.md) | Another price for a time at the EVSEs of groups or of operators, of an operator or an e-mobility provider. |
-| [EnergyMeter](docs/EnergyMeter.md) | A meter of a pool, grid connection point, station or EVSE, with its transparency software. |
+| [EnergyMeter](docs/EnergyMeter.md) | A meter of a pool, grid connection point, station or EVSE, with its transparency software and the certificates of its model. |
 | [EnergyMeterTemplate](docs/EnergyMeterTemplate.md) | What a series of energy meters naming it shares, e.g. manufacturer, model and firmware. |
 | [EnergyMeterGroup](docs/EnergyMeterGroup.md) | Energy meters of one charging station operator or grid operator; a collection. |
 | [ChargingStationManufacturer](docs/ChargingStationManufacturer.md) | A maker of charging stations, a party with its models, which stations and certificates name. |
@@ -548,8 +555,9 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
 - **Proofs:** the roaming network pruned, every child array complete, pruned to its root, or partial with the leaves
   it gives and their audit paths. A charging station proof gives the station with its EVSEs completely, the
   skeletons of its pool and operator, the charging tariffs its EVSEs take, the manufacturers with the models,
-  transparency software and certificates it and its energy meters name, its parking spaces and the grid connection point of its pool, and
-  embeds `commitId` and `revision`, so that the proof of the commit in a checkpoint keeps it evidence for months.
+  transparency software and certificates it and its energy meters name, in the skeletons of their bodies, its parking
+  spaces and the grid connection point of its pool, and embeds `commitId` and `revision`, so that the proof of the commit
+  in a checkpoint keeps it evidence for months.
 - **Attestations:** `{roamingNetworkId, commitId, revision, eTag, role, signer, signedAt, validUntil}`, signed
   (context `…/roamingNetwork/attestation/v1`). The `AttestationSigners` attest every new head, valid for
   `AttestationValidity` (15 minutes); `RefreshAttestations()` attests it again after `AttestationInterval` (5

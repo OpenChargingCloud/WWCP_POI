@@ -30,7 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// Changes of the transparency software certificates embedded in the conformity assessment bodies issuing them.
+    /// Changes of the certificates embedded in the conformity assessment bodies issuing them.
     /// </summary>
     public sealed partial class RoamingNetwork
     {
@@ -38,32 +38,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The properties of a transparency software certificate a change set can update or remove.
+        /// The properties of a certificate a change set can update or remove.
         /// </summary>
-        private static readonly ImmutableHashSet<String> ChangeableTransparencySoftwareCertificateProperties = [
-            TransparencySoftwareCertificate.PropertyKeys.Legislation,
-            TransparencySoftwareCertificate.PropertyKeys.ChargingStationModel,
-            TransparencySoftwareCertificate.PropertyKeys.HardwareRevisions,
-            TransparencySoftwareCertificate.PropertyKeys.FirmwareVersions,
-            TransparencySoftwareCertificate.PropertyKeys.ChargingStationManufacturerId,
-            TransparencySoftwareCertificate.PropertyKeys.DocumentNumber,
-            TransparencySoftwareCertificate.PropertyKeys.DocumentURL,
-            TransparencySoftwareCertificate.PropertyKeys.VerifiedTransparencySoftwareIds,
-            TransparencySoftwareCertificate.PropertyKeys.CompatibleTransparencySoftwareIds,
-            TransparencySoftwareCertificate.PropertyKeys.NotBefore,
-            TransparencySoftwareCertificate.PropertyKeys.NotAfter
+        private static readonly ImmutableHashSet<String> ChangeableConformityCertificateProperties = [
+            ConformityCertificate.PropertyKeys.Legislation,
+            ConformityCertificate.PropertyKeys.ChargingStationModel,
+            ConformityCertificate.PropertyKeys.HardwareRevisions,
+            ConformityCertificate.PropertyKeys.FirmwareVersions,
+            ConformityCertificate.PropertyKeys.ChargingStationManufacturerId,
+            ConformityCertificate.PropertyKeys.DocumentNumber,
+            ConformityCertificate.PropertyKeys.DocumentURL,
+            ConformityCertificate.PropertyKeys.VerifiedTransparencySoftwareIds,
+            ConformityCertificate.PropertyKeys.CompatibleTransparencySoftwareIds,
+            ConformityCertificate.PropertyKeys.NotBefore,
+            ConformityCertificate.PropertyKeys.NotAfter
         ];
 
         #endregion
 
 
-        #region (private static) TryApplyTransparencySoftwareCertificateChange(Change, Index, CreatedAt, AsHeld, Bodies, out CurrentValue, out HeldValue, out ErrorResponse)
+        #region (private static) TryApplyConformityCertificateChange(Change, Index, CreatedAt, AsHeld, Bodies, out CurrentValue, out HeldValue, out ErrorResponse)
 
         /// <summary>
-        /// Apply a change of a transparency software certificate to the given conformity assessment bodies: an added one to the body
+        /// Apply a change of a certificate to the given conformity assessment bodies: an added one to the body
         /// its parent names, every other to the one having it.
         /// </summary>
-        private static Boolean TryApplyTransparencySoftwareCertificateChange(RoamingNetworkChange                                                               Change,
+        private static Boolean TryApplyConformityCertificateChange(RoamingNetworkChange                                                               Change,
                                                                   Int32                                                                              Index,
                                                                   DateTimeOffset                                                                     CreatedAt,
                                                                   Boolean                                                                            AsHeld,
@@ -80,9 +80,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region The conformity assessment body: the one having it, or the parent of a new one
 
-            if (!TransparencySoftwareCertificate_Id.TryParse(Change.EntityId, out var certificateId))
+            if (!ConformityCertificate_Id.TryParse(Change.EntityId, out var certificateId))
             {
-                ErrorResponse = $"Change {Index}: invalid transparency software certificate identification '{Change.EntityId}'!";
+                ErrorResponse = $"Change {Index}: invalid certificate identification '{Change.EntityId}'!";
                 return false;
             }
 
@@ -93,7 +93,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (body is not null)
                 {
-                    ErrorResponse = $"Change {Index}: the transparency software certificate '{certificateId}' already exists, at the conformity assessment body '{body.Id}'!";
+                    ErrorResponse = $"Change {Index}: the certificate '{certificateId}' already exists, at the conformity assessment body '{body.Id}'!";
                     return false;
                 }
 
@@ -101,7 +101,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !ConformityAssessmentBody_Id.TryParse(Change.ParentEntityId ?? "", out var parentId) ||
                     !Bodies.TryGetValue(parentId, out body))
                 {
-                    ErrorResponse = $"Change {Index}: the transparency software certificate '{certificateId}' to add needs its ConformityAssessmentBody, an existing one!";
+                    ErrorResponse = $"Change {Index}: the certificate '{certificateId}' to add needs its ConformityAssessmentBody, an existing one!";
                     return false;
                 }
 
@@ -112,7 +112,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (body is null)
                 {
-                    ErrorResponse = $"Change {Index}: the transparency software certificate '{certificateId}' does not exist!";
+                    ErrorResponse = $"Change {Index}: the certificate '{certificateId}' does not exist!";
                     return false;
                 }
 
@@ -121,26 +121,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !ConformityAssessmentBody_Id.TryParse(Change.ParentEntityId ?? "", out var namedParentId) ||
                     namedParentId != body.Id))
                 {
-                    ErrorResponse = $"Change {Index}: the transparency software certificate '{certificateId}' belongs to ConformityAssessmentBody '{body.Id}', not to {Change.ParentEntityType} '{Change.ParentEntityId}'!";
+                    ErrorResponse = $"Change {Index}: the certificate '{certificateId}' belongs to ConformityAssessmentBody '{body.Id}', not to {Change.ParentEntityType} '{Change.ParentEntityId}'!";
                     return false;
                 }
 
             }
 
             var bodyJSON          = body.ToJSON(Embedded: true);
-            var certificates      = bodyJSON[ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates] as JArray;
+            var certificates      = bodyJSON[ConformityAssessmentBody.PropertyKeys.Certificates] as JArray;
             // Found under the identification it is kept with: the change may name it in another spelling.
-            var storedId          = body.TryGetTransparencySoftwareCertificate(certificateId, out var stored) ? stored.Id.ToString() : null;
+            var storedId          = body.TryGetConformityCertificate(certificateId, out var stored) ? stored.Id.ToString() : null;
             var certificateJSON       = Change.Kind == RoamingNetworkChangeKind.Add
                                         ? null
-                                        : certificates?.OfType<JObject>().FirstOrDefault(certificate => certificate[TransparencySoftwareCertificate.PropertyKeys.Id]?.Value<String>() == storedId);
+                                        : certificates?.OfType<JObject>().FirstOrDefault(certificate => certificate[ConformityCertificate.PropertyKeys.Id]?.Value<String>() == storedId);
 
             #endregion
 
             // An element change is applied as the change of the property it amounts to.
             var isElementChange = Change.IsElementChange;
 
-            if (!TryResolveElementChange(ref Change, certificateJSON, "transparency software certificate", out var elementValue, out ErrorResponse))
+            if (!TryResolveElementChange(ref Change, certificateJSON, "certificate", out var elementValue, out ErrorResponse))
             {
                 ErrorResponse = $"Change {Index}: {ErrorResponse}";
                 return false;
@@ -157,8 +157,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 !OldValueMatches(expected, CurrentValue))
             {
                 ErrorResponse = isProperty
-                                    ? $"Change {Index}: the property '{Change.PropertyName}' of the transparency software certificate '{certificateId}' is no longer the expected old value, but '{POIJSON.ContentText(CurrentValue)}'!"
-                                    : $"Change {Index}: the transparency software certificate '{certificateId}' is no longer the expected old value{(CurrentValue is null ? ": it does not exist" : "")}!";
+                                    ? $"Change {Index}: the property '{Change.PropertyName}' of the certificate '{certificateId}' is no longer the expected old value, but '{POIJSON.ContentText(CurrentValue)}'!"
+                                    : $"Change {Index}: the certificate '{certificateId}' is no longer the expected old value{(CurrentValue is null ? ": it does not exist" : "")}!";
                 return false;
             }
 
@@ -172,9 +172,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     var propertyName = Change.PropertyName!;
 
-                    if (!ChangeableTransparencySoftwareCertificateProperties.Contains(propertyName))
+                    if (!ChangeableConformityCertificateProperties.Contains(propertyName))
                     {
-                        ErrorResponse = $"Change {Index}: the property '{propertyName}' of a transparency software certificate can not be changed!";
+                        ErrorResponse = $"Change {Index}: the property '{propertyName}' of a certificate can not be changed!";
                         return false;
                     }
 
@@ -183,7 +183,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         if (CurrentValue is null)
                         {
-                            ErrorResponse = $"Change {Index}: the property '{propertyName}' of the transparency software certificate '{certificateId}' does not exist!";
+                            ErrorResponse = $"Change {Index}: the property '{propertyName}' of the certificate '{certificateId}' does not exist!";
                             return false;
                         }
 
@@ -202,18 +202,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 case RoamingNetworkChangeKind.Add:
 
                     if (Change.NewValue is not JObject newCertificate ||
-                        newCertificate[TransparencySoftwareCertificate.PropertyKeys.Id]?.Type != JTokenType.String ||
-                        !TransparencySoftwareCertificate_Id.TryParse(newCertificate[TransparencySoftwareCertificate.PropertyKeys.Id]!.Value<String>()!, out var newId) ||
+                        newCertificate[ConformityCertificate.PropertyKeys.Id]?.Type != JTokenType.String ||
+                        !ConformityCertificate_Id.TryParse(newCertificate[ConformityCertificate.PropertyKeys.Id]!.Value<String>()!, out var newId) ||
                         newId != certificateId)
                     {
-                        ErrorResponse = $"Change {Index}: the transparency software certificate to add must be a JSON object with the identification '{certificateId}'!";
+                        ErrorResponse = $"Change {Index}: the certificate to add must be a JSON object with the identification '{certificateId}'!";
                         return false;
                     }
 
                     if (certificates is null)
                     {
                         certificates = [];
-                        bodyJSON[ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates] = certificates;
+                        bodyJSON[ConformityAssessmentBody.PropertyKeys.Certificates] = certificates;
                     }
 
                     certificates.Add(newCertificate.DeepClone());
@@ -228,14 +228,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     certificates!.Remove(certificateJSON!);
 
                     if (certificates.Count == 0)
-                        bodyJSON.Remove(ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates);
+                        bodyJSON.Remove(ConformityAssessmentBody.PropertyKeys.Certificates);
 
                     break;
 
                 #endregion
 
                 default:
-                    ErrorResponse = $"Change {Index}: {Change.Kind} of a transparency software certificate is not supported yet!";
+                    ErrorResponse = $"Change {Index}: {Change.Kind} of a certificate is not supported yet!";
                     return false;
 
             }
@@ -252,7 +252,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // What is signed is what is held: the certificate as the body read again writes it (SPECIFICATION.md, section 4).
-            if (!TryHeldAsGiven(given, () => FindHeld(changedBody.ToJSON(Embedded: true), nameof(ConformityAssessmentBody), given), "transparency software certificate", AsHeld, out HeldValue, out ErrorResponse))
+            if (!TryHeldAsGiven(given, () => FindHeld(changedBody.ToJSON(Embedded: true), nameof(ConformityAssessmentBody), given), "certificate", AsHeld, out HeldValue, out ErrorResponse))
             {
                 ErrorResponse = $"Change {Index}: {ErrorResponse}";
                 return false;

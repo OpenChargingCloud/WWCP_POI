@@ -324,12 +324,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region The transparency software certificates its energy meters name, in the bodies issuing them
+            #region The certificates the station and its energy meters name, in the bodies issuing them
 
-            var certificateIds  = energyMeters.SelectMany(energyMeter => energyMeter.TransparencySoftwareStatus).
-                                               Select  (assignment  => assignment.CertificateId).
-                                               OfType<TransparencySoftwareCertificate_Id>().
-                                               ToHashSet();
+            var certificateIds  = chargingStation.CertificateIds.
+                                      Concat(energyMeters.SelectMany(energyMeter => energyMeter.CertificateIds)).
+                                      ToHashSet();
 
             var bodies          = new List<(Int32, JObject)>();
 
@@ -337,8 +336,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 var body                = RoamingNetwork.ConformityAssessmentBodies[bodyIndex];
-                var certificateIndices  = Enumerable.Range(0, body.TransparencySoftwareCertificates.Count).
-                                                     Where (index => certificateIds.Contains(body.TransparencySoftwareCertificates[index].Id)).
+                var certificateIndices  = Enumerable.Range(0, body.Certificates.Count).
+                                                     Where (index => certificateIds.Contains(body.Certificates[index].Id)).
                                                      ToArray();
 
                 if (certificateIndices.Length == 0)
@@ -349,8 +348,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 SetPartial(bodyJSON,
                            bodyNode,
-                           ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates,
-                           certificateIndices.Select(index => (index, body.TransparencySoftwareCertificates[index].ToJSON(Embedded: true))));
+                           ConformityAssessmentBody.PropertyKeys.Certificates,
+                           certificateIndices.Select(index => (index, body.Certificates[index].ToJSON(Embedded: true))));
 
                 bodies.Add((bodyIndex, bodyJSON));
 

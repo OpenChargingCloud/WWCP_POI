@@ -68,6 +68,7 @@ The properties of a charging station it gives its members, each written and read
 | `euVehicleCategories` | `EUVehicleCategories` | besides their own |
 | `features` | `Features` | besides their own |
 | `parkingSpaceIds` | `ParkingSpaceIds` | besides their own; parking spaces of the network |
+| `certificateIds` | `CertificateIds` | besides their own; certificates of charging station models of the network, each checked at the stations as they are at runtime |
 
 "Unless they have their own": of the first of their templates giving one. "Besides their own": of all their templates;
 of elements with the same key the first template's. Absent values are left out; an empty array is not written.

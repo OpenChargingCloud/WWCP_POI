@@ -72,6 +72,7 @@ See [common properties](README.md#common-properties). A charging station does no
 | `certificationInfo` | `CertificationInfo` | `URL?` | update/remove | Where to find information on its certification, e.g. its conformity with calibration law. |
 | `maxPower` | `MaxPower` | `Watt?` | update/remove | The power it can deliver at once, in W, not negative: with load management often less than the sum of its EVSEs, never more. It is given, not calculated. |
 | `parkingSpaceIds` | `ParkingSpaceIds` | `ImmutableArray<ParkingSpace_Id>` | update/remove | The parking spaces it charges at; see [parkingSpaceIds](#parkingspaceids). |
+| `certificateIds` | `CertificateIds` | `ImmutableArray<ConformityCertificate_Id>` | update/remove | The certificates of its model it names, each once, ordered (ordinal); see [Calibration and certification](#calibration-and-certification). |
 | `templateIds` | `TemplateIds` | `ImmutableArray<ChargingStationTemplate_Id>` | update/remove, element changes | The [charging station templates](ChargingStationTemplate.md) of its operator it takes, each once, in its order, the first deciding; see [templates and effective members](README.md#templates-and-effective-members). |
 
 Absent values are left out; empty arrays are not written.
@@ -144,7 +145,7 @@ In a history, it is set and read by `history.RuntimeStatus` with the kind `energ
 network, `modelId` one of its [models](ChargingStationManufacturer.md#chargingstationmodels): a model is unique within
 its manufacturer only, so a station names it only with its manufacturer. `hardwareRevision` names one of the
 `hardwareRevisions` of the model, `firmwareVersion` one of its `firmwareVersions`: what a certificate of the model
-covers is told by them (see [ConformityAssessmentBody](ConformityAssessmentBody.md#transparencysoftwarecertificates)).
+covers is told by them (see [ConformityAssessmentBody](ConformityAssessmentBody.md#certificates)).
 The network refuses a station naming an unknown manufacturer, model, hardware revision or firmware version, a model
 without a manufacturer, or a hardware revision or firmware version without a model, as the station is at runtime,
 with what its templates give it; and a manufacturer, a model, a hardware revision or a firmware version can not be
@@ -202,10 +203,19 @@ brands of its own. Changed as a whole, or [brand by brand](Brand.md#change-sets)
 
 ## Calibration and certification
 
+`certificateIds` names the [certificates](ConformityAssessmentBody.md#certificates) of conformity of its model: each
+one of the network, issued by a conformity assessment body for a charging station model, the model of the station with
+its manufacturer, covering its `hardwareRevision` and `firmwareVersion`. A certificate names its components: the
+transparency software releases it verifies, and the energy meters it was issued with; where it names energy meters,
+every energy meter of the station, its own and those of its EVSEs, is one of them, of its model, revision and
+firmware. The network refuses anything else, as the station is at runtime, with what its templates give it, and a
+certificate a station names can not be removed. The certificates of the meters are the meters' own
+([EnergyMeter](EnergyMeter.md)); the legal status of a transparency software release for a meter, its
+`transparencySoftwareStatus`, is proven by a certificate of the meter or of the station naming the release.
+
 `calibrationInfo` and `certificationInfo` are URLs, e.g. of the documents on the calibration of the station's
 energy meters and on its conformity with calibration law. They are not checked beyond being URLs. Features such as
-`GermanCalibrationLaw` or `EuropeanCalibrationLaw` say the same in short; the transparency software of the
-meters is part of the [energy meters](EnergyMeter.md).
+`GermanCalibrationLaw` or `EuropeanCalibrationLaw` say the same in short.
 
 
 ## Price status

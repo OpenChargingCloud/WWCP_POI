@@ -34,7 +34,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// Looks up an approval or compatibility document by its identification.
     /// </summary>
-    public delegate TransparencySoftwareCertificate?  TransparencySoftwareCertificateLookupDelegate(TransparencySoftwareCertificate_Id  CertificateId);
+    public delegate ConformityCertificate?  ConformityCertificateLookupDelegate(ConformityCertificate_Id  CertificateId);
 
 
     /// <summary>
@@ -106,7 +106,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The optional approval or compatibility document covering the software release.
         /// </summary>
         [Optional]
-        public TransparencySoftwareCertificate?     Certificate               { get; }
+        public ConformityCertificate?     Certificate               { get; }
 
         /// <summary>
         /// The optional name of the manufacturer of the software release, which embeds it, e.g. the vendor OCPI names.
@@ -131,7 +131,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The identification of the optional document.
         /// </summary>
-        public TransparencySoftwareCertificate_Id?  CertificateId
+        public ConformityCertificate_Id?  CertificateId
             => Certificate?.Id;
 
         #endregion
@@ -148,7 +148,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="CertificateIssuer">The optional name of the body that issued the document.</param>
         public TransparencySoftwareStatus(TransparencySoftware              TransparencySoftware,
                                           LegalStatus                       LegalStatus,
-                                          TransparencySoftwareCertificate?  Certificate         = null,
+                                          ConformityCertificate?  Certificate         = null,
                                           String?                           Vendor              = null,
                                           String?                           CertificateIssuer   = null)
         {
@@ -215,7 +215,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="TransparencySoftwareLookup">Looks up the software release.</param>
         /// <param name="CertificateLookup">Looks up the document.</param>
         public TransparencySoftwareStatus Clone(TransparencySoftwareLookupDelegate             TransparencySoftwareLookup,
-                                                TransparencySoftwareCertificateLookupDelegate  CertificateLookup)
+                                                ConformityCertificateLookupDelegate  CertificateLookup)
 
             => new (TransparencySoftwareLookup(TransparencySoftwareId) ??
                         throw new ArgumentException($"Unresolved software reference '{TransparencySoftwareId}' in the target network."),

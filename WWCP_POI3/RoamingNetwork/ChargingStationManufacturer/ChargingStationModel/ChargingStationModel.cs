@@ -34,7 +34,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// A model of charging stations: an immutable description, embedded completely in its charging station manufacturer.
-    /// Charging stations, charging station templates and transparency software certificates name it by its manufacturer
+    /// Charging stations, charging station templates and certificates name it by its manufacturer
     /// and its identification, which is unique within its manufacturer.
     /// </summary>
     /// <remarks>

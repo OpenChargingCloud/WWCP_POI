@@ -60,7 +60,7 @@ See [README.md](README.md#common-properties).
 | `parkingOperators` | `ParkingOperators` | [ParkingOperator](ParkingOperator.md)[] | add/remove | Ordered by `@id` (ordinal). |
 | `energyMeterManufacturers` | `EnergyMeterManufacturers` | [EnergyMeterManufacturer](EnergyMeterManufacturer.md)[] | add/remove | Parties, each with its models; ordered by `@id` (ordinal). |
 | `transparencySoftwareManufacturers` | `TransparencySoftwareManufacturers` | [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md)[] | add/remove | Parties, each with its releases, one per version of a software; ordered by `@id` (ordinal). `TransparencySoftware` gives the releases of all of them by their identifications, unique within the network. |
-| `conformityAssessmentBodies` | `ConformityAssessmentBodies` | [ConformityAssessmentBody](ConformityAssessmentBody.md)[] | add/remove | Parties, each with the transparency software certificates it issued; ordered by `@id` (ordinal). `TransparencySoftwareCertificates` gives the certificates of all of them by their identifications, unique within the network. |
+| `conformityAssessmentBodies` | `ConformityAssessmentBodies` | [ConformityAssessmentBody](ConformityAssessmentBody.md)[] | add/remove | Parties, each with the certificates it issued; ordered by `@id` (ordinal). `Certificates` gives the certificates of all of them by their identifications, unique within the network. |
 
 Every collection is omitted when empty. Children are never written or read by their identifications alone:
 `TryParse` refuses `chargingStationOperatorIds`, `chargingStationManufacturerIds`, `eMobilityProviderIds`,
@@ -86,7 +86,7 @@ with the default view options ([SPECIFICATION.md](../SPECIFICATION.md#2-the-cont
   `TryGetParkingOperatorById`, `TryGetChargingStationManufacturerById`, `TryGetEnergyMeterManufacturerById` (and
   `TryGetModel` of a manufacturer),
   `TryGetTransparencySoftwareManufacturerById`, `TryGetTransparencySoftwareById`, `TransparencySoftwareManufacturerOf`,
-  `TryGetConformityAssessmentBodyById`, `TryGetTransparencySoftwareCertificateById`, `ConformityAssessmentBodyOf`, ….
+  `TryGetConformityAssessmentBodyById`, `TryGetConformityCertificateById`, `ConformityAssessmentBodyOf`, ….
 
 
 ## @context
@@ -135,7 +135,7 @@ adds its children itself, e.g. with `RoamingNetworkChange.AddChildren(chargingSt
 
 The [ChargingStationManufacturer](ChargingStationManufacturer.md)s, parties with their models, named by the
 `manufacturerId` and `modelId` of charging stations and their templates and the `chargingStationManufacturerId` and
-`chargingStationModel` of certificates, under `chargingStationManufacturers`, ordered by `@id` (ordinal). Added and
+`chargingStationModel` of certificates of charging station models, under `chargingStationManufacturers`, ordered by `@id` (ordinal). Added and
 removed by the RNO: `RoamingNetworkChange.Add(manufacturer)` (with its keys, without its models), `Remove(manufacturerId)`;
 its models it adds itself: `Add(model, manufacturerId)`. One or a model still named can not be removed.
 
@@ -175,8 +175,8 @@ named can not be removed.
 
 The [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md)s, parties as the operators are: the RNO
 adds and removes them with their keys, each changes its own properties and its releases of transparency software,
-embedded in it as `transparencySoftware`, one per version of a software. Releases are named by certificates and by
-the `transparencySoftwareStatus` of [EnergyMeter](EnergyMeter.md)s, by their identifications alone: these are unique
+embedded in it as `transparencySoftware`, one per version of a software. Releases are named by certificates, among
+their components, and by the `transparencySoftwareStatus` of [EnergyMeter](EnergyMeter.md)s, by their identifications alone: these are unique
 within the network, whichever manufacturer embeds them. A manufacturer whose release is still named can not be
 removed.
 
@@ -185,10 +185,11 @@ removed.
 
 The [ConformityAssessmentBody](ConformityAssessmentBody.md)s, e.g. national metrology institutes, parties as the
 operators are: the RNO adds and removes them, with their keys or, while one does not take part, without; each changes
-its own properties and the transparency software certificates it issued, embedded in it as
-`transparencySoftwareCertificates`, the RNO in the place of one without keys. Certificates are named by the
-`transparencySoftwareStatus` of [EnergyMeter](EnergyMeter.md)s by their identifications alone: these are unique within
-the network, whichever body embeds them. A body whose certificate is still named can not be removed.
+its own properties and the certificates it issued, embedded in it as `certificates`, the RNO in the place of one
+without keys: each for a model of charging stations or of energy meters, naming its components. Certificates are named
+by the `certificateIds` of [ChargingStation](ChargingStation.md)s, [EnergyMeter](EnergyMeter.md)s and their templates
+by their identifications alone: these are unique within the network, whichever body embeds them. A body whose
+certificate is still named can not be removed.
 
 
 ## Change sets of the RNO
@@ -265,8 +266,10 @@ Checked by the constructor (so by `TryParse`) and again on the result of every c
   the `gridOperatorId` of a grid connection point (`gridOperators`);
   the `manufacturerId` of an energy meter (`energyMeterManufacturers`);
   the `chargingStationIds` of parking garages, spaces and sensors; the `parkingSpaceIds` of charging stations;
-  the releases and `chargingStationManufacturerId` of certificates;
-  the releases and `certificateId` of an energy meter's `transparencySoftwareStatus`, the certificate covering the release.
+  the releases, the models and the energy meters of certificates;
+  the releases of an energy meter's `transparencySoftwareStatus`;
+  the `certificateIds` of charging stations and energy meters, each for their model, covering their hardware revision
+  and firmware version, and every energy meter of a station one a certificate of the station names, where it names any.
   So a referenced entity can not be removed.
 
 Checked when a change set is applied:
@@ -335,8 +338,9 @@ Checked when a change set is applied:
       "name": { "de": "Physikalisch-Technische Bundesanstalt" },
       "notifiedBodyNumber": "0102",
       "notifiedFor": [ "MID" ],
-      "transparencySoftwareCertificates": [
+      "certificates": [
         { "@id": "PTB-2026-0042",
+          "chargingStationManufacturerId": "ACME",
           "chargingStationModel": "Wallbox 22",
           "hardwareRevisions": [ "2.1" ],
           "firmwareVersions": [ "4.7.1" ],

@@ -4,7 +4,9 @@ An energy meter manufacturer builds energy meters, e.g. the calibrated meters of
 **party**: the roaming network operator (RNO) adds and removes it, with its keys; it changes its own properties and
 its **models** with its own keys. An energy meter and an energy meter template name their manufacturer
 (`manufacturerId`), their model (`modelId`) and its hardware revision and firmware version (`hardwareRevision`,
-`firmwareVersion`). It is described by its name, its contact data and data licenses, as a
+`firmwareVersion`), a certificate of an energy meter model the manufacturer, the model and the hardware revisions and
+firmware versions it covers, and so does a certificate of a charging station model of the energy meters it was issued
+with. It is described by its name, its contact data and data licenses, as a
 charging station operator is.
 
 The identification is an `EnergyMeterManufacturer_Id`, any nonempty text, trimmed, compared case-insensitively,
@@ -79,8 +81,8 @@ names who made it, so it names none (`manufacturerId` is refused).
   `UpdateProperty(model, manufacturerId, …)`/`RemoveProperty(model, manufacturerId, …)`: every change names its
   manufacturer as its parent, as its identification is unique within it only; one without is refused. Signed by the
   manufacturer, with a signing key that may sign `models`.
-- A model still named by an energy meter or an energy meter template can not be removed, nor its manufacturer; nor a
-  hardware revision or firmware version of it one of them names. `versions`, one list of before, is no property of a
+- A model still named by an energy meter, an energy meter template or a certificate can not be removed, nor its
+  manufacturer; nor a hardware revision or firmware version of it one of them names. `versions`, one list of before, is no property of a
   model.
 
 
@@ -97,6 +99,8 @@ it names `models`.
 |---|---|---|
 | [EnergyMeter](EnergyMeter.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | `manufacturerId` names a manufacturer of the network; `modelId` a model of it, and only with its manufacturer; `hardwareRevision` one of the `hardwareRevisions` of the model, `firmwareVersion` one of its `firmwareVersions`, each only with the model: as the meter is at runtime, with what its templates give it. |
 | [EnergyMeterTemplate](EnergyMeterTemplate.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | the same, of the template; a hardware revision or firmware version without a model it gives to meters of their own model, checked at them. |
+| certificate of an energy meter model ([ConformityAssessmentBody](ConformityAssessmentBody.md#certificates)) | `energyMeterManufacturerId`, `energyMeterModel`, `hardwareRevisions`, `firmwareVersions` | the manufacturer names a manufacturer of the network, the model one of its models, each hardware revision one of its `hardwareRevisions`, each firmware version one of its `firmwareVersions`. |
+| certificate of a charging station model | `energyMeters`: `manufacturerId`, `modelId`, `hardwareRevisions`, `firmwareVersions` | the same, of each energy meter it was issued with. |
 
 The references are checked after every change set: a manufacturer, a model, a hardware revision or a firmware version
 still named can not be removed, and a meter or template can not name an unknown one.

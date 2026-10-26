@@ -4,8 +4,8 @@ A charging station manufacturer builds charging stations, e.g. wallboxes or DC c
 the roaming network operator (RNO) adds and removes it, with its keys; it changes its own properties and its
 **models** with its own keys. A charging station and a charging station template name their manufacturer
 (`manufacturerId`), their model (`modelId`) and its hardware revision and firmware version (`hardwareRevision`,
-`firmwareVersion`), a transparency software certificate the manufacturer, the model and the hardware revisions and
-firmware versions of the model it was issued for. It is described by its name, its contact data and data licenses, as a
+`firmwareVersion`), a certificate of a charging station model the manufacturer, the model and the hardware revisions
+and firmware versions of the model it was issued for. It is described by its name, its contact data and data licenses, as a
 charging station operator is.
 
 The identification is a `ChargingStationManufacturer_Id`, any nonempty text, trimmed, compared case-insensitively,
@@ -128,7 +128,7 @@ names `models`, its own properties only when it names `party` (SPECIFICATION.md,
 |---|---|---|
 | [ChargingStation](ChargingStation.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | `manufacturerId` names a manufacturer of the network; `modelId` a model of it, and only with its manufacturer; `hardwareRevision` one of the `hardwareRevisions` of the model, `firmwareVersion` one of its `firmwareVersions`, each only with the model: as the station is at runtime, with what its templates give it. |
 | [ChargingStationTemplate](ChargingStationTemplate.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | the same, of the template; a hardware revision or firmware version without a model it gives to stations of their own model, checked at them. |
-| transparency software certificate ([ConformityAssessmentBody](ConformityAssessmentBody.md#transparencysoftwarecertificates)) | `chargingStationManufacturerId`, `chargingStationModel`, `hardwareRevisions`, `firmwareVersions` | the manufacturer, mandatory, names a manufacturer of the network, the model one of its models, each hardware revision one of its `hardwareRevisions`, each firmware version one of its `firmwareVersions`. |
+| certificate of a charging station model ([ConformityAssessmentBody](ConformityAssessmentBody.md#certificates)) | `chargingStationManufacturerId`, `chargingStationModel`, `hardwareRevisions`, `firmwareVersions` | the manufacturer, mandatory, names a manufacturer of the network, the model one of its models, each hardware revision one of its `hardwareRevisions`, each firmware version one of its `firmwareVersions`. |
 
 The references are checked after every change set: a manufacturer, a model, a hardware revision or a firmware version
 still named can not be removed, and a station, template or certificate can not name an unknown one.

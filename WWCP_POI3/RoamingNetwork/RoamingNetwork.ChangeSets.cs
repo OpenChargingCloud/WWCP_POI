@@ -1148,9 +1148,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                 }
 
-                else if (change.EntityType == nameof(TransparencySoftwareCertificate))
+                else if (change.EntityType == nameof(ConformityCertificate))
                 {
-                    if (!TryApplyTransparencySoftwareCertificateChange(change, index, ChangeSet.CreatedAt, AsHeld, bodies, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyConformityCertificateChange(change, index, ChangeSet.CreatedAt, AsHeld, bodies, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1217,7 +1217,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var allEnergyMeterGroups    = AllEnergyMeterGroups   (operators.Values, gridOps.Values).ToArray();
             var allEnergyMeterTemplates = AllEnergyMeterTemplates(operators.Values, gridOps.Values).ToArray();
             var softwares               = TransparencySoftwareOf (softwareManufacturers.Values);
-            var certificates            = TransparencySoftwareCertificatesOf(bodies.Values);
+            var certificates            = CertificatesOf(bodies.Values);
 
             if ((networkOperators.Values.SingleOrDefault()?.KeyStatementError(Id) ??
                  UnknownManufacturer (operators.Values, manufacturers) ??
@@ -1229,8 +1229,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  UnknownChargingStation(parkingOps.Values, operators)  ??
                  UnknownParkingSpace(operators.Values, parkingOps.Values) ??
                  DuplicateTransparencySoftware(softwareManufacturers.Values) ??
-                 DuplicateTransparencySoftwareCertificate(bodies.Values) ??
-                 UnknownTransparencyReference(allEnergyMeters, softwares, certificates, manufacturers) ??
+                 DuplicateConformityCertificate(bodies.Values) ??
+                 UnknownCertificateReference(operators.Values, gridOps.Values, softwares, certificates, manufacturers, meterManufacturers) ??
                  DuplicateEnergyMeterGroup(allEnergyMeterGroups)       ??
                  DuplicateProviderGroup(operators.Values, providers.Values) ??
                  DuplicateChargingTariffOffer(operators.Values, providers.Values) ??

@@ -334,7 +334,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                    ConformityAssessmentBody.ToJSON(Embedded: true, IncludeChildArrays: false),
 
-                   [ Array(ConformityAssessmentBody.PropertyKeys.TransparencySoftwareCertificates,  ConformityAssessmentBody.TransparencySoftwareCertificates,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)) ],
+                   [ Array(ConformityAssessmentBody.PropertyKeys.Certificates,  ConformityAssessmentBody.Certificates,  value => () => Leaf(value, () => value.ToJSON(Embedded: true), Format)) ],
 
                    Format));
 

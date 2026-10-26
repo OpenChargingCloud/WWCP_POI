@@ -3,9 +3,9 @@
 A transparency software manufacturer makes transparency software, e.g. the software with which a driver checks the
 signed meter values of a charging session under the German calibration law. In POI 3 it is a **party**: the roaming
 network operator (RNO) adds and removes it, with its keys; it changes its own properties and its **releases**, one
-per version of a software, with its own keys. Energy meters and the transparency software certificates of
-[ConformityAssessmentBody](ConformityAssessmentBody.md)s name its releases
-by their identifications.
+per version of a software, with its own keys. Energy meters, with the legal status of a release for them, and the
+certificates of [ConformityAssessmentBody](ConformityAssessmentBody.md)s, which name the releases they were issued with
+among their components, name its releases by their identifications.
 
 It is the one the EU Cyber Resilience Act (CRA, Regulation (EU) 2024/2847) holds responsible for its software: it
 names its role under the CRA, where vulnerabilities are reported, its policy on coordinated vulnerability disclosure

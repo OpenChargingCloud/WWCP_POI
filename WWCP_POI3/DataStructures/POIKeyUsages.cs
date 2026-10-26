@@ -119,7 +119,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                    nameof(TransparencySoftware)    => Software,
 
-                   nameof(TransparencySoftwareCertificate) => Certificates,
+                   nameof(ConformityCertificate) => Certificates,
 
                    _                               => Party
 

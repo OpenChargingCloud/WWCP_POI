@@ -239,7 +239,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  TransparencySoftwareManufacturerIds = "transparencySoftwareManufacturerIds";
 
             /// <summary>
-            /// The property of its conformity assessment bodies, with the transparency software certificates they issued.
+            /// The property of its conformity assessment bodies, with the certificates they issued.
             /// </summary>
             public const String  ConformityAssessmentBodies          = "conformityAssessmentBodies";
 
@@ -450,20 +450,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // Certificates are embedded in the bodies issuing them, and unique within the network: energy meters name them
             // by their identifications alone.
-            if (DuplicateTransparencySoftwareCertificate(conformityAssessmentBodies) is String duplicateCertificate)
+            if (DuplicateConformityCertificate(conformityAssessmentBodies) is String duplicateCertificate)
                 throw new ArgumentException(duplicateCertificate, nameof(ConformityAssessmentBodies));
 
-            this.transparencySoftwareCertificates = TransparencySoftwareCertificatesOf(conformityAssessmentBodies);
+            this.certificates = CertificatesOf(conformityAssessmentBodies);
 
-            // Certificates name releases and models of this network; energy meters name releases and certificates.
-            if (UnknownTransparencyReference(AllEnergyMeters(chargingStationOperators, gridOperators), transparencySoftware, transparencySoftwareCertificates, chargingStationManufacturers.Index) is String transparencyError)
+            // Certificates name releases and models of this network, energy meters releases; stations and meters name the
+            // certificates of their models, covering their hardware revision and firmware version.
+            if (UnknownCertificateReference(chargingStationOperators, gridOperators, transparencySoftware, certificates, chargingStationManufacturers.Index, energyMeterManufacturers.Index) is String transparencyError)
                 throw new ArgumentException(transparencyError, nameof(TransparencySoftwareManufacturers));
 
             // Energy meter templates and groups are unique within the network; templates name manufacturers, models,
             // releases and certificates of it.
             if ((DuplicateEnergyMeterGroup          (AllEnergyMeterGroups   (chargingStationOperators, gridOperators)) ??
                  DuplicateEnergyMeterTemplate       (AllEnergyMeterTemplates(chargingStationOperators, gridOperators)) ??
-                 UnknownEnergyMeterTemplateReference(AllEnergyMeterTemplates(chargingStationOperators, gridOperators), energyMeterManufacturers.Index, transparencySoftware, transparencySoftwareCertificates)) is String energyMeterGroupError)
+                 UnknownEnergyMeterTemplateReference(AllEnergyMeterTemplates(chargingStationOperators, gridOperators), energyMeterManufacturers.Index, transparencySoftware, certificates)) is String energyMeterGroupError)
             {
                 throw new ArgumentException(energyMeterGroupError, nameof(ChargingStationOperators));
             }
@@ -1167,7 +1168,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             //JSON["gridOperators"] = POIJSON.Children(GridOperators);
             //JSON["transparencySoftware"] = POIJSON.Values(TransparencySoftware, value => value.ToJSON());
-            //JSON["transparencySoftwareCertificates"] = POIJSON.Values(TransparencySoftwareCertificates, value => value.ToJSON());
+            //JSON["certificates"] = POIJSON.Values(Certificates, value => value.ToJSON());
             //JSON["parkingOperators"] = POIJSON.Children(ParkingOperators);
             //JSON["chargingStationManufacturers"] = POIJSON.Children(ChargingStationManufacturers);
 
@@ -2199,7 +2200,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly POICollection<TransparencySoftwareManufacturer_Id, TransparencySoftwareManufacturer>  transparencySoftwareManufacturers;
         private readonly IReadOnlyDictionary<TransparencySoftware_Id, TransparencySoftware>                    transparencySoftware;
         private readonly POICollection<ConformityAssessmentBody_Id, ConformityAssessmentBody>                  conformityAssessmentBodies;
-        private readonly IReadOnlyDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  transparencySoftwareCertificates;
+        private readonly IReadOnlyDictionary<ConformityCertificate_Id, ConformityCertificate>  certificates;
 
         /// <summary>
         /// The conformity assessment bodies in this immutable network version, with the certificates they issued.
@@ -2218,7 +2219,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The conformity assessment body that issued the certificate having the given identification, if it is one of this network.
         /// </summary>
-        public ConformityAssessmentBody? ConformityAssessmentBodyOf(TransparencySoftwareCertificate_Id CertificateId)
+        public ConformityAssessmentBody? ConformityAssessmentBodyOf(ConformityCertificate_Id CertificateId)
 
             => ConformityAssessmentBodyOf(conformityAssessmentBodies, CertificateId);
 
@@ -2226,20 +2227,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The conformity assessment body of the given certificate among the given bodies.
         /// </summary>
         internal static ConformityAssessmentBody? ConformityAssessmentBodyOf(IEnumerable<ConformityAssessmentBody>  Bodies,
-                                                                            TransparencySoftwareCertificate_Id     CertificateId)
+                                                                            ConformityCertificate_Id     CertificateId)
 
-            => Bodies.FirstOrDefault(body => body.TryGetTransparencySoftwareCertificate(CertificateId, out _));
+            => Bodies.FirstOrDefault(body => body.TryGetConformityCertificate(CertificateId, out _));
 
         /// <summary>
         /// The certificates of the given conformity assessment bodies, by their identifications.
         /// </summary>
-        internal static IReadOnlyDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate> TransparencySoftwareCertificatesOf(IEnumerable<ConformityAssessmentBody> Bodies)
+        internal static IReadOnlyDictionary<ConformityCertificate_Id, ConformityCertificate> CertificatesOf(IEnumerable<ConformityAssessmentBody> Bodies)
         {
 
-            var certificates = new Dictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>();
+            var certificates = new Dictionary<ConformityCertificate_Id, ConformityCertificate>();
 
             foreach (var body in Bodies)
-                foreach (var certificate in body.TransparencySoftwareCertificates)
+                foreach (var certificate in body.Certificates)
                     certificates.TryAdd(certificate.Id, certificate);
 
             return certificates;
@@ -2249,15 +2250,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The error, when two of the given conformity assessment bodies have a certificate of the same identification.
         /// </summary>
-        internal static String? DuplicateTransparencySoftwareCertificate(IEnumerable<ConformityAssessmentBody> Bodies)
+        internal static String? DuplicateConformityCertificate(IEnumerable<ConformityAssessmentBody> Bodies)
         {
 
-            var seen = new Dictionary<TransparencySoftwareCertificate_Id, ConformityAssessmentBody_Id>();
+            var seen = new Dictionary<ConformityCertificate_Id, ConformityAssessmentBody_Id>();
 
             foreach (var body in Bodies)
-                foreach (var certificate in body.TransparencySoftwareCertificates)
+                foreach (var certificate in body.Certificates)
                     if (!seen.TryAdd(certificate.Id, body.Id))
-                        return $"The transparency software certificate '{certificate.Id}' of the conformity assessment body '{body.Id}' is one of the conformity assessment body '{seen[certificate.Id]}' already!";
+                        return $"The certificate '{certificate.Id}' of the conformity assessment body '{body.Id}' is one of the conformity assessment body '{seen[certificate.Id]}' already!";
 
             return null;
 
@@ -2333,11 +2334,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
-        /// The certificates of transparency software releases of all conformity assessment bodies in this immutable network
-        /// version, unique within the network.
+        /// The certificates of conformity of all conformity assessment bodies in this immutable network version, unique
+        /// within the network.
         /// </summary>
-        public IReadOnlyDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  TransparencySoftwareCertificates
-            => transparencySoftwareCertificates;
+        public IReadOnlyDictionary<ConformityCertificate_Id, ConformityCertificate>  Certificates
+            => certificates;
 
         /// <summary>
         /// Try to get the transparency software release having the given identification.
@@ -2348,66 +2349,206 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => transparencySoftware.TryGetValue(TransparencySoftwareId, out TransparencySoftware);
 
         /// <summary>
-        /// Try to get the transparency software certificate having the given identification.
+        /// Try to get the certificate having the given identification.
         /// </summary>
-        public Boolean TryGetTransparencySoftwareCertificateById(TransparencySoftwareCertificate_Id                        CertificateId,
-                                                                 [NotNullWhen(true)] out TransparencySoftwareCertificate?  Certificate)
+        public Boolean TryGetConformityCertificateById(ConformityCertificate_Id                        CertificateId,
+                                                                 [NotNullWhen(true)] out ConformityCertificate?  Certificate)
 
-            => transparencySoftwareCertificates.TryGetValue(CertificateId, out Certificate);
+            => certificates.TryGetValue(CertificateId, out Certificate);
 
         /// <summary>
-        /// The error, when a certificate names an unknown release, manufacturer, model, or hardware revision or firmware
-        /// version of its model, or an energy meter an unknown release, an unknown certificate, or a certificate not
-        /// covering its release.
+        /// The error, when a certificate names an unknown release, manufacturer or model, or a hardware revision or firmware
+        /// version its model does not have, also of the energy meters it was issued with; when an energy meter names an
+        /// unknown release; or when a charging station, an energy meter or a charging station template names a certificate
+        /// unknown or of the other kind, or a station or a meter one for another model or not covering its hardware revision
+        /// and firmware version, or a meter of a station is none of the energy meters a certificate of the station was
+        /// issued with: stations and meters as they are at runtime, with what their templates give them.
         /// </summary>
-        internal static String? UnknownTransparencyReference(IEnumerable<EnergyMeter>                                                                EnergyMeters,
-                                                             IReadOnlyDictionary<TransparencySoftware_Id,            TransparencySoftware>             TransparencySoftware,
-                                                             IReadOnlyDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  Certificates,
-                                                             IReadOnlyDictionary<ChargingStationManufacturer_Id,     ChargingStationManufacturer>      ChargingStationManufacturers)
+        internal static String? UnknownCertificateReference(IEnumerable<ChargingStationOperator>                                              ChargingStationOperators,
+                                                            IEnumerable<GridOperator>                                                         GridOperators,
+                                                            IReadOnlyDictionary<TransparencySoftware_Id,         TransparencySoftware>         TransparencySoftware,
+                                                            IReadOnlyDictionary<ConformityCertificate_Id,        ConformityCertificate>        Certificates,
+                                                            IReadOnlyDictionary<ChargingStationManufacturer_Id,  ChargingStationManufacturer>  ChargingStationManufacturers,
+                                                            IReadOnlyDictionary<EnergyMeterManufacturer_Id,      EnergyMeterManufacturer>      EnergyMeterManufacturers)
         {
 
+            var chargingStationOperators = ChargingStationOperators.ToArray();
+            var gridOperators            = GridOperators.           ToArray();
+
             foreach (var certificate in Certificates.Values)
-            {
+                if (UnknownReferenceOf(certificate, TransparencySoftware, ChargingStationManufacturers, EnergyMeterManufacturers) is String certificateError)
+                    return certificateError;
 
-                foreach (var releaseId in certificate.VerifiedTransparencySoftwareIds.Concat(certificate.CompatibleTransparencySoftwareIds))
-                    if (!TransparencySoftware.ContainsKey(releaseId))
-                        return $"The transparency software release '{releaseId}' of the certificate '{certificate.Id}' is unknown in the roaming network!";
-
-                if (!ChargingStationManufacturers.TryGetValue(certificate.ChargingStationManufacturerId, out var manufacturer))
-                    return $"The manufacturer '{certificate.ChargingStationManufacturerId}' of the certificate '{certificate.Id}' is unknown in the roaming network!";
-
-                if (!manufacturer.TryGetModel(certificate.ChargingStationModel, out var model))
-                    return $"The charging station model '{certificate.ChargingStationModel}' of the certificate '{certificate.Id}' is unknown at its manufacturer '{manufacturer.Id}'!";
-
-                foreach (var hardwareRevision in certificate.HardwareRevisions)
-                    if (!model.HasHardwareRevision(hardwareRevision))
-                        return $"The hardware revision '{hardwareRevision}' of the certificate '{certificate.Id}' is no hardware revision of the charging station model '{model.Id}' of '{manufacturer.Id}'!";
-
-                foreach (var firmwareVersion in certificate.FirmwareVersions)
-                    if (!model.HasFirmwareVersion(firmwareVersion))
-                        return $"The firmware version '{firmwareVersion}' of the certificate '{certificate.Id}' is no firmware version of the charging station model '{model.Id}' of '{manufacturer.Id}'!";
-
-            }
-
-            foreach (var energyMeter in EnergyMeters)
+            foreach (var energyMeter in AllEnergyMeters(chargingStationOperators, gridOperators))
                 foreach (var assignment in energyMeter.TransparencySoftwareStatus)
-                {
-
                     if (!TransparencySoftware.ContainsKey(assignment.TransparencySoftwareId))
                         return $"The transparency software release '{assignment.TransparencySoftwareId}' of the energy meter '{energyMeter.Id}' is unknown in the roaming network!";
 
-                    if (assignment.CertificateId.HasValue)
+            foreach (var chargingStationTemplate in chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.ChargingStationTemplates))
+                foreach (var certificateId in chargingStationTemplate.CertificateIds)
+                    if (CertificateOf($"the charging station template '{chargingStationTemplate.Id}'", certificateId, true, Certificates, out _) is String templateError)
+                        return templateError;
+
+            foreach (var chargingStation in chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EffectiveChargingStations))
+                foreach (var certificateId in chargingStation.CertificateIds)
+                {
+
+                    if (CertificateOf($"the charging station '{chargingStation.Id}'", certificateId, true, Certificates, out var certificate) is String stationError)
+                        return stationError;
+
+                    if (certificate!.ChargingStationManufacturerId != chargingStation.ManufacturerId ||
+                        certificate. ChargingStationModel          != chargingStation.ModelId)
                     {
+                        return $"The certificate '{certificate.Id}' of the charging station '{chargingStation.Id}' is for {certificate.Subject}, not for the model of the station!";
+                    }
 
-                        if (!Certificates.TryGetValue(assignment.CertificateId.Value, out var certificate))
-                            return $"The certificate '{assignment.CertificateId}' of the energy meter '{energyMeter.Id}' is unknown in the roaming network!";
+                    if (!certificate.Covers(chargingStation.HardwareRevision, chargingStation.FirmwareVersion))
+                        return $"The certificate '{certificate.Id}' of the charging station '{chargingStation.Id}' does not cover its hardware revision {Named(chargingStation.HardwareRevision)} and firmware version {Named(chargingStation.FirmwareVersion)}!";
 
-                        if (!certificate.Covers(assignment.TransparencySoftwareId))
-                            return $"The certificate '{certificate.Id}' of the energy meter '{energyMeter.Id}' does not cover the transparency software release '{assignment.TransparencySoftwareId}'!";
+                    // Where it names the energy meters it was issued with, every meter of the station is one of them.
+                    if (!certificate.EnergyMeters.IsEmpty)
+                        foreach (var energyMeter in chargingStation.AllEnergyMeters)
+                            if (!certificate.EnergyMeters.Any(certified => certified.Names(energyMeter.ManufacturerId, energyMeter.ModelId, energyMeter.HardwareRevision, energyMeter.FirmwareVersion)))
+                                return $"The energy meter '{energyMeter.Id}' of the charging station '{chargingStation.Id}' is none of the energy meters the certificate '{certificate.Id}' was issued with!";
 
+                }
+
+            foreach (var energyMeter in AllEffectiveEnergyMeters(chargingStationOperators, gridOperators))
+                foreach (var certificateId in energyMeter.CertificateIds)
+                {
+
+                    if (CertificateOf($"the energy meter '{energyMeter.Id}'", certificateId, false, Certificates, out var certificate) is String meterError)
+                        return meterError;
+
+                    if (certificate!.EnergyMeterManufacturerId != energyMeter.ManufacturerId ||
+                        certificate. EnergyMeterModel          != energyMeter.ModelId)
+                    {
+                        return $"The certificate '{certificate.Id}' of the energy meter '{energyMeter.Id}' is for {certificate.Subject}, not for the model of the meter!";
+                    }
+
+                    if (!certificate.Covers(energyMeter.HardwareRevision, energyMeter.FirmwareVersion))
+                        return $"The certificate '{certificate.Id}' of the energy meter '{energyMeter.Id}' does not cover its hardware revision {Named(energyMeter.HardwareRevision)} and firmware version {Named(energyMeter.FirmwareVersion)}!";
+
+                }
+
+            return null;
+
+            static String Named(String? Version)
+                => Version is null ? "(none)" : $"'{Version}'";
+
+        }
+
+        /// <summary>
+        /// The error, when the given certificate names an unknown release, manufacturer or model, or a hardware revision or
+        /// firmware version its model does not have, also of an energy meter it was issued with.
+        /// </summary>
+        private static String? UnknownReferenceOf(ConformityCertificate                                                             Certificate,
+                                                  IReadOnlyDictionary<TransparencySoftware_Id,         TransparencySoftware>         TransparencySoftware,
+                                                  IReadOnlyDictionary<ChargingStationManufacturer_Id,  ChargingStationManufacturer>  ChargingStationManufacturers,
+                                                  IReadOnlyDictionary<EnergyMeterManufacturer_Id,      EnergyMeterManufacturer>      EnergyMeterManufacturers)
+        {
+
+            foreach (var releaseId in Certificate.VerifiedTransparencySoftwareIds.Concat(Certificate.CompatibleTransparencySoftwareIds))
+                if (!TransparencySoftware.ContainsKey(releaseId))
+                    return $"The transparency software release '{releaseId}' of the certificate '{Certificate.Id}' is unknown in the roaming network!";
+
+            if (Certificate.IsForChargingStationModel)
+            {
+
+                if (!ChargingStationManufacturers.TryGetValue(Certificate.ChargingStationManufacturerId!.Value, out var manufacturer))
+                    return $"The manufacturer '{Certificate.ChargingStationManufacturerId}' of the certificate '{Certificate.Id}' is unknown in the roaming network!";
+
+                if (!manufacturer.TryGetModel(Certificate.ChargingStationModel!.Value, out var model))
+                    return $"The charging station model '{Certificate.ChargingStationModel}' of the certificate '{Certificate.Id}' is unknown at its manufacturer '{manufacturer.Id}'!";
+
+                if (UnknownVersionOf($"of the certificate '{Certificate.Id}'", $"the charging station model '{model.Id}' of '{manufacturer.Id}'",
+                                     Certificate.HardwareRevisions, model.HasHardwareRevision, Certificate.FirmwareVersions, model.HasFirmwareVersion) is String versionError)
+                {
+                    return versionError;
+                }
+
+                foreach (var energyMeter in Certificate.EnergyMeters)
+                {
+
+                    if (!EnergyMeterManufacturers.TryGetValue(energyMeter.ManufacturerId, out var meterManufacturer))
+                        return $"The energy meter manufacturer '{energyMeter.ManufacturerId}' of the certificate '{Certificate.Id}' is unknown in the roaming network!";
+
+                    if (!meterManufacturer.TryGetModel(energyMeter.ModelId, out var meterModel))
+                        return $"The energy meter model '{energyMeter.ModelId}' of the certificate '{Certificate.Id}' is unknown at its manufacturer '{meterManufacturer.Id}'!";
+
+                    if (UnknownVersionOf($"of the energy meter model '{meterModel.Id}' the certificate '{Certificate.Id}' was issued with", $"the energy meter model '{meterModel.Id}' of '{meterManufacturer.Id}'",
+                                         energyMeter.HardwareRevisions, meterModel.HasHardwareRevision, energyMeter.FirmwareVersions, meterModel.HasFirmwareVersion) is String meterVersionError)
+                    {
+                        return meterVersionError;
                     }
 
                 }
+
+            }
+
+            else
+            {
+
+                if (!EnergyMeterManufacturers.TryGetValue(Certificate.EnergyMeterManufacturerId!.Value, out var manufacturer))
+                    return $"The manufacturer '{Certificate.EnergyMeterManufacturerId}' of the certificate '{Certificate.Id}' is unknown in the roaming network!";
+
+                if (!manufacturer.TryGetModel(Certificate.EnergyMeterModel!.Value, out var model))
+                    return $"The energy meter model '{Certificate.EnergyMeterModel}' of the certificate '{Certificate.Id}' is unknown at its manufacturer '{manufacturer.Id}'!";
+
+                if (UnknownVersionOf($"of the certificate '{Certificate.Id}'", $"the energy meter model '{model.Id}' of '{manufacturer.Id}'",
+                                     Certificate.HardwareRevisions, model.HasHardwareRevision, Certificate.FirmwareVersions, model.HasFirmwareVersion) is String versionError)
+                {
+                    return versionError;
+                }
+
+            }
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// The error, when one of the given hardware revisions or firmware versions is none of the given model.
+        /// </summary>
+        /// <param name="Of">Whose they are, in words, e.g. "of the certificate 'C1'".</param>
+        /// <param name="Model">The model, in words, e.g. "the charging station model 'GD-DC300' of 'GraphDefined'".</param>
+        private static String? UnknownVersionOf(String                Of,
+                                                String                Model,
+                                                IEnumerable<String>   HardwareRevisions,
+                                                Func<String, Boolean> HasHardwareRevision,
+                                                IEnumerable<String>   FirmwareVersions,
+                                                Func<String, Boolean> HasFirmwareVersion)
+        {
+
+            foreach (var hardwareRevision in HardwareRevisions)
+                if (!HasHardwareRevision(hardwareRevision))
+                    return $"The hardware revision '{hardwareRevision}' {Of} is no hardware revision of {Model}!";
+
+            foreach (var firmwareVersion in FirmwareVersions)
+                if (!HasFirmwareVersion(firmwareVersion))
+                    return $"The firmware version '{firmwareVersion}' {Of} is no firmware version of {Model}!";
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// The error, when the given certificate, named by what is given, is unknown or of the other kind: a certificate of
+        /// a charging station model or of an energy meter model.
+        /// </summary>
+        /// <param name="Named">What names it, in words, e.g. "the charging station 'DE*GEF*S1'".</param>
+        private static String? CertificateOf(String                                                                Named,
+                                             ConformityCertificate_Id                                              CertificateId,
+                                             Boolean                                                               OfChargingStationModel,
+                                             IReadOnlyDictionary<ConformityCertificate_Id, ConformityCertificate>  Certificates,
+                                             out ConformityCertificate?                                            Certificate)
+        {
+
+            if (!Certificates.TryGetValue(CertificateId, out Certificate))
+                return $"The certificate '{CertificateId}' of {Named} is unknown in the roaming network!";
+
+            if (Certificate.IsForChargingStationModel != OfChargingStationModel)
+                return $"The certificate '{CertificateId}' of {Named} is for {Certificate.Subject}, not for a model of {(OfChargingStationModel ? "charging stations" : "energy meters")}!";
 
             return null;
 
@@ -2943,14 +3084,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The error, when an energy meter template gives its members an unknown manufacturer or model, a hardware revision
-        /// or firmware version the model it gives them does not have, an unknown transparency software release or
-        /// certificate, or a certificate not covering its release. A revision or firmware version without a model it gives
-        /// members of their own model: they are checked as they are at runtime.
+        /// or firmware version the model it gives them does not have, an unknown transparency software release, or a
+        /// certificate unknown or not of an energy meter model. A revision, a firmware version or a certificate it gives
+        /// members of their own model they are checked by as they are at runtime.
         /// </summary>
         internal static String? UnknownEnergyMeterTemplateReference(IEnumerable<EnergyMeterTemplate>                                                     EnergyMeterTemplates,
                                                                  IReadOnlyDictionary<EnergyMeterManufacturer_Id,         EnergyMeterManufacturer>          EnergyMeterManufacturers,
                                                                  IReadOnlyDictionary<TransparencySoftware_Id,            TransparencySoftware>             TransparencySoftware,
-                                                                 IReadOnlyDictionary<TransparencySoftwareCertificate_Id, TransparencySoftwareCertificate>  Certificates)
+                                                                 IReadOnlyDictionary<ConformityCertificate_Id, ConformityCertificate>  Certificates)
         {
 
             foreach (var energyMeterTemplate in EnergyMeterTemplates)
@@ -2967,23 +3108,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 foreach (var assignment in energyMeterTemplate.TransparencySoftwareStatus)
-                {
-
                     if (!TransparencySoftware.ContainsKey(assignment.TransparencySoftwareId))
                         return $"The transparency software release '{assignment.TransparencySoftwareId}' of the energy meter template '{energyMeterTemplate.Id}' is unknown in the roaming network!";
 
-                    if (assignment.CertificateId.HasValue)
-                    {
-
-                        if (!Certificates.TryGetValue(assignment.CertificateId.Value, out var certificate))
-                            return $"The certificate '{assignment.CertificateId}' of the energy meter template '{energyMeterTemplate.Id}' is unknown in the roaming network!";
-
-                        if (!certificate.Covers(assignment.TransparencySoftwareId))
-                            return $"The certificate '{certificate.Id}' of the energy meter template '{energyMeterTemplate.Id}' does not cover the transparency software release '{assignment.TransparencySoftwareId}'!";
-
-                    }
-
-                }
+                foreach (var certificateId in energyMeterTemplate.CertificateIds)
+                    if (CertificateOf($"the energy meter template '{energyMeterTemplate.Id}'", certificateId, false, Certificates, out _) is String certificateError)
+                        return certificateError;
 
             }
 

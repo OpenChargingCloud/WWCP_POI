@@ -1358,50 +1358,50 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Add                   (TransparencySoftwareCertificate, ConformityAssessmentBodyId)
+        #region Add                   (ConformityCertificate, ConformityAssessmentBodyId)
 
         /// <summary>
-        /// Add the given transparency software certificate to its roaming network.
+        /// Add the given certificate to its roaming network.
         /// </summary>
-        /// <param name="TransparencySoftwareCertificate">The new transparency software certificate.</param>
+        /// <param name="ConformityCertificate">The new certificate.</param>
         /// <param name="ConformityAssessmentBodyId">The identification of the conformity assessment body issuing it.</param>
-        public static RoamingNetworkChange Add(TransparencySoftwareCertificate  TransparencySoftwareCertificate,
+        public static RoamingNetworkChange Add(ConformityCertificate  ConformityCertificate,
                                                ConformityAssessmentBody_Id      ConformityAssessmentBodyId)
 
-            => Add(nameof(POI.TransparencySoftwareCertificate),
-                   TransparencySoftwareCertificate.Id.ToString(),
-                   TransparencySoftwareCertificate.ToJSON(Embedded: true),
+            => Add(nameof(POI.ConformityCertificate),
+                   ConformityCertificate.Id.ToString(),
+                   ConformityCertificate.ToJSON(Embedded: true),
                    nameof(POI.ConformityAssessmentBody),
                    ConformityAssessmentBodyId.ToString());
 
         /// <summary>
-        /// Remove the given transparency software certificate, optionally checking its complete previous JSON representation.
+        /// Remove the given certificate, optionally checking its complete previous JSON representation.
         /// </summary>
-        public static RoamingNetworkChange Remove(TransparencySoftwareCertificate_Id  TransparencySoftwareCertificateId,
+        public static RoamingNetworkChange Remove(ConformityCertificate_Id  ConformityCertificateId,
                                                   JToken?                             OldValue                            = null)
 
-            => Remove(nameof(POI.TransparencySoftwareCertificate),
-                      TransparencySoftwareCertificateId.ToString(),
+            => Remove(nameof(POI.ConformityCertificate),
+                      ConformityCertificateId.ToString(),
                       OldValue);
 
         /// <summary>
-        /// Update one property of the given transparency software certificate, optionally asserting its previous value.
+        /// Update one property of the given certificate, optionally asserting its previous value.
         /// </summary>
-        public static RoamingNetworkChange UpdateProperty(TransparencySoftwareCertificate  TransparencySoftwareCertificate,
+        public static RoamingNetworkChange UpdateProperty(ConformityCertificate  ConformityCertificate,
                                                           String                           PropertyName,
                                                           JToken?                          OldValue,
                                                           JToken                           NewValue)
 
-            => UpdateProperty(nameof(POI.TransparencySoftwareCertificate), TransparencySoftwareCertificate.Id.ToString(), PropertyName, OldValue, NewValue);
+            => UpdateProperty(nameof(POI.ConformityCertificate), ConformityCertificate.Id.ToString(), PropertyName, OldValue, NewValue);
 
         /// <summary>
-        /// Remove one property of the given transparency software certificate, optionally asserting its previous value.
+        /// Remove one property of the given certificate, optionally asserting its previous value.
         /// </summary>
-        public static RoamingNetworkChange RemoveProperty(TransparencySoftwareCertificate  TransparencySoftwareCertificate,
+        public static RoamingNetworkChange RemoveProperty(ConformityCertificate  ConformityCertificate,
                                                           String                           PropertyName,
                                                           JToken?                          OldValue   = null)
 
-            => RemoveProperty(nameof(POI.TransparencySoftwareCertificate), TransparencySoftwareCertificate.Id.ToString(), PropertyName, OldValue);
+            => RemoveProperty(nameof(POI.ConformityCertificate), ConformityCertificate.Id.ToString(), PropertyName, OldValue);
 
         #endregion
 

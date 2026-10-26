@@ -49,9 +49,10 @@ The properties of an energy meter it gives its members, each written and read as
 `hardwareRevision` and `firmwareVersion` (one of the model's) its members take the value of the first of their
 templates giving one, unless they have their own. A hardware revision or firmware version is checked against the
 model of the template, where it gives one, and against the model of each member, as it is at runtime.
-Of `transparencySoftwareStatus` (releases and certificates of the network) and `signatureMethods` they take those of
-all their templates besides their own; of the status of the same transparency software release their own, else the
-first template's. Its `serialNumber` and its `publicKeys` belong to the single device: no template gives them.
+Of `transparencySoftwareStatus` (releases of the network), `signatureMethods` and `certificateIds` (certificates of
+energy meter models of the network, checked at the meters as they are at runtime) they take those of all their
+templates besides their own; of the status of the same transparency software release their own, else the first
+template's. Its `serialNumber` and its `publicKeys` belong to the single device: no template gives them.
 
 Arrays are written only when not empty. A change set names the properties by their JSON keys:
 
