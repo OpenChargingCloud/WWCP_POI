@@ -210,6 +210,60 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region A_proof_does_not_wait_for_the_attestation_of_a_new_head()
+
+        /// <summary>
+        /// A proof asked for while a new head is shown, but not attested yet: it does not wait for the commit, which holds
+        /// the lock on, merging the tips, but takes the head attested before, with its attestation.
+        /// </summary>
+        [Test]
+        public void A_proof_does_not_wait_for_the_attestation_of_a_new_head()
+        {
+
+            var history = RoamingNetworkHistory.Start(NewNetwork());
+            history.AttestationSigners = [ Proofs.StationProofTests.RNOSigner ];
+            history.RefreshAttestations();
+
+            var before     = history.Head;
+            var changeSet  = before.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(nameof(EVSE), E11.ToString(), EVSE.PropertyKeys.PhysicalReference, null, "P-1") ],
+                                                                         CreatedAt: Created.AddMinutes(1));
+
+            // Announced while the commit holds the lock: the new head is shown, its attestation not made yet.
+            RoamingNetworkCommit_Id?     shownHead        = null;
+            Task<RoamingNetworkProof?>?  proofInTheGap    = null;
+            Boolean                      proofDidNotWait  = false;
+
+            history.OnCommitAnnouncement += announcement => {
+                shownHead        = history.Head.Commit.Id;
+                proofInTheGap    = Task.Run(() => history.TryGetChargingStationProof(S1, out var made, out _) ? made : null);
+                proofDidNotWait  = proofInTheGap.Wait(Patience);
+            };
+
+            var result = history.Commit(changeSet);
+
+            Assert.That(result.IsCommitted, Is.True, result.ErrorResponse);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(shownHead,                                  Is.EqualTo(result.Commit!.Id), "The new head was not shown when it was announced!");
+                Assert.That(proofDidNotWait,                            Is.True,                       "The proof waits for the commit holding the lock of the history!");
+                Assert.That(proofInTheGap!.Result?.CommitId,            Is.EqualTo(before.Commit.Id));
+                Assert.That(proofInTheGap.Result?.Attestations.Length,  Is.EqualTo(1));
+            }
+
+            // Attested: the proof of the new head.
+            Assert.That(history.TryGetChargingStationProof(S1, out var proofAfter, out var proofError), Is.True, proofError);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(proofAfter.CommitId,            Is.EqualTo(result.Commit!.Id));
+                Assert.That(proofAfter.Attestations.Length, Is.EqualTo(1));
+            }
+
+        }
+
+        #endregion
+
     }
 
 }

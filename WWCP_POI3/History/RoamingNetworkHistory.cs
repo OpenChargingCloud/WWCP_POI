@@ -272,6 +272,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.RoamingNetworkId  = RoamingNetwork.Id;
             this.head              = new RoamingNetworkHead(Root, RoamingNetwork);
+            this.attestedHead      = this.head;
             this.RuntimeStatus     = new RoamingNetworkRuntimeStatus(this);
             this.epoch             = Epoch ?? (Root.Profiles is not null ? new RoamingNetworkEpoch(Root.Epoch, Root.Profiles) : RoamingNetworkEpoch.First);
             this.previousEpoch     = PreviousEpoch;
@@ -1292,9 +1293,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 { }
             }
 
-            // Attested after it was announced, so that whoever learns of the attestation knows the commit.
+            // Attested after it was announced, so that whoever learns of the attestation knows the commit; until then,
+            // readers take the head attested before.
             if (headChanged)
+            {
                 AttestNewHead();
+                Volatile.Write(ref attestedHead, newHead);
+            }
 
         }
 

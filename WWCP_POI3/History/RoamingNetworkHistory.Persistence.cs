@@ -563,6 +563,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Head.Commit.Id == CommitId)
                 Volatile.Write(ref head, Head with { Commit = commit });
 
+            if (Volatile.Read(ref attestedHead).Commit.Id == CommitId)
+                Volatile.Write(ref attestedHead, attestedHead with { Commit = commit });
+
         }
 
         #endregion

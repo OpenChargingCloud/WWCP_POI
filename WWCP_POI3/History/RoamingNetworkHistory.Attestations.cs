@@ -47,6 +47,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly Lock                                                            treeLock         = new ();
         private readonly Dictionary<ETagHashAlgorithm, RoamingNetworkEffectiveTree>      effectiveTrees   = [];
 
+        /// <summary>
+        /// The head as far as it was attested here: set after the AttestationSigners signed a new head, or failed to.
+        /// </summary>
+        private          RoamingNetworkHead                                              attestedHead;
+
         private          TimeSpan                                                        attestationValidity  = RoamingNetworkAttestation.DefaultValidity;
 
         #endregion
@@ -473,8 +478,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The head and its attestations valid at the given time, without the lock. A head is shown right before it is
-        /// attested here (Take): a reader coming in between, while the AttestationSigners sign it, waits once for the
-        /// history, as every reader did before, and takes the head it finds then.
+        /// attested here (Take): a reader coming in between, while the AttestationSigners sign it, takes the head attested
+        /// last, as a reader coming a moment earlier would have. It does not wait for the lock, which the commit holds on,
+        /// merging the tips, and other commits take next.
         /// </summary>
         private (RoamingNetworkHead Head, IReadOnlyList<RoamingNetworkAttestation> Attestations) AttestedHead(DateTimeOffset? At)
         {
@@ -484,14 +490,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (attestations.Count == 0 && !AttestationSigners.IsDefaultOrEmpty)
             {
-
-                lock (historyLock)
-                {
-                    head = Head;
-                }
-
-                attestations = AttestationsOf(head.Commit.Id, At);
-
+                head          = Volatile.Read(ref attestedHead);
+                attestations  = AttestationsOf(head.Commit.Id, At);
             }
 
             return (head, attestations);
