@@ -64,8 +64,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     /// <remarks>
     /// Price statements are kept in the store as they are taken, and the statements a checkpoint names with it, so that a
-    /// signer continues its chains after a restart and a checkpoint still proves its statements. The price status itself
-    /// stays runtime data: a statement taken sets it, as of its validFrom.
+    /// signer continues its chains after a restart, and in the next epoch, and a checkpoint still proves its statements. The
+    /// price status itself stays runtime data: a statement taken sets it, as of its validFrom.
     /// </remarks>
     public sealed partial class RoamingNetworkHistory
     {
@@ -81,6 +81,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly Dictionary<(String EntityType, String EntityId), RoamingNetworkPriceStatement>     priceStatements            = [];
         private readonly List<RoamingNetworkPriceStatement>                                                  pendingPriceStatements     = [];
         private readonly Dictionary<RoamingNetworkCheckpoint_Id, ImmutableArray<RoamingNetworkPriceStatement>> checkpointPriceStatements = [];
+
+        /// <summary>
+        /// The last price statements of an epoch before, of entities without a current one here, as their algorithms are
+        /// not those of this epoch: not taken along, but the next statement of their entities made here follows them in
+        /// sequence. Nothing taken is checked against them (SPECIFICATION.md, section 11.4).
+        /// </summary>
+        private readonly Dictionary<(String EntityType, String EntityId), RoamingNetworkPriceStatement>     previousEpochPriceStatements = [];
 
         /// <summary>
         /// The latest checkpoint, for price statements to name without the lock of the history:
@@ -661,6 +668,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!priceStatements.TryGetValue(key, out var current) || current.Sequence < PriceStatement.Sequence)
                 priceStatements[key] = PriceStatement;
 
+            previousEpochPriceStatements.Remove(key);
+
             pendingPriceStatements.Add(PriceStatement);
 
             if (pendingPriceStatements.Count > MaxPendingPriceStatements)
@@ -670,10 +679,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private) TakePreviousEpochPriceStatement(PriceStatement)
+
+        /// <summary>
+        /// Hold the last price statement of an entity in an epoch before, not taken along, while the price statements are
+        /// locked: the next statement of its entity made here follows it, unless the entity has a current one.
+        /// </summary>
+        private void TakePreviousEpochPriceStatement(RoamingNetworkPriceStatement PriceStatement)
+        {
+
+            var key = (PriceStatement.EntityType, PriceStatement.EntityId);
+
+            if (!priceStatements.ContainsKey(key))
+                previousEpochPriceStatements[key] = PriceStatement;
+
+        }
+
+        #endregion
+
         #region (private) TryStateAnew(Signer, EntityType, EntityId, Prices, At, OnlyWhenChanged, out PriceStatement, out ErrorResponse)
 
         /// <summary>
-        /// Sign a price statement of the given prices of the given entity, following its current one, and take it.
+        /// Sign a price statement of the given prices of the given entity, following its current one, or the last one of an
+        /// epoch before, and take it.
         /// </summary>
         private Boolean TryStateAnew(RoamingNetworkCommitSigner                              Signer,
                                      String                                                  EntityType,
@@ -700,12 +728,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                // Its chain goes on across epochs, also from a statement not taken along.
+                var previous  = current ?? previousEpochPriceStatements.GetValueOrDefault((EntityType, EntityId));
+
                 var statement = Signer.StatePrices(RoamingNetworkId,
                                                    EntityType,
                                                    EntityId,
                                                    Prices,
-                                                   current is not null ? current.Sequence + 1 : 0,
-                                                   current?.Digest,
+                                                   previous is not null ? previous.Sequence + 1 : 0,
+                                                   previous?.Digest,
                                                    At,
                                                    At,
                                                    PriceStatementValidity.HasValue ? At + PriceStatementValidity.Value : null,
@@ -921,6 +952,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var key = (priceStatement.EntityType, priceStatement.EntityId);
                 if (!priceStatements.TryGetValue(key, out var current) || current.Sequence < priceStatement.Sequence)
                     priceStatements[key] = priceStatement;
+                previousEpochPriceStatements.Remove(key);
             }
 
             var digests = Ordered.Select(priceStatement => priceStatement.Digest).ToHashSet();
@@ -953,7 +985,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The log entries of the price statements that are not those of a checkpoint, the current ones and those for the
         /// next checkpoint, e.g. for a compacted log: the current ones first, so that the checkpoints after them drop those
-        /// signed before them again.
+        /// signed before them again, and before them the last ones of an epoch before, not taken along.
         /// </summary>
         private (IReadOnlyList<RoamingNetworkHistoryLogEntry> Before, IReadOnlyList<RoamingNetworkHistoryLogEntry> After) PriceStatementLogEntries()
         {
@@ -964,9 +996,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var ofCheckpoints  = checkpointPriceStatements.Values.SelectMany(ordered => ordered).Select(priceStatement => priceStatement.Digest).ToHashSet();
                 var pending        = pendingPriceStatements.Select(priceStatement => priceStatement.Digest).ToHashSet();
 
-                var before         = RoamingNetworkPriceStatement.InOrder(priceStatements.Values.Where(priceStatement => !ofCheckpoints.Contains(priceStatement.Digest) &&
-                                                                                                         !pending.      Contains(priceStatement.Digest))).
-                                                          Select(RoamingNetworkHistoryLogEntry.ForPriceStatement).
+                var before         = RoamingNetworkPriceStatement.InOrder(previousEpochPriceStatements.Values).
+                                                          Select(RoamingNetworkHistoryLogEntry.ForPreviousEpochPriceStatement).
+                                                          Concat(RoamingNetworkPriceStatement.InOrder(priceStatements.Values.Where(priceStatement => !ofCheckpoints.Contains(priceStatement.Digest) &&
+                                                                                                                                !pending.      Contains(priceStatement.Digest))).
+                                                                 Select(RoamingNetworkHistoryLogEntry.ForPriceStatement)).
                                                           ToArray();
 
                 var after          = pendingPriceStatements.Select(RoamingNetworkHistoryLogEntry.ForPriceStatement).ToArray();

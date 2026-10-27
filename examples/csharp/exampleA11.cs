@@ -253,6 +253,12 @@ public static class ExampleA11
         Console.WriteLine($"Epoch {epoch2.Epoch.Number}, genesis {epoch2.Root.Id.ToString().Length} hexadecimal digits: {epoch2.Root.Id}");
         Console.WriteLine($"  revision {epoch2.Root.Revision}, the ETags of checkpoint {final.Sequence}: {(epoch2.Root.ETags.SequenceEqual(final.ETags) ? "the same" : "others")}; epoch 1: {A1.History.EpochStatus}");
 
+        // Of the current price statements, only those signed with an algorithm of epoch 2 are taken along; the chains of the
+        // others go on there (7).
+        var notTakenAlong = A1.History.PriceStatements.Where(statement => !epoch2.Epoch.Profiles.AllowsSignatureAlgorithm(statement.Algorithm)).ToArray();
+
+        Console.WriteLine($"  price statements taken along: {epoch2.PriceStatements.Count} of {A1.History.PriceStatements.Count}; not those signed with {String.Join(", ", notTakenAlong.Select(statement => statement.Algorithm).Distinct())}");
+
         // Each witness starts epoch 2 from its own copy, holding checkpoint 6: the same genesis.
         var witnessHistories = new Dictionary<String, RoamingNetworkHistory>();
         var witnessGenesis   = new Dictionary<String, RoamingNetwork>();
@@ -345,9 +351,10 @@ public static class ExampleA11
 
         Committed(epoch2, lower.Sign(tariffsKey.Private, POIPublicKey.From(tariffsKey.Private).Id, tariffsKey.Algorithm));
 
-        // Its chain of price statements of DE*GEF*E1*1 goes on: taken along into epoch 2, the next one names the statement of
-        // example A10 and the final checkpoint, the latest DE*GEF knows.
-        var previous      = epoch2.PriceStatementsOf(ExampleA10.EVSEId).Single(statement => statement.IsOf(nameof(EVSE), ExampleA10.EVSEId.ToString()));
+        // Its chain of price statements of DE*GEF*E1*1 goes on: the statement of example A10, signed with ES256, was not taken
+        // along into epoch 2, the next one names it all the same, the last one of epoch 1, and the final checkpoint, the
+        // latest DE*GEF knows. No server checks it against that one, as none holds it as the current one in epoch 2.
+        var previous      = A1.History.PriceStatementsOf(ExampleA10.EVSEId).Single(statement => statement.IsOf(nameof(EVSE), ExampleA10.EVSEId.ToString()));
         var at            = DateTimeOffset.FromUnixTimeMilliseconds(Timestamp.Now.ToUnixTimeMilliseconds());
 
         RoamingNetworkPriceStatement StatementBy(COSEKeyPair Key)

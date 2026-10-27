@@ -198,9 +198,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Start the next epoch from the final checkpoint of this one (SPECIFICATION.md, section 11): nothing is applied, its
         /// genesis has the version of the commit of the final checkpoint, identified with the profiles of the next epoch, and
-        /// leads to the ETags of the final checkpoint; the runtime status and the current price statements are taken along,
-        /// and the profiles of this epoch, for the signatures of its first checkpoint. Every server starting it from the same
-        /// final checkpoint makes the same genesis. This history stays readable.
+        /// leads to the ETags of the final checkpoint; the runtime status is taken along, the current price statements signed
+        /// with an algorithm of the next epoch, and the profiles of this epoch, for the signatures of its first checkpoint.
+        /// The chains of the other price statements go on: the next statement of their entity made there follows them. Every
+        /// server starting it from the same final checkpoint makes the same genesis. This history stays readable.
         /// </summary>
         /// <param name="Next">The history of the next epoch.</param>
         /// <param name="ErrorResponse">Why it was not started.</param>
@@ -274,12 +275,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 nextHistory.Retention  = Retention ?? RoamingNetworkHistoryRetention.KeepEverything;
                 nextHistory.Archive    = Archive;
 
-                // Their chains go on.
+                // The current price statements of its algorithms are taken along; the chains of the others go on all the
+                // same: a statement made there follows the last one here, which nothing taken there is checked against.
                 lock (priceStatementLock)
                 lock (nextHistory.priceStatementLock)
                 {
+
                     foreach (var priceStatement in priceStatements.Values)
-                        nextHistory.priceStatements[(priceStatement.EntityType, priceStatement.EntityId)] = priceStatement;
+                        if (nextEpoch.Profiles.AllowsSignatureAlgorithm(priceStatement.Algorithm))
+                            nextHistory.priceStatements[(priceStatement.EntityType, priceStatement.EntityId)] = priceStatement;
+
+                    foreach (var priceStatement in priceStatements.Values.Where(priceStatement => !nextEpoch.Profiles.AllowsSignatureAlgorithm(priceStatement.Algorithm)).
+                                                                   Concat(previousEpochPriceStatements.Values))
+                        nextHistory.TakePreviousEpochPriceStatement(priceStatement);
+
                 }
 
                 if (Store is not null)

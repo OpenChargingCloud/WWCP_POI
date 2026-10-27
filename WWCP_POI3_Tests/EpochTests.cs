@@ -63,6 +63,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                                                                            RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator,
                                                                            "DE*RNO");
 
+        /// <summary>
+        /// An Ed25519 signing key of DE*GEF, besides its ES256 one: of an algorithm the epoch Restricted takes.
+        /// </summary>
+        private static readonly Org.BouncyCastle.Crypto.Parameters.Ed25519PrivateKeyParameters  GEFEd25519 = new (Convert.FromHexString("909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf"), 0);
+
         #endregion
 
 
@@ -93,13 +98,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
-        #region (static) Close(Profiles = null)
+        #region (static) Close(Profiles = null, Before = null)
 
         /// <summary>
         /// A history in the first epoch with two commits and a checkpoint, closed by its final checkpoint naming the next
-        /// epoch, of the given profiles, Strong by default.
+        /// epoch, of the given profiles, Strong by default; what else is given happens before.
         /// </summary>
-        private static (RoamingNetworkHistory History, RoamingNetworkCheckpoint Final) Close(RoamingNetworkEpochProfiles? Profiles = null)
+        private static (RoamingNetworkHistory History, RoamingNetworkCheckpoint Final) Close(RoamingNetworkEpochProfiles?    Profiles   = null,
+                                                                                              Action<RoamingNetworkHistory>?  Before     = null)
         {
 
             var history = NewHistory();
@@ -107,6 +113,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             Assert.That(Commit(history, "v1", 1).IsCommitted);
             Assert.That(history.TryMakeCheckpoint(out _, out var checkpointError, CreatedAt: T0.AddMinutes(2)), Is.True, checkpointError);
             Assert.That(Commit(history, "v2", 3).IsCommitted);
+
+            Before?.Invoke(history);
 
             history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, Operator, "DE*GEF", "offline", T0.AddDays(-30), out _, out _);
 
@@ -359,6 +367,102 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
                 Assert.That(history.TryStartNextEpoch(out _, out var signerError, Signers: [ Proofs.PriceStatementTests.Signer(ChargingStationOperator_Id.Parse("DE*GEF")) ]),  Is.False);
                 Assert.That(signerError,                       Does.Contain("is not one of the epoch 2"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Only_the_price_statements_of_its_algorithms_are_taken_along_and_the_chains_of_the_others_go_on()
+
+        /// <summary>
+        /// The next epoch takes along only the current price statements signed with one of its algorithms (SPECIFICATION.md,
+        /// section 11.4): DE*GEF*E1*2, signed with Ed25519, is current there, DE*GEF*E1*1, signed with ES256, is not. Its
+        /// chain goes on all the same, also after a restart and a compaction: the next statement made there has the next
+        /// sequence and names the last one of the first epoch. Nothing taken there is checked against that one: a statement
+        /// beginning its chain anew is taken as well.
+        /// </summary>
+        [Test]
+        public void Only_the_price_statements_of_its_algorithms_are_taken_along_and_the_chains_of_the_others_go_on()
+        {
+
+            const String  E11      = "DE*GEF*E1*1";
+            const String  E12      = "DE*GEF*E1*2";
+
+            var gefId              = ChargingStationOperator_Id.Parse("DE*GEF");
+            var ed25519Key         = new POIPublicKey(COSEKey.From(GEFEd25519.GeneratePublicKey()));
+            var es256              = Proofs.PriceStatementTests.Signer(gefId);
+            var ed25519            = new RoamingNetworkCommitSigner(GEFEd25519, ed25519Key.Id, COSEAlgorithm.Ed25519, RoamingNetworkCommitSignatureRoles.ChargingStationOperator, gefId.ToString());
+
+            static ChargingPrices Prices(Decimal Price)
+                => new ([ new ChargingTariffPrices(ChargingTariff_Id.Parse("DE*GEF*T1"),
+                                                   [ new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, Price, StepSize: 1) ]) ]) ]);
+
+            RoamingNetworkPriceStatement? first   = null;
+            RoamingNetworkPriceStatement? second  = null;
+            RoamingNetworkPriceStatement? other   = null;
+
+            var (history, _)       = Close(Restricted, firstEpoch => {
+
+                // DE*GEF signs with Ed25519 as well, its ES256 key stays.
+                Assert.That(firstEpoch.Head.RoamingNetwork.TryGetChargingStationOperatorById(gefId, out var gef),  Is.True);
+
+                var signingKeys    = (JArray) gef!.ToEmbeddedJSON()[POIPartyKeys.SigningKeysProperty]!;
+                var withEd25519    = new JArray(signingKeys.Concat([ ed25519Key.ToJSON() ]));
+
+                var keyCommit      = firstEpoch.Commit(firstEpoch.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(gef, POIPartyKeys.SigningKeysProperty, signingKeys, withEd25519) ],
+                                                                                                             CreatedAt: T0.AddMinutes(3).AddSeconds(30)));
+
+                Assert.That(keyCommit.IsCommitted,  Is.True, keyCommit.ErrorResponse);
+
+                first              = es256.  StatePrices(firstEpoch.RoamingNetworkId, nameof(EVSE), E11, Prices(0.29m), 0, null);
+                second             = es256.  StatePrices(firstEpoch.RoamingNetworkId, nameof(EVSE), E11, Prices(0.31m), 1, first.Digest);
+                other              = ed25519.StatePrices(firstEpoch.RoamingNetworkId, nameof(EVSE), E12, Prices(0.33m), 0, null);
+
+                foreach (var priceStatement in new[] { first, second, other })
+                    Assert.That(firstEpoch.TryAddPriceStatement(priceStatement, out var addError),  Is.EqualTo(POIPriceStatementResult.Taken), addError);
+
+            });
+
+            var store              = new RoamingNetworkHistoryMemoryStore();
+
+            Assert.That(history.TryStartNextEpoch(out var next, out var startError, Store: store),  Is.True, startError);
+
+            Assert.That(RoamingNetworkHistory.TryLoad(store, out var loaded, out var loadError),    Is.True, loadError);
+            Assert.That(loaded!.Compact(out var compactError),                                      Is.True, compactError);
+            Assert.That(RoamingNetworkHistory.TryLoad(store, out var again, out var againError),    Is.True, againError);
+
+            var takenAlong         = next!.PriceStatements;
+            var notTakenAlong      = next.TryGetPriceStatement(nameof(EVSE), E11, out _);
+
+            // A server holding a signing key of DE*GEF of the next epoch states the price status of DE*GEF*E1*1 there.
+            next. PriceStatementSigners = [ ed25519 ];
+            again!.PriceStatementSigners = [ ed25519 ];
+
+            Assert.That(next. TryStatePrices(nameof(EVSE), E11, out var third,      out var thirdError),       Is.True, thirdError);
+            Assert.That(again.TryStatePrices(nameof(EVSE), E11, out var thirdAgain, out var thirdAgainError),  Is.True, thirdAgainError);
+
+            // Another server beginning the chain anew.
+            var anew               = loaded.TryAddPriceStatement(ed25519.StatePrices(loaded.RoamingNetworkId, nameof(EVSE), E11, Prices(0.35m), 0, null), out var anewError);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(takenAlong.Select(priceStatement => priceStatement.Digest),  Is.EqualTo(new[] { other!.Digest }), "Only the statement signed with Ed25519 is taken along.");
+                Assert.That(notTakenAlong,                                               Is.False, "The statement signed with ES256 is not.");
+                Assert.That(loaded.TryGetPriceStatement(nameof(EVSE), E12, out var restarted) ? restarted.Digest : null,  Is.EqualTo(other.Digest));
+
+                foreach (var statement in new[] { third!, thirdAgain! })
+                {
+                    Assert.That(statement.Sequence,                                      Is.EqualTo(2), "The chain of DE*GEF*E1*1 goes on.");
+                    Assert.That(statement.Previous,                                      Is.EqualTo(second!.Digest));
+                    Assert.That(statement.Algorithm,                                     Is.EqualTo("Ed25519"));
+                }
+
+                Assert.That(next.TryGetPriceStatement(nameof(EVSE), E11, out var current) ? current.Digest : null,  Is.EqualTo(third!.Digest));
+
+                Assert.That(anew,                                                        Is.EqualTo(POIPriceStatementResult.Taken), anewError);
 
             }
 

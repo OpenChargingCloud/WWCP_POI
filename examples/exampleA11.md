@@ -107,9 +107,10 @@ Checkpoint 6, ad9ede39…: 2 signatures more, 8 in all
 ## 5. Epoch 2 starts from the version of the final checkpoint
 
 `TryStartNextEpoch` applies nothing: the genesis of epoch 2 has the version of checkpoint 6, revision 0, and is
-identified with SHA-512, 128 hexadecimal digits. Its ETags are those of checkpoint 6; the current price statements are
-taken along. Every server starting epoch 2 from checkpoint 6 makes the same genesis: the witnesses, from their own copies,
-make it as well. A server serves it in place of epoch 1 at the same URL (`TryServeNextEpoch` of POI_API); epoch 1 stays
+identified with SHA-512, 128 hexadecimal digits. Its ETags are those of checkpoint 6. Of the current price statements,
+those signed with an algorithm of epoch 2 are taken along (section 11.4): none, as `DE*GEF` signed those of examples A8
+and A10 with ES256; their chains go on in epoch 2 all the same (7). Every server starting epoch 2 from checkpoint 6 makes
+the same genesis: the witnesses, from their own copies, make it as well. A server serves it in place of epoch 1 at the same URL (`TryServeNextEpoch` of POI_API); epoch 1 stays
 readable and still proves its commits, e.g. the one of the driver's station proof.
 
 ```csharp
@@ -122,6 +123,7 @@ if (!A1.History.TryStartNextEpoch(out var epoch2, out error, Signers: signers, S
 ```
 Epoch 2, genesis 128 hexadecimal digits: 8cc0eff56abca778da1eef00f94ae525b5621b7fa064f6177661462c6781486790a38407d6d997abab5d6434834703e8d1e9e4657deec7c7238d683baa502c95
   revision 0, the ETags of checkpoint 6: the same; epoch 1: Closed
+  price statements taken along: 0 of 2; not those signed with ES256
   calibration.example: genesis 8cc0eff5…, the same
   association.example: genesis 8cc0eff5…, the same
 Epoch 1, revision 13: proved in checkpoint 4, as the driver keeps it
@@ -149,9 +151,14 @@ The new trust anchor: 3 keys, minConsensus 2, QR code of 511 characters
 ## 7. DE*GEF in epoch 2
 
 `DE*GEF` lowers its DC charging tariff with its ML-DSA `tariffs` key, revision 2, and states 0.59 €/kWh at
-`DE*GEF*E1*1`: the chain of price statements goes on, sequence 3 names the statement of example A10 and, as the latest
-checkpoint `DE*GEF` knows, checkpoint 6. A system of `DE*GEF` still signing with its old ES256 key is refused, for its
-commits and its statements alike.
+`DE*GEF*E1*1`: the chain of price statements goes on. Epoch 2 did not take the statement of example A10 along, signed with
+ES256, but sequence 3 names it all the same, the last one of epoch 1, and, as the latest checkpoint `DE*GEF` knows,
+checkpoint 6. No server checks it against that one: none holds it as the current one of epoch 2. A system of `DE*GEF`
+still signing with its old ES256 key is refused, for its commits and its statements alike.
+
+```csharp
+var previous = A1.History.PriceStatementsOf(ExampleA10.EVSEId).Single(statement => statement.IsOf(nameof(EVSE), ExampleA10.EVSEId.ToString()));
+```
 
 ```
 Signed by its old tariffs key: The signature algorithm 'ES256' of a signature of the change set is not one of the epoch 2, ML-DSA-65, ML-DSA-87!

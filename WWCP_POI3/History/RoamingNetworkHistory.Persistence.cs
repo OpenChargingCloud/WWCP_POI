@@ -255,6 +255,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 }
                                 break;
 
+                            case RoamingNetworkHistoryLogEntryType.PreviousEpochPriceStatement:
+                                lock (history.priceStatementLock)
+                                {
+                                    history.TakePreviousEpochPriceStatement(entry.PriceStatement!);
+                                }
+                                break;
+
                             case RoamingNetworkHistoryLogEntryType.CheckpointPriceStatements:
                                 lock (history.priceStatementLock)
                                 {

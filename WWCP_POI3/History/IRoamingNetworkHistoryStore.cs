@@ -127,7 +127,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// A change set no longer waiting: withdrawn, or fitting no version.
         /// </summary>
-        PendingChangeSetDropped
+        PendingChangeSetDropped,
+
+        /// <summary>
+        /// The last price statement of an entity in an epoch before, not taken along, as its algorithm is not one of this
+        /// epoch: the one the next statement of its entity made here follows (SPECIFICATION.md, section 11.4).
+        /// </summary>
+        PreviousEpochPriceStatement
 
     }
 
@@ -135,7 +141,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// One entry of the log of a history: a commit, signatures added to one, a status update, a checkpoint,
     /// signatures added to one, a price statement, the price statements of a checkpoint, a change set waiting for
-    /// signatures, or one no longer waiting.
+    /// signatures, one no longer waiting, or the last price statement of an entity in an epoch before.
     /// One line of JSON in a file: { type, commit } | { type, commitId, signatures } | { type, statusUpdate } |
     /// { type, checkpoint } | { type, checkpointId, signatures } | { type, priceStatement } |
     /// { type, checkpointId, priceStatements } | { type, changeSet } | { type, changeSetId }.
@@ -203,7 +209,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  CheckpointId     = "checkpointId";
 
             /// <summary>
-            /// The property of the price statement of a price statement entry.
+            /// The property of the price statement of a price statement or a previous epoch price statement entry.
             /// </summary>
             public const String  PriceStatement   = "priceStatement";
 
@@ -263,7 +269,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public RoamingNetworkCheckpoint_Id?                     CheckpointId    { get; }
 
         /// <summary>
-        /// The price statement of a PriceStatement entry.
+        /// The price statement of a PriceStatement or a PreviousEpochPriceStatement entry.
         /// </summary>
         public RoamingNetworkPriceStatement?                    PriceStatement  { get; }
 
@@ -350,6 +356,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => new (RoamingNetworkHistoryLogEntryType.PriceStatement, PriceStatement: PriceStatement);
 
         /// <summary>
+        /// The entry of the given last price statement of its entity in an epoch before, not taken along.
+        /// </summary>
+        public static RoamingNetworkHistoryLogEntry ForPreviousEpochPriceStatement(RoamingNetworkPriceStatement PriceStatement)
+            => new (RoamingNetworkHistoryLogEntryType.PreviousEpochPriceStatement, PriceStatement: PriceStatement);
+
+        /// <summary>
         /// The entry of the given price statements of the given checkpoint, in the order of its tree.
         /// </summary>
         public static RoamingNetworkHistoryLogEntry ForCheckpointPriceStatements(RoamingNetworkCheckpoint_Id                  CheckpointId,
@@ -412,6 +424,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            RoamingNetworkHistoryLogEntryType.PriceStatement
                                                                          => new JObject(
                                                                                 new JProperty(PropertyKeys.Type,             "priceStatement"),
+                                                                                new JProperty(PropertyKeys.PriceStatement,   PriceStatement!.ToJSON(Embedded: true))
+                                                                            ),
+
+                           RoamingNetworkHistoryLogEntryType.PreviousEpochPriceStatement
+                                                                         => new JObject(
+                                                                                new JProperty(PropertyKeys.Type,             "previousEpochPriceStatement"),
                                                                                 new JProperty(PropertyKeys.PriceStatement,   PriceStatement!.ToJSON(Embedded: true))
                                                                             ),
 
@@ -552,6 +570,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     Entry = ForPriceStatement(priceStatement);
+                    return true;
+
+                case "previousEpochPriceStatement":
+
+                    if (JSON[PropertyKeys.PriceStatement] is not JObject previousEpochPriceStatementJSON ||
+                        !RoamingNetworkPriceStatement.TryParse(previousEpochPriceStatementJSON, out var previousEpochPriceStatement, out ErrorResponse))
+                    {
+                        ErrorResponse = "Invalid previous epoch price statement entry!";
+                        return false;
+                    }
+
+                    Entry = ForPreviousEpochPriceStatement(previousEpochPriceStatement);
                     return true;
 
                 case "checkpointPriceStatements":

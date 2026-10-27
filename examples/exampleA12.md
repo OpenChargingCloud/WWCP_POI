@@ -14,7 +14,7 @@ Point, follows it and serves its copy. A driver's app subscribes at the mirror. 
 | Who | Where | What |
 |---|---|---|
 | `OCC` | its server, `POI_API` | serves `QA`; `DE*GEF` may set the status of its own EVSEs, everybody may read and subscribe |
-| the mirror | a `RoamingNetworkPeer` of `OCC`'s server, served by a `POI_API` of its own | trusts the trust anchor of epoch 2, takes commits and status, pushes nothing back |
+| the mirror | a `RoamingNetworkPeer` of `OCC`'s server, served by a `POI_API` of its own | trusts the trust anchor of epoch 2, takes commits, status and price statements, pushes nothing back |
 | the driver's app | a WebSocket to the mirror | subscribes to `statusUpdates`, `energyStatusUpdates`, `priceStatusUpdates` and `commits` |
 | `DE*GEF` | a WebSocket to `OCC`'s server, with its token | `setStatus` of `DE*GEF*E1*1`; `commitChangeSet`: revision 3, signed by its ML-DSA `tariffs` key |
 
@@ -75,7 +75,6 @@ var mirror = new RoamingNetworkPeer(occURL,
                                                  PushCommits                          = false,
                                                  PushStatus                           = false,
                                                  PushCheckpoints                      = false,
-                                                 FollowPriceStatements                = false,
                                                  PushPriceStatements                  = false
                                              });
 
@@ -86,10 +85,12 @@ mirrorAPI.AddRoamingNetworkHistory(mirror.History!);
 
 ```
 OCC serves QA, revision 2 of epoch 2: ws://127.0.0.1:64802/RNs/QA/history/ws
-The mirror follows: revision 2 of epoch 2, the head of OCC: True, 114 runtime statuses taken; it serves ws://127.0.0.1:64804/RNs/QA/history/ws
+The mirror follows: revision 2 of epoch 2, the head of OCC: True, 114 runtime statuses and 1 price statement(s) taken; it serves ws://127.0.0.1:64804/RNs/QA/history/ws
 ```
 
-The runtime statuses come with the snapshot, next to the version, not in it.
+The runtime statuses come with the snapshot, next to the version, not in it. The price statement is the one of
+[example A11](exampleA11.md), sequence 3 of `DE*GEF*E1*1`, signed with ML-DSA-65: the only one `OCC` holds in epoch 2,
+which took along none of epoch 1, signed with ES256 (section 11.4).
 
 
 ## 2. The driver's app subscribes at the mirror
@@ -210,9 +211,9 @@ Checkpoint 0 of epoch 2 holds runtime status: False
   provable later. What has to be provable, the price that applied, is a price statement ([example A8](exampleA8.md));
   signed statements of the status, e.g. of the availability of a station, are open
   ([SPECIFICATION.md](../SPECIFICATION.md), section 8.8, point 4, and section 12.6, point 3).
-- The mirror takes no price statements: those of epoch 1 that `OCC` took along into epoch 2 (section 11.4) are signed
-  with ES256, not with an algorithm of epoch 2, and a peer starting in epoch 2 refuses them. How a peer takes them is
-  open.
+- The price statements of epoch 1, signed with ES256, did not go into epoch 2 (section 11.4); the price status they set
+  did, with the runtime status. Until `DE*GEF` states it anew with a key of epoch 2, as it did for `DE*GEF*E1*1` in
+  [example A11](exampleA11.md), the price status of its other entities is runtime status only, without a statement.
 - A verifier of commit signatures is given the commit and the signature, not the version it is checked in; before the
   mirror has a history of its own, e.g. for the head commit of the snapshot it starts from, it checks the signing keys of
   `OCC` in `QA` as published, whose key statement it verifies against the trust anchor of epoch 2 first.

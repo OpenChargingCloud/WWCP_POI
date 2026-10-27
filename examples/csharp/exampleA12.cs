@@ -71,8 +71,8 @@ public static class ExampleA12
 
         // The mirror, e.g. of a National Access Point, trusts the trust anchor of epoch 2 it scanned: the snapshot it starts
         // from must name its keys, and every commit must be signed by signing keys of the quorum. It passes on, it changes
-        // nothing: it pushes no commits and no status back. It takes no price statements: those of epoch 1 OCC took along
-        // into epoch 2 are not of the algorithms of epoch 2, and a peer starting in epoch 2 refuses them.
+        // nothing: it pushes no commits, no status and no price statements back. It takes those of OCC: of the algorithms of
+        // epoch 2, as OCC took along only those, as every server starting epoch 2 does.
         if (!RoamingNetworkTrustAnchor.TryParse(File.ReadAllText("published/QA-trustAnchor-mldsa.txt"), out var anchor, out var error))
             Helpers.Fail(error);
 
@@ -93,7 +93,6 @@ public static class ExampleA12
                                                                      PushCommits                          = false,
                                                                      PushStatus                           = false,
                                                                      PushCheckpoints                      = false,
-                                                                     FollowPriceStatements                = false,
                                                                      PushPriceStatements                  = false
                                                                  });
 
@@ -112,7 +111,7 @@ public static class ExampleA12
 
         var mirrorURL = new Uri($"ws://127.0.0.1:{mirrorServer.TCPPort}/RNs/{qa}/history/ws");
 
-        Console.WriteLine($"The mirror follows: revision {mirrored.Head.Commit.Revision} of epoch {mirrored.Epoch.Number}, the head of OCC: {mirrored.Head.Commit.Id == A11.History.Head.Commit.Id}, {mirrored.RuntimeStatus.All.Count()} runtime statuses taken; it serves {mirrorURL}");
+        Console.WriteLine($"The mirror follows: revision {mirrored.Head.Commit.Revision} of epoch {mirrored.Epoch.Number}, the head of OCC: {mirrored.Head.Commit.Id == A11.History.Head.Commit.Id}, {mirrored.RuntimeStatus.All.Count()} runtime statuses and {mirrored.PriceStatements.Count} price statement(s) taken; it serves {mirrorURL}");
         Console.WriteLine();
 
         #endregion

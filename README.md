@@ -631,7 +631,8 @@ poiAPI.TryServeNextEpoch(next, out _);                                      // s
 - **The next epoch:** `TryStartNextEpoch(…)` starts it from the version of the final checkpoint: its genesis names the
   epoch and its profiles, every commit after it the epoch, and its first checkpoint the final one before
   (`PreviousEpoch`), signed with the algorithms of both epochs. Every server makes the same genesis; the runtime status
-  and the current price statements go along.
+  goes along, and the current price statements signed with an algorithm of the next epoch. The chains of the others go
+  on: the next statement of their entity names the last one of the epoch before, unchecked across the epochs.
 
 ### Persistence and retention
 

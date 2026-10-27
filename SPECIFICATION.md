@@ -1685,7 +1685,12 @@ its own epoch.
 
 A server applies nothing: it starts the next epoch from the version it has and checks the new genesis
 against the final checkpoint. Every server doing so makes the same genesis, and takes the commits of
-the epoch from there. The runtime status and the current price statements are taken along.
+the epoch from there. The runtime status is taken along, and of the current price statements those
+signed with an algorithm of the next epoch: one of another algorithm, which the next epoch refuses
+(11.1), is not, and its entity has no current statement there. Its chain goes on all the same (12.1):
+the next statement of the entity, signed with an algorithm of the next epoch, has the next `sequence`
+and names the last statement of the epoch before as `previous`, which no server checks across the
+epochs, as none holds it as the current one there (12.2).
 
 - **The server of the RNO** closes the epoch, starts the next one, and serves it in place of the old
   one (`TryServeNextEpoch`): the WebSocket of the old epoch closes, the one of the new epoch answers at
@@ -1754,7 +1759,7 @@ operator with one of its signing keys (section 4.1) when it sets the price.
   digits. Statements are neither reordered nor withdrawn unnoticed. Without `value`, as the identifications
   of commits and checkpoints: another valid signature of the same statement, as the ECDSA twin `(r, n − s)`
   anybody can make of a signature `(r, s)`, is the same statement, neither a second one of its sequence nor
-  a split view of its operator.
+  a split view of its operator. A chain goes on in the next epoch (11.4).
 - **Not before:** `after`, if given, names the latest checkpoint the operator knew: the statement was made
   after it.
 
