@@ -289,7 +289,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var notYet   = history.TryGetCommitProof(c4.Id, out _, out var notYetError);
             var wrong    = history.TryGetCommitProof(c1.Id, out _, out var wrongError, cp1.Id);
 
-            Assert.That(RoamingNetworkCheckpointProof.TryParse(proof1!.ToJSON(), out var parsed, out var parseError),  Is.True, parseError);
+            Assert.That(RoamingNetworkCheckpointProof.TryParse(proof1!.ToJSON(),            out var parsed,   out var parseError),  Is.True, parseError);
+            Assert.That(RoamingNetworkCheckpointProof.TryParse(proof1.ToJSON().ToString(),  out var fromText, out var textError),   Is.True, textError);
 
             var forged   = proof1.ToJSON();
             forged["leaf"]!["revision"] = 7;
@@ -305,6 +306,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(proof3.Verify(cp1, out var verifyError3),               Is.True, verifyError3);
 
                 Assert.That(parsed!.Verify(cp0, out var parsedError),               Is.True, parsedError);
+                Assert.That(fromText!.Verify(cp0, out var fromTextError),           Is.True, fromTextError);
                 Assert.That(proof1.Verify(cp1, out _),                              Is.False, "another checkpoint");
                 Assert.That(forgedProof!.Verify(cp0, out var forgedError),          Is.False);
                 Assert.That(forgedError,                                            Does.Contain("does not lead"));

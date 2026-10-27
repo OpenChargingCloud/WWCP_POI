@@ -368,6 +368,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (static) TryParse(Text, out Certificate, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the given JSON text of a signing key certificate, read as POIJSON.Read() reads it. Dates stay text,
+        /// so signed values keep their exact representation. Its signature is not verified here.
+        /// </summary>
+        public static Boolean TryParse(String                                                         Text,
+                                       [NotNullWhen(true)]  out RoamingNetworkSigningKeyCertificate?  Certificate,
+                                       [NotNullWhen(false)] out String?                               ErrorResponse)
+        {
+
+            Certificate = null;
+
+            try
+            {
+
+                if (POIJSON.Read(Text) is not JObject json)
+                {
+                    ErrorResponse = "The given JSON text must be a JSON object!";
+                    return false;
+                }
+
+                return TryParse(json, out Certificate, out ErrorResponse);
+
+            }
+            catch (Exception e)
+            {
+                ErrorResponse = e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
         #region (static) TryParse(JSON, out Certificate, out ErrorResponse)
 
         /// <summary>

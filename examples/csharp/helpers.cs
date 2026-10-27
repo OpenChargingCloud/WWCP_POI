@@ -19,25 +19,17 @@ public static class Helpers
     public static void SaveKey(AsymmetricKeyParameter Key, String File)
         => System.IO.File.WriteAllText(File, new String(PemEncoding.Write("PRIVATE KEY", PrivateKeyInfoFactory.CreatePrivateKeyInfo(Key).GetEncoded())) + "\n");
 
-    // A JSON file read as POI reads JSON: timestamps stay the text they are signed as, numbers the decimals they are.
+    // A JSON file read as POI reads JSON, with POIJSON.Read: timestamps stay the text they are signed as, numbers the
+    // decimals they are; a property named twice, a number a decimal cannot hold as written, and what RFC 8259 does not
+    // call JSON, e.g. a second value after the first, are refused.
     public static JObject ReadJSON(String File)
-    {
-        using var reader = new JsonTextReader(new StringReader(System.IO.File.ReadAllText(File))) {
-                               DateParseHandling   = DateParseHandling.None,
-                               FloatParseHandling  = FloatParseHandling.Decimal
-                           };
-        return JObject.Load(reader);
-    }
+        => POIJSON.Read(System.IO.File.ReadAllText(File)) as JObject
+               ?? throw new JsonReaderException($"{File} holds no JSON object!");
 
     // A JSON file of an array, read as ReadJSON reads one of an object.
     public static JArray ReadJSONArray(String File)
-    {
-        using var reader = new JsonTextReader(new StringReader(System.IO.File.ReadAllText(File))) {
-                               DateParseHandling   = DateParseHandling.None,
-                               FloatParseHandling  = FloatParseHandling.Decimal
-                           };
-        return JArray.Load(reader);
-    }
+        => POIJSON.Read(System.IO.File.ReadAllText(File)) as JArray
+               ?? throw new JsonReaderException($"{File} holds no JSON array!");
 
     // Stops with the given error.
     [DoesNotReturn]

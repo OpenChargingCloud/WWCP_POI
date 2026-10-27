@@ -372,6 +372,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(history.PendingChangeSets,    Has.Count.EqualTo(1));
                 Assert.That(RoamingNetworkChangeSetWithdrawal.TryParse(withdrawal.ToJSON(), out var read, out var error),  Is.True, error);
                 Assert.That(read,                         Is.EqualTo(withdrawal));
+                Assert.That(RoamingNetworkChangeSetWithdrawal.TryParse(withdrawal.ToJSON().ToString(), out var fromText, out var textError),  Is.True, textError);
+                Assert.That(fromText,                     Is.EqualTo(withdrawal));
             }
 
         }

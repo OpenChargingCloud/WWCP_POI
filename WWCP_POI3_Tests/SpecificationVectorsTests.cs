@@ -405,7 +405,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                             signingKey,
                                                                             DateTimeOffset.Parse("2026-10-17T00:00:00Z"));
 
-            Assert.That(RoamingNetworkSigningKeyCertificate.TryParse(certificate.ToJSON(), out var read, out var parseError), Is.True, parseError);
+            Assert.That(RoamingNetworkSigningKeyCertificate.TryParse(certificate.ToJSON(),            out var read,     out var parseError), Is.True, parseError);
+            Assert.That(RoamingNetworkSigningKeyCertificate.TryParse(certificate.ToJSON().ToString(), out var fromText, out var textError),  Is.True, textError);
 
             using (Assert.EnterMultipleScope())
             {
@@ -414,6 +415,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(certificate.TryVerify(identityKeys, out var certifiedBy, out var error),    Is.True, error);
                 Assert.That(certifiedBy!.Holder,                                                        Is.EqualTo("Alpha"));
                 Assert.That(read!.ToJSON().ToString(Formatting.None),                                   Is.EqualTo(certificate.ToJSON().ToString(Formatting.None)));
+                Assert.That(fromText!.ToJSON().ToString(Formatting.None),                               Is.EqualTo(certificate.ToJSON().ToString(Formatting.None)));
                 Assert.That(byBeta.TryVerify(identityKeys, out _, out error),                           Is.False, "a holder certifies its own signing keys only");
                 Assert.That(error,                                                                      Does.Contain("each holder certifies its own signing keys only"));
             }

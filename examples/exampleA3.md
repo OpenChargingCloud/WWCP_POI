@@ -584,10 +584,10 @@ var gefSigningKey     = LoadKey("DE-GEF/signing-infrastructure-privateKey.pem");
 
 await using var http  = new HTTPClient(URL.Parse(args.FirstOrDefault() ?? "http://127.0.0.1:2356"));
 
-// The head of QA as the hub serves it, checked against its ETags as it is read.
+// The head of QA as the hub serves it, read from its text as POIJSON.Read reads it, and checked against its ETags.
 async Task<RoamingNetwork> Head()
 
-    => RoamingNetwork.TryParse(JObject.Parse((await http.GET(HTTPPath.Root + "poi/RNs/QA")).HTTPBodyAsUTF8String!), out var head, out var error)
+    => RoamingNetwork.TryParse((await http.GET(HTTPPath.Root + "poi/RNs/QA")).HTTPBodyAsUTF8String!, out var head, out var error)
            ? head
            : throw new InvalidOperationException(error);
 
@@ -602,7 +602,7 @@ async Task Commit(String Description, params RoamingNetworkChange[] Changes)
                                       Content:      changeSet.ToJSON().ToString().ToUTF8Bytes(),
                                       ContentType:  HTTPContentType.Application.JSON_UTF8);
 
-    var answer    = JObject.Parse(response.HTTPBodyAsUTF8String!);
+    var answer    = POIJSON.Read(response.HTTPBodyAsUTF8String!);
 
     Console.WriteLine(response.HTTPStatusCode.IsSuccessful
                           ? $"{response.HTTPStatusCode.Code} {answer["status"]}, revision {answer["revision"]}: {Description}"

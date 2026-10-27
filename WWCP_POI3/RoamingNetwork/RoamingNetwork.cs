@@ -621,6 +621,79 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
 
+        #region (static) Parse    (Text, ...)
+
+        /// <summary>
+        /// Parse the given JSON text of a roaming network, read as POIJSON.Read() reads it: numbers with a fraction as
+        /// decimals, as written, and strings as strings, so that its ETags are calculated over the content it was written
+        /// with.
+        /// </summary>
+        /// <param name="Text">The JSON text to parse.</param>
+        /// <param name="CustomRoamingNetworkParser">An optional delegate to parse custom roaming network JSON objects.</param>
+        public static RoamingNetwork Parse(String                                        Text,
+                                           CustomJObjectParserDelegate<RoamingNetwork>?  CustomRoamingNetworkParser   = null)
+        {
+
+            if (TryParse(Text,
+                         out var roamingNetwork,
+                         out var errorResponse,
+                         CustomRoamingNetworkParser))
+            {
+                return roamingNetwork;
+            }
+
+            throw new ArgumentException("The given JSON text of a roaming network is invalid: " + errorResponse,
+                                        nameof(Text));
+
+        }
+
+        #endregion
+
+        #region (static) TryParse (Text, out RoamingNetwork, out ErrorResponse, ...)
+
+        /// <summary>
+        /// Try to parse the given JSON text of a roaming network, read as POIJSON.Read() reads it: numbers with a fraction
+        /// as decimals, as written, and strings as strings, so that its ETags are calculated over the content it was
+        /// written with. A property named twice, a number a decimal cannot hold as written, and what RFC 8259 does not
+        /// call JSON, e.g. a second value after the first, are refused.
+        /// </summary>
+        /// <param name="Text">The JSON text to parse.</param>
+        /// <param name="RoamingNetwork">The parsed roaming network.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="CustomRoamingNetworkParser">An optional delegate to parse custom roaming network JSON objects.</param>
+        public static Boolean TryParse(String                                        Text,
+                                       [NotNullWhen(true)]  out RoamingNetwork?      RoamingNetwork,
+                                       [NotNullWhen(false)] out String?              ErrorResponse,
+                                       CustomJObjectParserDelegate<RoamingNetwork>?  CustomRoamingNetworkParser   = null)
+        {
+
+            RoamingNetwork = null;
+
+            try
+            {
+
+                if (POIJSON.Read(Text) is not JObject json)
+                {
+                    ErrorResponse = "The given JSON text must be a JSON object!";
+                    return false;
+                }
+
+                return TryParse(json,
+                                out RoamingNetwork,
+                                out ErrorResponse,
+                                CustomRoamingNetworkParser);
+
+            }
+            catch (Exception e)
+            {
+                ErrorResponse = e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
         #region (static) Parse    (JSON, ...)
 
         /// <summary>

@@ -703,7 +703,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var closedCheckpoints      = JArray. Parse(await httpClient.GetStringAsync("epochs/1/checkpoints"));
             var proofText              = await httpClient.GetStringAsync($"epochs/1/commits/{v2.Id}/proof");
 
-            Assert.That(RoamingNetworkCheckpointProof.TryParse(JObject.Parse(proofText), out var proof, out var proofError),  Is.True, proofError);
+            Assert.That(RoamingNetworkCheckpointProof.TryParse(proofText, out var proof, out var proofError),  Is.True, proofError);
 
             using (Assert.EnterMultipleScope())
             {

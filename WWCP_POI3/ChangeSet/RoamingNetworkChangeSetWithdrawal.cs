@@ -244,6 +244,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region TryParse(Text, out Withdrawal, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the given JSON text of the withdrawal of a change set, read as POIJSON.Read() reads it.
+        /// Dates stay text, so its withdrawnAt keeps the exact representation it is signed with.
+        /// </summary>
+        /// <param name="Text">The JSON text to parse.</param>
+        /// <param name="Withdrawal">The parsed withdrawal.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        public static Boolean TryParse(String                                                       Text,
+                                       [NotNullWhen(true)]  out RoamingNetworkChangeSetWithdrawal?  Withdrawal,
+                                       [NotNullWhen(false)] out String?                             ErrorResponse)
+        {
+
+            Withdrawal = null;
+
+            try
+            {
+
+                if (POIJSON.Read(Text) is not JObject json)
+                {
+                    ErrorResponse = "The given JSON text must be a JSON object!";
+                    return false;
+                }
+
+                return TryParse(json, out Withdrawal, out ErrorResponse);
+
+            }
+            catch (Exception e)
+            {
+                ErrorResponse = e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
         #region TryParse(JSON, out Withdrawal, out ErrorResponse)
 
         /// <summary>

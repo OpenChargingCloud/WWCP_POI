@@ -464,9 +464,11 @@ leaves them out. Step d) is what binds the roaming network to the commit the hol
 version without a key statement, or with one of only some of the pinned holders. Step g) shows the texts the
 signatures cover, and warns where the QR code names the network otherwise.
 
-`Helpers.ReadJSON` reads the files as POI reads JSON: with `DateParseHandling.None`, so that timestamps stay the text
-they are signed as, and `FloatParseHandling.Decimal`, so that numbers stay the decimals they are. Read with
-`JObject.Parse`, `signedAt` would become a date, and the signatures would not verify.
+`Helpers.ReadJSON` reads the files as POI reads JSON, with `POIJSON.Read` (section 1 of the specification): timestamps
+stay the text they are signed as, numbers the decimals they are, as written, and a property named twice, a number a
+decimal cannot hold as written and a second value after the first are refused. Read with `JObject.Parse`, `signedAt`
+would become a date, and the signatures would not verify. `RoamingNetwork.TryParse`, `RoamingNetworkCommit.TryParse`
+and the others also take the text itself, and read it so.
 
 The ETags can also be calculated by hand, from the JSON alone, without the POI model, except for the tree; the CBOR
 from the canonical JSON as its bytes, so that a number with decimal places is a decimal fraction, as section 1 asks:

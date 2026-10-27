@@ -326,7 +326,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var segmentJSON      = JObject.Parse(await httpClient.GetStringAsync("archive/1"));
             using var missing    = await httpClient.GetAsync("archive/2");
 
-            Assert.That(RoamingNetworkCheckpointProof.TryParse(JObject.Parse(await proof.Content.ReadAsStringAsync()), out var parsedProof, out var proofError),  Is.True, proofError);
+            Assert.That(RoamingNetworkCheckpointProof.TryParse(await proof.Content.ReadAsStringAsync(), out var parsedProof, out var proofError),  Is.True, proofError);
 
             using (Assert.EnterMultipleScope())
             {

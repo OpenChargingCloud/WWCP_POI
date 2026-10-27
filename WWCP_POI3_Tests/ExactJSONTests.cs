@@ -318,6 +318,193 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
         #endregion
 
+
+        #region POIJSON_reads_as_section_1_asks()
+
+        /// <summary>
+        /// POIJSON.Read, public for a client that verifies what it is given itself (WWCPPOIConformanceTests, O1): numbers
+        /// with a fraction are the decimals they are written as, whole numbers integers, and a string that looks like a
+        /// point in time stays the string it is signed as.
+        /// </summary>
+        [Test]
+        public void POIJSON_reads_as_section_1_asks()
+        {
+
+            var json = POIJSON.Read("{ \"price\": 1.50, \"power\": 150000, \"signedAt\": \"2026-10-20T12:00:00.000Z\" }");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(json["price"]!.Type,             Is.EqualTo(JTokenType.Float));
+                Assert.That(json["power"]!.Type,             Is.EqualTo(JTokenType.Integer));
+                Assert.That(json["signedAt"]!.Type,          Is.EqualTo(JTokenType.String));
+                Assert.That(CanonicalJSON.Serialize(json),   Is.EqualTo("{\"power\":150000,\"price\":1.50,\"signedAt\":\"2026-10-20T12:00:00.000Z\"}"));
+            }
+
+        }
+
+        #endregion
+
+        #region POIJSON_refuses_what_section_1_refuses(Text, Error)
+
+        /// <summary>
+        /// POIJSON.Read refuses a property named twice, a second value after the first, what RFC 8259 does not call JSON,
+        /// and a number a decimal cannot hold as written.
+        /// </summary>
+        [TestCase("{\"value\":1,\"value\":2}",    "value")]
+        [TestCase("{\"value\":1} {\"value\":2}",  "RFC 8259")]
+        [TestCase("{\"value\":1,}",               "RFC 8259")]
+        [TestCase("{\"value\":1e-30}",            "1e-30")]
+        public void POIJSON_refuses_what_section_1_refuses(String Text, String Error)
+        {
+
+            Assert.That(() => POIJSON.Read(Text), Throws.InstanceOf<JsonReaderException>().With.Message.Contains(Error));
+
+        }
+
+        #endregion
+
+        #region POIJSON_reads_a_first_value_and_leaves_what_follows_to_its_caller()
+
+        /// <summary>
+        /// POIJSON.ReadFrom reads the first value of a reader from POIJSON.Reader as Read reads it, and leaves what
+        /// follows it to its caller, e.g. a WebSocket message that is one JSON array.
+        /// </summary>
+        [Test]
+        public void POIJSON_reads_a_first_value_and_leaves_what_follows_to_its_caller()
+        {
+
+            const String Alone      = "[1.50] ";
+            const String Text       = "[1.50] [2]";
+            const String Duplicate  = "{\"value\":1,\"value\":2} [2]";
+
+            using var alone      = POIJSON.Reader(Alone);
+            var firstAlone       = POIJSON.ReadFrom(alone, Alone);
+
+            using var reader     = POIJSON.Reader(Text);
+            var first            = POIJSON.ReadFrom(reader, Text);
+
+            using var duplicate  = POIJSON.Reader(Duplicate);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(CanonicalJSON.Serialize(firstAlone),                   Is.EqualTo("[1.50]"));
+                Assert.That(alone.Read(),                                          Is.False, "there is no more");
+                Assert.That(CanonicalJSON.Serialize(first),                        Is.EqualTo("[1.50]"));
+                Assert.That(() => reader.Read(),                                   Throws.InstanceOf<JsonReaderException>(), "there is more");
+                Assert.That(() => POIJSON.ReadFrom(duplicate, Duplicate),          Throws.InstanceOf<JsonReaderException>().With.Message.Contains("value"));
+            }
+
+        }
+
+        #endregion
+
+
+        #region A_roaming_network_is_read_from_its_JSON_text()
+
+        /// <summary>
+        /// A roaming network is read from the JSON text its ToJSON() writes, indented or canonical, with the ETags it was
+        /// written with: its decimals as written, 150000 W and 22.0 kW, and a coordinate that is no short decimal.
+        /// </summary>
+        [Test]
+        public void A_roaming_network_is_read_from_its_JSON_text()
+        {
+
+            var network  = tests.History.NumberRoundTripTests.NewNetwork();
+            var eTags    = network.CalcETags();
+            var json     = network.ToJSON();
+
+            Assert.That(RoamingNetwork.TryParse(json.ToString(),                out var fromText,       out var textError),       Is.True, textError);
+            Assert.That(RoamingNetwork.TryParse(CanonicalJSON.Serialize(json),  out var fromCanonical,  out var canonicalError),  Is.True, canonicalError);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(json["eTags"],                                              Is.Not.Null, "the ETags are checked as it is read");
+                Assert.That(fromText!.CalcETags(),                                      Is.EqualTo(eTags));
+                Assert.That(fromCanonical!.CalcETags(),                                 Is.EqualTo(eTags));
+                Assert.That(CanonicalJSON.Serialize(fromText.ToJSON()),                 Is.EqualTo(CanonicalJSON.Serialize(json)));
+                Assert.That(RoamingNetwork.Parse(json.ToString()).CalcETags(),          Is.EqualTo(eTags));
+                Assert.That(() => RoamingNetwork.Parse(json.ToString() + " {}"),        Throws.ArgumentException.With.Message.Contains("RFC 8259"));
+            }
+
+        }
+
+        #endregion
+
+        #region A_roaming_network_is_refused_where_its_text_is_not_read_as_section_1_asks(CustomData, Behind, Error)
+
+        /// <summary>
+        /// The JSON text of a roaming network with a property named twice, a second value after the first, or a number a
+        /// decimal cannot hold as written, is refused for its text; with neither, the same text is read.
+        /// </summary>
+        [TestCase("{\"value\":1,\"value\":2}",  "",                "value")]
+        [TestCase("{\"value\":1}",              " {\"value\":2}",  "RFC 8259")]
+        [TestCase("{\"value\":1e-30}",          "",                "1e-30")]
+        public void A_roaming_network_is_refused_where_its_text_is_not_read_as_section_1_asks(String CustomData, String Behind, String Error)
+        {
+
+            String Text(String Data)
+
+                => "{\"customData\":" + Data + "," + tests.History.NumberRoundTripTests.NewNetwork().ToJSON(IncludeETags: false).ToString(Formatting.None)[1..];
+
+            Assert.That(RoamingNetwork.TryParse(Text("{\"value\":1}"), out var network, out var error),  Is.True, error);
+            Assert.That(CanonicalJSON.Serialize(network!.ToJSON()["customData"]!),                       Is.EqualTo("{\"value\":1}"));
+
+            Assert.That(RoamingNetwork.TryParse(Text(CustomData) + Behind, out network, out error),     Is.False);
+            Assert.That(error,                                                                           Does.Contain(Error));
+
+        }
+
+        #endregion
+
+        #region What_a_client_reads_from_text_is_refused_where_it_is_not_read_as_section_1_asks(TryParse, Text, Error)
+
+        /// <summary>
+        /// Every TryParse(Text, …) of what a client reads from text: before it is parsed, a property named twice, a second
+        /// value after the first, and a number a decimal cannot hold as written are refused.
+        /// </summary>
+        private static IEnumerable<TestCaseData> TextParsers()
+        {
+
+            var parsers = new (String, Func<String, String?>)[] {
+                ("RoamingNetwork",                      text => RoamingNetwork.                     TryParse(text, out _, out var error) ? null : error),
+                ("RoamingNetworkChangeSet",             text => RoamingNetworkChangeSet.            TryParse(text, out _, out var error) ? null : error),
+                ("RoamingNetworkChangeSetWithdrawal",   text => RoamingNetworkChangeSetWithdrawal.  TryParse(text, out _, out var error) ? null : error),
+                ("RoamingNetworkCommit",                text => RoamingNetworkCommit.               TryParse(text, out _, out var error) ? null : error),
+                ("RoamingNetworkCheckpoint",            text => RoamingNetworkCheckpoint.           TryParse(text, out _, out var error) ? null : error),
+                ("RoamingNetworkCheckpointProof",       text => RoamingNetworkCheckpointProof.      TryParse(text, out _, out var error) ? null : error),
+                ("RoamingNetworkAttestation",           text => RoamingNetworkAttestation.          TryParse(text, out _, out var error) ? null : error),
+                ("RoamingNetworkProof",                 text => RoamingNetworkProof.                TryParse(text, out _, out var error) ? null : error),
+                ("RoamingNetworkPriceStatement",        text => RoamingNetworkPriceStatement.       TryParse(text, out _, out var error) ? null : error),
+                ("RoamingNetworkPriceStatementProof",   text => RoamingNetworkPriceStatementProof.  TryParse(text, out _, out var error) ? null : error),
+                ("RoamingNetworkKeyStatement",          text => RoamingNetworkKeyStatement.         TryParse(text, out _, out var error) ? null : error),
+                ("RoamingNetworkSigningKeyCertificate", text => RoamingNetworkSigningKeyCertificate.TryParse(text, out _, out var error) ? null : error)
+            };
+
+            var texts = new (String, String, String)[] {
+                ("PropertyNamedTwice",  "{\"twice\":1,\"twice\":2}",  "twice"),
+                ("SecondValue",         "{} {}",                      "RFC 8259"),
+                ("NoDecimal",           "{\"value\":1e-30}",          "1e-30")
+            };
+
+            foreach (var (name, tryParse) in parsers)
+                foreach (var (kind, text, error) in texts)
+                    yield return new TestCaseData(tryParse, text, error).
+                                     SetName($"What_a_client_reads_from_text_is_refused_where_it_is_not_read_as_section_1_asks({name},{kind})");
+
+        }
+
+        [TestCaseSource(nameof(TextParsers))]
+        public void What_a_client_reads_from_text_is_refused_where_it_is_not_read_as_section_1_asks(Func<String, String?>  TryParse,
+                                                                                                     String                 Text,
+                                                                                                     String                 Error)
+        {
+
+            Assert.That(TryParse(Text), Does.Contain(Error));
+
+        }
+
+        #endregion
+
     }
 
 }

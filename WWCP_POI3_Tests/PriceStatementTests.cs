@@ -595,7 +595,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             var pending  = history.PendingPriceStatements;
 
             Assert.That(history.TryGetPriceStatementProof(cp0.Id, s1.Digest, out var proof, out var proofError),  Is.True, proofError);
-            Assert.That(RoamingNetworkPriceStatementProof.TryParse(Read(proof!.ToJSON().ToString()), out var readProof, out var readError),  Is.True, readError);
+            Assert.That(RoamingNetworkPriceStatementProof.TryParse(proof!.ToJSON().ToString(), out var readProof, out var readError),  Is.True, readError);
 
             // Made after the checkpoint, the next statement names it, and the next checkpoint names only it.
             var s3       = SetPrice(history, EVSEType, E11, 0.35m, 4);
@@ -807,7 +807,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             var statementProofText     = await httpClient.GetStringAsync($"history/checkpoints/{checkpoint.Id}/priceStatements/{evse.Digest}/proof");
             var current                = Read(await httpClient.GetStringAsync("history/priceStatements"));
 
-            Assert.That(RoamingNetworkPriceStatementProof.TryParse(Read(statementProofText), out var statementProof, out var statementProofError),  Is.True, statementProofError);
+            Assert.That(RoamingNetworkPriceStatementProof.TryParse(statementProofText, out var statementProof, out var statementProofError),  Is.True, statementProofError);
 
             using (Assert.EnterMultipleScope())
             {

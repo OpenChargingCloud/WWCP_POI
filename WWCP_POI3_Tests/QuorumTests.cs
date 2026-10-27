@@ -608,7 +608,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 => Signed(network.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(network.Operator!, RoamingNetworkKeyStatement.JSONProperty, null, KeyStatement.ToJSON(Embedded: true)) ], CreatedAt: T0),
                           network, POIKeyKind.Signing, "Alpha", "Beta");
 
-            Assert.That(RoamingNetworkKeyStatement.TryParse(byTwo.ToJSON(), out var read, out var parseError), Is.True, parseError);
+            Assert.That(RoamingNetworkKeyStatement.TryParse(byTwo.ToJSON(),            out var read,     out var parseError), Is.True, parseError);
+            Assert.That(RoamingNetworkKeyStatement.TryParse(byTwo.ToJSON().ToString(), out var fromText, out var textError),  Is.True, textError);
 
             using (Assert.EnterMultipleScope())
             {
@@ -617,6 +618,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(byTwo.ToJSON()["minConsensus"]!.Value<Int32>(),    Is.EqualTo(2));
                 Assert.That(byTwo.Signatures.Select(signature => signature.KeyId),  Is.EqualTo(new[] { Key(network, "Alpha", POIKeyKind.Identity).Public.Id, Key(network, "Beta", POIKeyKind.Identity).Public.Id }));
                 Assert.That(JToken.DeepEquals(read!.ToJSON(), byTwo.ToJSON()), Is.True);
+                Assert.That(JToken.DeepEquals(fromText!.ToJSON(), byTwo.ToJSON()), Is.True);
 
                 Assert.That(byTwo.  TryVerify(network.Operator!.IdentityKeys.Select(key => key.Id), null, out var error1),  Is.True, error1);
                 Assert.That(byAlpha.TryVerify(network.Operator!.IdentityKeys.Select(key => key.Id), null, out var error2),  Is.False);

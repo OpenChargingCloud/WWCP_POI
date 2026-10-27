@@ -197,6 +197,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (static) TryParse(Text, out Proof, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse the given JSON text of a proof of a price statement, read as POIJSON.Read() reads it: numbers with
+        /// a fraction as decimals and strings as strings.
+        /// </summary>
+        public static Boolean TryParse(String                                                       Text,
+                                       [NotNullWhen(true)]  out RoamingNetworkPriceStatementProof?  Proof,
+                                       [NotNullWhen(false)] out String?                             ErrorResponse)
+        {
+
+            Proof = null;
+
+            try
+            {
+
+                if (POIJSON.Read(Text) is not JObject json)
+                {
+                    ErrorResponse = "The given JSON text must be a JSON object!";
+                    return false;
+                }
+
+                return TryParse(json, out Proof, out ErrorResponse);
+
+            }
+            catch (Exception e)
+            {
+                ErrorResponse = e.Message;
+                return false;
+            }
+
+        }
+
+        #endregion
+
         #region (static) TryParse(JSON, out Proof, out ErrorResponse)
 
         /// <summary>

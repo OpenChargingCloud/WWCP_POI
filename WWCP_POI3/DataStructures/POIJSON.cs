@@ -49,9 +49,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
     /// <summary>
-    /// Helpers for the JSON representations of the POI3 entities.
+    /// Reading JSON text as section 1 of the specification asks whoever reads JSON to hash or verify it again, and
+    /// helpers for the JSON representations of the POI3 entities.
     /// </summary>
-    internal static class POIJSON
+    /// <remarks>
+    /// Public is the reading alone: Read(), and Reader() with ReadFrom() for a reader that goes on after the first value.
+    /// A client verifying what it was given itself, a roaming network, a commit, a proof, reads its text with them, or
+    /// with the TryParse(Text, …) of what it reads, which read with them; read so, the JSON is hashed again as it was
+    /// written, with CanonicalJSON. The helpers of the entities are internal.
+    /// </remarks>
+    public static class POIJSON
     {
 
         #region (static) class PropertyKeys
@@ -59,7 +66,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Property keys for JSON and CBOR (de-)serialization the helpers read by default.
         /// </summary>
-        public static class PropertyKeys
+        internal static class PropertyKeys
         {
 
             /// <summary>
@@ -81,7 +88,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The property keys of the contact data of an organization, as TryParseContact(…) reads them.
         /// </summary>
-        public static class ContactKeys
+        internal static class ContactKeys
         {
 
             /// <summary>
@@ -155,7 +162,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// one, 150000 as 150000.0, which reads back as another decimal: a roaming network read again would not have
         /// the ETags it was written with. Written so, the text is canonical JSON, with its properties ordinally sorted.
         /// </remarks>
-        public static String ToText(JToken JSON)
+        internal static String ToText(JToken JSON)
 
             => CanonicalJSON.Serialize(JSON);
 
@@ -170,8 +177,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="Stream">A stream to write to.</param>
         /// <param name="JSON">The JSON.</param>
-        public static void Write(Stream  Stream,
-                                 JToken  JSON)
+        internal static void Write(Stream  Stream,
+                                   JToken  JSON)
 
             => CanonicalJSON.Write(Stream, JSON);
 
@@ -192,6 +199,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// What RFC 8259 does not call JSON is refused as well, which Newtonsoft takes: a trailing comma, a comment,
         /// single quotes, a name without quotes, 01 and 0x10, a raw control character in a string, and a second value
         /// after the first, which it dropped. A change set so written was taken here and refused by every reader of JSON.
+        /// JObject.Parse() takes most of it, makes a double of 1.50 and a date of a string that looks like one: whatever
+        /// is signed or hashed again is read here, e.g. a file a client verifies itself.
         /// </remarks>
         /// <param name="Text">The JSON text.</param>
         /// <param name="MaxDepth">The maximum depth of the JSON.</param>
@@ -253,6 +262,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// A reader of the given JSON text, as Read() reads it: dates stay text, numbers with a fraction decimals.
         /// </summary>
+        /// <remarks>
+        /// Its first value is read with ReadFrom(), which refuses what Read() refuses; read with JToken.ReadFrom() it
+        /// may name a property twice, have a number a decimal cannot hold, or be no JSON as RFC 8259 writes it.
+        /// </remarks>
         /// <param name="Text">The JSON text.</param>
         /// <param name="MaxDepth">The maximum depth of the JSON.</param>
         public static JsonTextReader Reader(String  Text,
@@ -272,6 +285,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The first JSON value of the given reader of the given JSON text, as Read() reads it, for a reader that goes on
         /// after it, e.g. to find out whether there is more.
         /// </summary>
+        /// <remarks>
+        /// What follows the first value is not checked: whether there is more, Reader.Read() tells, false at the end of
+        /// the text, a JsonReaderException before a second value; what to answer to it is the caller's, e.g. to a
+        /// WebSocket message that must be one JSON array. A reader already past the start of the text is not one
+        /// ReadFrom() reads: the text is checked from its first value on.
+        /// </remarks>
         /// <param name="Reader">A reader of the JSON text, from Reader().</param>
         /// <param name="Text">The JSON text the reader reads.</param>
         /// <exception cref="JsonReaderException">When the text is no JSON, or no JSON so read.</exception>
@@ -472,7 +491,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// identifications. And as JSON read from a text has the integer 22000 as well, JToken.DeepEquals takes the
         /// JSON of an entity and the same JSON read again for the same.
         /// </remarks>
-        public static JValue Number(Decimal Value)
+        internal static JValue Number(Decimal Value)
 
             => IsWhole(Value)
                    ? new JValue((Int64) Value)
@@ -488,7 +507,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// of a POI3 entity had them as floats, while the CBOR of its canonical JSON has a number with decimal places as a
         /// decimal fraction (tag 4, SPECIFICATION.md, section 1), and so its CBOR ETag would be another one.
         /// </summary>
-        public static JObject GeoCoordinateJSON(GeoCoordinate GeoCoordinate)
+        internal static JObject GeoCoordinateJSON(GeoCoordinate GeoCoordinate)
         {
 
             // Made anew: Newtonsoft keeps the type of a value it replaces, and so a double.
@@ -526,7 +545,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// JSON with decimals not written by POI3 itself, e.g. the values and the metadata a change set is given.
         /// Changed in place, for JSON made for the purpose, e.g. by ToJSON(); the JSON given is the one returned.
         /// </summary>
-        public static T WholeNumbersAsIntegers<T>(T JSON)
+        internal static T WholeNumbersAsIntegers<T>(T JSON)
             where T : JToken
         {
 
@@ -557,8 +576,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// 22000 is the decimal 22000, as the model holds it, and the decimal 22000.0 is not. JToken.DeepEquals has it
         /// the other way round, as it compares numbers of different types as different and decimals by their values.
         /// </summary>
-        public static Boolean SameContent(JToken? Value1,
-                                          JToken? Value2)
+        internal static Boolean SameContent(JToken? Value1,
+                                            JToken? Value2)
 
             => Value1 is null || Value2 is null
                    ? Value1 is null && Value2 is null
@@ -579,8 +598,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Not the question whether a value is the content it was: an old value is compared as canonical JSON
         /// (SameContent), and so is a merge commit with the merge of its parents.
         /// </remarks>
-        public static Boolean SameValue(JToken? Value1,
-                                        JToken? Value2)
+        internal static Boolean SameValue(JToken? Value1,
+                                          JToken? Value2)
         {
 
             if (Value1 is null || Value2 is null)
@@ -651,7 +670,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// A value as its content is, its canonical JSON, to say it in an error response; "absent" for none.
         /// </summary>
-        public static String ContentText(JToken? Value)
+        internal static String ContentText(JToken? Value)
 
             => Value is null
                    ? "absent"
@@ -664,11 +683,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional multi-language text.
         /// </summary>
-        public static Boolean TryParseI18N(JObject                           JSON,
-                                           String                            PropertyName,
-                                           String                            PropertyDescription,
-                                           out ImmutableI18NString?          Value,
-                                           [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseI18N(JObject                           JSON,
+                                             String                            PropertyName,
+                                             String                            PropertyDescription,
+                                             out ImmutableI18NString?          Value,
+                                             [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             Value = null;
@@ -699,11 +718,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional text.
         /// </summary>
-        public static Boolean TryParseString(JObject                           JSON,
-                                             String                            PropertyName,
-                                             String                            PropertyDescription,
-                                             out String?                       Value,
-                                             [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseString(JObject                           JSON,
+                                               String                            PropertyName,
+                                               String                            PropertyDescription,
+                                               out String?                       Value,
+                                               [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             Value = null;
@@ -733,12 +752,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional value given as a text, e.g. an identification or a phone number.
         /// </summary>
-        public static Boolean TryParseText<T>(JObject                           JSON,
-                                              String                            PropertyName,
-                                              String                            PropertyDescription,
-                                              POITextParser<T>                  Parser,
-                                              out T?                            Value,
-                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseText<T>(JObject                           JSON,
+                                                String                            PropertyName,
+                                                String                            PropertyDescription,
+                                                POITextParser<T>                  Parser,
+                                                out T?                            Value,
+                                                [NotNullWhen(false)] out String?  ErrorResponse)
 
             where T : struct
 
@@ -771,9 +790,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional address.
         /// </summary>
-        public static Boolean TryParseAddress(JObject                           JSON,
-                                              out Address?                      Address,
-                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseAddress(JObject                           JSON,
+                                                out Address?                      Address,
+                                                [NotNullWhen(false)] out String?  ErrorResponse)
 
             => TryParseAddress(JSON, PropertyKeys.Address, "address", out Address, out ErrorResponse);
 
@@ -781,11 +800,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional address, e.g. of an entrance.
         /// </summary>
-        public static Boolean TryParseAddress(JObject                           JSON,
-                                              String                            PropertyName,
-                                              String                            PropertyDescription,
-                                              out Address?                      Address,
-                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseAddress(JObject                           JSON,
+                                                String                            PropertyName,
+                                                String                            PropertyDescription,
+                                                out Address?                      Address,
+                                                [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             Address = null;
@@ -820,9 +839,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional geographical location.
         /// </summary>
-        public static Boolean TryParseGeoLocation(JObject                           JSON,
-                                                  out GeoCoordinate?                GeoLocation,
-                                                  [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseGeoLocation(JObject                           JSON,
+                                                    out GeoCoordinate?                GeoLocation,
+                                                    [NotNullWhen(false)] out String?  ErrorResponse)
 
             => TryParseGeoLocation(JSON, PropertyKeys.GeoLocation, "geo location", out GeoLocation, out ErrorResponse);
 
@@ -830,11 +849,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional geographical location, e.g. of an entrance.
         /// </summary>
-        public static Boolean TryParseGeoLocation(JObject                           JSON,
-                                                  String                            PropertyName,
-                                                  String                            PropertyDescription,
-                                                  out GeoCoordinate?                GeoLocation,
-                                                  [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseGeoLocation(JObject                           JSON,
+                                                    String                            PropertyName,
+                                                    String                            PropertyDescription,
+                                                    out GeoCoordinate?                GeoLocation,
+                                                    [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             GeoLocation = null;
@@ -876,9 +895,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// and the roaming network read again would not have the ETags it was written with. Parsed from their texts,
         /// they are the doubles that were written.
         /// </remarks>
-        public static Boolean TryParseGeoCoordinate(JObject                           JSON,
-                                                    out GeoCoordinate                 GeoCoordinate,
-                                                    [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseGeoCoordinate(JObject                           JSON,
+                                                      out GeoCoordinate                 GeoCoordinate,
+                                                      [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             var exact = (JObject) JSON.DeepClone();
@@ -897,11 +916,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional, not negative duration, given in seconds.
         /// </summary>
-        public static Boolean TryParseSeconds(JObject                           JSON,
-                                              String                            PropertyName,
-                                              String                            PropertyDescription,
-                                              out TimeSpan?                     Value,
-                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseSeconds(JObject                           JSON,
+                                                String                            PropertyName,
+                                                String                            PropertyDescription,
+                                                out TimeSpan?                     Value,
+                                                [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             Value = null;
@@ -931,11 +950,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional number, not negative, e.g. a distance in meters.
         /// </summary>
-        public static Boolean TryParseNonNegative(JObject                           JSON,
-                                                  String                            PropertyName,
-                                                  String                            PropertyDescription,
-                                                  out Decimal?                      Value,
-                                                  [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseNonNegative(JObject                           JSON,
+                                                    String                            PropertyName,
+                                                    String                            PropertyDescription,
+                                                    out Decimal?                      Value,
+                                                    [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             Value = null;
@@ -965,11 +984,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional integer, e.g. the priority of a group: a JSON number without fraction, neither a text nor 1.0.
         /// </summary>
-        public static Boolean TryParseInteger(JObject                           JSON,
-                                              String                            PropertyName,
-                                              String                            PropertyDescription,
-                                              out Int32?                        Value,
-                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseInteger(JObject                           JSON,
+                                                String                            PropertyName,
+                                                String                            PropertyDescription,
+                                                out Int32?                        Value,
+                                                [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             Value = null;
@@ -1008,7 +1027,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The given duration in seconds, as JSON: a whole number of them as an integer, see Number().
         /// </summary>
-        public static JValue Seconds(TimeSpan Duration)
+        internal static JValue Seconds(TimeSpan Duration)
 
             => Number((Decimal) Duration.Ticks / TimeSpan.TicksPerSecond);
 
@@ -1019,7 +1038,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The duration of the given seconds.
         /// </summary>
-        public static TimeSpan FromSeconds(Decimal Seconds)
+        internal static TimeSpan FromSeconds(Decimal Seconds)
 
             => TimeSpan.FromTicks((Int64) (Seconds * TimeSpan.TicksPerSecond));
 
@@ -1030,8 +1049,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// A value of the given enumeration by its exact name, e.g. a payment option; not by its number.
         /// </summary>
-        public static Boolean TryParseName<TEnum>(String     Text,
-                                                  out TEnum  Value)
+        internal static Boolean TryParseName<TEnum>(String     Text,
+                                                    out TEnum  Value)
 
             where TEnum : struct, Enum
 
@@ -1046,11 +1065,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Optional flags, given as an array of their names.
         /// </summary>
-        public static Boolean TryParseFlags<TEnum>(JObject                           JSON,
-                                                   String                            PropertyName,
-                                                   String                            PropertyDescription,
-                                                   out TEnum                         Value,
-                                                   [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseFlags<TEnum>(JObject                           JSON,
+                                                     String                            PropertyName,
+                                                     String                            PropertyDescription,
+                                                     out TEnum                         Value,
+                                                     [NotNullWhen(false)] out String?  ErrorResponse)
 
             where TEnum : struct, Enum
 
@@ -1103,7 +1122,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The names of the set flags, without the empty one, in the order of their values.
         /// </summary>
-        public static JArray FlagsToJSON<TEnum>(TEnum Flags)
+        internal static JArray FlagsToJSON<TEnum>(TEnum Flags)
 
             where TEnum : struct, Enum
 
@@ -1118,11 +1137,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional value given by its name, e.g. a voltage level.
         /// </summary>
-        public static Boolean TryParseEnum<TEnum>(JObject                           JSON,
-                                                  String                            PropertyName,
-                                                  String                            PropertyDescription,
-                                                  out TEnum?                        Value,
-                                                  [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseEnum<TEnum>(JObject                           JSON,
+                                                    String                            PropertyName,
+                                                    String                            PropertyDescription,
+                                                    out TEnum?                        Value,
+                                                    [NotNullWhen(false)] out String?  ErrorResponse)
 
             where TEnum : struct, Enum
 
@@ -1158,11 +1177,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Optional texts, given as an array, in their given order.
         /// </summary>
-        public static Boolean TryParseStrings(JObject                           JSON,
-                                              String                            PropertyName,
-                                              String                            PropertyDescription,
-                                              out ImmutableArray<String>        Values,
-                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseStrings(JObject                           JSON,
+                                                String                            PropertyName,
+                                                String                            PropertyDescription,
+                                                out ImmutableArray<String>        Values,
+                                                [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             Values = [];
@@ -1192,12 +1211,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Optional embedded values without identifications, given as an array, in their given order, e.g. images.
         /// </summary>
-        public static Boolean TryParseObjects<T>(JObject                           JSON,
-                                                 String                            PropertyName,
-                                                 String                            PropertyDescription,
-                                                 POIObjectParser<T>                Parser,
-                                                 out ImmutableArray<T>             Values,
-                                                 [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseObjects<T>(JObject                           JSON,
+                                                   String                            PropertyName,
+                                                   String                            PropertyDescription,
+                                                   POIObjectParser<T>                Parser,
+                                                   out ImmutableArray<T>             Values,
+                                                   [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             Values = [];
@@ -1248,9 +1267,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The given values in their given order, without null entries and without one given twice by its key.
         /// </summary>
-        public static ImmutableArray<T> Distinct<T>(IEnumerable<T>?  Values,
-                                                    Func<T, String>  Key,
-                                                    String           Description)
+        internal static ImmutableArray<T> Distinct<T>(IEnumerable<T>?  Values,
+                                                      Func<T, String>  Key,
+                                                      String           Description)
         {
 
             var values = (Values ?? []).ToArray();
@@ -1272,12 +1291,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// An optional embedded value, e.g. the opening times of a charging pool.
         /// </summary>
-        public static Boolean TryParseObject<T>(JObject                           JSON,
-                                                String                            PropertyName,
-                                                String                            PropertyDescription,
-                                                POIObjectParser<T>                Parser,
-                                                out T?                            Value,
-                                                [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseObject<T>(JObject                           JSON,
+                                                  String                            PropertyName,
+                                                  String                            PropertyDescription,
+                                                  POIObjectParser<T>                Parser,
+                                                  out T?                            Value,
+                                                  [NotNullWhen(false)] out String?  ErrorResponse)
 
             where T : class
 
@@ -1316,12 +1335,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Optional references, given as an array of identifications, in their given order.
         /// </summary>
-        public static Boolean TryParseIds<T>(JObject                           JSON,
-                                             String                            PropertyName,
-                                             String                            PropertyDescription,
-                                             POITextParser<T>                  Parser,
-                                             out ImmutableArray<T>             Values,
-                                             [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseIds<T>(JObject                           JSON,
+                                               String                            PropertyName,
+                                               String                            PropertyDescription,
+                                               POITextParser<T>                  Parser,
+                                               out ImmutableArray<T>             Values,
+                                               [NotNullWhen(false)] out String?  ErrorResponse)
 
             where T : struct
 
@@ -1369,8 +1388,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The given references in the order of their identifications (ordinal), without one given twice.
         /// </summary>
-        public static ImmutableArray<T> OrderedIds<T>(IEnumerable<T>?  Ids,
-                                                      String           Description)
+        internal static ImmutableArray<T> OrderedIds<T>(IEnumerable<T>?  Ids,
+                                                        String           Description)
 
             where T : struct
 
@@ -1392,8 +1411,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The given values in their given order, e.g. languages by preference, without one given twice.
         /// </summary>
-        public static ImmutableArray<T> UniqueIds<T>(IEnumerable<T>?  Ids,
-                                                     String           Description)
+        internal static ImmutableArray<T> UniqueIds<T>(IEnumerable<T>?  Ids,
+                                                       String           Description)
 
             where T : struct
         {
@@ -1414,7 +1433,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The given references as a JSON array of their identifications.
         /// </summary>
-        public static JArray IdsToJSON<T>(IEnumerable<T> Ids)
+        internal static JArray IdsToJSON<T>(IEnumerable<T> Ids)
 
             where T : struct
 
@@ -1428,13 +1447,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The optional embedded children of an entity, e.g. the charging stations of a charging pool.
         /// They must be given completely: their identifications alone are refused.
         /// </summary>
-        public static Boolean TryParseChildren<T>(JObject                           JSON,
-                                                  String                            PropertyName,
-                                                  String                            IdsPropertyName,
-                                                  String                            Description,
-                                                  POIObjectParser<T>                Parser,
-                                                  out ImmutableArray<T>             Children,
-                                                  [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseChildren<T>(JObject                           JSON,
+                                                    String                            PropertyName,
+                                                    String                            IdsPropertyName,
+                                                    String                            Description,
+                                                    POIObjectParser<T>                Parser,
+                                                    out ImmutableArray<T>             Children,
+                                                    [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             Children = [];
@@ -1492,10 +1511,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// An optional e-mail address, as its text: "info@example.org", or with the name of its owner,
         /// "Example Hotline &lt;hotline@example.org&gt;", as EMailAddress.ToString() writes it.
         /// </summary>
-        public static Boolean TryParseEMailAddress(JToken?                           Value,
-                                                    String                            PropertyDescription,
-                                                    out EMailAddress?                 EMailAddress,
-                                                    [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseEMailAddress(JToken?                           Value,
+                                                      String                            PropertyDescription,
+                                                      out EMailAddress?                 EMailAddress,
+                                                      [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             if (Value is null)
@@ -1516,10 +1535,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        public static Boolean TryParseEMailAddress(String?                           Text,
-                                                    String                            PropertyDescription,
-                                                    out EMailAddress?                 EMailAddress,
-                                                    [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseEMailAddress(String?                           Text,
+                                                      String                            PropertyDescription,
+                                                      out EMailAddress?                 EMailAddress,
+                                                      [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             EMailAddress   = null;
@@ -1555,17 +1574,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// most one { "uri" }, its address, geo location, telephone number, e-mail address, homepage, hotline and the URL
         /// of its terms and conditions.
         /// </summary>
-        public static Boolean TryParseContact(JObject                           JSON,
-                                              out URL?                          Logo,
-                                              out Address?                      Address,
-                                              out GeoCoordinate?                GeoLocation,
-                                              out PhoneNumber?                  Telephone,
-                                              out EMailAddress?                 EMailAddress,
-                                              out URL?                          Homepage,
-                                              out PhoneNumber?                  HotlinePhoneNumber,
-                                              out URL?                          TermsAndConditionsURL,
-                                              out ImmutableArray<DataLicense>   DataLicenses,
-                                              [NotNullWhen(false)] out String?  ErrorResponse)
+        internal static Boolean TryParseContact(JObject                           JSON,
+                                                out URL?                          Logo,
+                                                out Address?                      Address,
+                                                out GeoCoordinate?                GeoLocation,
+                                                out PhoneNumber?                  Telephone,
+                                                out EMailAddress?                 EMailAddress,
+                                                out URL?                          Homepage,
+                                                out PhoneNumber?                  HotlinePhoneNumber,
+                                                out URL?                          TermsAndConditionsURL,
+                                                out ImmutableArray<DataLicense>   DataLicenses,
+                                                [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
             Logo                   = null;

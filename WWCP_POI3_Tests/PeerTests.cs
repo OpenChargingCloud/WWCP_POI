@@ -214,7 +214,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             var proofText        = await httpClient.GetStringAsync($"commits/{c2.Commit!.Id}/proof");
             var checkpointsText  = await httpClient.GetStringAsync("checkpoints?since=0");
 
-            Assert.That(RoamingNetworkCheckpointProof.TryParse(JObject.Parse(proofText), out var proof, out var proofError),  Is.True, proofError);
+            Assert.That(RoamingNetworkCheckpointProof.TryParse(proofText, out var proof, out var proofError),  Is.True, proofError);
 
             using (Assert.EnterMultipleScope())
             {
