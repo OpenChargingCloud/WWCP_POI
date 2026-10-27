@@ -126,6 +126,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private          DateTimeOffset?                    plannedStatusAt;
 
         /// <summary>
+        /// The number of the SchedulePlannedStatus(…) begun last, and of the one that set the timer last: one that looked
+        /// before another set it may only make it earlier.
+        /// </summary>
+        private          UInt64                             plannedStatusBegun;
+        private          UInt64                             plannedStatusSetBy;
+
+        /// <summary>
         /// The status of every charging tariff offer of the head version as its times tell it, as told last: an offer
         /// becoming active at its notBefore, or expiring after its notAfter, is told of by a status update.
         /// </summary>
@@ -1407,10 +1414,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            SchedulePlannedStatus(newEntities);
+            var now = Timestamp.Now;
+
+            SchedulePlannedStatus(newEntities, now);
 
             // Its offers may have other times now.
-            TakeOfferStatus(RoamingNetwork);
+            TakeOfferStatus(RoamingNetwork, now);
 
             // Its groups may have other members now.
             HeadChanged(RoamingNetwork);
@@ -2237,11 +2246,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// longer has lets the timer look again, in vain.
         /// </summary>
         /// <param name="NewEntities">Optionally, the entities a new head version has new.</param>
-        private void SchedulePlannedStatus(IEnumerable<Object>? NewEntities = null)
+        /// <param name="Now">Optionally, the timestamp the status of the charging tariff offers was taken at: as of a later
+        /// one, an offer ending in between, e.g. as the timer woke up a little early, would neither be told expired nor be
+        /// waited for.</param>
+        private void SchedulePlannedStatus(IEnumerable<Object>?  NewEntities   = null,
+                                           DateTimeOffset?       Now           = null)
         {
 
+            UInt64 number;
+
+            lock (timerLock)
+                number = ++plannedStatusBegun;
+
             var network  = history.Head.RoamingNetwork;
-            var now      = Timestamp.Now;
+            var now      = Now ?? Timestamp.Now;
 
             var next     = (NewEntities is null
                                 ? EntitiesOf(network)
@@ -2253,10 +2271,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             lock (timerLock)
             {
 
-                if (NewEntities is not null && plannedStatusAt.HasValue && (!next.HasValue || plannedStatusAt.Value <= next.Value))
+                // Another one, having looked later, may have set the timer meanwhile: then this one may only make it
+                // earlier, waking it up in vain at worst.
+                if ((NewEntities is not null || number < plannedStatusSetBy) &&
+                    plannedStatusAt.HasValue && (!next.HasValue || plannedStatusAt.Value <= next.Value))
+                {
                     return;
+                }
 
-                plannedStatusAt = next;
+                plannedStatusAt     = next;
+                plannedStatusSetBy  = Math.Max(plannedStatusSetBy, number);
 
                 if (!next.HasValue)
                 {
@@ -2373,7 +2397,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TakeOfferStatus(RoamingNetwork)
+        #region (private) TakeOfferStatus(RoamingNetwork, Now)
 
         /// <summary>
         /// Tell of every charging tariff offer of the given head version whose status, as its times tell it, is another
@@ -2381,10 +2405,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// its schedule tells so. An offer new in the version is not told of, the version tells it; its owner setting it
         /// exhausted, or no longer, its schedule tells.
         /// </summary>
-        private void TakeOfferStatus(RoamingNetwork RoamingNetwork)
+        /// <param name="RoamingNetwork">The head version.</param>
+        /// <param name="Now">The timestamp to take the status at, the one to wait for the next one from.</param>
+        private void TakeOfferStatus(RoamingNetwork  RoamingNetwork,
+                                     DateTimeOffset  Now)
         {
 
-            var now      = Timestamp.Now;
             var changed  = new List<(ChargingTariffOffer_Id Id, Timestamped<ChargingTariffOfferStatusType> New, Timestamped<ChargingTariffOfferStatusType> Old)>();
 
             lock (offerStatusesLock)
@@ -2398,7 +2424,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var offer in offers.Values)
                 {
 
-                    var status = offer.StatusSince(now);
+                    var status = offer.StatusSince(Now);
 
                     if (offerStatuses.TryGetValue(offer.Id, out var told) &&
                         told.Value   != status.Value &&
@@ -2429,6 +2455,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         private void TakePlannedStatus()
         {
+
+            // The offers are waited for from the timestamp their status is taken at.
+            var now = Timestamp.Now;
 
             try
             {
@@ -2516,7 +2545,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     _ = chargingTariffOffer.Status;
                 }
 
-                TakeOfferStatus(network);
+                TakeOfferStatus(network, now);
 
                 foreach (var parkingSpaceGroup in network.ParkingSpaceGroups)
                 {
@@ -2589,7 +2618,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             catch
             { }
 
-            SchedulePlannedStatus();
+            SchedulePlannedStatus(Now: now);
 
         }
 

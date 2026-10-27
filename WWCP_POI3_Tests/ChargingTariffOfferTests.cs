@@ -645,6 +645,84 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region The_end_of_an_offer_passed_while_the_planned_statuses_are_taken_is_told()
+
+        /// <summary>
+        /// The timer wakes up just before an offer ends, for another planned status or a little early, and its notAfter
+        /// passes while the planned statuses are taken, after the offers were looked at: its end is waited for still, and
+        /// told, not lost as no longer to come.
+        /// </summary>
+        [Test]
+        public async Task The_end_of_an_offer_passed_while_the_planned_statuses_are_taken_is_told()
+        {
+
+            var history  = RoamingNetworkHistory.Start(NewNetwork());
+            var told     = new List<POIStatusUpdate>();
+            var expired  = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            history.RuntimeStatus.OnStatusUpdate += statusUpdate => {
+
+                // Taken after the offers: the clock passes the end of the offer meanwhile.
+                if (statusUpdate.EntityType == nameof(ChargingStationOperator) && statusUpdate.Value == "outOfService")
+                    Timestamp.TravelForwardInTime(TimeSpan.FromMilliseconds(200));
+
+                if (statusUpdate.EntityType == nameof(ChargingTariffOffer) && statusUpdate.EntityId == "gef-flash")
+                {
+
+                    lock (told)
+                        told.Add(statusUpdate);
+
+                    if (statusUpdate.Value == "expired")
+                        expired.TrySetResult();
+
+                }
+
+            };
+
+            // As in The_status_of_an_offer_is_told_when_it_begins_and_when_it_ends().
+            var now      = Timestamp.Now;
+            var begin    = DateTimeOffset.FromUnixTimeMilliseconds(now.ToUnixTimeMilliseconds() + 3000);
+            var end      = begin.AddMilliseconds(500);
+
+            try
+            {
+
+                Assert.That(history.Commit(history.Head.RoamingNetwork.CreateSignedChangeSet([
+                                RoamingNetworkChange.Add(new ChargingTariffOffer(ChargingTariffOffer_Id.Parse("gef-flash"),
+                                                                                 Discount:                    new ChargingTariffDiscount(10),
+                                                                                 ChargingStationOperatorIds:  [ GEF ],
+                                                                                 NotBefore:                   begin,
+                                                                                 NotAfter:                    end,
+                                                                                 Sessions:                    ChargingTariffOfferSessions.contract,
+                                                                                 Created:                     Created), GEF)
+                            ], CreatedAt: now)).IsCommitted);
+
+                // Due 50 ms before the offer ends.
+                Assert.That(history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.AdminStatus, nameof(ChargingStationOperator), GEF.ToString(), "outOfService", end.AddMilliseconds(-50), out _, out var error),
+                            Is.EqualTo(POIStatusUpdateResult.Scheduled), error);
+
+                Assert.That(Timestamp.Now, Is.LessThan(begin),
+                            $"Signing and committing the offer took {(Timestamp.Now - now).TotalMilliseconds:F0} ms, until after its notBefore: " +
+                             "the version tells its status, the runtime status tells nothing to wait for!");
+
+                await expired.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            }
+            finally
+            {
+                Timestamp.Reset();
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(told.Select(statusUpdate => statusUpdate.Value),  Is.EqualTo(new[] { "active", "expired" }));
+                Assert.That(told[1].Timestamp,                                Is.EqualTo(end));
+            }
+
+        }
+
+        #endregion
+
         #region The_status_of_an_offer_follows_its_times_unless_exhausted()
 
         [Test]
