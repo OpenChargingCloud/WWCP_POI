@@ -219,8 +219,10 @@ Checkpoint 0 of epoch 2 holds runtime status: False
   [example A11](exampleA11.md), the price status of its other entities is runtime status only, without a statement.
 - A token per operator is the simplest login; a server may as well use client certificates
   (`RoamingNetworkPeerOptions.ConfigureWebSocket`, `AuthenticateWebSocketClient`).
-- The hub serves its roaming networks by the same `POI_API`, with their WebSockets; it lets nobody set a status over
-  them yet (`AuthorizeStatusUpdate`), and this example uses `POI_API` without a hub.
+- The hub serves its roaming networks by the same `POI_API`, with their WebSockets; there a charging station operator
+  sets the status of its own entities as one of the hub's OCPI peers in the role CPO, with its OCPI token, or with the
+  API key of an account whose role the hub's configuration binds to the operator (`"poi": { "statusRoles": … }`).
+  This example uses `POI_API` without a hub.
 
 
 ## Next
