@@ -179,6 +179,6 @@ The certificate for another model: roamingNetwork.conformityAssessmentBodies.@le
 
 ## Next
 
-- The papers of a meter: the declaration of conformity of its model, the certificate of conformity of a notified
+- The papers of a meter: the declaration of conformity of its model, the certificates of conformity of a notified
   body and the calibration certificate of the single meter, QI-Digital documents each signed by its issuer and checked
   against `QA`: [example A14](exampleA14.md).

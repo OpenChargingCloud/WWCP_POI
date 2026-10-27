@@ -34,7 +34,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// A notified body a declaration of conformity names (Decision 768/2008/EC, Annex III, point 7): the conformity
     /// assessment body, its number, the module of its intervention and the certificate it issued, e.g. the EU-type
-    /// examination certificate of the model.
+    /// examination certificate of the model, or the approval of the quality system of its manufacturer.
     /// </summary>
     /// <param name="ConformityAssessmentBodyId">The conformity assessment body, one of the roaming network.</param>
     /// <param name="NotifiedBodyNumber">Its four digit number as a notified body.</param>
@@ -430,8 +430,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Whether the given certificate of conformity is one this declaration names (point 7): issued by the notified body
-        /// it names with it, under one of its legislations, for its model and in all its hardware revisions and firmware
-        /// versions. Whether the certificate itself is valid, its own TryVerify(…) tells.
+        /// it names with it, of the module it names, under one of its legislations; for its model and in all its hardware
+        /// revisions and firmware versions, or, of a module of quality assurance, approving the quality system of the
+        /// manufacturer of its model, of its kind and with its kind in the scope, as far as it can be told. Whether the
+        /// certificate itself is valid, its own TryVerify(…) tells.
         /// </summary>
         /// <param name="Certificate">A certificate of conformity.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
@@ -452,7 +454,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
             else if (!Legislations.Any(legislation => legislation.Name == Certificate.Legislation.Name))
                 ErrorResponse = $"The certificate '{Certificate.Id}' is issued under the {Certificate.Legislation.Name}, none of the legislations of {DocumentText}!";
 
-            else if (Certificate.Model.Type != Model.Type ||
+            // The approval of a quality system belongs to the manufacturer: it names no model, revisions or versions.
+            else if (Certificate.Manufacturer is QIDigitalManufacturer manufacturer)
+            {
+
+                if (!manufacturer.Makes(Model))
+                    ErrorResponse = $"The certificate '{Certificate.Id}' approves the quality system of {manufacturer.Text}, not of the {(Model.Type == QIDigitalModel.ChargingStationModelType ? "charging station" : "energy meter")} manufacturer '{Model.ManufacturerId}' of {DocumentText}!";
+
+                else if (!manufacturer.InScope(Model.Type == QIDigitalModel.ChargingStationModelType ? QIDigitalItem.ChargingStationType : QIDigitalItem.EnergyMeterType))
+                    ErrorResponse = $"The certificate '{Certificate.Id}' approves a quality system for {String.Join(", ", manufacturer.Scope)}, not for the model '{Model.ModelId}' of {DocumentText}!";
+
+                else
+                    ErrorResponse = null;
+
+            }
+
+            else if (Certificate.Model!.Type != Model.Type ||
                      !QIDigitalModel.SameId(Certificate.Model.ManufacturerId, Model.ManufacturerId) ||
                      !QIDigitalModel.SameId(Certificate.Model.ModelId,        Model.ModelId))
                 ErrorResponse = $"The certificate '{Certificate.Id}' is one of the model '{Certificate.Model.ModelId}' of '{Certificate.Model.ManufacturerId}', not of '{Model.ModelId}' of '{Model.ManufacturerId}'!";

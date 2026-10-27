@@ -11,16 +11,18 @@ public static class ExampleA14
 {
 
     // The papers of a meter, digital: the QI-Digital documents. SAALE declares that its meter model SM-3 conforms to the
-    // Measuring Instruments Directive, the PTB, its notified body, states the EU-type examination certificate of the model,
-    // and a calibration laboratory states the calibration of one meter of DE*GEF, the SM-3 of DE*GEF*E2*1. Each signs its
-    // document with its own key of QA. The documents are no part of QA: their issuers hand them out, and anybody checks
-    // them against QA, its parties and their keys, the models of the manufacturers and the meter as QA names it.
+    // Measuring Instruments Directive, the PTB, its notified body, states the EU-type examination certificate of the model
+    // and the approval of the quality system of SAALE, and a calibration laboratory states the calibration of one meter of
+    // DE*GEF, the SM-3 of DE*GEF*E2*1. Each signs its document with its own key of QA. The documents are no part of QA:
+    // their issuers hand them out, and anybody checks them against QA, its parties and their keys, the models of the
+    // manufacturers and the meter as QA names it.
 
 
     internal static readonly ConformityAssessmentBody_Id        labId              = ConformityAssessmentBody_Id.      Parse("EM-LAB");
     internal static readonly EnergyMeterModel_Id                sm3                = EnergyMeterModel_Id.              Parse("SM-3");
     internal static readonly EVSE_Id                            EVSEId             = EVSE_Id.                          Parse("DE*GEF*E2*1");
     internal static readonly DigitalCertificateOfConformity_Id  typeExaminationId  = DigitalCertificateOfConformity_Id.Parse("DE-26-M-PTB-0108");
+    internal static readonly DigitalCertificateOfConformity_Id  qualitySystemId    = DigitalCertificateOfConformity_Id.Parse("DE-26-QS-PTB-0042");
     internal static readonly DigitalDeclarationOfConformity_Id  declarationId      = DigitalDeclarationOfConformity_Id.Parse("DoC-SM-3-2026-01");
     internal static readonly DigitalCalibrationCertificate_Id   calibrationId      = DigitalCalibrationCertificate_Id. Parse("DCC-2026-0815");
 
@@ -28,6 +30,11 @@ public static class ExampleA14
     /// The EU-type examination certificate of the SM-3, as the PTB hands it out.
     /// </summary>
     internal const String CertificateOfConformity  = "published/PTB-DE-26-M-PTB-0108.json";
+
+    /// <summary>
+    /// The approval of the quality system of SAALE, as the PTB hands it out.
+    /// </summary>
+    internal const String QualitySystemApproval    = "published/PTB-DE-26-QS-PTB-0042.json";
 
     /// <summary>
     /// The EU declaration of conformity of the SM-3, as SAALE hands it out.
@@ -84,7 +91,7 @@ public static class ExampleA14
 
         #endregion
 
-        #region 2. The PTB states the EU-type examination certificate of the SM-3
+        #region 2. The PTB states the EU-type examination certificate of the SM-3 and approves the quality system of SAALE
 
         // Module B under the MID: the model SM-3 of SAALE in its hardware revision 1.4 with the firmware 1.0.7, as SAALE
         // stated it in example A2; with the standards applied, the characteristics confirmed and the conditions of its
@@ -121,14 +128,41 @@ public static class ExampleA14
 
         File.WriteAllText(CertificateOfConformity, typeExamination.ToJSON().ToString());
 
-        Console.WriteLine($"The PTB: {typeExamination.Id}, module {typeExamination.Module} under the {typeExamination.Legislation.Name}, for the {typeExamination.Model.ModelId} of {typeExamination.Model.ManufacturerId}, signed with {typeExamination.Signature!.Algorithm}");
+        Console.WriteLine($"The PTB: {typeExamination.Id}, module {typeExamination.Module} under the {typeExamination.Legislation.Name}, for the {typeExamination.Model!.ModelId} of {typeExamination.Model.ManufacturerId}, signed with {typeExamination.Signature!.Algorithm}");
+
+        // Module D under the MID: the quality system of SAALE for the production, the final product inspection and the
+        // testing of its active electrical energy meters, MI-003. The approval belongs to SAALE, not to the SM-3: it names
+        // the manufacturer and the scope of its quality system, no model; valid for three years, under the surveillance of
+        // the PTB.
+        var qualitySystem   = new DigitalCertificateOfConformity(
+                                  qualitySystemId,
+                                  DCoCModule.D,
+                                  QIDigitalLegislation.MID,
+                                  ExampleA13.ptbId,
+                                  "0102",
+                                  QIDigitalManufacturer.Of(ExampleA2.acMeterMakerId, [ QIDigitalManufacturer.Categories.MI003 ]),
+                                  ValidFrom:    now,
+                                  ValidUntil:   now.AddYears(3),
+                                  Conclusion:   ImmutableI18NString.Create(Languages.en, "The quality system of SAALE for production, final product inspection and testing meets the MID, Annex II, module D, for MI-003."),
+                                  Conditions:   [ ImmutableI18NString.Create(Languages.en, "Subject to the surveillance of the notified body.") ],
+                                  DocumentURL:  URL.Parse("https://www.ptb.example/certificates/DE-26-QS-PTB-0042.pdf")
+                              );
+
+        qualitySystem       = Signed(qualitySystem, "PTB/signing-certificates-privateKey.pem", COSEAlgorithm.MLDsa65);
+
+        if (!qualitySystem.TryVerify(qa, out error, now))
+            Helpers.Fail(error);
+
+        File.WriteAllText(QualitySystemApproval, qualitySystem.ToJSON().ToString());
+
+        Console.WriteLine($"The PTB: {qualitySystem.Id}, module {qualitySystem.Module} under the {qualitySystem.Legislation.Name}, for the quality system of {qualitySystem.Manufacturer!.ManufacturerId}, scope {String.Join(", ", qualitySystem.Manufacturer.Scope)}, signed with {qualitySystem.Signature!.Algorithm}");
 
         #endregion
 
         #region 3. SAALE declares the conformity of the SM-3
 
-        // Under its sole responsibility: the model, the legislations, the standards, the notified body with its module and
-        // its certificate, where and by whom it is signed for SAALE.
+        // Under its sole responsibility: the model, the legislations, the standards, the notified body with its modules and
+        // its certificates, where and by whom it is signed for SAALE.
         var declaration     = new DigitalDeclarationOfConformity(
                                   declarationId,
                                   QIDigitalModel.Of(ExampleA2.acMeterMakerId, sm3, [ HardwareRevision.Parse("1.4") ], [ FirmwareVersion.Parse("1.0.7") ]),
@@ -137,7 +171,9 @@ public static class ExampleA14
                                   new QIDigitalPerson("Jane Doe", "Managing director"),
                                   Standards:              [ new QIDigitalStandard("EN 50470-1:2006"), new QIDigitalStandard("EN 50470-3:2022") ],
                                   NotifiedBodies:         [ new DDoCNotifiedBody(ExampleA13.ptbId, "0102", DCoCModule.B, typeExaminationId,
-                                                                                 ImmutableI18NString.Create(Languages.en, "Performed the EU-type examination and issued the EU-type examination certificate")) ],
+                                                                                 ImmutableI18NString.Create(Languages.en, "Performed the EU-type examination and issued the EU-type examination certificate")),
+                                                            new DDoCNotifiedBody(ExampleA13.ptbId, "0102", DCoCModule.D, qualitySystemId,
+                                                                                 ImmutableI18NString.Create(Languages.en, "Approved the quality system of the manufacturer and surveils it")) ],
                                   AdditionalInformation:  ImmutableI18NString.Create(Languages.en, "Accuracy class B, three-phase, 3 x 230/400 V, 0.25 to 63 A.")
                               );
 
@@ -150,12 +186,12 @@ public static class ExampleA14
 
         declaration         = Signed(declaration, "SAALE/meters-signing-models-privateKey.pem", COSEAlgorithm.ES256);
 
-        if (!declaration.TryVerify(qa, out error, now) || !declaration.TryVerify(typeExamination, out error))
+        if (!declaration.TryVerify(qa, out error, now) || !declaration.TryVerify(typeExamination, out error) || !declaration.TryVerify(qualitySystem, out error))
             Helpers.Fail(error);
 
         File.WriteAllText(DeclarationOfConformity, declaration.ToJSON().ToString());
 
-        Console.WriteLine($"SAALE: {declaration.Id}, the {declaration.Model.ModelId} under the {String.Join(", ", declaration.Legislations.Select(legislation => legislation.Name))}, naming {typeExaminationId}, signed with {declaration.Signature!.Algorithm}");
+        Console.WriteLine($"SAALE: {declaration.Id}, the {declaration.Model.ModelId} under the {String.Join(", ", declaration.Legislations.Select(legislation => legislation.Name))}, naming {typeExaminationId} and {qualitySystemId}, signed with {declaration.Signature!.Algorithm}");
 
         #endregion
 
@@ -231,8 +267,8 @@ public static class ExampleA14
 
     /// <summary>
     /// Anybody checks the papers of the meter of DE*GEF*E2*1 against QA as published: each document read from its file,
-    /// signed by a key of its issuer that may sign it; the declaration naming the certificate of conformity, which covers
-    /// the meter the calibration certificate is for.
+    /// signed by a key of its issuer that may sign it; the declaration naming the certificates of conformity, each of which
+    /// covers the meter the calibration certificate is for.
     /// </summary>
     public static void Validate()
     {
@@ -258,31 +294,51 @@ public static class ExampleA14
 
         Console.WriteLine($"QA, revision {commit.Revision} of epoch {commit.Epoch}: checked against the trust anchor of epoch 2");
 
-        // b) The certificate of conformity: of a conformity assessment body of QA with its number, notified for its
-        //    legislation; its model one of its manufacturer, in revisions and versions it has; valid now.
+        // b) The certificates of conformity: each of a conformity assessment body of QA with its number, notified for its
+        //    legislation, and valid now; the type examination for a model of its manufacturer, in revisions and versions
+        //    it has; the approval of the quality system for a manufacturer of QA.
         var now = Timestamp.Now;
 
         if (!DigitalCertificateOfConformity.TryParse(File.ReadAllText(CertificateOfConformity), out var typeExamination, out error))
             Helpers.Fail(error);
 
         Console.WriteLine($"{typeExamination.Id}, by the {typeExamination.ConformityAssessmentBodyId}, notified body {typeExamination.NotifiedBodyNumber}: {(typeExamination.TryVerify(qa, out error, now) ? "valid" : error)}");
-        Console.WriteLine($"  module {typeExamination.Module}, under the {typeExamination.Legislation}, for the {typeExamination.Model.ModelId} of {typeExamination.Model.ManufacturerId}, hardware {String.Join("/", typeExamination.Model.HardwareRevisions)}, firmware {String.Join("/", typeExamination.Model.FirmwareVersions)}");
+        Console.WriteLine($"  module {typeExamination.Module}, under the {typeExamination.Legislation}, for the {typeExamination.Model!.ModelId} of {typeExamination.Model.ManufacturerId}, hardware {String.Join("/", typeExamination.Model.HardwareRevisions)}, firmware {String.Join("/", typeExamination.Model.FirmwareVersions)}");
         Console.WriteLine($"  {typeExamination.Conclusion?.FirstText()}");
 
-        // c) The declaration of conformity: of the manufacturer of its model, signed by its key for its models; and the
-        //    certificate it names, of the notified body it names, for its model in all its revisions and versions.
+        if (!DigitalCertificateOfConformity.TryParse(File.ReadAllText(QualitySystemApproval), out var qualitySystem, out error))
+            Helpers.Fail(error);
+
+        Console.WriteLine($"{qualitySystem.Id}, by the {qualitySystem.ConformityAssessmentBodyId}, notified body {qualitySystem.NotifiedBodyNumber}: {(qualitySystem.TryVerify(qa, out error, now) ? "valid" : error)}");
+        Console.WriteLine($"  module {qualitySystem.Module}, under the {qualitySystem.Legislation}, for the quality system of {qualitySystem.Manufacturer!.ManufacturerId}, scope {String.Join(", ", qualitySystem.Manufacturer.Scope)}, until {qualitySystem.ValidUntil?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}");
+        Console.WriteLine($"  {qualitySystem.Conclusion?.FirstText()} {qualitySystem.Conditions.FirstOrDefault()?.FirstText()}");
+
+        // c) The declaration of conformity: of the manufacturer of its model, signed by its key for its models; and each
+        //    certificate it names, picked by its identification, of the notified body it names with its module: the type
+        //    examination for its model in all its revisions and versions, the approval for the quality system of its
+        //    manufacturer.
         if (!DigitalDeclarationOfConformity.TryParse(File.ReadAllText(DeclarationOfConformity), out var declaration, out error))
             Helpers.Fail(error);
 
         Console.WriteLine($"{declaration.Id}, by {declaration.Model.ManufacturerId}, the manufacturer of the {declaration.Model.ModelId}: {(declaration.TryVerify(qa, out error, now) ? "valid" : error)}");
         Console.WriteLine($"  under the {String.Join(", ", declaration.Legislations)}; signed in {declaration.PlaceOfIssue} by {declaration.Signatory}");
 
+        var certificates = new[] { typeExamination, qualitySystem }.ToDictionary(certificate => certificate.Id);
+
         foreach (var notifiedBody in declaration.NotifiedBodies)
-            Console.WriteLine($"  {notifiedBody.CertificateId} of the notified body {notifiedBody.NotifiedBodyNumber}, the {notifiedBody.ConformityAssessmentBodyId}, module {notifiedBody.Module}: {(declaration.TryVerify(typeExamination, out error) ? "the certificate it names" : error)}");
+        {
+
+            var named = notifiedBody.CertificateId is DigitalCertificateOfConformity_Id certificateId && certificates.TryGetValue(certificateId, out var certificate)
+                            ? declaration.TryVerify(certificate, out error) ? "the certificate it names" : error
+                            : "no certificate at hand";
+
+            Console.WriteLine($"  {notifiedBody.CertificateId} of the notified body {notifiedBody.NotifiedBodyNumber}, the {notifiedBody.ConformityAssessmentBodyId}, module {notifiedBody.Module}: {named}");
+
+        }
 
         // d) The calibration certificate: of a laboratory of QA, signed by its key for certificates; its item the meter as QA
-        //    names it at runtime, its measurement results within their limits, and its meter one the certificate of
-        //    conformity covers.
+        //    names it at runtime, its measurement results within their limits, and its meter one both certificates of
+        //    conformity cover.
         if (!DigitalCalibrationCertificate.TryParse(File.ReadAllText(CalibrationCertificate), out var calibration, out error))
             Helpers.Fail(error);
 
@@ -302,6 +358,7 @@ public static class ExampleA14
 
         Console.WriteLine($"  passes: {calibration.Passes}; recalibration due {calibration.RecalibrationDue?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}; signed by {calibration.MainSigner}");
         Console.WriteLine($"  {typeExamination.Id} covers it: {(typeExamination.TryCover(calibration.Item, out error) ? "its model, hardware revision and firmware version" : error)}");
+        Console.WriteLine($"  {qualitySystem.Id} covers it: {(qualitySystem.TryCover(calibration.Item, out error) ? $"an energy meter of {qualitySystem.Manufacturer.ManufacturerId}, of {String.Join(", ", qualitySystem.Manufacturer.Scope)}" : error)}");
 
         #endregion
 
@@ -313,7 +370,7 @@ public static class ExampleA14
 
         Console.WriteLine($"Another error at Imax: {(DigitalCalibrationCertificate.TryParse(changed, out var changedCalibration, out error) && changedCalibration.TryVerify(qa, out error, now) ? "valid" : error)}");
 
-        // b) The certificate of conformity for the DC meter of DE*GEF*E1*1, a KDM-500 of KERNBERG.
+        // b) The certificates of conformity for the DC meter of DE*GEF*E1*1, a KDM-500 of KERNBERG.
         if (!qa.TryGetChargingStationOperatorById(ExampleA2.gefId, out var gef))
             Helpers.Fail($"QA has no charging station operator '{ExampleA2.gefId}'");
 
@@ -321,6 +378,7 @@ public static class ExampleA14
             Helpers.Fail($"QA has no energy meter of '{ExampleA10.EVSEId}'");
 
         Console.WriteLine($"{typeExamination.Id} for the meter of {ExampleA10.EVSEId}: {(typeExamination.TryCover(QIDigitalItem.Of(evse.EnergyMeter), out error) ? "covered" : error)}");
+        Console.WriteLine($"{qualitySystem.Id} for the meter of {ExampleA10.EVSEId}: {(qualitySystem.  TryCover(QIDigitalItem.Of(evse.EnergyMeter), out error) ? "covered" : error)}");
 
         #endregion
 

@@ -35,7 +35,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The conformity assessment module of a certificate of conformity (Decision 768/2008/EC, Annex II), as the NoBoMet
     /// D-CoC documents distinguish them: type examination (D-CoC MB), quality assurance (D-CoC QA), product verification
-    /// (D-CoC MF).
+    /// (D-CoC MF). A certificate of type examination or of product verification is for a model, one of quality assurance
+    /// approves the quality system of its manufacturer.
     /// </summary>
     public enum DCoCModule
     {
@@ -46,49 +47,73 @@ namespace cloud.charging.open.protocols.WWCP.POI
         B,
 
         /// <summary>
-        /// Conformity to type based on quality assurance of the production process.
+        /// Conformity to type based on quality assurance of the production process: the approval of the quality system of
+        /// the manufacturer for production, final product inspection and testing.
         /// </summary>
         D,
 
         /// <summary>
-        /// Quality assurance of the production process.
+        /// Quality assurance of the production process: the approval of the quality system of the manufacturer.
         /// </summary>
         D1,
 
         /// <summary>
-        /// Conformity to type based on product quality assurance.
+        /// Conformity to type based on product quality assurance: the approval of the quality system of the manufacturer
+        /// for final product inspection and testing.
         /// </summary>
         E,
 
         /// <summary>
-        /// Quality assurance of final product inspection and testing.
+        /// Quality assurance of final product inspection and testing: the approval of the quality system of the manufacturer.
         /// </summary>
         E1,
 
         /// <summary>
-        /// Conformity to type based on product verification.
+        /// Conformity to type based on product verification: a certificate of the products verified, by their model.
         /// </summary>
         F,
 
         /// <summary>
-        /// Conformity based on product verification.
+        /// Conformity based on product verification: a certificate of the products verified, by their model.
         /// </summary>
         F1,
 
         /// <summary>
-        /// Conformity based on unit verification.
+        /// Conformity based on unit verification: a certificate of the unit verified, by its model.
         /// </summary>
         G,
 
         /// <summary>
-        /// Conformity based on full quality assurance.
+        /// Conformity based on full quality assurance: the approval of the quality system of the manufacturer for design,
+        /// manufacture, final product inspection and testing.
         /// </summary>
         H,
 
         /// <summary>
-        /// Conformity based on full quality assurance plus design examination.
+        /// Conformity based on full quality assurance plus design examination: the approval of the quality system of the
+        /// manufacturer, as for H.
         /// </summary>
         H1
+
+    }
+
+
+    /// <summary>
+    /// What a conformity assessment module certifies: a model, or the quality system of a manufacturer.
+    /// </summary>
+    public static class DCoCModuleExtensions
+    {
+
+        /// <summary>
+        /// Whether a certificate of the given module approves the quality system of a manufacturer (D, D1, E, E1, H, H1)
+        /// and names its manufacturer, not a model as one of type examination or product verification (B, F, F1, G).
+        /// </summary>
+        /// <param name="Module">A conformity assessment module.</param>
+        public static Boolean ApprovesQualitySystem(this DCoCModule Module)
+
+            => Module is DCoCModule.D  or DCoCModule.D1 or
+                         DCoCModule.E  or DCoCModule.E1 or
+                         DCoCModule.H  or DCoCModule.H1;
 
     }
 
@@ -97,16 +122,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// A digital certificate of conformity (D-CoC) of a charging station model or an energy meter model, in the hardware
-    /// revisions and firmware versions it covers, issued and signed by a conformity assessment body of the roaming network
-    /// as a notified body, e.g. the EU-type examination certificate (Module B) of a meter model under the MID, with one of
-    /// its signing keys that may sign certificates.
+    /// revisions and firmware versions it covers, or of the quality system of a charging station or an energy meter
+    /// manufacturer, in the scope it covers, issued and signed by a conformity assessment body of the roaming network as a
+    /// notified body, e.g. the EU-type examination certificate (Module B) of a meter model or the approval of the quality
+    /// system of its manufacturer (Module D) under the MID, with one of its signing keys that may sign certificates.
     /// </summary>
     /// <remarks>
-    /// Its structure follows the D-CoC of PTB and NoBoMet (NoBoMet Document 1:2023 and D-CoC MB): its administrative data,
-    /// i.e. its identification and revision, its module and legislation, its issuing body with its number, the certificate
-    /// holder as the manufacturer of its model, the approved model and its validity; its certification results, i.e. the
-    /// normative documents applied, the characteristics confirmed, its conclusion and the conditions of its validity; and
-    /// its comment. Its date of issue is when it was signed.
+    /// Its structure follows the D-CoC of PTB and NoBoMet (NoBoMet Document 1:2023, D-CoC MB and D-CoC QA): its
+    /// administrative data, i.e. its identification and revision, its module and legislation, its issuing body with its
+    /// number, the certificate holder as the manufacturer of its model, the approved model and its validity, or, of a
+    /// module of quality assurance, the manufacturer as the certificate holder with the scope of its quality system
+    /// instead of a model; its certification results, i.e. the normative documents applied, the characteristics
+    /// confirmed, its conclusion and the conditions of its validity; and its comment. Its date of issue is when it was
+    /// signed.
     /// </remarks>
     public sealed class DigitalCertificateOfConformity : AQIDigitalDocument<DigitalCertificateOfConformity>
     {
@@ -164,6 +192,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// The property of its model.
             /// </summary>
             public const String  Model                       = "model";
+
+            /// <summary>
+            /// The property of its manufacturer, with the scope of its quality system.
+            /// </summary>
+            public const String  Manufacturer                = "manufacturer";
 
             /// <summary>
             /// The property of the beginning of its validity.
@@ -242,9 +275,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The approved model, its manufacturer the certificate holder, in the hardware revisions and firmware versions it
-        /// covers.
+        /// covers: of a module for a model (B, F, F1, G), null otherwise.
         /// </summary>
-        public QIDigitalModel                           Model                         { get; }
+        public QIDigitalModel?                          Model                         { get; }
+
+        /// <summary>
+        /// The manufacturer whose quality system it approves, the certificate holder, with the scope of its quality system:
+        /// of a module of quality assurance (D, D1, E, E1, H, H1), null otherwise. The approval belongs to the
+        /// manufacturer, not to one of its models.
+        /// </summary>
+        public QIDigitalManufacturer?                   Manufacturer                  { get; }
 
         /// <summary>
         /// Since when it is valid.
@@ -308,10 +348,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Constructor(s)
 
         /// <summary>
-        /// Create a new digital certificate of conformity; Sign(…) signs it.
+        /// Create a new digital certificate of conformity of a model, of a module for a model (B, F, F1, G); Sign(…) signs
+        /// it.
         /// </summary>
         /// <param name="Id">Its identification, assigned by its conformity assessment body.</param>
-        /// <param name="Module">Its conformity assessment module.</param>
+        /// <param name="Module">Its conformity assessment module, one for a model.</param>
         /// <param name="Legislation">The legislation it is issued under.</param>
         /// <param name="ConformityAssessmentBodyId">Its conformity assessment body.</param>
         /// <param name="NotifiedBodyNumber">The four digit number of its body as a notified body.</param>
@@ -343,15 +384,114 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               ImmutableI18NString?                  Comment           = null,
                                               QIDigitalSignature?                   Signature         = null)
 
+            : this(Id,
+                   Module,
+                   Legislation,
+                   ConformityAssessmentBodyId,
+                   NotifiedBodyNumber,
+                   Model ?? throw new ArgumentNullException(nameof(Model)),
+                   null,
+                   ValidFrom,
+                   ValidUntil,
+                   Revision,
+                   Standards,
+                   Characteristics,
+                   Conclusion,
+                   Conditions,
+                   DocumentURL,
+                   Comment,
+                   Signature)
+
+        { }
+
+
+        /// <summary>
+        /// Create a new digital certificate of conformity of the quality system of a manufacturer, of a module of quality
+        /// assurance (D, D1, E, E1, H, H1); Sign(…) signs it.
+        /// </summary>
+        /// <param name="Id">Its identification, assigned by its conformity assessment body.</param>
+        /// <param name="Module">Its conformity assessment module, one of quality assurance.</param>
+        /// <param name="Legislation">The legislation it is issued under.</param>
+        /// <param name="ConformityAssessmentBodyId">Its conformity assessment body.</param>
+        /// <param name="NotifiedBodyNumber">The four digit number of its body as a notified body.</param>
+        /// <param name="Manufacturer">The manufacturer whose quality system it approves, with the scope of its quality system.</param>
+        /// <param name="ValidFrom">Since when it is valid.</param>
+        /// <param name="ValidUntil">Until when it is valid.</param>
+        /// <param name="Revision">Its revision.</param>
+        /// <param name="Standards">The normative documents applied.</param>
+        /// <param name="Characteristics">The characteristics it confirms.</param>
+        /// <param name="Conclusion">Its conclusion.</param>
+        /// <param name="Conditions">The conditions of its validity.</param>
+        /// <param name="DocumentURL">The URL of its human readable document.</param>
+        /// <param name="Comment">Its comment.</param>
+        /// <param name="Signature">Its signature, if it is signed.</param>
+        public DigitalCertificateOfConformity(DigitalCertificateOfConformity_Id     Id,
+                                              DCoCModule                            Module,
+                                              QIDigitalLegislation                  Legislation,
+                                              ConformityAssessmentBody_Id           ConformityAssessmentBodyId,
+                                              String                                NotifiedBodyNumber,
+                                              QIDigitalManufacturer                 Manufacturer,
+                                              DateTimeOffset                        ValidFrom,
+                                              DateTimeOffset?                       ValidUntil        = null,
+                                              UInt32                                Revision          = 0,
+                                              IEnumerable<QIDigitalStandard>?       Standards         = null,
+                                              IEnumerable<QIDigitalQuantity>?       Characteristics   = null,
+                                              ImmutableI18NString?                  Conclusion        = null,
+                                              IEnumerable<ImmutableI18NString>?     Conditions        = null,
+                                              URL?                                  DocumentURL       = null,
+                                              ImmutableI18NString?                  Comment           = null,
+                                              QIDigitalSignature?                   Signature         = null)
+
+            : this(Id,
+                   Module,
+                   Legislation,
+                   ConformityAssessmentBodyId,
+                   NotifiedBodyNumber,
+                   null,
+                   Manufacturer ?? throw new ArgumentNullException(nameof(Manufacturer)),
+                   ValidFrom,
+                   ValidUntil,
+                   Revision,
+                   Standards,
+                   Characteristics,
+                   Conclusion,
+                   Conditions,
+                   DocumentURL,
+                   Comment,
+                   Signature)
+
+        { }
+
+
+        private DigitalCertificateOfConformity(DigitalCertificateOfConformity_Id     Id,
+                                               DCoCModule                            Module,
+                                               QIDigitalLegislation                  Legislation,
+                                               ConformityAssessmentBody_Id           ConformityAssessmentBodyId,
+                                               String                                NotifiedBodyNumber,
+                                               QIDigitalModel?                       Model,
+                                               QIDigitalManufacturer?                Manufacturer,
+                                               DateTimeOffset                        ValidFrom,
+                                               DateTimeOffset?                       ValidUntil,
+                                               UInt32                                Revision,
+                                               IEnumerable<QIDigitalStandard>?       Standards,
+                                               IEnumerable<QIDigitalQuantity>?       Characteristics,
+                                               ImmutableI18NString?                  Conclusion,
+                                               IEnumerable<ImmutableI18NString>?     Conditions,
+                                               URL?                                  DocumentURL,
+                                               ImmutableI18NString?                  Comment,
+                                               QIDigitalSignature?                   Signature)
+
             : base(Signature)
 
         {
 
             ArgumentNullException.ThrowIfNull(Legislation);
-            ArgumentNullException.ThrowIfNull(Model);
 
             if (Id.IsNullOrEmpty)
                 throw new ArgumentException("A digital certificate of conformity requires an identification!", nameof(Id));
+
+            if (HolderMismatch(Id, Module, Model, Manufacturer) is String holderMismatch)
+                throw new ArgumentException(holderMismatch, Model is null ? nameof(Manufacturer) : nameof(Model));
 
             if (NotifiedBodyNumber is null || NotifiedBodyNumber.Length != 4 || !NotifiedBodyNumber.All(Char.IsAsciiDigit))
                 throw new ArgumentException($"The number of the notified body of the digital certificate of conformity '{Id}' must be four digits!", nameof(NotifiedBodyNumber));
@@ -370,6 +510,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ConformityAssessmentBodyId  = ConformityAssessmentBodyId;
             this.NotifiedBodyNumber          = NotifiedBodyNumber;
             this.Model                       = Model;
+            this.Manufacturer                = Manufacturer;
             this.ValidFrom                   = QIDigitalJSON.Timestamp(ValidFrom);
             this.ValidUntil                  = QIDigitalJSON.Timestamp(ValidUntil);
             this.Revision                    = Revision;
@@ -402,8 +543,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Verify this certificate against the given roaming network: signed by a signing key of its conformity assessment
         /// body, one of the network with its number as a notified body and notified for its legislation, that may sign
-        /// certificates; its model one of its manufacturer, in hardware revisions and firmware versions of it; and valid at
-        /// the given time, if one is given.
+        /// certificates; its model one of its manufacturer, in hardware revisions and firmware versions of it, or its
+        /// manufacturer one of the network of the kind it names; and valid at the given time, if one is given.
         /// </summary>
         /// <param name="RoamingNetwork">The roaming network.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
@@ -437,7 +578,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            return Model.TryVerify(RoamingNetwork, out ErrorResponse) &&
+            return (Model is not null
+                        ? Model.        TryVerify(RoamingNetwork, out ErrorResponse)
+                        : Manufacturer!.TryVerify(RoamingNetwork, out ErrorResponse)) &&
                    TryVerify(body.SigningKeys, out ErrorResponse, At);
 
         }
@@ -448,12 +591,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Whether it covers the given charging station or energy meter, e.g. the item of a digital calibration certificate:
-        /// one of its model, in one of its hardware revisions and one of its firmware versions.
+        /// one of its model, in one of its hardware revisions and one of its firmware versions; or, of a module of quality
+        /// assurance, one of its manufacturer, of the kind it is a manufacturer of and of a kind in the scope of its
+        /// quality system, as far as it can be told, e.g. an energy meter for MI-003.
         /// </summary>
         public Boolean TryCover(QIDigitalItem                     Item,
                                 [NotNullWhen(false)] out String?  ErrorResponse)
 
-            => Model.TryCover(Item, out ErrorResponse);
+            => Model is not null
+                   ? Model.        TryCover(Item, out ErrorResponse)
+                   : Manufacturer!.TryCover(Item, out ErrorResponse);
 
         #endregion
 
@@ -510,7 +657,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!QIDigitalJSON.TryOnly(JSON, "a digital certificate of conformity", out ErrorResponse,
                                            QIDigitalSignature.PropertyKeys.Context, PropertyKeys.Id, PropertyKeys.Revision, PropertyKeys.Module,
                                            PropertyKeys.Legislation, PropertyKeys.ConformityAssessmentBodyId, PropertyKeys.NotifiedBodyNumber,
-                                           PropertyKeys.Model, PropertyKeys.ValidFrom, PropertyKeys.ValidUntil, PropertyKeys.Standards,
+                                           PropertyKeys.Model, PropertyKeys.Manufacturer, PropertyKeys.ValidFrom, PropertyKeys.ValidUntil, PropertyKeys.Standards,
                                            PropertyKeys.Characteristics, PropertyKeys.Conclusion, PropertyKeys.Conditions,
                                            PropertyKeys.DocumentURL, PropertyKeys.Comment, QIDigitalSignature.PropertyKeys.Signature) ||
                     !QIDigitalJSON.TryContext(JSON, JSONLDContext, "a digital certificate of conformity", out ErrorResponse))
@@ -525,10 +672,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 if (!POIJSON.TryParseEnum<DCoCModule>                (JSON, PropertyKeys.Module,             "module",                                                                    out var module,           out ErrorResponse) ||
-                    !POIJSON.TryParseObject<QIDigitalLegislation>    (JSON, PropertyKeys.Legislation,        "legislation",           QIDigitalLegislation.TryParse,                      out var legislation,      out ErrorResponse) ||
-                    !POIJSON.TryParseObject<QIDigitalModel>          (JSON, PropertyKeys.Model,              "model",                 QIDigitalModel.      TryParse,                      out var model,            out ErrorResponse) ||
-                    !POIJSON.TryParseObjects<QIDigitalStandard>      (JSON, PropertyKeys.Standards,          "standard",              QIDigitalStandard.   TryParse,                      out var standards,        out ErrorResponse) ||
-                    !POIJSON.TryParseObjects<QIDigitalQuantity>      (JSON, PropertyKeys.Characteristics,    "characteristic",        QIDigitalQuantity.   TryParse,                      out var characteristics,  out ErrorResponse) ||
+                    !POIJSON.TryParseObject<QIDigitalLegislation>    (JSON, PropertyKeys.Legislation,        "legislation",           QIDigitalLegislation. TryParse,                     out var legislation,      out ErrorResponse) ||
+                    !POIJSON.TryParseObject<QIDigitalModel>          (JSON, PropertyKeys.Model,              "model",                 QIDigitalModel.       TryParse,                     out var model,            out ErrorResponse) ||
+                    !POIJSON.TryParseObject<QIDigitalManufacturer>   (JSON, PropertyKeys.Manufacturer,       "manufacturer",          QIDigitalManufacturer.TryParse,                     out var manufacturer,     out ErrorResponse) ||
+                    !POIJSON.TryParseObjects<QIDigitalStandard>      (JSON, PropertyKeys.Standards,          "standard",              QIDigitalStandard.    TryParse,                     out var standards,        out ErrorResponse) ||
+                    !POIJSON.TryParseObjects<QIDigitalQuantity>      (JSON, PropertyKeys.Characteristics,    "characteristic",        QIDigitalQuantity.    TryParse,                     out var characteristics,  out ErrorResponse) ||
                     !POIJSON.TryParseString                          (JSON, PropertyKeys.NotifiedBodyNumber, "notified body number",                                                      out var number,           out ErrorResponse) ||
                     !POIJSON.TryParseI18N                            (JSON, PropertyKeys.Conclusion,         "conclusion",                                                                out var conclusion,       out ErrorResponse) ||
                     !POIJSON.TryParseI18N                            (JSON, PropertyKeys.Comment,            "comment",                                                                   out var comment,          out ErrorResponse) ||
@@ -540,9 +688,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!module.HasValue || legislation is null || model is null || number is null || !validFrom.HasValue)
+                if (!module.HasValue || legislation is null || number is null || !validFrom.HasValue)
                 {
-                    ErrorResponse = $"The digital certificate of conformity '{id}' requires its module, its legislation, the number of its notified body, its model and the beginning of its validity!";
+                    ErrorResponse = $"The digital certificate of conformity '{id}' requires its module, its legislation, the number of its notified body and the beginning of its validity!";
+                    return false;
+                }
+
+                if (HolderMismatch(id, module.Value, model, manufacturer) is String holderMismatch)
+                {
+                    ErrorResponse = holderMismatch;
                     return false;
                 }
 
@@ -593,6 +747,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                     bodyId,
                                                                     number,
                                                                     model,
+                                                                    manufacturer,
                                                                     validFrom.Value,
                                                                     validUntil,
                                                                     revision,
@@ -633,7 +788,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            new JProperty(PropertyKeys.Legislation,                 Legislation.ToJSON()),
                            new JProperty(PropertyKeys.ConformityAssessmentBodyId,  ConformityAssessmentBodyId.ToString()),
                            new JProperty(PropertyKeys.NotifiedBodyNumber,          NotifiedBodyNumber),
-                           new JProperty(PropertyKeys.Model,                       Model.ToJSON()),
+                           Model is not null
+                               ? new JProperty(PropertyKeys.Model,                 Model.        ToJSON())
+                               : new JProperty(PropertyKeys.Manufacturer,          Manufacturer!.ToJSON()),
                            new JProperty(PropertyKeys.ValidFrom,                   ValidFrom.ToISO8601())
                        );
 
@@ -675,6 +832,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     ConformityAssessmentBodyId,
                     NotifiedBodyNumber,
                     Model,
+                    Manufacturer,
                     ValidFrom,
                     ValidUntil,
                     Revision,
@@ -685,6 +843,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     DocumentURL,
                     Comment,
                     Signature);
+
+        #endregion
+
+
+        #region (private static) HolderMismatch(Id, Module, Model, Manufacturer)
+
+        /// <summary>
+        /// Why the given model and manufacturer do not fit the given module, or null when they do: exactly one of them, a
+        /// model for a module for a model, a manufacturer for one of quality assurance.
+        /// </summary>
+        private static String? HolderMismatch(DigitalCertificateOfConformity_Id  Id,
+                                              DCoCModule                         Module,
+                                              QIDigitalModel?                    Model,
+                                              QIDigitalManufacturer?             Manufacturer)
+
+            => Module.ApprovesQualitySystem()
+
+                   ? Model is not null
+                         ? $"The digital certificate of conformity '{Id}' of the module {Module} approves the quality system of a manufacturer and names it, not a model!"
+                         : Manufacturer is null
+                               ? $"The digital certificate of conformity '{Id}' of the module {Module} requires the manufacturer whose quality system it approves!"
+                               : null
+
+                   : Manufacturer is not null
+                         ? $"The digital certificate of conformity '{Id}' of the module {Module} is for a model and names it, not a manufacturer!"
+                         : Model is null
+                               ? $"The digital certificate of conformity '{Id}' of the module {Module} requires its model!"
+                               : null;
 
         #endregion
 

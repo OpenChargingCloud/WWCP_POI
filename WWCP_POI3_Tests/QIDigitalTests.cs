@@ -60,6 +60,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly FirmwareVersion                 F18        = FirmwareVersion. Parse("1.8");
 
         private static readonly DigitalCertificateOfConformity_Id  TypeExamination  = DigitalCertificateOfConformity_Id.Parse("DE-26-M-PTB-0042");
+        private static readonly DigitalCertificateOfConformity_Id  QualitySystem    = DigitalCertificateOfConformity_Id.Parse("DE-26-QS-PTB-0007");
         private static readonly EnergyMeterTemplate_Id             MeterTemplate    = EnergyMeterTemplate_Id.Parse("DE*GEF*EMT_M500");
 
         #endregion
@@ -236,9 +237,33 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region NewDDoC(NotifiedBodies = PTB)
+        #region NewQualitySystem(Manufacturer = METERS with MI-003, Module = D)
 
-        private static DigitalDeclarationOfConformity NewDDoC(FirmwareVersion[]? FirmwareVersions = null)
+        /// <summary>
+        /// The approval of the quality system of the given manufacturer by the PTB: production, final product inspection
+        /// and testing (module D) of its active electrical energy meters, by default.
+        /// </summary>
+        private static DigitalCertificateOfConformity NewQualitySystem(QIDigitalManufacturer?  Manufacturer   = null,
+                                                                       DCoCModule              Module         = DCoCModule.D)
+
+            => new (QualitySystem,
+                    Module,
+                    QIDigitalLegislation.MID,
+                    PTB,
+                    "0102",
+                    Manufacturer ?? QIDigitalManufacturer.Of(METERS, [ QIDigitalManufacturer.Categories.MI003 ]),
+                    ValidFrom:   DateTimeOffset.Parse("2026-03-01T00:00:00Z"),
+                    ValidUntil:  DateTimeOffset.Parse("2029-02-28T23:59:59Z"),
+                    Standards:   [ new QIDigitalStandard("EN ISO 9001:2015") ],
+                    Conclusion:  ImmutableI18NString.Create(Languages.en, "The quality system of METERS meets Annex II, module D, of the MID."),
+                    Conditions:  [ ImmutableI18NString.Create(Languages.en, "Subject to the surveillance of the notified body.") ]);
+
+        #endregion
+
+        #region NewDDoC(FirmwareVersions = 1.7, WithQualitySystem = false)
+
+        private static DigitalDeclarationOfConformity NewDDoC(FirmwareVersion[]?  FirmwareVersions    = null,
+                                                              Boolean             WithQualitySystem   = false)
 
             => new (DigitalDeclarationOfConformity_Id.Parse("DoC-M500-2026-01"),
                     QIDigitalModel.Of(METERS, M500, [ R30 ], FirmwareVersions ?? [ F17 ]),
@@ -247,7 +272,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                     new QIDigitalPerson("Jane Doe", "Managing director"),
                     Standards:              [ new QIDigitalStandard("EN 50470-1:2022"), new QIDigitalStandard("EN 50470-3:2022") ],
                     NotifiedBodies:         [ new DDoCNotifiedBody(PTB, "0102", DCoCModule.B, TypeExamination,
-                                                                   ImmutableI18NString.Create(Languages.en, "EU-type examination")) ],
+                                                                   ImmutableI18NString.Create(Languages.en, "EU-type examination")),
+                                              .. WithQualitySystem
+                                                     ? new[] { new DDoCNotifiedBody(PTB, "0102", DCoCModule.D, QualitySystem,
+                                                                                    ImmutableI18NString.Create(Languages.en, "Approval of the quality system")) }
+                                                     : [] ],
                     AdditionalInformation:  ImmutableI18NString.Create(Languages.en, "Accuracy class B."));
 
         #endregion
@@ -540,6 +569,160 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(newFirmware.TryVerify(otherDCoC, out var error4),   Is.False);
                 Assert.That(error4,                                             Does.Contain("names no certificate 'DE-26-M-PTB-0043'"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_DCoC_of_module_D_approves_the_quality_system_of_its_manufacturer()
+
+        [Test]
+        public void A_DCoC_of_module_D_approves_the_quality_system_of_its_manufacturer()
+        {
+
+            var network  = NewNetwork();
+            network.TryGetEnergyMeterById(Meter1, out var meter);
+
+            var dcoc     = SignedBy(NewQualitySystem(), TestParties.Party(PTB));
+            var json     = dcoc.ToJSON();
+            var ddoc     = SignedBy(NewDDoC(WithQualitySystem: true), TestParties.Party(METERS));
+
+            Assert.That(DigitalCertificateOfConformity.TryParse(json.ToString(), out var parsed, out var parseError), Is.True, parseError);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(dcoc.   TryVerify(network, out var error1, T0),                 Is.True, error1);
+                Assert.That(parsed!.TryVerify(network, out var error2, T0),                 Is.True, error2);
+                Assert.That(JToken.DeepEquals(parsed.ToJSON(), json),                       Is.True);
+                Assert.That(parsed. Digest,                                                 Is.EqualTo(dcoc.Digest));
+                Assert.That(parsed. Model,                                                  Is.Null);
+                Assert.That(parsed. Manufacturer!.EnergyMeterManufacturerId,                Is.EqualTo(METERS));
+                Assert.That(parsed. Manufacturer!.Scope,                                    Is.EqualTo(new[] { "MI-003" }));
+                Assert.That(json.   ContainsKey("model"),                                   Is.False);
+                Assert.That(json["manufacturer"]!.ToString(Formatting.None),                Is.EqualTo("""{"type":"EnergyMeterManufacturer","manufacturerId":"METERS","scope":["MI-003"]}"""));
+
+                // It covers the meters of its manufacturer, whatever their model; the declaration names it with the type
+                // examination, and checks each.
+                Assert.That(dcoc.   TryCover(QIDigitalItem.Of(meter!), out var error3),     Is.True, error3);
+                Assert.That(ddoc.   TryVerify(network, out var error4, T0),                 Is.True, error4);
+                Assert.That(ddoc.   TryVerify(dcoc, out var error5),                        Is.True, error5);
+                Assert.That(ddoc.   TryVerify(SignedBy(NewDCoC(), TestParties.Party(PTB)), out var error6),
+                                                                                            Is.True, error6);
+
+                Assert.That(DCoCModule.D. ApprovesQualitySystem(),                          Is.True);
+                Assert.That(DCoCModule.H1.ApprovesQualitySystem(),                          Is.True);
+                Assert.That(DCoCModule.B. ApprovesQualitySystem(),                          Is.False);
+                Assert.That(DCoCModule.F. ApprovesQualitySystem(),                          Is.False);
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_DCoC_names_a_model_or_a_manufacturer_as_its_module_requires()
+
+        [Test]
+        public void A_DCoC_names_a_model_or_a_manufacturer_as_its_module_requires()
+        {
+
+            var typeExamination  = NewDCoC().ToJSON();
+            var qualitySystem    = NewQualitySystem().ToJSON();
+
+            // Module D with the model of the type examination instead of its manufacturer, module B with the manufacturer
+            // instead of its model, and one with both.
+            var dWithModel       = (JObject) qualitySystem.DeepClone();
+            dWithModel.Remove("manufacturer");
+            dWithModel["model"]           = typeExamination["model"]!.DeepClone();
+
+            var bWithManufacturer = (JObject) typeExamination.DeepClone();
+            bWithManufacturer.Remove("model");
+            bWithManufacturer["manufacturer"] = qualitySystem["manufacturer"]!.DeepClone();
+
+            var both             = (JObject) typeExamination.DeepClone();
+            both["manufacturer"]          = qualitySystem["manufacturer"]!.DeepClone();
+
+            var neither          = (JObject) qualitySystem.DeepClone();
+            neither.Remove("manufacturer");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(() => new DigitalCertificateOfConformity(QualitySystem, DCoCModule.D, QIDigitalLegislation.MID, PTB, "0102",
+                                                                     QIDigitalModel.Of(METERS, M500, [ R30 ], [ F17 ]), Created),
+                            Throws.ArgumentException.With.Message.Contains("of the module D approves the quality system of a manufacturer and names it, not a model"));
+
+                Assert.That(() => NewQualitySystem(Module: DCoCModule.B),
+                            Throws.ArgumentException.With.Message.Contains("of the module B is for a model and names it, not a manufacturer"));
+
+                Assert.That(() => QIDigitalManufacturer.Of(METERS, []),
+                            Throws.ArgumentException.With.Message.Contains("names at least one category of its scope"));
+
+                Assert.That(() => QIDigitalManufacturer.Of(METERS, [ "MI-003", "MI-003" ]),
+                            Throws.ArgumentException.With.Message.Contains("must not be given twice"));
+
+                Assert.That(DigitalCertificateOfConformity.TryParse(dWithModel,        out _, out var error1),  Is.False);
+                Assert.That(error1,                                                                             Is.EqualTo("The digital certificate of conformity 'DE-26-QS-PTB-0007' of the module D approves the quality system of a manufacturer and names it, not a model!"));
+
+                Assert.That(DigitalCertificateOfConformity.TryParse(bWithManufacturer, out _, out var error2),  Is.False);
+                Assert.That(error2,                                                                             Is.EqualTo("The digital certificate of conformity 'DE-26-M-PTB-0042' of the module B is for a model and names it, not a manufacturer!"));
+
+                Assert.That(DigitalCertificateOfConformity.TryParse(both,              out _, out var error3),  Is.False);
+                Assert.That(error3,                                                                             Does.Contain("is for a model and names it, not a manufacturer"));
+
+                Assert.That(DigitalCertificateOfConformity.TryParse(neither,           out _, out var error4),  Is.False);
+                Assert.That(error4,                                                                             Does.Contain("requires the manufacturer whose quality system it approves"));
+
+                Assert.That(QIDigitalManufacturer.TryParse(JObject.Parse("""{ "type": "EnergyMeterManufacturer", "manufacturerId": "METERS", "scope": [ "MI-003" ], "modelId": "M-500" }"""), out _, out var error5), Is.False);
+                Assert.That(error5,                                                                             Is.EqualTo("Unknown property 'modelId' of a manufacturer!"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_DCoC_of_a_quality_system_is_refused_where_its_manufacturer_does_not_fit()
+
+        [Test]
+        public void A_DCoC_of_a_quality_system_is_refused_where_its_manufacturer_does_not_fit()
+        {
+
+            var network      = NewNetwork();
+            network.TryGetChargingStationOperatorById(GEF, out var gef);
+            gef!.TryGetEffectiveChargingStation(S1, out var station);
+
+            var unknown      = SignedBy(NewQualitySystem(QIDigitalManufacturer.Of(EnergyMeterManufacturer_Id.    Parse("NOBODY"), [ "MI-003" ])), TestParties.Party(PTB));
+            var wrongKind    = SignedBy(NewQualitySystem(QIDigitalManufacturer.Of(ChargingStationManufacturer_Id.Parse("METERS"), [ "MI-003" ])), TestParties.Party(PTB));
+            var ofOthers     = SignedBy(NewQualitySystem(QIDigitalManufacturer.Of(OTHERS,                                         [ "MI-003" ])), TestParties.Party(PTB));
+            var stations     = SignedBy(NewQualitySystem(QIDigitalManufacturer.Of(ACME,                                           [ "MI-003" ])), TestParties.Party(PTB));
+            var ddoc         = SignedBy(NewDDoC(WithQualitySystem: true), TestParties.Party(METERS));
+            var otherMeter   = QIDigitalItem.Of(new EnergyMeter(EnergyMeter_Id.Parse("meter-9"), ManufacturerId: OTHERS, Created: Created));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(unknown.   TryVerify(network, out var error1, T0),                       Is.False);
+                Assert.That(error1,                                                                  Is.EqualTo("The energy meter manufacturer 'NOBODY' is none of the roaming network 'rn1'!"));
+
+                Assert.That(wrongKind. TryVerify(network, out var error2, T0),                       Is.False);
+                Assert.That(error2,                                                                  Is.EqualTo("The charging station manufacturer 'METERS' is none of the roaming network 'rn1'!"));
+
+                Assert.That(ofOthers.  TryVerify(network, out var error3, T0),                       Is.True, error3);
+                Assert.That(ddoc.      TryVerify(ofOthers, out var error4),                          Is.False);
+                Assert.That(error4,                                                                  Is.EqualTo("The certificate 'DE-26-QS-PTB-0007' approves the quality system of the energy meter manufacturer 'OTHERS', not of the energy meter manufacturer 'METERS' of the digital declaration of conformity 'DoC-M500-2026-01'!"));
+
+                Assert.That(ofOthers.  TryCover(otherMeter, out var error5),                         Is.True, error5);
+                Assert.That(NewQualitySystem().TryCover(otherMeter, out var error6),                 Is.False);
+                Assert.That(error6,                                                                  Is.EqualTo("The energy meter 'meter-9' is none of 'METERS'!"));
+
+                // A charging station manufacturer whose scope is the meters of the MID: its stations are none of it.
+                Assert.That(stations.  TryVerify(network, out var error7, T0),                       Is.True, error7);
+                Assert.That(stations.  TryCover(QIDigitalItem.Of(station!), out var error8),         Is.False);
+                Assert.That(error8,                                                                  Is.EqualTo("The charging station 'DE*GEF*S1' is of no category of the scope MI-003 of the quality system of the charging station manufacturer 'ACME'!"));
 
             }
 
