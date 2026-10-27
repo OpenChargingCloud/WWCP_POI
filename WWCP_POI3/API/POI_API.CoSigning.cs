@@ -283,7 +283,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 return Task.FromResult(request.Respond(History.CoSign(changeSet, VerifyChangeSetSignature).ToJSON()));
 
-            });
+            }, Batches: true);
 
             WebSocketServer.AddCommand("addPendingSignatures", request => {
 
@@ -307,7 +307,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 return Task.FromResult(request.Respond(History.AddPendingSignatures(changeSetId, signatures, VerifyChangeSetSignature).ToJSON()));
 
-            });
+            }, Batches: true);
 
             WebSocketServer.AddCommand("withdrawChangeSet", request => {
 
@@ -331,7 +331,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 return Task.FromResult(request.Respond(History.Withdraw(withdrawal).ToJSON()));
 
-            });
+            }, Batches: true);
 
             WebSocketServer.AddTopic(new POIWebSocketTopic(PendingChangeSetsTopic,
                                                            "pendingChangeSet",

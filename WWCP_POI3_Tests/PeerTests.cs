@@ -386,6 +386,44 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
         #endregion
 
+        #region A_follower_far_behind_catches_up_naming_few_commits()
+
+        /// <summary>
+        /// A follower hundreds of commits behind catches up page by page, naming the commits it holds as HaveIds() names
+        /// them: its tips and a sample of older ones, far fewer than a server takes (POI3-ISSUES.md S12).
+        /// </summary>
+        [Test]
+        public async Task A_follower_far_behind_catches_up_naming_few_commits()
+        {
+
+            RoamingNetworkHistory.TryFromSnapshot(leader!.ToSnapshotJSON(), out var own, out _);
+
+            for (var i = 1; i <= 300; i++)
+                Assert.That(Publish($"v{i}").IsCommitted, Is.True);
+
+            // A server taking far fewer than the default, but as many as an honest peer names.
+            poiAPI!.MaxHaveIds = 40;
+
+            var follower = await StartFollower(own,
+                                               new RoamingNetworkPeerOptions {
+                                                   TrustAnchor           = TrustAnchor,
+                                                   MaxCommitsPerRequest  = 25,
+                                                   MinReconnectDelay     = TimeSpan.FromMilliseconds(50),
+                                                   MaxReconnectDelay     = TimeSpan.FromMilliseconds(200)
+                                               });
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(follower.History,                Is.SameAs(own), "The follower started again instead of catching up.");
+                Assert.That(InSync(),                        Is.True);
+                Assert.That(own!.Head.Commit.Revision,       Is.EqualTo(300));
+                Assert.That(own.HaveIds(),                   Has.Count.LessThanOrEqualTo(40));
+            }
+
+        }
+
+        #endregion
+
         #region A_follower_of_a_head_unknown_to_the_leader_keeps_it_until_reset()
 
         /// <summary>

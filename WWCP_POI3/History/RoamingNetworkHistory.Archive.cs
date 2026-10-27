@@ -29,14 +29,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The archive of a history: the commits it dropped when compacting, one segment per compaction,
     /// still readable and provable (SPECIFICATION.md, section 10.6).
+    /// Read without the lock: the archive keeps its segments in order itself, and a change of it, by a compaction or
+    /// another archive, makes the readers index it anew.
     /// </summary>
     public sealed partial class RoamingNetworkHistory
     {
 
+        #region (private) class ArchiveIndex, LoadedArchiveSegment
+
+        /// <summary>
+        /// Which segment of an archive holds which commit, as long as the archive did not change.
+        /// </summary>
+        private sealed record ArchiveIndex(IRoamingNetworkHistoryArchive                      Archive,
+                                           Int64                                              Generation,
+                                           IReadOnlyDictionary<RoamingNetworkCommit_Id, UInt32>  Numbers);
+
+        /// <summary>
+        /// The commits of a segment of an archive loaded last, by their identifications.
+        /// </summary>
+        private sealed record LoadedArchiveSegment(IRoamingNetworkHistoryArchive                          Archive,
+                                                   Int64                                                  Generation,
+                                                   UInt32                                                 Number,
+                                                   Func<RoamingNetworkCommit_Id, RoamingNetworkCommit?>   Lookup);
+
+        #endregion
+
         #region Data
 
-        private Dictionary<RoamingNetworkCommit_Id, UInt32>?  archiveIndex;
-        private RoamingNetworkArchiveSegment?                 lastArchiveSegment;
+        private ArchiveIndex?          archiveIndex;
+        private LoadedArchiveSegment?  lastArchiveSegment;
+
+        /// <summary>
+        /// Counts the changes of the archive: an index or a segment of an older one is not taken.
+        /// </summary>
+        private Int64                  archiveGeneration;
 
         #endregion
 
@@ -53,8 +79,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 lock (historyLock)
                 {
                     Volatile.Write(ref archive, value);
-                    archiveIndex        = null;
-                    lastArchiveSegment  = null;
+                    ForgetArchiveIndex();
                 }
             }
         }
@@ -74,6 +99,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Try to return the given commit from the archive: one this history dropped when compacting.
+        /// Read without the lock.
         /// </summary>
         /// <param name="CommitId">A commit identification.</param>
         /// <param name="Commit">The commit.</param>
@@ -81,21 +107,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             [NotNullWhen(true)] out RoamingNetworkCommit?   Commit)
         {
 
-            lock (historyLock)
-            {
+            Commit = null;
 
-                Commit = null;
+            if (!TryGetArchiveLookupOf(CommitId, out var lookup))
+                return false;
 
-                if (!TryLoadArchiveSegmentOf(CommitId, out var segment))
-                    return false;
+            // Also the root of the first segment, which only its base holds: the genesis, or the commit of the snapshot
+            // the history started from.
+            Commit = lookup(CommitId);
 
-                // Also the root of the first segment, which only its base holds: the genesis, or the commit of the snapshot
-                // the history started from.
-                Commit = ArchiveLookup(segment)(CommitId);
-
-                return Commit is not null;
-
-            }
+            return Commit is not null;
 
         }
 
@@ -150,8 +171,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       ? segments[^1].Number
                                       : (UInt32) segments.Count + 1;
 
-            var baseJSON        = SnapshotJSON(oldRoot, rootVersion, rootVersion);
-            baseJSON.Remove(PropertyKeys.RuntimeStatus);
+            var baseJSON        = SnapshotJSON(oldRoot, rootVersion, StatusOf: null);
 
             currentArchive.Append(new RoamingNetworkArchiveSegment(
                                       new RoamingNetworkArchiveSegmentInfo(number,
@@ -165,56 +185,91 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       segmentCommits
                                   ));
 
-            archiveIndex        = null;
-            lastArchiveSegment  = null;
+            ForgetArchiveIndex();
 
         }
 
         #endregion
 
-        #region (private) TryLoadArchiveSegmentOf(CommitId, out Segment)
+        #region (private) ForgetArchiveIndex()
 
         /// <summary>
-        /// The segment of the archive holding the given commit, while the history is locked; the last one loaded is kept.
+        /// Let go of the index of the archive and of the segment loaded last, while the history is locked, once the archive
+        /// changed: a reader that took them before keeps them, but does not leave them for the next one.
         /// </summary>
-        private Boolean TryLoadArchiveSegmentOf(RoamingNetworkCommit_Id                                CommitId,
-                                                [NotNullWhen(true)] out RoamingNetworkArchiveSegment?  Segment)
+        private void ForgetArchiveIndex()
+        {
+            Interlocked.Increment(ref archiveGeneration);
+            Volatile.Write(ref archiveIndex,       null);
+            Volatile.Write(ref lastArchiveSegment, null);
+        }
+
+        #endregion
+
+        #region (private) TryGetArchiveLookupOf(CommitId, out Lookup)
+
+        /// <summary>
+        /// The commits of the segment of the archive holding the given commit, its root included, by their
+        /// identifications; without the lock. The index of the archive and the segment loaded last are kept.
+        /// </summary>
+        private Boolean TryGetArchiveLookupOf(RoamingNetworkCommit_Id                                                       CommitId,
+                                              [NotNullWhen(true)] out Func<RoamingNetworkCommit_Id, RoamingNetworkCommit?>?  Lookup)
         {
 
-            Segment = null;
+            Lookup = null;
 
-            var currentArchive = Archive;
+            var generation      = Interlocked.Read(ref archiveGeneration);
+            var currentArchive  = Archive;
 
             if (currentArchive is null)
                 return false;
 
-            if (archiveIndex is null)
+            var index = Volatile.Read(ref archiveIndex);
+
+            if (index is null || index.Generation != generation || index.Archive != currentArchive)
             {
 
-                archiveIndex = [];
+                var numbers = new Dictionary<RoamingNetworkCommit_Id, UInt32>();
 
                 foreach (var info in currentArchive.Segments)
                 {
 
                     foreach (var commitId in info.CommitIds)
-                        archiveIndex[commitId] = info.Number;
+                        numbers[commitId] = info.Number;
 
                     // The root of every later segment is the end of the one before.
-                    archiveIndex.TryAdd(info.RootId, info.Number);
+                    numbers.TryAdd(info.RootId, info.Number);
 
                 }
 
+                index = new ArchiveIndex(currentArchive, generation, numbers);
+
+                // Left for the next reader only while the archive did not change meanwhile.
+                if (Interlocked.Read(ref archiveGeneration) == generation)
+                    Volatile.Write(ref archiveIndex, index);
+
             }
 
-            if (!archiveIndex.TryGetValue(CommitId, out var number))
+            if (!index.Numbers.TryGetValue(CommitId, out var number))
                 return false;
 
-            if (lastArchiveSegment?.Info.Number != number)
-                lastArchiveSegment = currentArchive.Load(number);
+            var loaded = Volatile.Read(ref lastArchiveSegment);
 
-            Segment = lastArchiveSegment;
+            if (loaded is null || loaded.Generation != generation || loaded.Archive != currentArchive || loaded.Number != number)
+            {
 
-            return Segment is not null;
+                if (currentArchive.Load(number) is not RoamingNetworkArchiveSegment segment)
+                    return false;
+
+                loaded = new LoadedArchiveSegment(currentArchive, generation, number, ArchiveLookup(segment));
+
+                if (Interlocked.Read(ref archiveGeneration) == generation)
+                    Volatile.Write(ref lastArchiveSegment, loaded);
+
+            }
+
+            Lookup = loaded.Lookup;
+            return true;
 
         }
 

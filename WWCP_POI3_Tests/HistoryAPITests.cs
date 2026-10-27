@@ -184,6 +184,43 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region The_commits_held_are_named_and_bounded_over_HTTP()
+
+        /// <summary>
+        /// The commits missing at who holds the given ones, ?have=…: at most MaxHaveIds of them, more are refused,
+        /// duplicates count once (POI3-ISSUES.md S12).
+        /// </summary>
+        [Test]
+        public async Task The_commits_held_are_named_and_bounded_over_HTTP()
+        {
+
+            var root  = leader!.Root.Id;
+            var c1    = Publish("v1", 1).Commit!;
+            var c2    = Publish("v2", 2).Commit!;
+
+            poiAPI!.MaxHaveIds = 2;
+
+            var twice    = await Get($"commits?have={c1.Id},{c1.Id}");
+            var tooMany  = await Get($"commits?have={root},{c1.Id},{c2.Id}");
+            var unknown  = await Get($"commits?have={new String('0', 64)}");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(twice.StatusCode,                                                   Is.EqualTo(HttpStatusCode.OK), twice.Text);
+                Assert.That(JArray.Parse(twice.Text).Select(commit => commit["@id"]!.Value<String>()),  Is.EqualTo(new[] { c2.Id.ToString() }));
+
+                Assert.That(tooMany.StatusCode,                                                 Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(tooMany.Text,                                                       Does.Contain("At most 2"));
+
+                Assert.That(unknown.StatusCode,                                                 Is.EqualTo(HttpStatusCode.NotFound));
+
+            }
+
+        }
+
+        #endregion
+
         #region Commit(ChangeSet, Query = "")
 
         private static readonly HttpMethod COMMIT = new ("COMMIT");

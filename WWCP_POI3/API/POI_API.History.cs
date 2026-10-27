@@ -182,6 +182,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET    ~/RNs/{roamingNetworkId}/history/snapshot?runtimeStatus=false          the head commit, the complete roaming network and its runtime status
     /// GET    ~/RNs/{roamingNetworkId}/history/commitInfos?since={commitId}&amp;max={n}   the metadata of the commits since, without changes
     /// GET    ~/RNs/{roamingNetworkId}/history/commits?since={commitId}&amp;max={n}       the complete commits since
+    /// GET    ~/RNs/{roamingNetworkId}/history/commits?have={commitId,…}&amp;max={n}     the complete commits missing at who holds these,
+    ///                                                                             at most MaxHaveIds of them
     /// GET    ~/RNs/{roamingNetworkId}/history/commits/{commitId}                    one complete commit
     /// COMMIT ~/RNs/{roamingNetworkId}/history/changeSets?expectedHead={commitId}&amp;rebase=true
     ///                                                                                         publish a change set as the new head commit

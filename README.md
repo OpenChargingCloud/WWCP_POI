@@ -474,8 +474,15 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
   a virtual merge base, as git's recursive strategy does. Where they conflict, it has a conflict marker
   (`{"@conflict": {base, left, right}}`, also the `base` of a conflict there): the tips merge if they
   resolved it alike, and conflict otherwise.
-- **Exchange:** `HaveIds()` names the tips and a sample of older commits, `TryGetMissingCommits(have)`
-  returns what is missing there, parents first, and `TryAppend(commits)` takes them and merges afterwards.
+- **Exchange:** `HaveIds()` names the tips and a sample of older commits, at most `DefaultMaxHaveIds` (1,000),
+  `TryGetMissingCommits(have)` returns what is missing there, parents first, walking back from the tips and the
+  commits held at once, the higher revisions first, only as far as commits are missing; and `TryAppend(commits)`
+  takes them and merges afterwards.
+- **Readers** take an immutable view of the history and never wait for a commit, which holds the history for all of
+  its time, merges and syncing to the disk included: the head, the tips with their versions, the commits, the
+  attestations, the checkpoints and the proofs of commits, the snapshot of a checkpoint (a version no longer kept is
+  calculated again for the reader), the archive, and the change sets waiting for signatures, whose signatures are
+  checked once per change set, signatures, tips and checkpoints (`PendingChangeSetChecks` counts the checks).
 - **Commit signatures:** several parties sign a commit, each on its own and in any order, with a `role`
   (`leader`, `roamingNetworkOperator`, `chargingStationOperator`, …), an optional `signer` and `signedAt`:
   a server through `Start(network, Signers: […])` or `history.Signers`, a roaming network operator that
@@ -705,7 +712,7 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/history/snapshot?runtimeStatus=false` | head commit, complete network, its runtime status, and the attestations of the head (`attestations`), of the head attested last |
 | `GET ~/RNs/{id}/history/commitInfos?since={commitId}&max={n}` | metadata of the commits since |
 | `GET ~/RNs/{id}/history/commits?since={commitId}&max={n}` | complete commits since |
-| `GET ~/RNs/{id}/history/commits?have={commitId,…}&max={n}` | complete commits missing at who holds these, parents first |
+| `GET ~/RNs/{id}/history/commits?have={commitId,…}&max={n}` | complete commits missing at who holds these, parents first; at most `MaxHaveIds` (1,000) of them, 400 beyond |
 | `POST ~/RNs/{id}/history/commits` `{commits: […]}` | 200 appended (how many, head, tips, conflicts), 422 one refused, 403 |
 | `GET ~/RNs/{id}/history/commits/{commitId}` | one commit |
 | `COMMIT ~/RNs/{id}/history/changeSets` | 201 committed, 200 already committed (the commit, the `head`, the `conflicts` left), 409 it would conflict with the head (`{status, description, head, conflicts}`), 422 refused |
@@ -770,7 +777,9 @@ and their identifications, unique in the roaming network, name no owner.
 Versions are immutable and their runtime status is no part of these representations, so each one is calculated
 once per version and format and kept as long as the version is referenced; an entity a commit does not change is
 the same object in the new version and keeps its representations. A 304 costs a lookup. Only an expanded view is
-calculated for every request.
+calculated for every request. Of the views without parts (`?without=…`), every combination one of its own, at most
+`MaxOmissionViews` (16) are kept per version, the ones asked for first; another one is calculated for its request
+(`OmissionViewsNotKept` counts them).
 
 ### Query
 
@@ -807,15 +816,15 @@ the lists of what an operator embeds as well, takes:
 
 | Parameter | |
 |---|---|
-| `match` | words separated by spaces or commas, each contained in a text of an entry, case-insensitively; a word starting with `!` must not be; given more than once, all of them |
+| `match` | words separated by spaces or commas, each contained in a text of an entry, case-insensitively; a word starting with `!` must not be; given more than once, all of them; at most `MaxMatchWords` (16) words of `MaxMatchLength` (256) characters together, 400 beyond |
 | `operatorId` | `CPs` only: the charging pools of one charging station operator |
-| `offset`, `limit` | the part of the matching entries; all of them without `limit`, which is at least 1 |
+| `offset`, `limit` | the part of the matching entries; `limit` from 1 to `MaxListLimit` (1,000), 400 beyond; without it, at most `MaxListLimit` of them |
 
 Entries are in the natural order of their identifications, a run of digits by its number: `P1`, `P2`, `P10`. What
 an entity embeds stays in their ordinal order, the one of its canonical JSON and its ETag. `X-Total-Count` says how
 many entries the list has,
 `X-Filtered-Count` how many match, and `Link` names the `next` and the `prev` page; the `ETag` is the one of the
-returned content. A list without any of them is kept with its version, as above.
+returned content. A list without any of them is kept with its version, as above, and returned whole.
 
 `new POI_API(HTTPServer, RootPath: "/poi", HTMLView: …)` serves all of it below a path of its own, e.g. beside a web
 interface. With an `HTMLView`, a request for a list or an entity that prefers `text/html` to JSON and CBOR - a browser opening
@@ -840,7 +849,7 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 [4, "42", "NotFound", "The commit … is unknown here!", {}]   request error
 ```
 
-- **Actions:** `head`, `tips`, `haveIds`, `snapshot`, `commitInfos`, `commits {since? | have?, max?}`, `commit {commitId}`,
+- **Actions:** `head`, `tips`, `haveIds`, `snapshot`, `commitInfos`, `commits {since? | have?, max?}` (`have` at most `MaxHaveIds`), `commit {commitId}`,
   `pushCommits {commits}` → `{appended, head, tips, conflicts?, description?}`, `pushStatusUpdates` (below),
   `commitChangeSet {changeSet}` → `{status, …, head, conflicts?}`, `runtimeStatus`,
   `signCommit {commitId, signatures}` → `{commitId, signatures, added}`; checkpoints: `checkpoints {since?, max?}`
@@ -869,8 +878,13 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
   another server, as the topics push them, up to `MaxBatchSize`, each allowed as `AuthorizeStatusPush` decides
   (refused without it), e.g. only for the operators that server hosts. They are taken with their timestamps:
   the latest status of an entity wins, wherever it was set.
-- **Batches:** messages of the same action aggregate. A request `{batch: [p1, p2, …]}` runs per payload,
+- **Batches:** messages of the same action aggregate, of the actions that change something or set a status:
+  `setStatus`, `commitChangeSet`, `signCommit`, `signCheckpoint`, `coSignChangeSet`, `addPendingSignatures` and
+  `withdrawChangeSet` (`AddCommand(…, Batches: true)`); a batch of another action, e.g. a read, is refused with
+  `NotSupported`. A request `{batch: [p1, p2, …]}` runs per payload,
   in order, and is answered with `{batch: [r1, {error: {code, description, details}}, …]}`, up to `MaxBatchSize`.
+  Once the answers exceed `MaxBatchResponseBytes` (4 MiB), the payloads left are not processed, each answered with a
+  `GenericError`; once the connection closes, they are not processed at all.
   Pushes of the same action that wait together go out as one `{batch: […]}`, up to the `maxBatchSize`
   of `subscribe` (1 turns it off); `PushCoalescingDelay` lets more gather.
 - **Errors:** the codes of OCPP-J plus `NotFound`; an unreadable frame is answered on id `"-1"`.

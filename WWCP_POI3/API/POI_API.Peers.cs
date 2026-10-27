@@ -59,6 +59,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public IReadOnlyCollection<String>?   RequiredCommitSignatureRoles    { get; set; }
 
+        /// <summary>
+        /// The maximum number of commits a request may name as held, "have", over HTTP and the WebSocket;
+        /// RoamingNetworkHistory.DefaultMaxHaveIds by default, as many as HaveIds() names at most. More are refused.
+        /// </summary>
+        public Int32                          MaxHaveIds                      { get; set; } = RoamingNetworkHistory.DefaultMaxHaveIds;
+
         #endregion
 
 
@@ -265,14 +271,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) TryParseHave(Have, out HaveIds, out ErrorResponse)
+        #region (private) TryParseHave(Have, out HaveIds, out ErrorResponse)
 
         /// <summary>
-        /// The commit identifications of "have", a JSON array or a comma separated text.
+        /// The commit identifications of "have", a JSON array or a comma separated text, each once:
+        /// at most MaxHaveIds of them, more are refused.
         /// </summary>
-        private static Boolean TryParseHave(JToken                                                     Have,
-                                            [NotNullWhen(true)]  out IReadOnlyList<RoamingNetworkCommit_Id>?  HaveIds,
-                                            [NotNullWhen(false)] out String?                           ErrorResponse)
+        private Boolean TryParseHave(JToken                                                     Have,
+                                     [NotNullWhen(true)]  out IReadOnlyList<RoamingNetworkCommit_Id>?  HaveIds,
+                                     [NotNullWhen(false)] out String?                           ErrorResponse)
         {
 
             HaveIds = null;
@@ -289,9 +296,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            var haveIds = new List<RoamingNetworkCommit_Id>();
+            var named = texts.Take(Math.Max(0, MaxHaveIds) + 1).ToArray();
 
-            foreach (var text in texts)
+            // An honest server names its tips and a sample of older commits (HaveIds()), never more.
+            if (named.Length > MaxHaveIds)
+            {
+                ErrorResponse = $"At most {MaxHaveIds} commits held may be named: name the tips and a sample of older commits!";
+                return false;
+            }
+
+            var haveIds = new HashSet<RoamingNetworkCommit_Id>();
+
+            foreach (var text in named)
             {
 
                 if (text is null || !RoamingNetworkCommit_Id.TryParse(text, out var commitId))
@@ -304,7 +320,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            HaveIds        = haveIds;
+            HaveIds        = [ .. haveIds ];
             ErrorResponse  = null;
             return true;
 

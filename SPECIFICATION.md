@@ -672,6 +672,27 @@ commit. Signatures added later are sent with
 `signCommit` over the WebSocket or `POST …/history/commits/{commitId}/signatures`, and pushed
 on the topic `commitSignatures`.
 
+### 5.5 The commits missing elsewhere, and what a read may cost
+
+A server fetches the commits it misses from another one by naming the commits it holds, **`have`**
+(`GET ~/history/commits?have={commitId,…}&max={n}`, `commits {have, max?}` over the WebSocket): its tips, its
+latest commits and older ones at growing distances, and its root, as `GET ~/history/haveIds` and `haveIds` list
+them. The answer is every commit that neither is one of them nor is followed by one, parents before their
+children, at most `max`; the server fetches the rest after the last one. Commits unknown to the other server are
+skipped; none of them known is `NotFound` (404), and it starts from a checkpoint (10.5).
+
+- A server names **at most 1,000** commits held, the tips first, and MAY refuse a request naming more (400,
+  `FormatViolation`), as a server takes them from anybody who asks. Each one counts once.
+- Whoever reads a history may be anybody, as the reads are public: a server SHOULD answer them from one state of the
+  history without waiting for a commit, which may hold the history for long, merging or syncing to a disk, and
+  bound what one request costs it. POI3 answers every read from an immutable view, checks the signatures of a change
+  set waiting (4.2) once per change set, signatures and head, keeps at most 16 views without parts per version of an
+  entity, aggregates as a batch over the WebSocket only the requests of actions that change something or set a status
+  (`setStatus`, `commitChangeSet`, `signCommit`, `signCheckpoint`, `coSignChangeSet`, `addPendingSignatures`,
+  `withdrawChangeSet`; a batch of another action is refused with `NotSupported`), stops processing a batch whose
+  answers exceed 4 MiB or whose connection closed, and returns at most 1,000 entries of a list searched or paged, for
+  a search of at most 16 words of 256 characters together; each of these limits is the server's to choose.
+
 
 ## 6. Examples
 

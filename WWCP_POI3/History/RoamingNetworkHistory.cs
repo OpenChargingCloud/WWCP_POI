@@ -133,6 +133,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const Int32 DefaultMaxCommits = 1000;
 
         /// <summary>
+        /// The default maximum number of commits a history names as held, and a server takes as held from another one
+        /// (HaveIds(), TryGetMissingCommits(…)).
+        /// </summary>
+        public const Int32 DefaultMaxHaveIds = 1000;
+
+        /// <summary>
         /// The prefix of the identification of the change set of a merge commit.
         /// </summary>
         public const String MergeChangeSetIdPrefix = "merge-";
@@ -237,16 +243,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The tips: the commits no other commit follows, the head first.
-        /// More than one, while they conflict.
+        /// More than one, while they conflict. Read without the lock: the versions of the tips are always kept.
         /// </summary>
         public IReadOnlyList<RoamingNetworkHead>  Tips
         {
             get
             {
-                lock (historyLock)
-                {
-                    return [ .. tips.Select(tip => new RoamingNetworkHead(commits[commitIndex[tip]], VersionOf(tip))) ];
-                }
+
+                var view = View;
+
+                return [ .. view.Tips.Select(tip => new RoamingNetworkHead(view.Commits[view.CommitIndex[tip]],
+                                                                           TryGetVersion(view, tip, out var version, out var errorResponse)
+                                                                               ? version
+                                                                               : throw new InvalidOperationException(errorResponse))) ];
+
             }
         }
 
@@ -2177,15 +2187,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         private Boolean IsOrFollows(RoamingNetworkCommit_Id  CommitId,
                                     RoamingNetworkCommit_Id  AncestorId)
+
+            => IsOrFollows(CommitId, AncestorId, null);
+
+
+        /// <param name="CommitId">The commit.</param>
+        /// <param name="AncestorId">The ancestor.</param>
+        /// <param name="View">The view of a reader without the lock; none while the history is locked.</param>
+        private Boolean IsOrFollows(RoamingNetworkCommit_Id  CommitId,
+                                    RoamingNetworkCommit_Id  AncestorId,
+                                    ReadView?                View)
         {
 
-            if (CommitId == AncestorId)
-                return commitIndex.ContainsKey(CommitId);
+            IReadOnlyDictionary<RoamingNetworkCommit_Id, Int32>  index    = View is null ? commitIndex : View.CommitIndex;
+            IReadOnlyList<RoamingNetworkCommit>                  held     = View is null ? commits     : View.Commits;
 
-            if (!commitIndex.TryGetValue(AncestorId, out var ancestorIndex))
+            if (CommitId == AncestorId)
+                return index.ContainsKey(CommitId);
+
+            if (!index.TryGetValue(AncestorId, out var ancestorIndex))
                 return false;
 
-            var revision  = commits[ancestorIndex].Revision;
+            var revision  = held[ancestorIndex].Revision;
             var walked    = new HashSet<RoamingNetworkCommit_Id>();
             var pending   = new Stack<RoamingNetworkCommit_Id>([ CommitId ]);
 
@@ -2195,11 +2218,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (commitId == AncestorId)
                     return true;
 
-                if (commitIndex.TryGetValue(commitId, out var index) &&
-                    commits[index].Revision > revision                &&
+                if (index.TryGetValue(commitId, out var position) &&
+                    held[position].Revision > revision              &&
                     walked.Add(commitId))
                 {
-                    foreach (var parentId in commits[index].ParentIds)
+                    foreach (var parentId in held[position].ParentIds)
                         pending.Push(parentId);
                 }
 
@@ -2211,7 +2234,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) StaleVersionError(Commit)
+        #region (private) StaleVersionError(Commit, View = null)
 
         /// <summary>
         /// Why a change set may not be made for the version of the given commit, as it is too old: more than
@@ -2220,10 +2243,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// So no change set starts a branch where the history is long settled, which would keep its tips from being merged
         /// cheaply and the history from being compacted.
         /// </summary>
-        private String? StaleVersionError(RoamingNetworkCommit Commit)
+        /// <param name="Commit">The commit.</param>
+        /// <param name="View">The view of a reader without the lock, whose first tip is its head; none while the history is locked.</param>
+        private String? StaleVersionError(RoamingNetworkCommit  Commit,
+                                          ReadView?             View   = null)
         {
 
-            var head = Head.Commit;
+            var head = View is null ? Head.Commit : View.Commits[View.CommitIndex[View.Tips[0]]];
 
             if (Commit.Id == head.Id)
                 return null;
@@ -2234,10 +2260,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return $"The change set was made for the version '{Commit.Id}' of the revision {Commit.Revision}, more than {MaxRevisionsBehindHead} revisions behind the head of the revision {head.Revision}: prepare it again for the head!";
             }
 
-            if (checkpoints.Count > 0                                &&
-                checkpoints[^1].CommitId is var checkpointCommitId   &&
-                commitIndex.ContainsKey(checkpointCommitId)          &&
-                !IsOrFollows(Commit.Id, checkpointCommitId))
+            IReadOnlyList<RoamingNetworkCheckpoint>              checkpointsHeld  = View is null ? checkpoints : View.Checkpoints;
+            IReadOnlyDictionary<RoamingNetworkCommit_Id, Int32>  index            = View is null ? commitIndex : View.CommitIndex;
+
+            if (checkpointsHeld.Count > 0                                                   &&
+                checkpointsHeld[checkpointsHeld.Count - 1].CommitId is var checkpointCommitId  &&
+                index.ContainsKey(checkpointCommitId)                                       &&
+                !IsOrFollows(Commit.Id, checkpointCommitId, View))
             {
                 return $"The change set was made for the version '{Commit.Id}', which does not follow the commit '{checkpointCommitId}' of the latest checkpoint: prepare it again for the head!";
             }
@@ -2321,18 +2350,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           Int32                                                      MaxCount   = DefaultMaxCommits)
         {
 
-            var view = View;
-
-            if (!view.CommitIndex.ContainsKey(CommitId))
+            if (View.Missing([ CommitId ]) is not List<RoamingNetworkCommit> missing)
             {
                 Commits        = null;
                 ErrorResponse  = $"The commit '{CommitId}' is unknown here; start from a new snapshot!";
                 return false;
             }
 
-            var held       = view.Ancestors(CommitId);
-
-            Commits        = view.Commits.Where(commit => !held.Contains(commit.Id)).Take(Math.Max(0, MaxCount)).ToArray();
+            Commits        = [ .. missing.Take(Math.Max(0, MaxCount)) ];
             ErrorResponse  = null;
             return true;
 
@@ -2340,14 +2365,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region HaveIds()
+        #region HaveIds(MaxCount = DefaultMaxHaveIds)
 
         /// <summary>
         /// The commits to tell another server this history holds, so that it can send the ones missing here:
-        /// the tips, the latest commits, older ones at growing distances, and the root.
-        /// It may send some held already; appending them again changes nothing.
+        /// the tips, the latest commits, older ones at growing distances, and the root, at most the given number,
+        /// the tips first. It may send some held already; appending them again changes nothing.
         /// </summary>
-        public IReadOnlyList<RoamingNetworkCommit_Id> HaveIds()
+        /// <param name="MaxCount">The maximum number of commits to name, as a server takes at most DefaultMaxHaveIds.</param>
+        public IReadOnlyList<RoamingNetworkCommit_Id> HaveIds(Int32 MaxCount = DefaultMaxHaveIds)
         {
 
             var view  = View;
@@ -2366,7 +2392,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             have.Add(view.Commits[0].Id);
 
-            return [ .. have.Distinct() ];
+            return [ .. have.Distinct().Take(Math.Max(1, MaxCount)) ];
 
         }
 
@@ -2378,6 +2404,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Try to return the commits a server holding the given commits and their ancestors misses, completely,
         /// parents before their children, at most the given number; commits unknown here are skipped.
         /// None of them known here requires a new snapshot.
+        /// It costs the commits missing, not every commit for every given one (ReadView.Missing(…)); a server limits how
+        /// many it takes from another one, e.g. POI_API.MaxHaveIds.
         /// </summary>
         /// <param name="Have">The commits the caller holds, e.g. its tips.</param>
         /// <param name="Commits">The commits it misses.</param>
@@ -2389,22 +2417,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             Int32                                                      MaxCount   = DefaultMaxCommits)
         {
 
-            var view   = View;
-            var known  = Have.Where(view.CommitIndex.ContainsKey).ToArray();
-
-            if (known.Length == 0)
+            if (View.Missing(Have) is not List<RoamingNetworkCommit> missing)
             {
                 Commits        = null;
                 ErrorResponse  = "None of the given commits is known here; start from a new snapshot!";
                 return false;
             }
 
-            var held = new HashSet<RoamingNetworkCommit_Id>();
-
-            foreach (var commitId in known)
-                held.UnionWith(view.Ancestors(commitId));
-
-            Commits        = view.Commits.Where(commit => !held.Contains(commit.Id)).Take(Math.Max(0, MaxCount)).ToArray();
+            Commits        = [ .. missing.Take(Math.Max(0, MaxCount)) ];
             ErrorResponse  = null;
             return true;
 
@@ -2455,7 +2475,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             commitIndex[Commit.Id]  = commits.Count;
             versions   [Commit.Id]  = RoamingNetwork;
             commits.Add(Commit);
-            PublishAddedCommit(Commit);
+            PublishAddedCommit(Commit, RoamingNetwork);
 
             if (Commit.ChangeSet is RoamingNetworkChangeSet changeSet && !Commit.IsMerge)
             {

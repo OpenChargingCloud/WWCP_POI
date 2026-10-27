@@ -1173,10 +1173,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var currentHistory  = History!;
             var haveIds         = await Expect(Connection, "haveIds", [], CancellationToken);
 
+            // As many as a server takes: naming fewer of them held there only pushes some again, which changes nothing.
             var have            = (haveIds[POI_API.PropertyKeys.HaveIds] as JArray ?? []).
+                                      Take   (RoamingNetworkHistory.DefaultMaxHaveIds).
                                       Select (item     => RoamingNetworkCommit_Id.TryParse(item.Value<String>() ?? "", out var commitId) ? commitId : (RoamingNetworkCommit_Id?) null).
                                       Where  (commitId => commitId.HasValue).
                                       Select (commitId => commitId!.Value).
+                                      Distinct().
                                       ToArray();
 
             if (!currentHistory.TryGetMissingCommits(have, out var missing, out _, Int32.MaxValue))

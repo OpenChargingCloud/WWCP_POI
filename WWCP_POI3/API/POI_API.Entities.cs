@@ -223,6 +223,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         private volatile POICollection<RoamingNetwork_Id, RoamingNetwork>? roamingNetworksServed;
 
+        /// <summary>
+        /// The default maximum number of views without parts (?without=…) kept per version of an entity, in either format.
+        /// </summary>
+        public const Int32 DefaultMaxOmissionViews = 16;
+
+        private Int64 omissionViewsNotKept;
+
+        #endregion
+
+        #region Properties
+
+        /// <summary>
+        /// The maximum number of views without parts (?without=…) kept per version of an entity, all formats together:
+        /// every combination of the parts named is a view of its own, and they would be thousands. One more is calculated
+        /// for its request, and not kept.
+        /// </summary>
+        public Int32 MaxOmissionViews { get; set; } = DefaultMaxOmissionViews;
+
+        /// <summary>
+        /// The number of views without parts calculated for their request only, as MaxOmissionViews of them were kept for
+        /// the version already.
+        /// </summary>
+        public Int64 OmissionViewsNotKept
+            => Interlocked.Read(ref omissionViewsNotKept);
+
         #endregion
 
         #region (private) Representations
@@ -235,6 +260,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             private readonly ConcurrentDictionary<(String View, ETagFormat Format), Lazy<POIRepresentation>> representations = new ();
 
+            private Int32 boundedViews;
+
             /// <summary>
             /// The representation of the given view and format, calculated by the given delegate the first time only.
             /// </summary>
@@ -243,6 +270,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               Func<POIRepresentation>  Create)
 
                 => representations.GetOrAdd((View, Format), _ => new Lazy<POIRepresentation>(Create)).Value;
+
+            /// <summary>
+            /// The representation of the given view and format, calculated by the given delegate the first time only, as
+            /// long as no more than the given number of such views are kept, e.g. of views without parts; calculated for
+            /// this call only beyond.
+            /// </summary>
+            /// <param name="View">The view.</param>
+            /// <param name="Format">The format.</param>
+            /// <param name="Create">Calculates the representation.</param>
+            /// <param name="MaxViews">How many views of this kind are kept at most.</param>
+            /// <param name="Kept">Whether the representation is kept, or was calculated for this call only.</param>
+            public POIRepresentation GetOrAddBounded(String                   View,
+                                                     ETagFormat               Format,
+                                                     Func<POIRepresentation>  Create,
+                                                     Int32                    MaxViews,
+                                                     out Boolean              Kept)
+            {
+
+                Kept = true;
+
+                if (representations.TryGetValue((View, Format), out var known))
+                    return known.Value;
+
+                if (Interlocked.Increment(ref boundedViews) > MaxViews)
+                {
+                    Interlocked.Decrement(ref boundedViews);
+                    Kept = false;
+                    return Create();
+                }
+
+                var created = new Lazy<POIRepresentation>(Create);
+
+                if (!representations.TryAdd((View, Format), created))
+                {
+                    Interlocked.Decrement(ref boundedViews);
+                    return representations[(View, Format)].Value;
+                }
+
+                return created.Value;
+
+            }
 
         }
 
@@ -2129,7 +2197,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     json.Remove(omission);
                                                 return json;
                                             },
-                                            View: $"without={String.Join(",", omissions)};eTags={eTags.Length}");
+                                            View:      $"without={String.Join(",", omissions)};eTags={eTags.Length}",
+                                            Omission:  true);
 
             if (stored.Length > 0)
                 return EntityResponse(Request,
@@ -2246,19 +2315,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="View">The view of the entity, e.g. without its charging pools; its whole representation by default.</param>
         /// <param name="StoredETag">The ETag of the stored representation of the entity, e.g. of a charging pool served as it is at runtime: X-Stored-ETag.</param>
+        /// <param name="Omission">Whether the view leaves parts out (?without=…): at most MaxOmissionViews of them are kept per version.</param>
         private HTTPResponse CachedEntityResponse(HTTPRequest   Request,
                                                   Object        Version,
                                                   Func<JToken>  JSON,
                                                   String        View         = "",
-                                                  String?       StoredETag   = null)
+                                                  String?       StoredETag   = null,
+                                                  Boolean       Omission     = false)
         {
 
-            var format = FormatOf(Request);
+            var format           = FormatOf(Request);
+            var representations  = representationCache.GetValue(Version, _ => new Representations());
+
+            if (!Omission)
+                return EntityResponse(Request,
+                                      format,
+                                      representations.GetOrAdd(View, format, () => POIRepresentation.Of(JSON(), format)),
+                                      StoredETag: StoredETag);
+
+            var representation = representations.GetOrAddBounded(View, format, () => POIRepresentation.Of(JSON(), format), MaxOmissionViews, out var kept);
+
+            if (!kept)
+                Interlocked.Increment(ref omissionViewsNotKept);
 
             return EntityResponse(Request,
                                   format,
-                                  representationCache.GetValue(Version, _ => new Representations()).
-                                                      GetOrAdd(View, format, () => POIRepresentation.Of(JSON(), format)),
+                                  representation,
                                   StoredETag: StoredETag);
 
         }
@@ -2384,7 +2466,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 json.Remove(omission);
                                             return json;
                                         },
-                                        View: "without=" + String.Join(",", omissions));
+                                        View:      "without=" + String.Join(",", omissions),
+                                        Omission:  true);
 
         }
 

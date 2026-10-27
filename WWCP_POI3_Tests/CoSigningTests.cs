@@ -52,7 +52,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         /// The network of the station proof tests, its operator with the signing and identity keys of three holders, two
         /// of which must sign what it owns.
         /// </summary>
-        private static RoamingNetwork Network()
+        internal static RoamingNetwork Network()
         {
 
             var network       = StationProofTests.NewNetwork();
@@ -82,8 +82,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         /// <summary>
         /// An unsigned change set of the data source of the given network, which its operator owns.
         /// </summary>
-        private static RoamingNetworkChangeSet ChangeSet(RoamingNetwork  Network,
-                                                         String          DataSource   = "quorum")
+        internal static RoamingNetworkChangeSet ChangeSet(RoamingNetwork  Network,
+                                                          String          DataSource   = "quorum")
 
             => Network.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(Network, "dataSource", null, DataSource) ], CreatedAt: T0);
 
@@ -94,9 +94,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         /// <summary>
         /// The given change set signed by the signing keys of the given holders of the quorum.
         /// </summary>
-        private static RoamingNetworkChangeSet SignedBy(RoamingNetworkChangeSet  ChangeSet,
-                                                        RoamingNetwork           Network,
-                                                        params String[]          Holders)
+        internal static RoamingNetworkChangeSet SignedBy(RoamingNetworkChangeSet  ChangeSet,
+                                                         RoamingNetwork           Network,
+                                                         params String[]          Holders)
         {
 
             foreach (var holder in Holders)
@@ -165,6 +165,58 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(history.PendingChangeSets,                   Is.Empty);
                 Assert.That(announced.Select(result => result.Status),   Is.EqualTo(new[] { RoamingNetworkCoSigningStatus.Pending, RoamingNetworkCoSigningStatus.Committed }));
                 Assert.That(history.CoSign(beta.ChangeSet).Status,       Is.EqualTo(RoamingNetworkCoSigningStatus.AlreadyCommitted));
+            }
+
+        }
+
+        #endregion
+
+        #region A_waiting_change_set_is_checked_once_for_its_readers()
+
+        /// <summary>
+        /// Reading a change set waiting for signatures does not verify its signatures again with every read, which anybody
+        /// may ask for: once per change set with the signatures it has, while the tips and the checkpoints stay the same.
+        /// New signatures, or a new head, whose keys may be others, check it again (POI3-ISSUES.md S12).
+        /// </summary>
+        [Test]
+        public void A_waiting_change_set_is_checked_once_for_its_readers()
+        {
+
+            var network    = Network();
+            var history    = RoamingNetworkHistory.Start(network);
+            var changeSet  = ChangeSet(network);
+
+            Assert.That(history.CoSign(SignedBy(changeSet, network, "Alpha")).Status, Is.EqualTo(RoamingNetworkCoSigningStatus.Pending));
+
+            var reads = Enumerable.Range(0, 10).Select(_ => history.TryGetPendingChangeSet(changeSet.Id, out var result) ? result : null).ToArray();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(reads,                                       Has.All.Not.Null);
+                Assert.That(reads.Distinct().Count(),                    Is.EqualTo(1), "Every read made its result anew.");
+                Assert.That(reads[0]!.Missing,                           Has.Count.EqualTo(1));
+                Assert.That(history.PendingChangeSetChecks,              Is.EqualTo(1));
+            }
+
+            // The same signature again changes nothing: still checked once.
+            history.AddPendingSignatures(changeSet.Id, SignedBy(changeSet, network, "Alpha").Signatures);
+            history.TryGetPendingChangeSet(changeSet.Id, out _);
+
+            Assert.That(history.PendingChangeSetChecks,                  Is.EqualTo(1));
+
+            // A new head, of another change set signed by the quorum: checked again, once, in the version it was made for.
+            var committed  = history.CoSign(SignedBy(ChangeSet(network, "other"), network, "Alpha", "Gamma"));
+
+            Assert.That(committed.Status,                                Is.EqualTo(RoamingNetworkCoSigningStatus.Committed), committed.ErrorResponse);
+
+            history.TryGetPendingChangeSet(changeSet.Id, out var afterCommit);
+            history.TryGetPendingChangeSet(changeSet.Id, out _);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(history.PendingChangeSetChecks,              Is.EqualTo(2));
+                Assert.That(afterCommit!.ChangeSet!.Id,                  Is.EqualTo(changeSet.Id));
+                Assert.That(afterCommit.Missing,                         Has.Count.EqualTo(1));
             }
 
         }

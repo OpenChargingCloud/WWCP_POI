@@ -548,6 +548,54 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
         #endregion
 
+        #region Views_without_parts_are_kept_up_to_a_bound()
+
+        /// <summary>
+        /// Every combination of the parts an operator leaves out is a view of its own, thousands of them: at most
+        /// MaxOmissionViews of them are kept per version, the ones asked for first; one more is calculated for its request,
+        /// with the same content and ETag, and not kept (POI3-ISSUES.md S12).
+        /// </summary>
+        [Test]
+        public async Task Views_without_parts_are_kept_up_to_a_bound()
+        {
+
+            poiAPI!.MaxOmissionViews = 2;
+
+            var omissions  = new[] { "chargingPools", "chargingTariffs", "EVSETemplates", "chargingStationTemplates", "chargingPoolTemplates" };
+            var first      = new List<(HttpResponseMessage Response, Byte[] Content)>();
+
+            foreach (var omission in omissions)
+                first.Add(await Send(HttpMethod.Get, CSO + "?without=" + omission));
+
+            var notKept    = poiAPI.OmissionViewsNotKept;
+
+            var keptAgain  = await Send(HttpMethod.Get, CSO + "?without=" + omissions[1]);
+            var keptCount  = poiAPI.OmissionViewsNotKept;
+
+            var lastAgain  = await Send(HttpMethod.Get, CSO + "?without=" + omissions[^1]);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(first.Select(answer => answer.Response.StatusCode),  Has.All.EqualTo(HttpStatusCode.OK));
+
+                // Two kept, three calculated for their requests.
+                Assert.That(notKept,                                             Is.EqualTo(3));
+                Assert.That(keptCount,                                           Is.EqualTo(3), "A view kept was calculated again.");
+                Assert.That(poiAPI.OmissionViewsNotKept,                         Is.EqualTo(4), "A view beyond the bound was kept.");
+
+                // Calculated again, it is the same.
+                Assert.That(HeaderOf(keptAgain.Response, "ETag"),                Is.EqualTo(HeaderOf(first[1].Response, "ETag")));
+                Assert.That(HeaderOf(lastAgain.Response, "ETag"),                Is.EqualTo(HeaderOf(first[^1].Response, "ETag")));
+                Assert.That(HeaderOf(lastAgain.Response, "ETag"),                Is.EqualTo(ETagOf("json", lastAgain.Content)));
+                Assert.That(ParseJSON(lastAgain.Content)[omissions[^1]],         Is.Null);
+
+            }
+
+        }
+
+        #endregion
+
         #region A_grid_operator_leaves_out_its_grid_connection_points_which_are_listed()
 
         [Test]

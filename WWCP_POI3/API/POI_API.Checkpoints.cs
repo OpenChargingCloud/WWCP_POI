@@ -497,7 +497,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            _                                => request.Error(POIWebSocketErrorCodes.SecurityError, result.Error)
                                        });
 
-            });
+            }, Batches: true);
 
             WebSocketServer.AddCommand("pushCheckpoints", request => {
 

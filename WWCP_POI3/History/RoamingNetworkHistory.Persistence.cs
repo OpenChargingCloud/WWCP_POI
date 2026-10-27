@@ -304,6 +304,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 Interlocked.Exchange(ref history.logEntries, content.Entries.Count);
                 Volatile.Write(ref history.store, Store);
 
+                history.PublishPendingChangeSets();
                 history.RetainVersions();
                 history.MergeTips();
 
@@ -586,9 +587,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private Boolean TryGetVersion(RoamingNetworkCommit_Id                   CommitId,
                                       [NotNullWhen(true)]  out RoamingNetwork?  RoamingNetwork,
                                       [NotNullWhen(false)] out String?          ErrorResponse)
+
+            => TryCalculateVersion(CommitId, versions, HeldLookup, versions, out RoamingNetwork, out ErrorResponse);
+
+        #endregion
+
+        #region (private static) TryCalculateVersion(CommitId, Kept, Lookup, Remember, out RoamingNetwork, out ErrorResponse)
+
+        /// <summary>
+        /// The version of the given commit: kept, or calculated again from the closest one kept on the line of its first
+        /// parents, as the given lookup finds the commits.
+        /// </summary>
+        /// <param name="CommitId">The commit.</param>
+        /// <param name="Kept">The versions kept.</param>
+        /// <param name="Lookup">The commits, by their identifications.</param>
+        /// <param name="Remember">Where to keep a version calculated again, e.g. the versions of the history while it is locked; nowhere for a reader.</param>
+        /// <param name="RoamingNetwork">The version.</param>
+        /// <param name="ErrorResponse">Why it can not be calculated.</param>
+        private static Boolean TryCalculateVersion(RoamingNetworkCommit_Id                                          CommitId,
+                                                   IReadOnlyDictionary<RoamingNetworkCommit_Id, RoamingNetwork>     Kept,
+                                                   Func<RoamingNetworkCommit_Id, RoamingNetworkCommit?>             Lookup,
+                                                   IDictionary<RoamingNetworkCommit_Id, RoamingNetwork>?            Remember,
+                                                   [NotNullWhen(true)]  out RoamingNetwork?                         RoamingNetwork,
+                                                   [NotNullWhen(false)] out String?                                 ErrorResponse)
         {
 
-            if (versions.TryGetValue(CommitId, out RoamingNetwork))
+            if (Kept.TryGetValue(CommitId, out RoamingNetwork))
             {
                 ErrorResponse = null;
                 return true;
@@ -597,16 +621,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var line = new Stack<RoamingNetworkCommit>();
             var next = CommitId;
 
-            while (!versions.TryGetValue(next, out RoamingNetwork))
+            while (!Kept.TryGetValue(next, out RoamingNetwork))
             {
 
-                if (!commitIndex.TryGetValue(next, out var index) || commits[index].ParentId is not RoamingNetworkCommit_Id parentId)
+                if (Lookup(next) is not RoamingNetworkCommit commitOfLine || commitOfLine.ParentId is not RoamingNetworkCommit_Id parentId)
                 {
                     ErrorResponse = $"The version of the commit '{CommitId}' can not be calculated here!";
                     return false;
                 }
 
-                line.Push(commits[index]);
+                line.Push(commitOfLine);
                 next = parentId;
 
             }
@@ -625,7 +649,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (commit.IsMerge)
                 {
 
-                    if (!TryGetVersion(commit.ParentIds[1], out var right, out ErrorResponse))
+                    if (!TryCalculateVersion(commit.ParentIds[1], Kept, Lookup, Remember, out var right, out ErrorResponse))
                     {
                         RoamingNetwork = null;
                         return false;
@@ -639,7 +663,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            versions[CommitId] = RoamingNetwork;
+            if (Remember is not null)
+                Remember[CommitId] = RoamingNetwork;
 
             ErrorResponse = null;
             return true;
@@ -673,7 +698,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (versions.Count <= (Int64) Retention.RecentVersions + tips.Count + 1)
                 return;
 
-            var keep = new HashSet<RoamingNetworkCommit_Id>(tips) { commits[0].Id };
+            var keep     = new HashSet<RoamingNetworkCommit_Id>(tips) { commits[0].Id };
+            var dropped  = new List<RoamingNetworkCommit_Id>();
 
             for (var index = Math.Max(0, commits.Count - Retention.RecentVersions); index < commits.Count; index++)
                 keep.Add(commits[index].Id);
@@ -683,7 +709,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     (Retention.VersionCheckpointInterval == 0 || commits[commitIndex[commitId]].Revision % Retention.VersionCheckpointInterval != 0))
                 {
                     versions.Remove(commitId);
+                    dropped.Add(commitId);
                 }
+
+            if (dropped.Count > 0)
+                PublishDroppedVersions(dropped);
 
         }
 
@@ -708,38 +738,56 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="StaleError">Why the version it was made for is too old, when that is the only one it fits (StaleVersionError).</param>
         private (RoamingNetworkCommit Commit, RoamingNetwork Version)? FindVersionFor(RoamingNetworkChangeSet  ChangeSet,
                                                                                     out String?              StaleError)
+
+            => FindVersionFor(ChangeSet, null, out StaleError);
+
+
+        /// <summary>
+        /// The commit whose version the given change set was made for, as FindVersionFor(ChangeSet, out StaleError)
+        /// finds it: in the given view, for a reader without the lock, or in the history, while it is locked.
+        /// </summary>
+        /// <param name="ChangeSet">The change set.</param>
+        /// <param name="View">The view of a reader, which calculates a version not kept without keeping it; none while the history is locked.</param>
+        /// <param name="StaleError">Why the version it was made for is too old, when that is the only one it fits (StaleVersionError).</param>
+        private (RoamingNetworkCommit Commit, RoamingNetwork Version)? FindVersionFor(RoamingNetworkChangeSet  ChangeSet,
+                                                                                    ReadView?                View,
+                                                                                    out String?              StaleError)
         {
 
             StaleError = null;
 
-            foreach (var tip in tips)
-                if (versions[tip].Fits(ChangeSet))
+            IReadOnlyList<RoamingNetworkCommit_Id>                        tipIds       = View is null ? tips     : View.Tips;
+            IReadOnlyList<RoamingNetworkCommit>                           allCommits   = View is null ? commits  : View.Commits;
+            IReadOnlyDictionary<RoamingNetworkCommit_Id, RoamingNetwork>  keptVersions = View is null ? versions : View.Versions;
+
+            foreach (var tip in tipIds)
+                if (keptVersions[tip].Fits(ChangeSet))
                 {
 
-                    var commit = commits[commitIndex[tip]];
+                    var commit = View is null ? commits[commitIndex[tip]] : View.Commits[View.CommitIndex[tip]];
 
-                    if (StaleVersionError(commit) is String tipError)
+                    if (StaleVersionError(commit, View) is String tipError)
                     {
                         StaleError ??= tipError;
                         continue;
                     }
 
-                    return (commit, versions[tip]);
+                    return (commit, keptVersions[tip]);
 
                 }
 
-            for (var index = commits.Count - 1; index >= 0; index--)
+            for (var index = allCommits.Count - 1; index >= 0; index--)
             {
 
-                var commit = commits[index];
+                var commit = allCommits[index];
 
-                if (versions.TryGetValue(commit.Id, out var kept))
+                if (keptVersions.TryGetValue(commit.Id, out var kept))
                 {
 
                     if (!kept.Fits(ChangeSet))
                         continue;
 
-                    if (StaleVersionError(commit) is String keptError)
+                    if (StaleVersionError(commit, View) is String keptError)
                     {
                         StaleError ??= keptError;
                         continue;
@@ -759,13 +807,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     continue;
                 }
 
-                if (StaleVersionError(commit) is String calculatedError)
+                if (StaleVersionError(commit, View) is String calculatedError)
                 {
                     StaleError ??= calculatedError;
                     continue;
                 }
 
-                if (TryGetVersion(commit.Id, out var calculated, out _) &&
+                if ((View is null
+                         ? TryGetVersion(commit.Id, out var calculated, out _)
+                         : TryGetVersion(View, commit.Id, out calculated, out _)) &&
                     calculated.Fits(ChangeSet))
                 {
                     return (commit, calculated);
@@ -794,11 +844,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// A snapshot of the given commit and its version, with the floors of the last changes of its effective members,
-        /// and with the runtime status of the given version.
+        /// and with the runtime status of the given version, if any.
         /// </summary>
         private JObject SnapshotJSON(RoamingNetworkCommit  Commit,
-                                            RoamingNetwork        RoamingNetwork,
-                                            RoamingNetwork        StatusOf)
+                                     RoamingNetwork        RoamingNetwork,
+                                     RoamingNetwork?       StatusOf)
         {
 
             var json = new JObject(
@@ -810,7 +860,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (RoamingNetwork.EffectiveFloorsJSON() is JArray effectiveLastChanges)
                 json.Add(PropertyKeys.EffectiveLastChanges, effectiveLastChanges);
 
-            json.Add(PropertyKeys.RuntimeStatus, new JArray(RoamingNetworkRuntimeStatus.Of(StatusOf).Select(status => status.ToJSON(Embedded: true))));
+            if (StatusOf is not null)
+                json.Add(PropertyKeys.RuntimeStatus, new JArray(RoamingNetworkRuntimeStatus.Of(StatusOf).Select(status => status.ToJSON(Embedded: true))));
 
             if (epoch.Number > 1)
                 json.Add(EpochJSONProperty, EpochJSON(epoch, previousEpoch, PreviousEpochProfiles));

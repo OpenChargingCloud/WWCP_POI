@@ -265,6 +265,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
             var (beyond, _, beyondList)  = await Get("RNs/rn1/CPs?offset=5&limit=2");
             var (invalid, _, _)          = await Get("RNs/rn1/CPs?offset=minus");
             var (none,    _, _)          = await Get("RNs/rn1/CPs?limit=0");
+            var (largest, _, _)          = await Get($"RNs/rn1/CPs?offset=2&limit={POI_API.DefaultMaxListLimit}");
             var (huge,    _, _)          = await Get("RNs/rn1/CPs?offset=2&limit=18446744073709551615");
             var (unknown, _, _)          = await Get("RNs/rn2/CPs");
 
@@ -281,10 +282,64 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
                 Assert.That(invalid.StatusCode,                         Is.EqualTo(HttpStatusCode.BadRequest));
 
-                // A page of none would name itself as the next one; a huge limit names the first page as the previous one.
+                // A page of none would name itself as the next one; a limit beyond the offset names the first page as the
+                // previous one; one above the maximum is refused.
                 Assert.That(none.StatusCode,                            Is.EqualTo(HttpStatusCode.BadRequest));
-                Assert.That(HeaderOf(huge, "Link"),                     Is.EqualTo("</RNs/rn1/CPs?limit=18446744073709551615>; rel=\"prev\""));
+                Assert.That(HeaderOf(largest, "Link"),                  Is.EqualTo($"</RNs/rn1/CPs?limit={POI_API.DefaultMaxListLimit}>; rel=\"prev\""));
+                Assert.That(huge.StatusCode,                            Is.EqualTo(HttpStatusCode.BadRequest));
                 Assert.That(unknown.StatusCode,                         Is.EqualTo(HttpStatusCode.NotFound));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Limits_and_searches_are_bounded()
+
+        /// <summary>
+        /// Every word of a search is looked for in the texts of every entry, and a page is calculated for its request:
+        /// a limit above MaxListLimit, a match longer than MaxMatchLength or of more than MaxMatchWords words is refused,
+        /// in every list; without a limit, a search or a page returns at most MaxListLimit entries, and the whole list,
+        /// kept with its version, all of them (POI3-ISSUES.md S12).
+        /// </summary>
+        [Test]
+        public async Task Limits_and_searches_are_bounded()
+        {
+
+            var (aboveMax,   _, _)          = await Get($"RNs/rn1/CPs?limit={POI_API.DefaultMaxListLimit + 1}");
+            var (listAbove,  _, _)          = await Get($"RNs/rn1/CSOs?limit={POI_API.DefaultMaxListLimit + 1}");
+            var (longMatch,  _, _)          = await Get($"RNs/rn1/CPs?match={new String('j', POI_API.DefaultMaxMatchLength + 1)}");
+            var (longest,    _, _)          = await Get($"RNs/rn1/CPs?match={new String('j', POI_API.DefaultMaxMatchLength)}");
+            var (manyWords,  _, _)          = await Get($"RNs/rn1/CPs?match={String.Join(",", Enumerable.Repeat("jena", POI_API.DefaultMaxMatchWords + 1))}");
+            var (manyParts,  _, _)          = await Get($"RNs/rn1/CPs?{String.Join("&", Enumerable.Repeat("match=jena", POI_API.DefaultMaxMatchWords + 1))}");
+            var (mostWords,  _, mostList)   = await Get($"RNs/rn1/CPs?match={String.Join(",", Enumerable.Repeat("jena", POI_API.DefaultMaxMatchWords))}");
+
+            poiAPI!.MaxListLimit = 1;
+
+            var (searched,   _, searchedList)  = await Get("RNs/rn1/CPs?match=jena");
+            var (whole,      _, wholeList)     = await Get("RNs/rn1/CPs");
+            var (aboveOne,   _, _)             = await Get("RNs/rn1/CPs?limit=2");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(aboveMax.StatusCode,                        Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(listAbove.StatusCode,                       Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(longMatch.StatusCode,                       Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(longest.StatusCode,                         Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(manyWords.StatusCode,                       Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(manyParts.StatusCode,                       Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(Ids(mostList),                              Is.EqualTo(new[] { "DE*EXA*P1", "DE*GEF*P1" }));
+
+                Assert.That(Ids(searchedList),                          Is.EqualTo(new[] { "DE*EXA*P1" }));
+                Assert.That(HeaderOf(searched, "X-Filtered-Count"),     Is.EqualTo("2"));
+                Assert.That(HeaderOf(searched, "Link"),                 Is.EqualTo("</RNs/rn1/CPs?match=jena&offset=1>; rel=\"next\""));
+
+                Assert.That(Ids(wholeList),                             Is.EqualTo(new[] { "DE*EXA*P1", "DE*GEF*P1", "DE*GEF*P2" }));
+                Assert.That(HeaderOf(whole, "Link"),                    Is.Null);
+
+                Assert.That(aboveOne.StatusCode,                        Is.EqualTo(HttpStatusCode.BadRequest));
 
             }
 

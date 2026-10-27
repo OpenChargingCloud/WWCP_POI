@@ -17,7 +17,9 @@
 
 #region Usings
 
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 
 using Newtonsoft.Json.Linq;
 
@@ -137,12 +139,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public sealed partial class RoamingNetworkHistory
     {
 
+        #region (private) class PendingCheck
+
+        /// <summary>
+        /// The result of checking the signatures of a change set waiting for them, for its readers: valid as long as the
+        /// tips and the checkpoints of the history are these, which decide the version it fits, and so its keys.
+        /// </summary>
+        private sealed record PendingCheck(ImmutableArray<RoamingNetworkCommit_Id>   Tips,
+                                           ImmutableList<RoamingNetworkCheckpoint>   Checkpoints,
+                                           RoamingNetworkCoSigningResult             Result);
+
+        #endregion
+
         #region Data
 
         /// <summary>
         /// The change sets waiting for the signatures of their owners, in the order they came, by their identifications.
         /// </summary>
-        private readonly OrderedDictionary<ChangeSet_Id, RoamingNetworkChangeSet> pendingChangeSets = new ();
+        private readonly OrderedDictionary<ChangeSet_Id, RoamingNetworkChangeSet>        pendingChangeSets  = new ();
+
+        /// <summary>
+        /// The checks of the change sets waiting for signatures, by each one with the signatures it has: one with new
+        /// signatures is another one, and one no longer waiting lets go of its check.
+        /// </summary>
+        private readonly ConditionalWeakTable<RoamingNetworkChangeSet, PendingCheck>     pendingChecks      = new ();
+
+        private          Int64                                                           pendingCheckCount;
+
+        /// <summary>
+        /// Whether a commit let go of change sets waiting for signatures, which are shown with its tips.
+        /// </summary>
+        private          Boolean                                                         pendingChangeSetsChanged;
 
         #endregion
 
@@ -155,18 +182,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The change sets waiting for the signatures of their owners (SPECIFICATION.md, section 4.2), with those they
-        /// have, in the order they came.
+        /// have, in the order they came. Read without the lock.
         /// </summary>
         public IReadOnlyList<RoamingNetworkChangeSet> PendingChangeSets
-        {
-            get
-            {
-                lock (historyLock)
-                {
-                    return [ .. pendingChangeSets.Values ];
-                }
-            }
-        }
+            => View.PendingChangeSets;
+
+        /// <summary>
+        /// The number of times this history checked the signatures of a change set waiting for them for its readers
+        /// (TryGetPendingChangeSet): once per change set with the signatures it has, while the tips and the checkpoints
+        /// stay the same, not with every read.
+        /// </summary>
+        public Int64 PendingChangeSetChecks
+            => Interlocked.Read(ref pendingCheckCount);
 
         #endregion
 
@@ -185,6 +212,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The change set of the given identification waiting for signatures, with those it has and those still missing.
+        /// Read without the lock: its signatures are checked once, in the version it fits, and checked again only once it
+        /// has new ones, or the tips or the checkpoints of the history changed (PendingChangeSetChecks).
         /// </summary>
         /// <param name="ChangeSetId">The identification of the change set.</param>
         /// <param name="Result">The change set, its signatures and those still missing.</param>
@@ -192,23 +221,32 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               [NotNullWhen(true)] out RoamingNetworkCoSigningResult?   Result)
         {
 
-            lock (historyLock)
+            var view = View;
+
+            if (!view.PendingIndex.TryGetValue(ChangeSetId, out var changeSet))
             {
-
-                if (!pendingChangeSets.TryGetValue(ChangeSetId, out var changeSet))
-                {
-                    Result = null;
-                    return false;
-                }
-
-                Result = FindVersionFor(changeSet) is (_, RoamingNetwork version) &&
-                         version.TryCheckCoSigning(changeSet, out var missing, out _, out _)
-                             ? new (RoamingNetworkCoSigningStatus.Pending, changeSet, missing)
-                             : new (RoamingNetworkCoSigningStatus.Pending, changeSet);
-
-                return true;
-
+                Result = null;
+                return false;
             }
+
+            if (pendingChecks.TryGetValue(changeSet, out var check) &&
+                check.Tips        == view.Tips                       &&
+                check.Checkpoints == view.Checkpoints)
+            {
+                Result = check.Result;
+                return true;
+            }
+
+            Interlocked.Increment(ref pendingCheckCount);
+
+            Result = FindVersionFor(changeSet, view, out _) is (_, RoamingNetwork version) &&
+                     version.TryCheckCoSigning(changeSet, out var missing, out _, out _)
+                         ? new (RoamingNetworkCoSigningStatus.Pending, changeSet, missing)
+                         : new (RoamingNetworkCoSigningStatus.Pending, changeSet);
+
+            pendingChecks.AddOrUpdate(changeSet, new PendingCheck(view.Tips, view.Checkpoints, Result));
+
+            return true;
 
         }
 
@@ -354,6 +392,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 pendingChangeSets[changeSet.Id] = changeSet;
+                PublishPendingChangeSets();
 
                 var pendingResult = new RoamingNetworkCoSigningResult(RoamingNetworkCoSigningStatus.Pending, changeSet, missing);
 
@@ -492,6 +531,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             else if (Entry.ChangeSet is RoamingNetworkChangeSet changeSet && FindCommitted(changeSet) is null)
                 pendingChangeSets[changeSet.Id] = changeSet;
 
+            // Shown once loaded, all of them at once (TryLoad(…)).
+
         }
 
         #endregion
@@ -506,8 +547,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             RoamingNetworkChangeSet  ChangeSet)
         {
             foreach (var changeSetId in ChangeSetIds(ChangeSet))
-                if (pendingChangeSets.Remove(changeSetId, out var waiting) && !loading)
-                    Announce(new (RoamingNetworkCoSigningStatus.Committed, waiting, Commit: Commit));
+                if (pendingChangeSets.Remove(changeSetId, out var waiting))
+                {
+
+                    // Shown with the tips the commit changes, in one view (PublishTips()).
+                    pendingChangeSetsChanged = true;
+
+                    if (!loading)
+                        Announce(new (RoamingNetworkCoSigningStatus.Committed, waiting, Commit: Commit));
+
+                }
         }
 
         #endregion
@@ -521,6 +570,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
             StoreAppend(RoamingNetworkHistoryLogEntry.ForPendingChangeSetDropped(ChangeSet.Id));
             pendingChangeSets.Remove(ChangeSet.Id);
+            PublishPendingChangeSets();
         }
 
         /// <summary>

@@ -523,6 +523,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The proof that the given commit is one of the commits of a checkpoint (SPECIFICATION.md, section 10.4):
         /// of the given checkpoint, or of the first one whose commits include it.
+        /// Read without the lock, from the view and the archive.
         /// </summary>
         /// <param name="CommitId">The commit.</param>
         /// <param name="Proof">The proof.</param>
@@ -536,80 +537,78 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Proof = null;
 
-            lock (historyLock)
+            var view             = View;
+            var checkpointsHeld  = view.Checkpoints;
+
+            // A commit held is proved from the commits held, else, or e.g. when it is the root of the history and its
+            // checkpoint covers commits dropped when compacting, from the segment of the archive holding it.
+            var lookups = new List<Func<RoamingNetworkCommit_Id, RoamingNetworkCommit?>>();
+
+            if (view.CommitIndex.ContainsKey(CommitId))
+                lookups.Add(view.Lookup);
+
+            if (TryGetArchiveLookupOf(CommitId, out var archiveLookup))
+                lookups.Add(archiveLookup);
+
+            if (lookups.Count == 0)
+            {
+                ErrorResponse = $"The commit '{CommitId}' is unknown here!";
+                return false;
+            }
+
+            foreach (var lookup in lookups)
+            for (var position = 0; position < checkpointsHeld.Count; position++)
             {
 
-                // A commit held is proved from the commits held, else, or e.g. when it is the root of the history and its
-                // checkpoint covers commits dropped when compacting, from the segment of the archive holding it.
-                var lookups = new List<Func<RoamingNetworkCommit_Id, RoamingNetworkCommit?>>();
+                var checkpoint = checkpointsHeld[position];
 
-                if (commitIndex.ContainsKey(CommitId))
-                    lookups.Add(HeldLookup);
+                if (CheckpointId.HasValue && checkpoint.Id != CheckpointId.Value)
+                    continue;
 
-                if (TryLoadArchiveSegmentOf(CommitId, out var segment))
-                    lookups.Add(ArchiveLookup(segment));
+                var previous = position > 0 && checkpointsHeld[position - 1].Sequence + 1 == checkpoint.Sequence
+                                   ? checkpointsHeld[position - 1].CommitId
+                                   : (RoamingNetworkCommit_Id?) null;
 
-                if (lookups.Count == 0)
-                {
-                    ErrorResponse = $"The commit '{CommitId}' is unknown here!";
-                    return false;
-                }
+                if (checkpoint.Sequence > 0 && previous is null)
+                    continue;
 
-                foreach (var lookup in lookups)
-                for (var position = 0; position < checkpoints.Count; position++)
-                {
+                if (CommitsOf(lookup, checkpoint.CommitId, previous) is not IReadOnlyList<RoamingNetworkCommit> commitsOfCheckpoint)
+                    continue;
 
-                    var checkpoint = checkpoints[position];
+                var leafIndex = -1;
 
-                    if (CheckpointId.HasValue && checkpoint.Id != CheckpointId.Value)
-                        continue;
+                for (var i = 0; i < commitsOfCheckpoint.Count; i++)
+                    if (commitsOfCheckpoint[i].Id == CommitId)
+                    {
+                        leafIndex = i;
+                        break;
+                    }
 
-                    var previous = position > 0 && checkpoints[position - 1].Sequence + 1 == checkpoint.Sequence
-                                       ? checkpoints[position - 1].CommitId
-                                       : (RoamingNetworkCommit_Id?) null;
+                if (leafIndex < 0)
+                    continue;
 
-                    if (checkpoint.Sequence > 0 && previous is null)
-                        continue;
+                var commit = commitsOfCheckpoint[leafIndex];
 
-                    if (CommitsOf(lookup, checkpoint.CommitId, previous) is not IReadOnlyList<RoamingNetworkCommit> commitsOfCheckpoint)
-                        continue;
+                Proof = new RoamingNetworkCheckpointProof(checkpoint.Id,
+                                                          commit.Id,
+                                                          commit.ETags,
+                                                          commit.Revision,
+                                                          (UInt64) leafIndex,
+                                                          (UInt64) commitsOfCheckpoint.Count,
+                                                          POIMerkleTree.AuditPathOfLeafHashes(checkpoint.IdentificationHash,
+                                                                                              [ .. commitsOfCheckpoint.Select(commitOfCheckpoint => POIMerkleTree.LeafHash(checkpoint.IdentificationHash, RoamingNetworkCheckpoint.Leaf(commitOfCheckpoint))) ],
+                                                                                              leafIndex));
 
-                    var leafIndex = -1;
-
-                    for (var i = 0; i < commitsOfCheckpoint.Count; i++)
-                        if (commitsOfCheckpoint[i].Id == CommitId)
-                        {
-                            leafIndex = i;
-                            break;
-                        }
-
-                    if (leafIndex < 0)
-                        continue;
-
-                    var commit = commitsOfCheckpoint[leafIndex];
-
-                    Proof = new RoamingNetworkCheckpointProof(checkpoint.Id,
-                                                              commit.Id,
-                                                              commit.ETags,
-                                                              commit.Revision,
-                                                              (UInt64) leafIndex,
-                                                              (UInt64) commitsOfCheckpoint.Count,
-                                                              POIMerkleTree.AuditPathOfLeafHashes(checkpoint.IdentificationHash,
-                                                                                                  [ .. commitsOfCheckpoint.Select(commitOfCheckpoint => POIMerkleTree.LeafHash(checkpoint.IdentificationHash, RoamingNetworkCheckpoint.Leaf(commitOfCheckpoint))) ],
-                                                                                                  leafIndex));
-
-                    ErrorResponse = null;
-                    return true;
-
-                }
-
-                ErrorResponse = CheckpointId.HasValue
-                                    ? $"The commit '{CommitId}' is not one of the commits of the checkpoint '{CheckpointId}' here!"
-                                    : $"No checkpoint here includes the commit '{CommitId}' yet!";
-
-                return false;
+                ErrorResponse = null;
+                return true;
 
             }
+
+            ErrorResponse = CheckpointId.HasValue
+                                ? $"The commit '{CommitId}' is not one of the commits of the checkpoint '{CheckpointId}' here!"
+                                : $"No checkpoint here includes the commit '{CommitId}' yet!";
+
+            return false;
 
         }
 
@@ -620,6 +619,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// A snapshot of the version of the commit of the given checkpoint, with the checkpoint, without runtime status:
         /// where a server or client joins from (SPECIFICATION.md, section 10.5).
+        /// Read without the lock: a version not kept is calculated again for the reader, and kept as the one calculated last.
         /// </summary>
         public Boolean TryGetCheckpointSnapshotJSON(RoamingNetworkCheckpoint_Id         CheckpointId,
                                                     [NotNullWhen(true)]  out JObject?   Snapshot,
@@ -628,32 +628,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Snapshot = null;
 
-            lock (historyLock)
+            var view = View;
+
+            if (!view.CheckpointIndex.TryGetValue(CheckpointId, out var index))
             {
-
-                if (!checkpointIndex.TryGetValue(CheckpointId, out var index))
-                {
-                    ErrorResponse = $"The checkpoint '{CheckpointId}' is unknown here!";
-                    return false;
-                }
-
-                var checkpoint = checkpoints[index];
-
-                if (!commitIndex.TryGetValue(checkpoint.CommitId, out var commitPosition) ||
-                    !TryGetVersion(checkpoint.CommitId, out var version, out ErrorResponse))
-                {
-                    ErrorResponse = $"The commit of the checkpoint '{CheckpointId}' is no longer held here!";
-                    return false;
-                }
-
-                Snapshot = SnapshotJSON(commits[commitPosition], version, Head.RoamingNetwork);
-                Snapshot.Remove(PropertyKeys.RuntimeStatus);
-                Snapshot.Add(PropertyKeys.Checkpoint, checkpoint.ToJSON(Embedded: true));
-
-                ErrorResponse = null;
-                return true;
-
+                ErrorResponse = $"The checkpoint '{CheckpointId}' is unknown here!";
+                return false;
             }
+
+            var checkpoint = view.Checkpoints[index];
+
+            if (!view.TryGetCommit(checkpoint.CommitId, out var commit) ||
+                !TryGetVersion(view, checkpoint.CommitId, out var version, out ErrorResponse))
+            {
+                ErrorResponse = $"The commit of the checkpoint '{CheckpointId}' is no longer held here!";
+                return false;
+            }
+
+            Snapshot = SnapshotJSON(commit, version, StatusOf: null);
+            Snapshot.Add(PropertyKeys.Checkpoint, checkpoint.ToJSON(Embedded: true));
+
+            ErrorResponse = null;
+            return true;
 
         }
 
@@ -1028,7 +1024,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (checkpointIndex.TryGetValue(CheckpointId, out var index))
+            {
                 checkpoints[index] = checkpoints[index].WithSignatures(Signatures);
+                PublishReplacedCheckpoint(index, checkpoints[index]);
+            }
 
         }
 

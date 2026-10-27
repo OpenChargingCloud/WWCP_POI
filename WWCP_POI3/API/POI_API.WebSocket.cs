@@ -54,7 +54,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// snapshot          { runtimeStatus? }                         the head commit, the complete roaming network and, unless
     ///                                                              runtimeStatus is false, its runtime status
     /// commitInfos       { since?, max? }                           { commitInfos: [ … ] }
-    /// commits           { since?, max? }                           { commits:     [ … ] }
+    /// commits           { since? | have?, max? }                   { commits:     [ … ] }: since a commit, or missing at who holds
+    ///                                                              the commits of have, at most MaxHaveIds of them
     /// commit            { commitId }                               the complete commit
     /// commitChangeSet   { changeSet }                              { status, …, head, conflicts? }: Committed or AlreadyCommitted with the
     ///                                                              metadata of the commit, the head and the conflicts left, or Refused
@@ -75,7 +76,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// unsubscribe       { topics: [ … ] }                          { topics: [ … ] }
     /// Unknown commits are answered with the request error NotFound, invalid requests with FormatViolation,
     /// change sets nobody may submit with SecurityError.
-    /// Every action takes a batch, { batch: [ payload, … ] }, answered with { batch: [ response or { error }, … ] }.
+    /// The actions that change something or set a status take a batch, { batch: [ payload, … ] }, answered with
+    /// { batch: [ response or { error }, … ] }: setStatus, commitChangeSet, signCommit, signCheckpoint, coSignChangeSet,
+    /// addPendingSignatures and withdrawChangeSet; a batch of a read is refused with NotSupported.
     ///
     /// Topic                  Push
     /// commitAnnouncements    commitAnnouncement   { timestamp, commitId, parentIds, revision, description? }
@@ -417,7 +420,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Task.FromResult(
                     CommitChangeSet(request, History)
-                )
+                ),
+
+                Batches: true
 
             );
 
@@ -429,7 +434,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Task.FromResult(
                     SignCommit(request, History)
-                )
+                ),
+
+                Batches: true
 
             );
 
@@ -449,11 +456,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region setStatus
 
+            // Status updates come often, e.g. within a minute as the AFIR asks: they aggregate as a batch.
             webSocketServer.AddCommand("setStatus", request =>
 
                 Task.FromResult(
                     SetStatus(request, History)
-                )
+                ),
+
+                Batches: true
 
             );
 

@@ -42,16 +42,58 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///
     /// Every list of the roaming networks, ~/RNs and ~/RNs/{RN_Id}/{CSOs|GOs|EMPs|CSMs|POs} as well, takes
     /// - match:   words separated by spaces or commas, each contained in a text of an entry, case-insensitively;
-    ///            a word starting with "!" must not be contained,
+    ///            a word starting with "!" must not be contained; at most MaxMatchLength characters and
+    ///            MaxMatchWords words, all of them together,
     /// - offset:  the number of matching entries to skip,
-    /// - limit:   the maximum number of entries to return, at least 1.
+    /// - limit:   the maximum number of entries to return, 1 to MaxListLimit; MaxListLimit without it.
     /// Entries are in the natural order of their identifications, a run of digits by its number: P1, P2, P10.
     /// X-Total-Count is the number of all entries,
     /// X-Filtered-Count the number of matching ones, and Link names the next and the previous page.
-    /// The ETag is the one of the returned content. A list without any of these is kept with its version.
+    /// The ETag is the one of the returned content. A list without any of these is kept with its version, and is
+    /// returned whole.
     /// </remarks>
     public partial class POI_API
     {
+
+        #region Data
+
+        /// <summary>
+        /// The default maximum number of entries of a list returned at once, when searched or paged.
+        /// </summary>
+        public const Int32 DefaultMaxListLimit     = 1000;
+
+        /// <summary>
+        /// The default maximum length of the words a list is searched for, all of them together.
+        /// </summary>
+        public const Int32 DefaultMaxMatchLength   = 256;
+
+        /// <summary>
+        /// The default maximum number of words a list is searched for.
+        /// </summary>
+        public const Int32 DefaultMaxMatchWords    = 16;
+
+        #endregion
+
+        #region Properties
+
+        /// <summary>
+        /// The maximum number of entries of a list returned at once, when searched or paged: a larger limit is refused,
+        /// and without one, at most this many are returned, with a link to the next page. The whole list, neither
+        /// searched nor paged, is kept with its version, and returned whole.
+        /// </summary>
+        public Int32 MaxListLimit      { get; set; } = DefaultMaxListLimit;
+
+        /// <summary>
+        /// The maximum length of the words a list is searched for, all match parameters together; longer is refused.
+        /// </summary>
+        public Int32 MaxMatchLength    { get; set; } = DefaultMaxMatchLength;
+
+        /// <summary>
+        /// The maximum number of words a list is searched for, all match parameters together; more are refused.
+        /// </summary>
+        public Int32 MaxMatchWords     { get; set; } = DefaultMaxMatchWords;
+
+        #endregion
 
         #region (private) ListQuery
 
@@ -60,15 +102,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         /// <param name="Match">The search words, as given.</param>
         /// <param name="Offset">The number of matching entries to skip.</param>
-        /// <param name="Limit">The maximum number of entries to return, or all.</param>
+        /// <param name="Limit">The maximum number of entries to return, as given.</param>
         /// <param name="Further">Further parameters of the list, e.g. operatorId, to keep in its links.</param>
+        /// <param name="MaxLimit">The maximum number of entries to return without a limit.</param>
         private sealed record ListQuery(String?                                 Match,
                                         UInt64                                  Offset,
                                         UInt64?                                 Limit,
-                                        IReadOnlyList<(String Name, String Value)>  Further)
+                                        IReadOnlyList<(String Name, String Value)>  Further,
+                                        UInt64                                  MaxLimit)
         {
 
             private readonly String[] terms = (Match ?? "").Split([ ' ', ',' ], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            /// <summary>
+            /// The number of its search words.
+            /// </summary>
+            public Int32 Words
+                => terms.Length;
+
+            /// <summary>
+            /// The maximum number of entries of a page: the limit, or the maximum one without it.
+            /// </summary>
+            public UInt64 PageSize
+                => Limit ?? MaxLimit;
 
             /// <summary>
             /// Whether it neither searches nor pages: the whole list.
@@ -308,12 +364,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private)        TryParseListQuery(Request, Further, out Query, out ErrorResponse)
 
         /// <summary>
-        /// The match, offset and limit of the request, or an error response.
+        /// The match, offset and limit of the request, or an error response: a limit of 1 to MaxListLimit, and a match
+        /// of at most MaxMatchLength characters and MaxMatchWords words.
         /// </summary>
-        private static Boolean TryParseListQuery(HTTPRequest                                       Request,
-                                                 IReadOnlyList<(String Name, String Value)>        Further,
-                                                 [NotNullWhen(true)]  out ListQuery?               Query,
-                                                 [NotNullWhen(false)] out HTTPResponse?            ErrorResponse)
+        private Boolean TryParseListQuery(HTTPRequest                                       Request,
+                                          IReadOnlyList<(String Name, String Value)>        Further,
+                                          [NotNullWhen(true)]  out ListQuery?               Query,
+                                          [NotNullWhen(false)] out HTTPResponse?            ErrorResponse)
         {
 
             Query          = null;
@@ -321,6 +378,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var     offsetText  = Request.QueryString.GetString("offset");
             var     limitText   = Request.QueryString.GetString("limit");
+            var     maxLimit    = (UInt64) Math.Max(1, MaxListLimit);
             UInt64  offset      = 0;
             UInt64? limit       = null;
 
@@ -334,9 +392,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 // At least one entry: a page of none would name itself as the next one.
-                if (!UInt64.TryParse(limitText, out var parsedLimit) || parsedLimit == 0)
+                if (!UInt64.TryParse(limitText, out var parsedLimit) || parsedLimit == 0 || parsedLimit > maxLimit)
                 {
-                    ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"Invalid limit '{limitText}': it must be at least 1!");
+                    ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"Invalid limit '{limitText}': it must be at least 1 and at most {maxLimit}!");
                     return false;
                 }
 
@@ -348,10 +406,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // its own is one more word, e.g. ?match=jena,nord&amp;match=!süd.
             var match = String.Join(" ", Request.QueryString.GetStrings("match"));
 
+            // Every word is looked for in the texts of every entry: their number and length bound what a search costs.
+            if (match.Length > MaxMatchLength)
+            {
+                ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"The match is {match.Length} characters long, longer than {MaxMatchLength}!");
+                return false;
+            }
+
             Query = new ListQuery(match.Length > 0 ? match : null,
                                   offset,
                                   limit,
-                                  Further);
+                                  Further,
+                                  maxLimit);
+
+            if (Query.Words > MaxMatchWords)
+            {
+                ErrorResponse = EntityErrorResponse(Request, HTTPStatusCode.BadRequest, $"The match has {Query.Words} words, more than {MaxMatchWords}!");
+                Query         = null;
+                return false;
+            }
 
             return true;
 
@@ -397,8 +470,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 ? entries
                                 : [.. entries.Where(entry => Query.Matches(SearchText(entry)))];
 
+            // At most a page: without a limit, as many as one may ask for.
             var offset    = (Int32) Math.Min(Query.Offset, (UInt64) filtered.Count);
-            var limit     = (Int32) Math.Min(Query.Limit ?? (UInt64) filtered.Count, (UInt64) (filtered.Count - offset));
+            var limit     = (Int32) Math.Min(Query.PageSize, (UInt64) (filtered.Count - offset));
             var page      = filtered.Skip(offset).Take(limit);
 
             var representation = POIRepresentation.Of(ToJSON(page), format);
@@ -409,8 +483,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (offset + limit < filtered.Count)
                 links.Add($"<{path}{Query.QueryString((UInt64) (offset + limit))}>; rel=\"next\"");
 
-            if (offset > 0 && Query.Limit.HasValue)
-                links.Add($"<{path}{Query.QueryString((UInt64) Math.Max(0L, (Int64) offset - (Int64) Math.Min(Query.Limit.Value, (UInt64) Int32.MaxValue)))}>; rel=\"prev\"");
+            if (offset > 0)
+                links.Add($"<{path}{Query.QueryString((UInt64) Math.Max(0L, (Int64) offset - (Int64) Math.Min(Query.PageSize, (UInt64) Int32.MaxValue)))}>; rel=\"prev\"");
 
             return EntityResponse(Request,
                                   format,

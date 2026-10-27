@@ -908,8 +908,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
                                                                        StatusPayload("status",      "offline",     "2026-10-11T11:00:00Z")
                                                                    ))));
 
+            // Reads do not aggregate: a batch would multiply them without end.
             var heads     = await client.Request("2", "head",      new JObject(new JProperty("batch", new JArray(new JObject(), new JObject()))));
-            var empty     = await client.Request("3", "head",      new JObject(new JProperty("batch", new JArray())));
+            var empty     = await client.Request("3", "setStatus", new JObject(new JProperty("batch", new JArray())));
 
             var inCBOR    = await client.Request("4", "setStatus",
                                                  Binary:       true,
@@ -930,8 +931,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
                 Assert.That(results[3]!["result"]!.Value<String>(),                 Is.EqualTo("Updated"));
                 Assert.That(results[4]!["result"]!.Value<String>(),                 Is.EqualTo("Outdated"));
 
-                Assert.That(heads.Payload!["batch"]!.Count(),                       Is.EqualTo(2));
-                Assert.That(heads.Payload["batch"]![1]!["revision"]!.Value<Int32>(), Is.Zero);
+                Assert.That(heads.MessageType,                                      Is.EqualTo(POIWebSocketMessageType.RequestError));
+                Assert.That(heads.ErrorCode,                                        Is.EqualTo(POIWebSocketErrorCodes.NotSupported));
                 Assert.That(empty.ErrorCode,                                        Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
 
                 Assert.That(inCBOR.GetPayloadJSON()!["batch"]![0]!["result"]!.Value<String>(),  Is.EqualTo("Updated"));
@@ -1051,6 +1052,136 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
 
                 Assert.That(push.Action,                                                             Is.EqualTo("energyStatusUpdate"));
                 Assert.That(Payloads(push).Select(update => update["value"]!["used"]!.Value<Decimal>()),  Is.EqualTo(new[] { 11000m, 7400m }));
+
+            }
+
+        }
+
+        #endregion
+
+        #region The_answers_of_a_batch_are_bounded()
+
+        /// <summary>
+        /// Once the answers of a batch exceed MaxBatchResponseBytes, the payloads left are not processed, but answered with
+        /// an error each (POI3-ISSUES.md S12).
+        /// </summary>
+        [Test]
+        public async Task The_answers_of_a_batch_are_bounded()
+        {
+
+            poiAPI!.AuthorizeStatusUpdate            = (request, login, statusUpdate) => true;
+            webSocketServer!.MaxBatchResponseBytes  = 1;
+
+            await using var client = await Connect();
+
+            var statuses  = await client.Request("1", "setStatus", new JObject(new JProperty("batch", new JArray(
+                                                                       StatusPayload("status",      "offline",       "2026-10-11T12:00:00Z"),
+                                                                       StatusPayload("adminStatus", "outOfService",  "2026-10-11T12:00:00Z"),
+                                                                       StatusPayload("status",      "available",     "2026-10-11T12:01:00Z")
+                                                                   ))));
+
+            var results   = statuses.Payload!["batch"]!;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(statuses.MessageType,                                   Is.EqualTo(POIWebSocketMessageType.Response));
+                Assert.That(results.Count(),                                        Is.EqualTo(3));
+                Assert.That(results[0]!["result"]!.Value<String>(),                 Is.EqualTo("Updated"));
+                Assert.That(results[1]!["error"]!["code"]!.Value<String>(),         Is.EqualTo(POIWebSocketErrorCodes.GenericError));
+                Assert.That(results[2]!["error"]!["code"]!.Value<String>(),         Is.EqualTo(POIWebSocketErrorCodes.GenericError));
+
+                // Not processed: the status is still the one of the first payload.
+                Assert.That(leader!.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, nameof(RoamingNetwork), "rn1", out var status) ? status.Value : null,
+                                                                                    Is.EqualTo("offline"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_closed_connection_cancels_the_rest_of_its_batch()
+
+        /// <summary>
+        /// A batch whose connection closes is not processed any further: nobody would get the answers (POI3-ISSUES.md S12).
+        /// </summary>
+        [Test]
+        public async Task A_closed_connection_cancels_the_rest_of_its_batch()
+        {
+
+            var processed  = 0;
+            var entered    = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var released   = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            webSocketServer!.AddCommand("slowWrite", async request => {
+
+                                            if (Interlocked.Increment(ref processed) == 1)
+                                            {
+                                                entered.TrySetResult();
+                                                await released.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                                            }
+
+                                            return request.Respond(new JObject());
+
+                                        },
+                                        Batches: true);
+
+            var client = await Connect();
+
+            await client.Send(POIWebSocketMessage.Request("1", "slowWrite", new JObject(new JProperty("batch", new JArray(Enumerable.Range(0, 5).Select(_ => new JObject()))))));
+
+            Assert.That(await entered.Task.WaitAsync(TimeSpan.FromSeconds(10)).ContinueWith(task => task.IsCompletedSuccessfully), Is.True, "The batch was not processed.");
+
+            client.Abort();
+
+            var closed = await Eventually(() => !webSocketServer.Sessions.Any());
+
+            released.TrySetResult();
+
+            await Task.Delay(300);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(closed,                         Is.True, "The server did not notice the connection closing.");
+                Assert.That(Volatile.Read(ref processed),   Is.EqualTo(1), "The rest of the batch was processed for a closed connection.");
+            }
+
+            await client.DisposeAsync();
+
+        }
+
+        #endregion
+
+        #region The_commits_held_are_bounded()
+
+        /// <summary>
+        /// A request names at most MaxHaveIds commits held: more are refused, duplicates count once (POI3-ISSUES.md S12).
+        /// </summary>
+        [Test]
+        public async Task The_commits_held_are_bounded()
+        {
+
+            var c1 = Publish("v1", 1).Commit!;
+            var c2 = Publish("v2", 2).Commit!;
+
+            poiAPI!.MaxHaveIds = 2;
+
+            await using var client = await Connect();
+
+            var tooMany  = await client.Request("1", "commits", new JObject(new JProperty("have", new JArray(leader!.Root.Id.ToString(), c1.Id.ToString(), c2.Id.ToString()))));
+            var twice    = await client.Request("2", "commits", new JObject(new JProperty("have", new JArray(c1.Id.ToString(), c1.Id.ToString()))));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(tooMany.MessageType,                                            Is.EqualTo(POIWebSocketMessageType.RequestError));
+                Assert.That(tooMany.ErrorCode,                                              Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));
+                Assert.That(tooMany.ErrorDescription,                                       Does.Contain("At most 2"));
+
+                Assert.That(twice.MessageType,                                              Is.EqualTo(POIWebSocketMessageType.Response));
+                Assert.That(twice.Payload!["commits"]!.Select(commit => commit["@id"]!.Value<String>()),
+                                                                                            Is.EqualTo(new[] { c2.Id.ToString() }));
 
             }
 

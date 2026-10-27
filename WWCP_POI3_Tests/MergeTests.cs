@@ -175,6 +175,79 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region The_missing_commits_are_those_no_given_one_follows()
+
+        /// <summary>
+        /// The commits a server holding some commits misses, in a history of branches and merges: those that neither are
+        /// one of them nor are followed by one, parents before their children, as walking all ancestors of each one finds
+        /// them; and so are the commits since one (POI3-ISSUES.md S12).
+        /// </summary>
+        [Test]
+        public void The_missing_commits_are_those_no_given_one_follows()
+        {
+
+            var (server1, server2) = Servers();
+
+            Change(server1, 1, network => [ RoamingNetworkChange.UpdateProperty(EVSE(network), "maxPower", null, 11000) ]);
+            Change(server2, 2, network => [ RoamingNetworkChange.UpdateProperty(network.GetChargingStationOperatorById(EXA)!, "telephone", null, "+49 30 1") ]);
+            Change(server2, 3, network => [ RoamingNetworkChange.UpdateProperty(network, "dataSource", null, "v2") ]);
+
+            Exchange(server1, server2);
+            Exchange(server2, server1);
+
+            Change(server1, 4, network => [ RoamingNetworkChange.UpdateProperty(EVSE(network), "maxPower", 11000, 7000) ]);
+            Change(server2, 5, network => [ RoamingNetworkChange.UpdateProperty(network.GetChargingStationOperatorById(EXA)!, "telephone", "+49 30 1", "+49 30 2") ]);
+
+            Exchange(server1, server2);
+            Exchange(server2, server1);
+
+            Change(server1, 6, network => [ RoamingNetworkChange.UpdateProperty(network, "dataSource", "v2", "v3") ]);
+
+            Assert.That(server1.TryGetCommitsSince(server1.Root.Id, out var since, out var sinceError), Is.True, sinceError);
+
+            var all = new[] { server1.Root }.Concat(since!).ToArray();
+
+            Assert.That(all.Count(commit => commit.IsMerge), Is.EqualTo(2));
+
+            // Every commit and every pair of them as held, and one unknown here among them.
+            var unknown  = RoamingNetworkCommit_Id.Parse(new String('0', 64));
+            var haves    = all.SelectMany(first => all.Select(second => new[] { first.Id, second.Id }).Prepend(new[] { first.Id, unknown })).ToArray();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                foreach (var have in haves)
+                {
+
+                    var held      = new HashSet<RoamingNetworkCommit_Id>();
+                    var pending   = new Stack<RoamingNetworkCommit_Id>(have.Where(server1.Contains));
+
+                    while (pending.TryPop(out var commitId))
+                        if (held.Add(commitId) && server1.TryGetCommit(commitId, out var commit))
+                            foreach (var parentId in commit.ParentIds)
+                                pending.Push(parentId);
+
+                    Assert.That(server1.TryGetMissingCommits(have, out var missing, out var missingError), Is.True, missingError);
+                    Assert.That(missing!.Select(commit => commit.Id),
+                                Is.EqualTo(all.Where(commit => !held.Contains(commit.Id)).Select(commit => commit.Id)),
+                                $"Missing at who holds {String.Join(", ", have)}");
+
+                    Assert.That(server1.TryGetCommitsSince(have[0], out var commitsSince, out _), Is.True);
+                    Assert.That(commitsSince!.Select(commit => commit.Id),
+                                Is.EqualTo(server1.TryGetMissingCommits([ have[0] ], out var single, out _) ? single.Select(commit => commit.Id) : null));
+
+                }
+
+                Assert.That(server1.TryGetMissingCommits([ unknown ], out _, out _), Is.False);
+                Assert.That(server1.TryGetMissingCommits(all.Select(commit => commit.Id), out var none, out _), Is.True);
+                Assert.That(none, Is.Empty);
+
+            }
+
+        }
+
+        #endregion
+
         #region The_same_party_in_another_spelling_is_the_same_entity()
 
         /// <summary>

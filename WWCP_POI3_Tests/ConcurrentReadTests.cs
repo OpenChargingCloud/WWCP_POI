@@ -210,6 +210,123 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region Tips_waiting_change_sets_commit_proofs_and_the_archive_do_not_wait_for_a_commit()
+
+        /// <summary>
+        /// The readers that waited for the lock until POI3-ISSUES.md S12: the tips, the change sets waiting for signatures,
+        /// the proofs of commits, from the commits held and from the archive, the archived commits and the snapshot of a
+        /// checkpoint whose version is calculated again. They read the state before the commit holding the lock.
+        /// </summary>
+        [Test]
+        public void Tips_waiting_change_sets_commit_proofs_and_the_archive_do_not_wait_for_a_commit()
+        {
+
+            using var store    = new BlockingStore();
+
+            var network        = CoSigningTests.Network();
+            var history        = RoamingNetworkHistory.Start(network,
+                                                             Store:      store,
+                                                             // Only the versions of the root, the tips and the latest commit are kept.
+                                                             Retention:  new RoamingNetworkHistoryRetention {
+                                                                             VersionCheckpointInterval  = 0,
+                                                                             RecentVersions             = 1,
+                                                                             RetainCommits              = 2,
+                                                                             CompactAfterLogEntries     = Int64.MaxValue
+                                                                         },
+                                                             Archive:    new RoamingNetworkHistoryMemoryArchive());
+
+            RoamingNetworkCommit Commit(String DataSource)
+            {
+                var result = history.Commit(CoSigningTests.SignedBy(CoSigningTests.ChangeSet(history.Head.RoamingNetwork, DataSource), network, "Alpha", "Gamma"));
+                Assert.That(result.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), result.ErrorResponse);
+                return result.Commit!;
+            }
+
+            RoamingNetworkCheckpoint Checkpoint(RoamingNetworkCommit Of)
+            {
+                Assert.That(history.TryMakeCheckpoint(out var checkpoint, out var error, Of.Id, DateTimeOffset.Parse("2026-10-23T00:00:00Z").AddHours(history.Checkpoints.Count)), Is.True, error);
+                return checkpoint!;
+            }
+
+            var c1       = Commit("v1");
+            var c2       = Commit("v2");
+            var cp0      = Checkpoint(c2);
+            var c3       = Commit("v3");
+            var c4       = Commit("v4");
+            Checkpoint(c4);
+            var c5       = Commit("v5");
+            var c6       = Commit("v6");
+            var cp2      = Checkpoint(c6);
+            var c7       = Commit("v7");
+
+            // Compacted to the commit of the second checkpoint: the commits before are in the archive.
+            Assert.That(history.Compact(out var compactError), Is.True, compactError);
+            Assert.That(history.Root.Id,                       Is.EqualTo(c4.Id));
+
+            var waiting  = CoSigningTests.SignedBy(CoSigningTests.ChangeSet(history.Head.RoamingNetwork, "waiting"), network, "Alpha");
+
+            Assert.That(history.CoSign(waiting).Status,        Is.EqualTo(RoamingNetworkCoSigningStatus.Pending));
+
+            store.Block();
+
+            var commit   = Task.Run(() => history.Commit(CoSigningTests.SignedBy(CoSigningTests.ChangeSet(history.Head.RoamingNetwork, "v8"), network, "Alpha", "Gamma")));
+
+            try
+            {
+
+                Assert.That(store.Entered.Wait(Patience), Is.True, "The commit did not reach the store!");
+
+                var tips      = Within("Tips",                         () => history.Tips);
+                var pending   = Within("PendingChangeSets",            () => history.PendingChangeSets);
+                var result    = Within("TryGetPendingChangeSet",       () => history.TryGetPendingChangeSet(waiting.Id, out var read) ? read : null);
+                var heldProof = Within("TryGetCommitProof (held)",     () => history.TryGetCommitProof(c5.Id, out var proof, out var error) ? proof : throw new AssertionException(error));
+                var oldProof  = Within("TryGetCommitProof (archive)",  () => history.TryGetCommitProof(c1.Id, out var proof, out var error) ? proof : throw new AssertionException(error));
+                var archived  = Within("TryGetArchivedCommit",         () => history.TryGetArchivedCommit(c3.Id, out var archivedCommit) ? archivedCommit : null);
+                var snapshot  = Within("TryGetCheckpointSnapshotJSON", () => history.TryGetCheckpointSnapshotJSON(cp2.Id, out var json, out var error) ? json : throw new AssertionException(error));
+
+                using (Assert.EnterMultipleScope())
+                {
+
+                    Assert.That(tips.Select(tip => tip.Commit.Id),                      Is.EqualTo(new[] { c7.Id }));
+                    Assert.That(tips[0].RoamingNetwork.DataSource,                      Is.EqualTo("v7"));
+                    Assert.That(pending.Select(changeSet => changeSet.Id),              Is.EqualTo(new[] { waiting.Id }));
+                    Assert.That(result?.Missing,                                        Has.Count.EqualTo(1));
+
+                    Assert.That(heldProof.CheckpointId,                                 Is.EqualTo(cp2.Id));
+                    Assert.That(heldProof.Verify(cp2, out var heldError),               Is.True, heldError);
+                    Assert.That(oldProof. CheckpointId,                                 Is.EqualTo(cp0.Id));
+                    Assert.That(oldProof. Verify(cp0, out var oldError),                Is.True, oldError);
+                    Assert.That(archived?.Id,                                           Is.EqualTo(c3.Id));
+
+                    // The version of the commit of the checkpoint is no longer kept: calculated again, for the reader.
+                    Assert.That(RoamingNetworkCommit.TryParse((JObject) snapshot[RoamingNetworkHistory.PropertyKeys.Commit]!, out var snapshotCommit, out _) ? snapshotCommit.Id : (RoamingNetworkCommit_Id?) null,
+                                                                                        Is.EqualTo(c6.Id));
+                    Assert.That(snapshot[RoamingNetworkHistory.PropertyKeys.RoamingNetwork]!["dataSource"]!.Value<String>(),
+                                                                                        Is.EqualTo("v6"));
+                    Assert.That(snapshot.ContainsKey(RoamingNetworkHistory.PropertyKeys.RuntimeStatus),  Is.False);
+
+                }
+
+            }
+            finally
+            {
+                store.Release();
+            }
+
+            Assert.That(commit.Wait(Patience), Is.True);
+            Assert.That(commit.Result.IsCommitted, Is.True, commit.Result.ErrorResponse);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(history.Tips.Select(tip => tip.Commit.Id),                  Is.EqualTo(new[] { commit.Result.Commit!.Id }));
+                Assert.That(history.TryGetPendingChangeSet(waiting.Id, out var after),  Is.True);
+                Assert.That(after!.Missing,                                             Has.Count.EqualTo(1));
+            }
+
+        }
+
+        #endregion
+
         #region A_proof_does_not_wait_for_the_attestation_of_a_new_head()
 
         /// <summary>
