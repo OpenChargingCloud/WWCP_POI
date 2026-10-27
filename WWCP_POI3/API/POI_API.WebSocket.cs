@@ -650,10 +650,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ? Request.Respond(CommittedJSON(result, History))
 
-                       : Request.Respond(new JObject(
-                             new JProperty(PropertyKeys.Status,       result.Status.ToString()),
-                             new JProperty(PropertyKeys.Description,  result.ErrorResponse)
-                         ));
+                       : result.Status == RoamingNetworkCommitStatus.Conflict
+
+                             ? Request.Respond(ConflictJSON(result))
+
+                             : Request.Respond(new JObject(
+                                   new JProperty(PropertyKeys.Status,       result.Status.ToString()),
+                                   new JProperty(PropertyKeys.Description,  result.ErrorResponse)
+                               ));
 
         }
 

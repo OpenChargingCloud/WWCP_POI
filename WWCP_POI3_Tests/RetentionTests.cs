@@ -147,11 +147,16 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                                                         Retention: new RoamingNetworkHistoryRetention { RetainCommits = 1 });
 
             var commits   = Linear(history, 2);
-            var version2  = history.Head.RoamingNetwork;
+
+            // Another server, on revision 2.
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(history.ToSnapshotJSON(), out var other, out var snapshotError), Is.True, snapshotError);
+
             Linear(history, 8, From: 3);
 
-            // A branch from revision 2, conflicting with the data source of the other tip: both stay.
-            Assert.That(PersistenceTests.Change(history, 20, "dataSource", "other", version2).IsCommitted);
+            // A branch from revision 2 of the other server, conflicting with the data source of the other tip: both stay.
+            var branch    = PersistenceTests.Change(other!, 20, "dataSource", "other");
+            Assert.That(branch.IsCommitted);
+            Assert.That(history.TryAppend(branch.Commit!, out var appendError), Is.True, appendError);
             Assert.That(history.Tips, Has.Count.EqualTo(2));
 
             Assert.That(history.Compact(out var error), Is.True, error);

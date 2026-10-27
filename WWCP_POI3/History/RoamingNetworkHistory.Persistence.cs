@@ -693,14 +693,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The commit whose version the given change set was made for: a tip, the head first,
-        /// or else the latest commit having it, also one whose version is calculated again.
+        /// or else the latest commit having it, also one whose version is calculated again; not one too old (StaleVersionError).
         /// </summary>
         private (RoamingNetworkCommit Commit, RoamingNetwork Version)? FindVersionFor(RoamingNetworkChangeSet ChangeSet)
+
+            => FindVersionFor(ChangeSet, out _);
+
+
+        /// <summary>
+        /// The commit whose version the given change set was made for: a tip, the head first,
+        /// or else the latest commit having it, also one whose version is calculated again; not one too old.
+        /// </summary>
+        /// <param name="ChangeSet">The change set.</param>
+        /// <param name="StaleError">Why the version it was made for is too old, when that is the only one it fits (StaleVersionError).</param>
+        private (RoamingNetworkCommit Commit, RoamingNetwork Version)? FindVersionFor(RoamingNetworkChangeSet  ChangeSet,
+                                                                                    out String?              StaleError)
         {
+
+            StaleError = null;
 
             foreach (var tip in tips)
                 if (versions[tip].Fits(ChangeSet))
-                    return (commits[commitIndex[tip]], versions[tip]);
+                {
+
+                    var commit = commits[commitIndex[tip]];
+
+                    if (StaleVersionError(commit) is String tipError)
+                    {
+                        StaleError ??= tipError;
+                        continue;
+                    }
+
+                    return (commit, versions[tip]);
+
+                }
 
             for (var index = commits.Count - 1; index >= 0; index--)
             {
@@ -709,17 +735,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (versions.TryGetValue(commit.Id, out var kept))
                 {
-                    if (kept.Fits(ChangeSet))
-                        return (commit, kept);
+
+                    if (!kept.Fits(ChangeSet))
+                        continue;
+
+                    if (StaleVersionError(commit) is String keptError)
+                    {
+                        StaleError ??= keptError;
+                        continue;
+                    }
+
+                    return (commit, kept);
+
+                }
+
+                // Not kept: only when the ETags of the commit name the same version, it is calculated again;
+                // too old, it is not even calculated.
+                var comparable = ChangeSet.BeforeETags.Where(before => commit.ETags.Any(eTag => eTag.Format == before.Format && eTag.HashAlgorithm == before.HashAlgorithm)).ToArray();
+
+                if (comparable.Length == 0 ||
+                    !comparable.All(before => commit.ETags.Contains(before)))
+                {
                     continue;
                 }
 
-                // Not kept: only when the ETags of the commit name the same version, it is calculated again.
-                var comparable = ChangeSet.BeforeETags.Where(before => commit.ETags.Any(eTag => eTag.Format == before.Format && eTag.HashAlgorithm == before.HashAlgorithm)).ToArray();
+                if (StaleVersionError(commit) is String calculatedError)
+                {
+                    StaleError ??= calculatedError;
+                    continue;
+                }
 
-                if (comparable.Length > 0 &&
-                    comparable.All(before => commit.ETags.Contains(before)) &&
-                    TryGetVersion(commit.Id, out var calculated, out _) &&
+                if (TryGetVersion(commit.Id, out var calculated, out _) &&
                     calculated.Fits(ChangeSet))
                 {
                     return (commit, calculated);

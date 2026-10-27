@@ -390,8 +390,9 @@ station or a meter may differ from them: e.g. its `currentTypes`, `connectorType
 when the server takes it, by its clock, and its `createdAt` MUST NOT be later than then, a few minutes of clock skew
 aside: a `createdAt` chosen before lets no key sign once it expired. Made for another version than the head, it MUST
 also not conflict with a tip it will be merged with as section 5.3 says: signed by a key that tip removed, or which
-expired there; it is prepared again for the head. A server taking the commit of a peer checks what the commit says,
-not the clock of the server that took it.
+expired there; it is prepared again for the head. Its commit MUST merge with the head, and the version it was made
+for MUST NOT be too old (5.3, "No conflict from a change set"). A server taking the commit of a peer checks what the
+commit says, not the clock of the server that took it, nor how old the version is it follows.
 
 Nobody can replace the identity keys of the RNO once they are lost or expired. An RNO SHOULD name
 at least two identity keys with different `notAfter`, and SHOULD replace an identity key before it
@@ -443,7 +444,7 @@ The holders of a quorum, and the owners of the changes of one change set, sign i
 signatures sign the change set without the others (4), so adding one changes nothing it says. A server MAY offer a
 place where a change set **waits** for the signatures still missing, `~/history/changeSets/pending`:
 
-- It takes a change set to wait only when it fits a version (5), every signature it has is valid by a key of that
+- It takes a change set to wait only when it fits a version not too old (5.3), every signature it has is valid by a key of that
   version valid at its `createdAt` and when it takes it, or by a new identity key of one of its changes (4.1), at least one is by an owner
   of one of its changes (4.1), and its changes apply
   to that version, leading to its after ETags. So nobody makes it hold change sets nobody owning anything signed.
@@ -609,6 +610,32 @@ exactly the new value; then, as every other property, by `UpdateProperty`/`Remov
 `oldValue` is the value they find. A merge commit MUST be refused unless it is the merge of its parents as calculated here,
 exactly. Conflicting tips stay until an owner commits a change set to one of them that resolves
 the conflict, e.g. taking the value of the other one.
+
+**No conflict from a change set.** A server commits a change set made for another version than the head, another tip
+or an older commit, only when the commit it would make merges with the head as calculated here: the three-way merge,
+the preconditions and the keys of both, with their merge base. Otherwise it MUST refuse the change set and keep
+nothing of it, and answers that it conflicts, with the conflicts (POI_API: `409 Conflict`, `{status: "Conflict",
+description, head, conflicts}`); its owner prepares it again for the head (rebased, section 4). The head is the first
+tip, the one of the highest revision: a branch conflicting with the head, which its owner extended alone until its
+revision was the highest, would become the head, and every commit of the others since the branch parted would fall
+out of it, a party removed since returning. A change set made for another tip that resolves its conflict with the head
+merges with the head, and is committed. A change set made for the head conflicts with nothing.
+
+**Too old.** A server MUST also refuse a change set made for another version than the head when that version is more
+than a limit of revisions behind the head, the server's choice (1,000 by default), or does not follow the commit of
+the latest checkpoint it holds (section 10), nor is it: the owner prepares it again for the head (POI_API: 422, as for
+a change set that fits no version). So no branch starts where the history is long settled, whose merge with every
+later tip would walk back to it, and which would keep the history from being compacted (10.6).
+
+**Conflicting tips** therefore come only from the commits of different servers: two servers each took a change set
+without conflict with its own head, which conflict with each other. A server appends the commit of another server also
+where it conflicts with its head, and whatever version it follows (5.2), as the other server took it by its own head:
+refusing it would part their histories for good, and a limit of each would part them where their heads differ. This
+case remains: the head is still the tip of the highest revision, so a server whose commits another server appends can
+still make a conflicting branch the head there, as before; who may push commits to a server is the server's to decide.
+Such tips stay until an owner resolves the conflict with a change set on one of them, which then merges with the head.
+The merge of two tips depends on these two commits alone: a server MAY remember that two tips conflict, with their
+conflicts, until one of them is no tip any longer, instead of merging them again with every commit.
 
 ### 5.4 Signatures
 
@@ -861,6 +888,9 @@ and change sets name it as a precondition (section 4).
 
 1. **Co-signing across servers:** a change set waits for signatures at one server (4.2); holders using other
    servers sign it there, as peers learn of it only by its commit.
+2. **Conflicting tips of servers:** a server takes no conflict from a change set (5.3), but the commits of another
+   server are appended as they are: a server pushing commits can still make a conflicting branch the head of the
+   servers taking them, and a branch it started long ago keeps them from compacting. The head is chosen by revision.
 
 
 ## 8. Proofs of entities by a signed hash tree

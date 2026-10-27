@@ -377,12 +377,87 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(postB.JSON["head"]!["parentIds"]!.Count(),           Is.EqualTo(2));
                 Assert.That(postB.JSON["conflicts"],                             Is.Null);
 
-                // C changes the data source, as A did: committed, but it conflicts.
-                Assert.That(postC.StatusCode,                                    Is.EqualTo(HttpStatusCode.Created));
+                // C changes the data source, as A did: it would conflict with the head, and is refused with the conflicts.
+                Assert.That(postC.StatusCode,                                    Is.EqualTo(HttpStatusCode.Conflict));
+                Assert.That(postC.JSON["status"]!.Value<String>(),               Is.EqualTo("Conflict"));
                 Assert.That(postC.JSON["conflicts"]![0]!["propertyName"]!.Value<String>(),  Is.EqualTo("dataSource"));
+                Assert.That(postC.JSON["head"]!["@id"]!.Value<String>(),         Is.EqualTo(leader.Head.Commit.Id.ToString()));
+                Assert.That(postC.JSON["description"]!.Value<String>(),          Does.Contain("Prepare it again for the head!"));
 
                 Assert.That(leader.Head.Commit.Revision,                         Is.EqualTo(2));
-                Assert.That(leader.Tips,                                         Has.Count.EqualTo(2));
+                Assert.That(leader.Tips,                                         Has.Count.EqualTo(1));
+                Assert.That(leader.Head.RoamingNetwork.DataSource,               Is.EqualTo("A"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_conflicting_or_too_old_fork_is_refused_over_HTTP()
+
+        /// <summary>
+        /// A fork from the root, changing the data source the head changed since, and extended on its own until it would be
+        /// longer than the main line: 409 Conflict with the conflicts, the rest fits no version, and the head stays.
+        /// A fork too far behind the head is refused as well, 422.
+        /// </summary>
+        [Test]
+        public async Task A_conflicting_or_too_old_fork_is_refused_over_HTTP()
+        {
+
+            poiAPI!.AuthorizeChangeSetSubmission = (request, changeSet) => true;
+
+            var v0        = leader!.Head.RoamingNetwork;
+
+            Publish("v1", 1);
+            var named     = await Commit(ChangeSet(leader, "name", new JObject(new JProperty("en", "Network"))));
+            var head      = leader.Head.Commit.Id;
+
+            var fork      = new List<RoamingNetworkChangeSet>();
+            var version   = v0;
+
+            for (var i = 0; i < 4; i++)
+            {
+                var changeSet = version.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(version, "dataSource", null, "fork" + i) ],
+                                                              CreatedAt: DateTimeOffset.Parse("2026-10-11T14:00:00Z").AddMinutes(i));
+                fork.Add(changeSet);
+                version = version.ApplyChangeSet(changeSet);
+            }
+
+            var posts     = new List<(HttpStatusCode StatusCode, JObject JSON)>();
+
+            foreach (var changeSet in fork)
+                posts.Add(await Commit(changeSet));
+
+            // Not conflicting, but more revisions behind the head than taken.
+            leader.MaxRevisionsBehindHead = 1;
+
+            var tooOld    = await Commit(v0.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(v0, "description", null, new JObject(new JProperty("en", "Late"))) ],
+                                                                  CreatedAt: DateTimeOffset.Parse("2026-10-11T15:00:00Z")));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(named.StatusCode,                                     Is.EqualTo(HttpStatusCode.Created));
+
+                Assert.That(posts[0].StatusCode,                                  Is.EqualTo(HttpStatusCode.Conflict));
+                Assert.That(posts[0].JSON["status"]!.Value<String>(),             Is.EqualTo("Conflict"));
+                Assert.That(posts[0].JSON["conflicts"]!.Single()["propertyName"]!.Value<String>(),  Is.EqualTo("dataSource"));
+                Assert.That(posts[0].JSON["head"]!["@id"]!.Value<String>(),       Is.EqualTo(head.ToString()));
+
+                foreach (var post in posts.Skip(1))
+                {
+                    Assert.That(post.StatusCode,                                  Is.EqualTo((HttpStatusCode) 422));
+                    Assert.That(post.JSON["description"]!.Value<String>(),        Does.Contain("fits no version"));
+                }
+
+                Assert.That(tooOld.StatusCode,                                    Is.EqualTo((HttpStatusCode) 422));
+                Assert.That(tooOld.JSON["description"]!.Value<String>(),          Does.Contain("more than 1 revisions behind the head"));
+
+                Assert.That(leader.Head.Commit.Id,                                Is.EqualTo(head));
+                Assert.That(leader.Tips,                                          Has.Count.EqualTo(1));
+                Assert.That(leader.Head.RoamingNetwork.DataSource,                Is.EqualTo("v1"));
+                Assert.That(leader.Head.RoamingNetwork.Name[Languages.en],        Is.EqualTo("Network"));
 
             }
 

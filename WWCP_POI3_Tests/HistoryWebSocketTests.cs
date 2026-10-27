@@ -533,9 +533,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
                 Assert.That(leader.Tips.Select(tip => tip.Commit.Id.ToString()),  Does.Contain(published.Payload["@id"]!.Value<String>()));
                 Assert.That(again.Payload!["status"]!.Value<String>(),            Is.EqualTo("AlreadyCommitted"));
 
-                // B, made for the version A was, too, is committed to it, but conflicts with A.
-                Assert.That(conflict.Payload!["status"]!.Value<String>(),         Is.EqualTo("Committed"));
+                // B, made for the version A was, too, would conflict with A, the head: refused, with the conflict.
+                Assert.That(conflict.Payload!["status"]!.Value<String>(),         Is.EqualTo("Conflict"));
                 Assert.That(conflict.Payload["conflicts"]!.Count(),               Is.EqualTo(1));
+                Assert.That(conflict.Payload["head"]!["@id"]!.Value<String>(),    Is.EqualTo(published.Payload["@id"]!.Value<String>()));
+                Assert.That(leader.Tips,                                          Has.Count.EqualTo(1));
                 Assert.That(leader.Head.Commit.ParentIds,                         Is.EqualTo(new[] { head0 }));
 
                 Assert.That(invalid.ErrorCode,                                    Is.EqualTo(POIWebSocketErrorCodes.FormatViolation));

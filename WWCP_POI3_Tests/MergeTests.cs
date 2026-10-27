@@ -258,7 +258,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         /// <summary>
         /// A change of an EVSE, prepared while its charging pool had a certain ETag, committed after the head moved on:
-        /// refused when the head changed the pool, merged when it changed something else.
+        /// refused as a conflict with the head when the head changed the pool, merged when it changed something else.
         /// </summary>
         [Test]
         public void Preconditions_hold_also_for_the_head_a_change_set_is_merged_into()
@@ -290,8 +290,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(merged.Status,                                       Is.EqualTo(RoamingNetworkCommitStatus.Committed), merged.ErrorResponse);
                 Assert.That(server1.Tips,                                        Has.Count.EqualTo(1));
                 Assert.That(EVSE(server1.Head.RoamingNetwork).MaxPower?.Value,   Is.EqualTo(11000m));
-                Assert.That(refused.Status,                                      Is.EqualTo(RoamingNetworkCommitStatus.Refused));
-                Assert.That(refused.ErrorResponse,                               Does.Contain($"The ChargingPool '{Pool(v1).Id}' the change set requires").And.Contain("Prepare it again for the head!"));
+                Assert.That(refused.Status,                                      Is.EqualTo(RoamingNetworkCommitStatus.Conflict));
+                // Both ways: the head changed the pool, and the change set its EVSE, which the pool embeds,
+                // while the change set merged before requires the pool as it was, too.
+                Assert.That(refused.Conflicts!.Select(conflict => conflict.Kind),      Is.All.EqualTo(RoamingNetworkMergeConflictKind.Precondition));
+                Assert.That(refused.Conflicts!.Select(conflict => conflict.EntityId),  Is.All.EqualTo(Pool(v1).Id.ToString()));
+                Assert.That(refused.ErrorResponse,                               Does.Contain($"requires the ChargingPool '{Pool(v1).Id}'").And.Contain("Prepare it again for the head!"));
+                Assert.That(server1.Tips,                                        Has.Count.EqualTo(1));
             }
 
         }
@@ -451,7 +456,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(refused.Status,                                      Is.EqualTo(RoamingNetworkCommitStatus.Refused));
+                Assert.That(refused.Status,                                      Is.EqualTo(RoamingNetworkCommitStatus.Conflict));
+                Assert.That(refused.Conflicts!.Single().Kind,                    Is.EqualTo(RoamingNetworkMergeConflictKind.RevokedKey));
                 Assert.That(refused.ErrorResponse,                               Does.Contain($"is signed by the key '{TestParties.Key(TestParties.Party(GEF)).Public.Id}'").And.Contain("no longer names").And.Contain("Prepare it again for the head!"));
                 Assert.That(server1.Tips,                                        Has.Count.EqualTo(1));
                 Assert.That(EVSE(server1.Head.RoamingNetwork).MaxPower?.Value,   Is.EqualTo(22000m));

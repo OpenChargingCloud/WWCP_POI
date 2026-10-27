@@ -113,9 +113,16 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             var root = History.Head.RoamingNetwork;
 
+            // Another server, on the same head; a server takes no conflict from a change set, but from another server.
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(History.ToSnapshotJSON(), out var other, out var snapshotError), Is.True, snapshotError);
+
             Assert.That(Change(History, 1, "dataSource",  "v2").IsCommitted);
             Assert.That(Change(History, 2, "name",        "Network", root).IsCommitted);   // a branch, merged
-            Assert.That(Change(History, 3, "dataSource",  "v3", root).IsCommitted);        // a branch, conflicting
+
+            var conflicting = Change(other!, 3, "dataSource", "v3");                        // a branch, conflicting
+            Assert.That(conflicting.IsCommitted);
+            Assert.That(History.TryAppend(conflicting.Commit!, out var appendError), Is.True, appendError);
+            Assert.That(History.Tips, Has.Count.EqualTo(2));
 
             Assert.That(History.TryAddSignatures(History.Root.Id,
                                                  [ History.Root.CreateSignature(CommitSignatureTests.RNOKey, "rno", COSEAlgorithm.Ed25519, RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator, SignedAt: T0) ],

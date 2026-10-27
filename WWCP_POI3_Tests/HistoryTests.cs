@@ -162,6 +162,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var history  = RoamingNetworkHistory.Start(NewNetwork());
             var root     = history.Head;
 
+            // Another server, starting with the same genesis commit.
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(history.ToSnapshotJSON(), out var server2, out var snapshotError), Is.True, snapshotError);
+
             // Three change sets made for the same version, e.g. on three servers.
             var csA      = DataSource(history, "A", 1);
             var csB      = history.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(history.Head.RoamingNetwork, "description") ],
@@ -175,8 +178,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var b        = history.Commit(csB);
             var mergeAB  = history.Head;
 
-            // C changes the data source, as A did: it stays a tip of its own.
-            var c        = history.Commit(csC);
+            // C changes the data source, as A did: made for the root, it would conflict with the head, and is refused here...
+            var refused  = history.Commit(csC);
+
+            // ...but the other server, whose head is the root, commits it: appended here, it stays a tip of its own.
+            var c        = server2!.Commit(csC);
+
+            Assert.That(history.TryAppend(c.Commit!, out var appendError), Is.True, appendError);
 
             using (Assert.EnterMultipleScope())
             {
@@ -192,6 +200,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(mergeAB.Commit.ChangeSet!.Signatures,      Is.Empty);
                 Assert.That(mergeAB.RoamingNetwork.DataSource,         Is.EqualTo("A"));
                 Assert.That(mergeAB.RoamingNetwork.Description.Count,  Is.Zero);
+
+                Assert.That(refused.Status,                            Is.EqualTo(RoamingNetworkCommitStatus.Conflict));
+                Assert.That(refused.IsCommitted,                       Is.False);
+                Assert.That(refused.Commit,                            Is.Null);
+                Assert.That(refused.Head.Commit.Id,                    Is.EqualTo(mergeAB.Commit.Id));
+                Assert.That(refused.Conflicts!.Single().Kind,          Is.EqualTo(RoamingNetworkMergeConflictKind.DifferentValues));
+                Assert.That(refused.Conflicts!.Single().PropertyName,  Is.EqualTo("dataSource"));
+                Assert.That(refused.ErrorResponse,                     Does.Contain("conflicts with the head").And.Contain("Prepare it again for the head!"));
 
                 Assert.That(c.Status,                                  Is.EqualTo(RoamingNetworkCommitStatus.Committed));
                 Assert.That(history.Head.Commit.Id,                    Is.EqualTo(mergeAB.Commit.Id));

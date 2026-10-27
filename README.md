@@ -435,7 +435,7 @@ make the same merge commits.
 var server1 = RoamingNetworkHistory.Start(rn1);
 RoamingNetworkHistory.TryFromSnapshot(server1.ToSnapshotJSON(), out var server2, out _);
 
-var result  = server1.Commit(cs);                         // Committed, AlreadyCommitted, Refused
+var result  = server1.Commit(cs);                         // Committed, AlreadyCommitted, Refused, Conflict
 
 server1.TryGetMissingCommits(server2!.HaveIds(), out var commits, out _);
 server2.TryAppend(commits!, out _, out _);                // and merged with the tips of server 2
@@ -451,6 +451,13 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
   its `createdAt` and when the server takes it (`Commit(cs, At: …)`, now by default), and it must not be created
   later than then; made for an older version, it is refused when a tip it would be merged with removed a key it is
   signed by, or that key expired there: a removed key signs nothing into the head through an older version.
+- **No conflict from a change set:** made for another version than the head, a change set is committed only when its
+  commit merges with the head, as a merge calculates it (values, preconditions, revoked keys); otherwise the result is
+  `Conflict`, with the `Conflicts`, and nothing is stored: the owner prepares it again for the head (`TryRebase`).
+  So nobody makes a branch that conflicts with the head and outgrows it, rolling the others back; a change set on a
+  side tip that resolves a conflict is taken. The version must also be at most `MaxRevisionsBehindHead` revisions
+  behind the head (1,000 by default) and follow the commit of the latest checkpoint, else it is refused. Commits of
+  other servers are appended whatever they follow: tips conflict only where two servers took conflicting change sets.
 - **Tips and merges:** the tips are the commits no other one follows, ordered by revision, then by id;
   the head is the first one, its version is `Head.RoamingNetwork`. The first two tips that do not
   conflict are merged into a merge commit with both as `parentIds`: a three-way merge with their best
@@ -460,7 +467,9 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
   of one is signed by a key both had before they parted that the other one removed, or which expired there
   (`RevokedKey`). Conflicting tips stay, with their
   `Conflicts` (`{kind, entityType, entityId, propertyName?, base, left, right}`), until the owner commits
-  a change set to one of them that resolves the conflict, e.g. taking the value of the other one.
+  a change set to one of them that resolves the conflict, e.g. taking the value of the other one. A pair of
+  conflicting tips is merged once, not again with every commit (`MergeCalculations` counts the merges), and the
+  common ancestors are found by one walk from both, the higher revisions first, back to where they parted only.
 - **Several best common ancestors**, e.g. after a conflict was resolved on two servers, are merged into
   a virtual merge base, as git's recursive strategy does. Where they conflict, it has a conflict marker
   (`{"@conflict": {base, left, right}}`, also the `base` of a conflict there): the tips merge if they
@@ -698,7 +707,7 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/history/commits?have={commitId,…}&max={n}` | complete commits missing at who holds these, parents first |
 | `POST ~/RNs/{id}/history/commits` `{commits: […]}` | 200 appended (how many, head, tips, conflicts), 422 one refused, 403 |
 | `GET ~/RNs/{id}/history/commits/{commitId}` | one commit |
-| `COMMIT ~/RNs/{id}/history/changeSets` | 201 committed, 200 already committed (the commit, the `head`, the `conflicts` left), 422 refused |
+| `COMMIT ~/RNs/{id}/history/changeSets` | 201 committed, 200 already committed (the commit, the `head`, the `conflicts` left), 409 it would conflict with the head (`{status, description, head, conflicts}`), 422 refused |
 | `POST ~/RNs/{id}/history/commits/{commitId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403, 404, 422 invalid |
 | `GET ~/RNs/{id}/history/changeSets/pending` | the change sets waiting for signatures: `{pendingChangeSets: [{status, changeSet, missing}]}` |
 | `POST ~/RNs/{id}/history/changeSets/pending` | a change set signed by an owner: 202 waiting (`missing`), 201 committed, 200 committed before, 403, 422 refused |

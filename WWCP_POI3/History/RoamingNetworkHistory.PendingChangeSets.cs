@@ -281,8 +281,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (ChangeSetSignatureError(changeSet) is String signatureCountError)
                     return Refused(signatureCountError);
 
-                if (FindVersionFor(changeSet) is not (_, RoamingNetwork version))
-                    return Dropped(waiting, "The change set fits no version of this history: prepare it again for the head!");
+                if (FindVersionFor(changeSet, out var staleError) is not (_, RoamingNetwork version))
+                    return Dropped(waiting, staleError ?? "The change set fits no version of this history: prepare it again for the head!");
 
                 // Taken now: its keys valid also now, by the clock of this server, and created no later than now.
                 var at = At ?? Timestamp.Now;

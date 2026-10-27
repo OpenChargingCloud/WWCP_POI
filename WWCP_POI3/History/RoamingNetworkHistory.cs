@@ -61,7 +61,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The change set was refused, e.g. as it is invalid, not signed by its owners, or fits no version: nothing changed.
         /// </summary>
-        Refused
+        Refused,
+
+        /// <summary>
+        /// The change set was made for another version than the head, and its commit would conflict with the head
+        /// (SPECIFICATION.md, section 5.3): nothing changed. Its owner prepares it again for the head.
+        /// </summary>
+        Conflict
 
     }
 
@@ -73,10 +79,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <param name="Head">The head afterwards.</param>
     /// <param name="Commit">The commit of the change set, when committed now or before.</param>
     /// <param name="ErrorResponse">Why it was not committed.</param>
-    public sealed record RoamingNetworkCommitResult(RoamingNetworkCommitStatus  Status,
-                                                    RoamingNetworkHead          Head,
-                                                    RoamingNetworkCommit?       Commit          = null,
-                                                    String?                     ErrorResponse   = null)
+    /// <param name="Conflicts">The conflicts with the head, when its commit would conflict with it.</param>
+    public sealed record RoamingNetworkCommitResult(RoamingNetworkCommitStatus                  Status,
+                                                    RoamingNetworkHead                          Head,
+                                                    RoamingNetworkCommit?                       Commit          = null,
+                                                    String?                                     ErrorResponse   = null,
+                                                    IReadOnlyList<RoamingNetworkMergeConflict>? Conflicts       = null)
     {
 
         /// <summary>
@@ -109,7 +117,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// The history of a roaming network as a graph of commits, held in memory with the version of each.
     /// There is no leader: every server commits change sets signed by their owners, appends the commits of others,
     /// and merges the tips that do not conflict, deterministically, so that every server makes the same merge commits.
-    /// Conflicting tips stay until an owner resolves the conflict with a change set on one of them.
+    /// A server takes no conflict from a change set: one made for an older version or another tip is committed only
+    /// when its commit merges with the head. Conflicting tips come only from commits of different servers, and stay
+    /// until an owner resolves the conflict with a change set on one of them.
     /// Every change of the history is atomic: it is visible completely or not at all.
     /// </summary>
     public sealed partial class RoamingNetworkHistory
@@ -127,6 +137,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String MergeChangeSetIdPrefix = "merge-";
 
+        /// <summary>
+        /// The default maximum number of revisions the version a change set is made for may be behind the head.
+        /// </summary>
+        public const UInt64 DefaultMaxRevisionsBehindHead = 1000;
+
         private readonly Lock                                                       historyLock          = new ();
         private readonly List<RoamingNetworkCommit>                                 commits              = [];
         private readonly Dictionary<RoamingNetworkCommit_Id, Int32>                 commitIndex          = [];
@@ -135,6 +150,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly List<RoamingNetworkCommit_Id>                              tips                 = [];
         private          RoamingNetworkHead                                         head;
         private          ImmutableArray<RoamingNetworkMergeConflict>                conflicts            = [];
+
+        /// <summary>
+        /// The conflicts of the pairs of tips that do not merge, by the pair, in their order: a merge depends on the two
+        /// commits alone, so it is calculated once, not again with every commit, and forgotten once one of them is no tip.
+        /// </summary>
+        private readonly Dictionary<(RoamingNetworkCommit_Id Left, RoamingNetworkCommit_Id Right),
+                                    IReadOnlyList<RoamingNetworkMergeConflict>>     conflictingTips      = [];
+
+        private          Int64                                                      mergeCalculations;
 
         #endregion
 
@@ -236,6 +260,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The keys that sign every commit made here, e.g. the one of this server, also merge commits.
         /// </summary>
         public ImmutableArray<RoamingNetworkCommitSigner>  Signers  { get; set; } = [];
+
+        /// <summary>
+        /// How many revisions the version a change set is made for may be behind the head; DefaultMaxRevisionsBehindHead
+        /// by default. A change set made for an older version is refused: it is prepared again for the head.
+        /// Commits appended from other servers are not bound by it.
+        /// </summary>
+        public UInt64                MaxRevisionsBehindHead    { get; set; } = DefaultMaxRevisionsBehindHead;
+
+        /// <summary>
+        /// The number of merges this history calculated: of two tips, also of those that conflict, and of the head with
+        /// the commit of a change set made for another version. A pair of tips that conflicts is not merged again until
+        /// one of them is no tip any longer.
+        /// </summary>
+        public Int64                 MergeCalculations
+            => Interlocked.Read(ref mergeCalculations);
 
         /// <summary>
         /// The number of commits this history holds, including its root.
@@ -751,6 +790,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The keys it is signed by must be valid at its creation and when it is taken, by the clock of this server, and it
         /// must not be created later than then; made for an older version, it must not be signed by a key a tip it will be
         /// merged with removed, or which expired there (SPECIFICATION.md, sections 4.1 and 5.3).
+        /// Made for another version than the head, that version must be at most MaxRevisionsBehindHead revisions behind
+        /// the head and follow the commit of the latest checkpoint, and its commit must merge with the head without
+        /// conflict (SPECIFICATION.md, section 5.3); otherwise it is refused, as a conflict with the conflicts: a server
+        /// takes no conflict from a change set, its owner prepares it again for the head.
         /// The new commit is merged with the other tips where it does not conflict.
         /// It must be identified by its content and have changes; a change set committed before, also in a rebased
         /// version, is not committed again (SPECIFICATION.md, section 4).
@@ -793,9 +836,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (FindCommitted(ChangeSet) is RoamingNetworkCommit committed)
                     return new (RoamingNetworkCommitStatus.AlreadyCommitted, Head, committed);
 
-                // The version it was made for: a tip, the head first, or else the latest commit having it.
-                if (FindVersionFor(ChangeSet) is not (RoamingNetworkCommit parent, RoamingNetwork parentVersion))
-                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: "The change set fits no version of this history: prepare it again for the head!");
+                // The version it was made for: a tip, the head first, or else the latest commit having it, not too old.
+                if (FindVersionFor(ChangeSet, out var staleError) is not (RoamingNetworkCommit parent, RoamingNetwork parentVersion))
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: staleError ?? "The change set fits no version of this history: prepare it again for the head!");
 
                 // Taken now: its keys valid also now, by the clock of this server, so that a creation chosen earlier does
                 // not let a key sign once it expired; and created no later than now.
@@ -813,15 +856,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (VersionEpochError(roamingNetwork) is String versionError)
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: versionError);
 
-                // Made for an older version: its preconditions must also hold for the tips it will be merged with, and its
-                // keys must not be ones they removed, or which expired there.
+                var unsigned = RoamingNetworkCommit.Next(parent, ChangeSet, roamingNetwork);
+
+                MergedTips? mergedWithHead = null;
+
+                // Made for another version than the head: its commit must merge with the head, so that no change set makes
+                // a tip conflicting with the head, which might become the head itself (SPECIFICATION.md, section 5.3).
+                if (parent.Id != Head.Commit.Id &&
+                    ConflictsWithHead(unsigned, roamingNetwork, out mergedWithHead) is { Count: > 0 } headConflicts)
+                {
+                    return new (RoamingNetworkCommitStatus.Conflict,
+                                Head,
+                                ErrorResponse:  $"The change set, made for the version '{parent.Id}', conflicts with the head '{Head.Commit.Id}': " +
+                                                $"{String.Join(" ", headConflicts.Select(conflict => conflict.Description))} Prepare it again for the head!",
+                                Conflicts:      headConflicts);
+                }
+
+                // Made for an older version: its preconditions must also hold for the other tips it will be merged with,
+                // and its keys must not be ones they removed, or which expired there.
                 if (BrokenPreconditionOf(ChangeSet, parent.Id) is String preconditionError)
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: preconditionError);
 
                 if (RevokedKeyOfTips(ChangeSet, parent.Id) is String revokedKeyError)
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: revokedKeyError);
 
-                var commit = SignedBy(Signers, RoamingNetworkCommit.Next(parent, ChangeSet, roamingNetwork));
+                var commit = SignedBy(Signers, unsigned);
 
                 try
                 {
@@ -832,7 +891,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: "The commit can not be stored: " + e.Message);
                 }
 
-                MergeTips();
+                // Its merge with the head is calculated already.
+                MergeTips(mergedWithHead);
                 CompactIfDue();
 
                 return new (RoamingNetworkCommitStatus.Committed, Head, commit);
@@ -852,6 +912,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Its revision is one more than the highest one of its parents. Its own signatures must all be valid,
         /// and it must be signed in every required role. Afterwards, the tips are merged where they do not conflict.
         /// A commit this history holds already is accepted, taking the signatures it has in addition.
+        /// Unlike a change set, it is appended also when it conflicts with the head, and whatever version it follows:
+        /// the other server took it by its own head, and refusing it here would part the histories for good.
         /// </summary>
         /// <param name="Commit">The commit.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
@@ -1305,14 +1367,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) MergeTips()
+        #region (private) MergeTips(Merged = null)
 
         /// <summary>
         /// Merge the tips, while the history is locked: the first two that do not conflict, in their order,
         /// again and again, until none are left that do not conflict. Every server holding the same commits
         /// makes the same merge commits. The conflicts of the tips left are kept.
+        /// A pair of tips that conflicts is not merged again while both are tips: its conflicts are remembered,
+        /// so that conflicting tips do not make every later commit merge every pair of them anew.
         /// </summary>
-        private void MergeTips()
+        /// <param name="Merged">The merge of two of the tips calculated already, e.g. of the head and a new commit.</param>
+        private void MergeTips(MergedTips? Merged = null)
         {
 
             var found = new List<RoamingNetworkMergeConflict>();
@@ -1330,10 +1395,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     for (var j = i + 1; j < tips.Count && !merged; j++)
                     {
 
+                        if (conflictingTips.TryGetValue((tips[i], tips[j]), out var knownConflicts))
+                        {
+                            found.AddRange(knownConflicts);
+                            continue;
+                        }
+
                         var left   = commits[commitIndex[tips[i]]];
                         var right  = commits[commitIndex[tips[j]]];
 
-                        if (TryMerge(left, right, out var roamingNetwork, out var changeSet, out var mergeConflicts, out var mergeError))
+                        Boolean                                     mergeable;
+                        RoamingNetwork?                             roamingNetwork;
+                        RoamingNetworkChangeSet?                    changeSet;
+                        IReadOnlyList<RoamingNetworkMergeConflict>  mergeConflicts  = [];
+                        String?                                     mergeError      = null;
+
+                        // Calculated already: the same, as a merge depends on the two commits alone.
+                        if (Merged is not null && Merged.Left == left.Id && Merged.Right == right.Id)
+                        {
+                            mergeable       = true;
+                            roamingNetwork  = Merged.RoamingNetwork;
+                            changeSet       = Merged.ChangeSet;
+                            Merged          = null;
+                        }
+
+                        else
+                        {
+                            Interlocked.Increment(ref mergeCalculations);
+                            mergeable = TryMerge(left, right, out roamingNetwork, out changeSet, out mergeConflicts, out mergeError);
+                        }
+
+                        if (mergeable && roamingNetwork is not null && changeSet is not null)
                         {
 
                             try
@@ -1352,18 +1444,100 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         }
 
                         else
-                            found.AddRange(mergeError is not null
-                                               ? [ new RoamingNetworkMergeConflict(RoamingNetworkMergeConflictKind.InvalidResult, nameof(RoamingNetwork), RoamingNetworkId.ToString(), null, null, null, null, mergeError) ]
-                                               : mergeConflicts);
+                        {
+
+                            IReadOnlyList<RoamingNetworkMergeConflict> pairConflicts = mergeError is not null
+                                                                                           ? [ InvalidResult(mergeError) ]
+                                                                                           : mergeConflicts;
+
+                            conflictingTips[(left.Id, right.Id)] = pairConflicts;
+                            found.AddRange(pairConflicts);
+
+                        }
 
                     }
                 }
 
             }
 
+            // Remembered only while both are tips.
+            foreach (var pair in conflictingTips.Keys.ToArray())
+                if (!tips.Contains(pair.Left) || !tips.Contains(pair.Right))
+                    conflictingTips.Remove(pair);
+
             ImmutableInterlocked.InterlockedExchange(ref conflicts, tips.Count > 1 ? [ .. found ] : []);
 
         }
+
+        #endregion
+
+        #region (private) ConflictsWithHead(Commit, RoamingNetwork, out Merged)
+
+        /// <summary>
+        /// The merge of two tips calculated before they are both tips, by their identifications in their order.
+        /// </summary>
+        private sealed record MergedTips(RoamingNetworkCommit_Id   Left,
+                                         RoamingNetworkCommit_Id   Right,
+                                         RoamingNetwork            RoamingNetwork,
+                                         RoamingNetworkChangeSet   ChangeSet);
+
+
+        /// <summary>
+        /// The conflicts of the given commit, not taken yet, with the head, as merging them would find them (TryMerge):
+        /// none, when they merge, and their merge then, which MergeTips() takes once the commit is taken, as the first
+        /// two tips that do not conflict are the head and the commit. The commit and its version are held only while the
+        /// merge is calculated, and nobody sees them: the history is locked, and the view is not published.
+        /// </summary>
+        private IReadOnlyList<RoamingNetworkMergeConflict> ConflictsWithHead(RoamingNetworkCommit  Commit,
+                                                                             RoamingNetwork        RoamingNetwork,
+                                                                             out MergedTips?       Merged)
+        {
+
+            var head = Head.Commit;
+
+            Merged = null;
+
+            commitIndex[Commit.Id]  = commits.Count;
+            versions   [Commit.Id]  = RoamingNetwork;
+            commits.Add(Commit);
+
+            try
+            {
+
+                Interlocked.Increment(ref mergeCalculations);
+
+                var (left, right) = IsCanonicalOrder(head, Commit) ? (head, Commit) : (Commit, head);
+
+                if (TryMerge(left, right, out var merge, out var changeSet, out var mergeConflicts, out var mergeError))
+                {
+                    Merged = new MergedTips(left.Id, right.Id, merge, changeSet);
+                    return [];
+                }
+
+                return mergeError is not null
+                           ? [ InvalidResult(mergeError) ]
+                           : mergeConflicts;
+
+            }
+            finally
+            {
+                commits.RemoveAt(commits.Count - 1);
+                commitIndex.Remove(Commit.Id);
+                versions.   Remove(Commit.Id);
+            }
+
+        }
+
+        #endregion
+
+        #region (private) InvalidResult(Description)
+
+        /// <summary>
+        /// A merge that can not be calculated, or whose result is invalid, as a conflict of the roaming network.
+        /// </summary>
+        private RoamingNetworkMergeConflict InvalidResult(String Description)
+
+            => new (RoamingNetworkMergeConflictKind.InvalidResult, nameof(RoamingNetwork), RoamingNetworkId.ToString(), null, null, null, null, Description);
 
         #endregion
 
@@ -1384,7 +1558,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ChangeSet       = null;
             Conflicts       = [];
 
-            if (!TryGetMergeBase(Left.Id, Right.Id, 0, out var mergeBase, out ErrorResponse) ||
+            // One walk for the merge base and the commits of each branch.
+            var ancestry = CommonAncestryOf(Left.Id, Right.Id);
+
+            if (!TryGetMergeBase(Left.Id, Right.Id, ancestry.Best, 0, out var mergeBase, out ErrorResponse) ||
                 !TryGetVersion  (Left.Id,  out var leftVersion,  out ErrorResponse) ||
                 !TryGetVersion  (Right.Id, out var rightVersion, out ErrorResponse))
             {
@@ -1392,7 +1569,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // A change set of one branch naming an entity as it must still be, which the other branch changed.
-            var broken = BrokenPreconditions(Left.Id, Right.Id, mergeBase, leftVersion, rightVersion);
+            var broken = BrokenPreconditions(ancestry, mergeBase, leftVersion, rightVersion);
 
             if (broken.Count > 0)
             {
@@ -1401,7 +1578,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // A change set of one branch signed by a key the other branch removed, or which expired there.
-            if (RevokedKeys(Left.Id, Right.Id, leftVersion, rightVersion, out ErrorResponse) is not List<RoamingNetworkMergeConflict> revoked)
+            if (RevokedKeys(ancestry, leftVersion, rightVersion, out ErrorResponse) is not List<RoamingNetworkMergeConflict> revoked)
                 return false;
 
             if (revoked.Count > 0)
@@ -1422,22 +1599,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) BrokenPreconditions(Left, Right, MergeBase, LeftVersion, RightVersion)
+        #region (private) BrokenPreconditions(Ancestry, MergeBase, LeftVersion, RightVersion)
 
         /// <summary>
         /// The preconditions of the change sets of each branch since the merge base the other branch broke, as conflicts:
         /// a change set applies only while the entities it names are as it read them, also when it is merged.
         /// </summary>
-        private List<RoamingNetworkMergeConflict> BrokenPreconditions(RoamingNetworkCommit_Id         Left,
-                                                                      RoamingNetworkCommit_Id         Right,
+        private List<RoamingNetworkMergeConflict> BrokenPreconditions(CommonAncestry                  Ancestry,
                                                                       POI.RoamingNetwork.MergeBase    MergeBase,
                                                                       POI.RoamingNetwork              LeftVersion,
                                                                       POI.RoamingNetwork              RightVersion)
         {
 
-            var conflicts       = new List<RoamingNetworkMergeConflict>();
-            var leftAncestors   = Ancestors(Left);
-            var rightAncestors  = Ancestors(Right);
+            var conflicts = new List<RoamingNetworkMergeConflict>();
 
             void Check(IEnumerable<RoamingNetworkCommit_Id>  BranchOnly,
                        POI.RoamingNetwork                    Other,
@@ -1471,8 +1645,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            Check(rightAncestors.Where(commitId => !leftAncestors. Contains(commitId)), LeftVersion,  "left");
-            Check(leftAncestors. Where(commitId => !rightAncestors.Contains(commitId)), RightVersion, "right");
+            Check(Ancestry.RightOnly, LeftVersion,  "left");
+            Check(Ancestry.LeftOnly,  RightVersion, "right");
 
             return conflicts;
 
@@ -1480,26 +1654,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) RevokedKeys(Left, Right, LeftVersion, RightVersion, out ErrorResponse)
+        #region (private) RevokedKeys(Ancestry, LeftVersion, RightVersion, out ErrorResponse)
 
         /// <summary>
         /// The change sets of each branch since their best common ancestors signed by a key the other branch removed, or
         /// which expired there, as conflicts (RevokedKeyOf, SPECIFICATION.md section 5.3); null when the versions of the
         /// common ancestors are not to be had.
         /// </summary>
-        private List<RoamingNetworkMergeConflict>? RevokedKeys(RoamingNetworkCommit_Id  Left,
-                                                               RoamingNetworkCommit_Id  Right,
-                                                               POI.RoamingNetwork       LeftVersion,
-                                                               POI.RoamingNetwork       RightVersion,
-                                                               out String?              ErrorResponse)
+        private List<RoamingNetworkMergeConflict>? RevokedKeys(CommonAncestry       Ancestry,
+                                                               POI.RoamingNetwork   LeftVersion,
+                                                               POI.RoamingNetwork   RightVersion,
+                                                               out String?          ErrorResponse)
         {
 
-            if (!TryGetBestCommonAncestorVersions(Left, Right, out var bases, out ErrorResponse))
+            if (!TryGetVersions(Ancestry.Best, out var bases, out ErrorResponse))
                 return null;
 
-            var conflicts       = new List<RoamingNetworkMergeConflict>();
-            var leftAncestors   = Ancestors(Left);
-            var rightAncestors  = Ancestors(Right);
+            var conflicts = new List<RoamingNetworkMergeConflict>();
 
             void Check(IEnumerable<RoamingNetworkCommit_Id>  BranchOnly,
                        POI.RoamingNetwork                    Other,
@@ -1520,8 +1691,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
             }
 
-            Check(rightAncestors.Where(commitId => !leftAncestors. Contains(commitId)), LeftVersion,  "left version");
-            Check(leftAncestors. Where(commitId => !rightAncestors.Contains(commitId)), RightVersion, "right version");
+            Check(Ancestry.RightOnly, LeftVersion,  "left version");
+            Check(Ancestry.LeftOnly,  RightVersion, "right version");
 
             ErrorResponse = null;
             return conflicts;
@@ -1586,9 +1757,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          RoamingNetworkCommit_Id  ParentId)
         {
 
-            var parentAncestors = Ancestors(ParentId);
-
-            foreach (var tip in tips.Where(tip => !parentAncestors.Contains(tip)))
+            foreach (var tip in tips.Where(tip => !IsOrFollows(ParentId, tip)))
             {
 
                 if (!TryGetBestCommonAncestorVersions(ParentId, tip, out var bases, out var error) ||
@@ -1617,12 +1786,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                          RoamingNetworkCommit_Id                              Right,
                                                          out IReadOnlyList<POI.RoamingNetwork>                Versions,
                                                          [NotNullWhen(false)] out String?                     ErrorResponse)
+
+            => TryGetVersions(BestCommonAncestors(Left, Right), out Versions, out ErrorResponse);
+
+        #endregion
+
+        #region (private) TryGetVersions(Commits, out Versions, out ErrorResponse)
+
+        /// <summary>
+        /// The versions of the given commits, in their order.
+        /// </summary>
+        private Boolean TryGetVersions(IEnumerable<RoamingNetworkCommit>                    Commits,
+                                       out IReadOnlyList<POI.RoamingNetwork>                Versions,
+                                       [NotNullWhen(false)] out String?                     ErrorResponse)
         {
 
             var versions = new List<POI.RoamingNetwork>();
             Versions     = versions;
 
-            foreach (var commit in BestCommonAncestors(Left, Right))
+            foreach (var commit in Commits)
             {
 
                 if (!TryGetVersion(commit.Id, out var version, out ErrorResponse))
@@ -1647,25 +1829,121 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         private List<RoamingNetworkCommit> BestCommonAncestors(RoamingNetworkCommit_Id  Left,
                                                                RoamingNetworkCommit_Id  Right)
+
+            => CommonAncestryOf(Left, Right).Best;
+
+        #endregion
+
+        #region (private) CommonAncestryOf(Left, Right)
+
+        /// <summary>
+        /// The best common ancestors of two commits, and the commits only one of them is or follows.
+        /// </summary>
+        /// <param name="Best">The best common ancestors, in their order: the common ancestors no other common ancestor follows.</param>
+        /// <param name="LeftOnly">The commits the left commit is or follows, and the right one not.</param>
+        /// <param name="RightOnly">The commits the right commit is or follows, and the left one not.</param>
+        private sealed record CommonAncestry(List<RoamingNetworkCommit>        Best,
+                                             HashSet<RoamingNetworkCommit_Id>  LeftOnly,
+                                             HashSet<RoamingNetworkCommit_Id>  RightOnly);
+
+
+        /// <summary>
+        /// The common ancestry of the given commits, as this history holds them, found by one walk from both, the higher
+        /// revisions first, as git finds a merge base: a commit both reach is a common ancestor, and every commit it follows
+        /// is no best one. As a parent has a lower revision than its children, every commit is complete once it is reached
+        /// in the walk, and the walk ends once only commits following a common ancestor are left: it goes back no further
+        /// than the branches of the two commits since their common ancestors, not to the root.
+        /// </summary>
+        private CommonAncestry CommonAncestryOf(RoamingNetworkCommit_Id  Left,
+                                                RoamingNetworkCommit_Id  Right)
         {
 
-            var common     = Ancestors(Left);
-            common.IntersectWith(Ancestors(Right));
+            const Byte LeftFlag   = 1;
+            const Byte RightFlag  = 2;
+            const Byte Both       = LeftFlag | RightFlag;
+            const Byte Stale      = 4;
 
-            var notBest    = new HashSet<RoamingNetworkCommit_Id>();
+            var best       = new List<RoamingNetworkCommit>();
+            var leftOnly   = new HashSet<RoamingNetworkCommit_Id>();
+            var rightOnly  = new HashSet<RoamingNetworkCommit_Id>();
 
-            foreach (var commitId in common)
+            var flags      = new Dictionary<RoamingNetworkCommit_Id, Byte>();
+            var queue      = new PriorityQueue<RoamingNetworkCommit_Id, UInt64>(Comparer<UInt64>.Create((revision1, revision2) => revision2.CompareTo(revision1)));
+            var nonStale   = 0;
+
+            // A commit is reached only from its children, of higher revisions: never again once it was taken from the queue.
+            void Reach(RoamingNetworkCommit_Id  CommitId,
+                       Byte                     Flags)
+            {
+
+                if (!commitIndex.TryGetValue(CommitId, out var index))
+                    return;
+
+                if (flags.TryGetValue(CommitId, out var before))
+                {
+
+                    if ((before & Stale) == 0 && (Flags & Stale) != 0)
+                        nonStale--;
+
+                    flags[CommitId] = (Byte) (before | Flags);
+
+                }
+
+                else
+                {
+
+                    flags[CommitId] = Flags;
+                    queue.Enqueue(CommitId, commits[index].Revision);
+
+                    if ((Flags & Stale) == 0)
+                        nonStale++;
+
+                }
+
+            }
+
+            Reach(Left,  LeftFlag);
+            Reach(Right, RightFlag);
+
+            while (nonStale > 0 && queue.TryDequeue(out var commitId, out _))
+            {
+
+                var commitFlags = flags[commitId];
+
+                if ((commitFlags & Stale) == 0)
+                {
+
+                    nonStale--;
+
+                    switch (commitFlags)
+                    {
+
+                        // A common ancestor no other one follows: those it follows are no best ones.
+                        case Both:
+                            best.Add(commits[commitIndex[commitId]]);
+                            commitFlags |= Stale;
+                            break;
+
+                        case LeftFlag:
+                            leftOnly. Add(commitId);
+                            break;
+
+                        default:
+                            rightOnly.Add(commitId);
+                            break;
+
+                    }
+
+                }
+
                 foreach (var parentId in commits[commitIndex[commitId]].ParentIds)
-                    if (commitIndex.ContainsKey(parentId))
-                        notBest.UnionWith(Ancestors(parentId));
+                    Reach(parentId, commitFlags);
 
-            var best       = common.Where(commitId => !notBest.Contains(commitId)).
-                                    Select(commitId => commits[commitIndex[commitId]]).
-                                    ToList();
+            }
 
             best.Sort((commit1, commit2) => IsCanonicalOrder(commit1, commit2) ? (commit1.Id == commit2.Id ? 0 : -1) : 1);
 
-            return best;
+            return new (best, leftOnly, rightOnly);
 
         }
 
@@ -1684,9 +1962,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (ChangeSet.Preconditions.IsDefaultOrEmpty)
                 return null;
 
-            var parentAncestors = Ancestors(ParentId);
-
-            foreach (var tip in tips.Where(tip => !parentAncestors.Contains(tip)))
+            foreach (var tip in tips.Where(tip => !IsOrFollows(ParentId, tip)))
             {
 
                 if (!TryGetMergeBase(ParentId, tip, 0, out var mergeBase, out var mergeBaseError) ||
@@ -1718,12 +1994,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         Int32                                                        Depth,
                                         [NotNullWhen(true)]  out POI.RoamingNetwork.MergeBase?       MergeBase,
                                         out String?                                                  ErrorResponse)
+
+            => TryGetMergeBase(Left, Right, BestCommonAncestors(Left, Right), Depth, out MergeBase, out ErrorResponse);
+
+
+        /// <param name="Left">The left commit.</param>
+        /// <param name="Right">The right commit.</param>
+        /// <param name="Best">Their best common ancestors, in their order.</param>
+        /// <param name="Depth">How deeply the merge bases of best common ancestors are nested.</param>
+        /// <param name="MergeBase">The merge base.</param>
+        /// <param name="ErrorResponse">Why there is none.</param>
+        private Boolean TryGetMergeBase(RoamingNetworkCommit_Id                                      Left,
+                                        RoamingNetworkCommit_Id                                      Right,
+                                        IReadOnlyList<RoamingNetworkCommit>                          Best,
+                                        Int32                                                        Depth,
+                                        [NotNullWhen(true)]  out POI.RoamingNetwork.MergeBase?       MergeBase,
+                                        out String?                                                  ErrorResponse)
         {
 
             MergeBase      = null;
             ErrorResponse  = null;
 
-            var best = BestCommonAncestors(Left, Right);
+            var best = Best;
 
             if (best.Count == 0)
             {
@@ -1780,6 +2072,85 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         pending.Push(parentId);
 
             return ancestors;
+
+        }
+
+        #endregion
+
+        #region (private) IsOrFollows(CommitId, AncestorId)
+
+        /// <summary>
+        /// Whether the given commit is the given ancestor, or follows it, as this history holds them. Only the commits of
+        /// higher revisions than the ancestor are walked: a parent has a lower revision than its children.
+        /// </summary>
+        private Boolean IsOrFollows(RoamingNetworkCommit_Id  CommitId,
+                                    RoamingNetworkCommit_Id  AncestorId)
+        {
+
+            if (CommitId == AncestorId)
+                return commitIndex.ContainsKey(CommitId);
+
+            if (!commitIndex.TryGetValue(AncestorId, out var ancestorIndex))
+                return false;
+
+            var revision  = commits[ancestorIndex].Revision;
+            var walked    = new HashSet<RoamingNetworkCommit_Id>();
+            var pending   = new Stack<RoamingNetworkCommit_Id>([ CommitId ]);
+
+            while (pending.TryPop(out var commitId))
+            {
+
+                if (commitId == AncestorId)
+                    return true;
+
+                if (commitIndex.TryGetValue(commitId, out var index) &&
+                    commits[index].Revision > revision                &&
+                    walked.Add(commitId))
+                {
+                    foreach (var parentId in commits[index].ParentIds)
+                        pending.Push(parentId);
+                }
+
+            }
+
+            return false;
+
+        }
+
+        #endregion
+
+        #region (private) StaleVersionError(Commit)
+
+        /// <summary>
+        /// Why a change set may not be made for the version of the given commit, as it is too old: more than
+        /// MaxRevisionsBehindHead revisions behind the head, or not following the commit of the latest checkpoint
+        /// (SPECIFICATION.md, section 5.3); none for the head, or a commit recent enough.
+        /// So no change set starts a branch where the history is long settled, which would keep its tips from being merged
+        /// cheaply and the history from being compacted.
+        /// </summary>
+        private String? StaleVersionError(RoamingNetworkCommit Commit)
+        {
+
+            var head = Head.Commit;
+
+            if (Commit.Id == head.Id)
+                return null;
+
+            if (head.Revision > Commit.Revision &&
+                head.Revision - Commit.Revision > MaxRevisionsBehindHead)
+            {
+                return $"The change set was made for the version '{Commit.Id}' of the revision {Commit.Revision}, more than {MaxRevisionsBehindHead} revisions behind the head of the revision {head.Revision}: prepare it again for the head!";
+            }
+
+            if (checkpoints.Count > 0                                &&
+                checkpoints[^1].CommitId is var checkpointCommitId   &&
+                commitIndex.ContainsKey(checkpointCommitId)          &&
+                !IsOrFollows(Commit.Id, checkpointCommitId))
+            {
+                return $"The change set was made for the version '{Commit.Id}', which does not follow the commit '{checkpointCommitId}' of the latest checkpoint: prepare it again for the head!";
+            }
+
+            return null;
 
         }
 

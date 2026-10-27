@@ -539,7 +539,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// and merge it with the other tips where it does not conflict.
         /// 201 Created:          committed now; the metadata of the commit, of the head, and the conflicts left
         /// 200 OK:               committed before, also in a rebased version; the metadata of its commit
-        /// 422 Unprocessable:    refused, e.g. as it is not signed by its owners or fits no version
+        /// 409 Conflict:         made for another version than the head, its commit would conflict with the head;
+        ///                       the conflicts and the metadata of the head: prepare it again for the head
+        /// 422 Unprocessable:    refused, e.g. as it is not signed by its owners, fits no version or one too old
         /// 400 Bad Request:      no valid change set, or one for another roaming network
         /// 403 Forbidden:        submitting is not enabled, or not allowed for the sender
         /// </summary>
@@ -590,6 +592,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                     HTTPStatusCode.OK,
                                                                                     CommittedJSON(result, history)),
 
+                       RoamingNetworkCommitStatus.Conflict          => JSONResponse(Request,
+                                                                                    HTTPStatusCode.Conflict,
+                                                                                    ConflictJSON(result)),
+
                        _                                            => ErrorResponse(Request,
                                                                                      HTTPStatusCode.UnprocessableEntity,
                                                                                      result.ErrorResponse)
@@ -637,6 +643,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return json;
 
         }
+
+        #endregion
+
+        #region (internal static) ConflictJSON(Result)
+
+        /// <summary>
+        /// Why a change set made for another version than the head was refused: the conflicts its commit would have with
+        /// the head, and the metadata of the head to prepare it again for.
+        /// </summary>
+        internal static JObject ConflictJSON(RoamingNetworkCommitResult Result)
+
+            => new (
+                   new JProperty(PropertyKeys.Status,       Result.Status.ToString()),
+                   new JProperty(PropertyKeys.Description,  Result.ErrorResponse),
+                   new JProperty(PropertyKeys.Head,         new RoamingNetworkCommitInfo(Result.Head.Commit).ToJSON(Embedded: true)),
+                   new JProperty(PropertyKeys.Conflicts,    new JArray((Result.Conflicts ?? []).Select(conflict => conflict.ToJSON(Embedded: true))))
+               );
 
         #endregion
 
