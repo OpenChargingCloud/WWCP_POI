@@ -27,8 +27,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// The epochs of a peer (SPECIFICATION.md, section 11): when the other server serves the next epoch, a history whose
     /// epoch its final checkpoint closed starts the next one itself, from the version it has, and catches up there; one
-    /// without the final checkpoint starts from the other server. A history in an epoch the other server has not reached
-    /// yet waits for it.
+    /// without the final checkpoint starts from the other server, anchored in the trust anchor as at first, and only in a
+    /// later epoch, never in one before. A history in an epoch the other server has not reached yet waits for it.
     /// </summary>
     public sealed partial class RoamingNetworkPeer
     {
@@ -58,7 +58,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!options.FollowEpochs)
                 throw new InvalidOperationException($"The other server is in the epoch {theirs}, this history in the epoch {ours}, and the peer does not follow epochs!");
 
-            // From the final checkpoint held here, as every server does; else as from the start.
+            // From the final checkpoint held here, as every server does; else as from the start, anchored in the trust anchor,
+            // and of a later epoch.
             if (theirs == ours + 1 &&
                 currentHistory.FinalCheckpoint is not null &&
                 currentHistory.TryStartNextEpoch(out var nextHistory,
@@ -70,7 +71,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return;
             }
 
-            await StartFromSnapshotAsync(Connection, CancellationToken);
+            await StartFromSnapshotAsync(Connection, Replacement.NextEpoch, CancellationToken);
 
         }
 

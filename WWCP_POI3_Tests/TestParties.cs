@@ -225,6 +225,100 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region WithKeyStatement(this Network)
+
+        /// <summary>
+        /// The given roaming network with test keys, its operator stating its identity key in a key statement, valid from
+        /// 2026 to 2036: so that its trust anchor anchors what its operator signs (SPECIFICATION.md, section 8.6).
+        /// </summary>
+        public static RoamingNetwork WithKeyStatement(this RoamingNetwork Network)
+        {
+
+            var identity      = Key(Party(Network), POIKeyKind.Identity);
+            var json          = Network.ToJSON();
+            var keyStatement  = RoamingNetworkKeyStatement.Create(identity.Private,
+                                                                  COSEAlgorithm.ES512,
+                                                                  1,
+                                                                  Network.Id,
+                                                                  Network.Operator!.Id,
+                                                                  [ identity.Public ],
+                                                                  DateTimeOffset.Parse("2026-01-01T00:00:00Z"),
+                                                                  DateTimeOffset.Parse("2036-01-01T00:00:00Z"));
+
+            json[RoamingNetwork.PropertyKeys.Operator]![RoamingNetworkKeyStatement.JSONProperty] = keyStatement.ToJSON(Embedded: true);
+
+            if (!RoamingNetwork.TryParse(json, out var network, out var error))
+                throw new ArgumentException("The roaming network with a key statement is invalid: " + error);
+
+            return network;
+
+        }
+
+        #endregion
+
+        #region OperatorSigner(this Network) / TrustAnchor(this Network) / VerifyOperatorCheckpointSignature(Network)
+
+        /// <summary>
+        /// The certified signing key of the test operator of the given roaming network, in the role of the roaming network
+        /// operator: for attestations and checkpoints anchored in its trust anchor.
+        /// </summary>
+        public static RoamingNetworkCommitSigner OperatorSigner(this RoamingNetwork Network)
+        {
+
+            var (privateKey, publicKey) = Key(Party(Network), POIKeyKind.Signing);
+
+            return new RoamingNetworkCommitSigner(privateKey,
+                                                  publicKey.Id,
+                                                  COSEAlgorithm.ES256,
+                                                  RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator);
+
+        }
+
+        /// <summary>
+        /// The trust anchor of the given roaming network: the identity key of its test operator.
+        /// </summary>
+        public static RoamingNetworkTrustAnchor TrustAnchor(this RoamingNetwork Network)
+
+            => new (Network.Id,
+                    [ org.GraphDefined.Vanaheimr.Hermod.HTTP.URL.Parse($"https://hub.example/poi/RNs/{Network.Id}") ],
+                    [ Key(Party(Network), POIKeyKind.Identity).Public.Id ]);
+
+        /// <summary>
+        /// Verifies the signatures of checkpoints by the signing key of the test operator of the given roaming network,
+        /// and those the given other delegate verifies, e.g. of witnesses.
+        /// </summary>
+        public static VerifyCheckpointSignatureDelegate VerifyOperatorCheckpointSignature(RoamingNetwork                      Network,
+                                                                                          VerifyCheckpointSignatureDelegate?  Others   = null)
+        {
+
+            var (_, publicKey) = Key(Party(Network), POIKeyKind.Signing);
+
+            return (checkpoint, signature) => (signature.KeyId == publicKey.Id && checkpoint.VerifySignature(signature, publicKey.Key, publicKey.Id, out _)) ||
+                                              (Others?.Invoke(checkpoint, signature) ?? false);
+
+        }
+
+        #endregion
+
+        #region Attesting(this History)
+
+        /// <summary>
+        /// The given history, attesting its head by the test operator of its roaming network, now and whenever it changes.
+        /// </summary>
+        public static RoamingNetworkHistory Attesting(this RoamingNetworkHistory History)
+        {
+
+            History.AttestationSigners = [ History.Head.RoamingNetwork.OperatorSigner() ];
+
+            if (!History.TryAttest(out _, out var error))
+                throw new ArgumentException("The head can not be attested: " + error);
+
+            return History;
+
+        }
+
+        #endregion
+
         #region WithKeys(this Operator / Provider)
 
         /// <summary>

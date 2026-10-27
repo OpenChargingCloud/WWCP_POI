@@ -136,19 +136,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TryJoinFromCheckpointAsync(Connection, CancellationToken)
+        #region (private) TryJoinFromCheckpointAsync(Connection, TrustAnchor, CancellationToken)
 
         /// <summary>
         /// A new history from the version of the latest checkpoint of the other server carrying the signatures required, or
-        /// of the latest one before that does, with the price statements it names (SPECIFICATION.md, section 10.5); null when
-        /// the peer does not join from checkpoints, or there is no such checkpoint: it starts from the head then.
+        /// of the latest one before that does, with the price statements it names (SPECIFICATION.md, section 10.5), and that
+        /// checkpoint; it must be signed as the given trust anchor requires: in the role of the roaming network operator by
+        /// signing keys of as many holders as the trust anchor and the key statement of its version require, each certified
+        /// by an identity key the trust anchor names. Nothing when the peer does not join from checkpoints, or there is no
+        /// such checkpoint: it starts from the head then.
         /// </summary>
-        private async Task<RoamingNetworkHistory?> TryJoinFromCheckpointAsync(Connection         Connection,
-                                                                             CancellationToken  CancellationToken)
+        private async Task<(RoamingNetworkHistory? History, RoamingNetworkCheckpoint? Checkpoint)> TryJoinFromCheckpointAsync(Connection                 Connection,
+                                                                                                                               RoamingNetworkTrustAnchor  TrustAnchor,
+                                                                                                                               CancellationToken          CancellationToken)
         {
 
             if (!options.JoinFromCheckpoint || !options.FollowCheckpoints || options.VerifyCheckpointSignature is not VerifyCheckpointSignatureDelegate verify)
-                return null;
+                return (null, null);
 
             var latestAnswer = await Connection.RequestAsync("checkpoints", new JObject(new JProperty(POI_API.PropertyKeys.Latest, true)), CancellationToken);
 
@@ -156,7 +160,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 latestAnswer.GetPayloadJSON()?[POI_API.PropertyKeys.Checkpoints]?.OfType<JObject>().FirstOrDefault() is not JObject latestJSON ||
                 !RoamingNetworkCheckpoint.TryParse(latestJSON, out var latest, out _))
             {
-                return null;
+                return (null, null);
             }
 
             // The latest one first; when it does not carry the signatures required, e.g. of witnesses not there yet, those before.
@@ -211,13 +215,143 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     continue;
                 }
 
+                // Signed by the roaming network operator as the trust anchor requires, with the keys its version gives.
+                if (!joined.TryGetRootProof(out var rootProof, out errorResponse) ||
+                    !rootProof.Verify(checkpoint, TrustAnchor, out errorResponse))
+                {
+                    RaiseError($"The checkpoint '{checkpoint.Id}' of the other server is not anchored in the trust anchor of the roaming network '{TrustAnchor.Id}': {errorResponse}", null);
+                    continue;
+                }
+
                 // From there: not to be pushed back.
                 receivedCheckpoints.TryAdd(checkpoint.Id, 0);
 
                 foreach (var signature in checkpoint.Signatures)
                     receivedCheckpointSignatures.TryAdd((checkpoint.Id, signature), 0);
 
-                return joined;
+                return (joined, checkpoint);
+
+            }
+
+            return (null, null);
+
+        }
+
+        #endregion
+
+        #region (private) WhyNotFollowingAsync(Connection, Current, New, Checkpoint, CancellationToken)
+
+        /// <summary>
+        /// Why the given new history of the other server is not proven to follow the head and every tip of the given one held
+        /// here, or null: each must be a commit the new one holds, or one of the commits of the checkpoint it joined from or
+        /// of one before it in its line, as the proof of the commit there tells (SPECIFICATION.md, sections 10.4 and 10.5),
+        /// every checkpoint between named by the one after it, as its previousId. A snapshot of the head proves nothing of the
+        /// commits before it, and a commit not pushed yet is known nowhere else: neither is proven to be followed.
+        /// </summary>
+        private async Task<String?> WhyNotFollowingAsync(Connection                 Connection,
+                                                         RoamingNetworkHistory      Current,
+                                                         RoamingNetworkHistory      New,
+                                                         RoamingNetworkCheckpoint?  Checkpoint,
+                                                         CancellationToken          CancellationToken)
+        {
+
+            var unknown = Current.Tips.Select(tip => tip.Commit.Id).
+                                       Append(Current.Head.Commit.Id).
+                                       Distinct().
+                                       Where (commitId => !New.Contains(commitId)).
+                                       ToArray();
+
+            if (unknown.Length == 0)
+                return null;
+
+            if (Checkpoint is null)
+                return $"The other server knows none of the commits of this history, and its snapshot of the head '{New.Head.Commit.Id}' does not prove to follow the head '{Current.Head.Commit.Id}' held here: " +
+                       "it is kept, with its commits not pushed yet. Joining from checkpoints proves it, a reset replaces it regardless.";
+
+            // The line of checkpoints up to the one joined from, as far as it is checked: each named by the one after it.
+            var line = new Dictionary<RoamingNetworkCheckpoint_Id, RoamingNetworkCheckpoint> { { Checkpoint.Id, Checkpoint } };
+
+            foreach (var commitId in unknown)
+            {
+
+                var proofAnswer = await Connection.RequestAsync("commitProof",
+                                                                new JObject(new JProperty(RoamingNetworkCommitSignature.PropertyKeys.CommitId, commitId.ToString())),
+                                                                CancellationToken);
+
+                if (proofAnswer.IsError ||
+                    proofAnswer.GetPayloadJSON() is not JObject proofJSON ||
+                    !RoamingNetworkCheckpointProof.TryParse(proofJSON, out var proof, out _) ||
+                    proof.CommitId != commitId)
+                {
+                    return $"The other server proves not that the commit '{commitId}' held here is one of its checkpoints: it is kept, with its commits not pushed yet. {proofAnswer.ErrorDescription}".TrimEnd();
+                }
+
+                if (!line.TryGetValue(proof.CheckpointId, out var ofCommit))
+                {
+
+                    var checkpointAnswer = await Connection.RequestAsync("checkpoint",
+                                                                         new JObject(new JProperty(POI_API.PropertyKeys.CheckpointId, proof.CheckpointId.ToString())),
+                                                                         CancellationToken);
+
+                    if (checkpointAnswer.IsError ||
+                        checkpointAnswer.GetPayloadJSON() is not JObject checkpointJSON ||
+                        !RoamingNetworkCheckpoint.TryParse(checkpointJSON, out ofCommit, out _) ||
+                        ofCommit.Id    != proof.CheckpointId ||
+                        ofCommit.Epoch != Checkpoint.Epoch   ||
+                        ofCommit.Sequence > Checkpoint.Sequence)
+                    {
+                        return $"The checkpoint '{proof.CheckpointId}' of the commit '{commitId}' held here is none of the line of the checkpoint '{Checkpoint.Id}'!";
+                    }
+
+                    // From it up to the one joined from, each checkpoint naming the one before.
+                    var between   = new List<RoamingNetworkCheckpoint> { ofCommit };
+                    var previous  = ofCommit;
+
+                    while (previous.Sequence < Checkpoint.Sequence)
+                    {
+
+                        var pageAnswer = await Connection.RequestAsync("checkpoints",
+                                                                       new JObject(
+                                                                           new JProperty(POI_API.PropertyKeys.Since,  previous.Sequence),
+                                                                           new JProperty(POI_API.PropertyKeys.Max,    Math.Max(options.MaxCommitsPerRequest, 1))
+                                                                       ),
+                                                                       CancellationToken);
+
+                        var page = pageAnswer.IsError ? [] : pageAnswer.GetPayloadJSON()?[POI_API.PropertyKeys.Checkpoints]?.OfType<JObject>().ToArray() ?? [];
+
+                        if (page.Length == 0)
+                            return $"The other server gives not the line of checkpoints from '{ofCommit.Id}' to '{Checkpoint.Id}'!";
+
+                        foreach (var nextJSON in page)
+                        {
+
+                            if (!RoamingNetworkCheckpoint.TryParse(nextJSON, out var next, out _) ||
+                                next.Sequence   != previous.Sequence + 1 ||
+                                next.PreviousId != previous.Id)
+                            {
+                                return $"The checkpoint after '{previous.Id}' of the other server does not name it before it!";
+                            }
+
+                            previous = next;
+                            between.Add(next);
+
+                            if (next.Sequence == Checkpoint.Sequence)
+                                break;
+
+                        }
+
+                    }
+
+                    if (previous.Id != Checkpoint.Id)
+                        return $"The line of checkpoints from '{ofCommit.Id}' of the other server ends in '{previous.Id}', not in '{Checkpoint.Id}'!";
+
+                    foreach (var checkedCheckpoint in between)
+                        line[checkedCheckpoint.Id] = checkedCheckpoint;
+
+                }
+
+                if (!proof.Verify(ofCommit, out var proofError))
+                    return $"The proof of the commit '{commitId}' held here in the checkpoint '{ofCommit.Id}' is invalid: {proofError}";
 
             }
 

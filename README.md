@@ -701,7 +701,7 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/history/head` | metadata of the head commit |
 | `GET ~/RNs/{id}/history/tips` | metadata of the head and all tips, and the conflicts keeping them apart |
 | `GET ~/RNs/{id}/history/haveIds` | the tips and a sample of older commits held here |
-| `GET ~/RNs/{id}/history/snapshot?runtimeStatus=false` | head commit, complete network and its runtime status |
+| `GET ~/RNs/{id}/history/snapshot?runtimeStatus=false` | head commit, complete network, its runtime status, and the attestations of the head (`attestations`), of the head attested last |
 | `GET ~/RNs/{id}/history/commitInfos?since={commitId}&max={n}` | metadata of the commits since |
 | `GET ~/RNs/{id}/history/commits?since={commitId}&max={n}` | complete commits since |
 | `GET ~/RNs/{id}/history/commits?have={commitId,…}&max={n}` | complete commits missing at who holds these, parents first |
@@ -882,9 +882,12 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 both commit, push their commits to each other, and merge alike.
 
 ```csharp
+// The trust anchor of the roaming network, e.g. as scanned from the QR code of its operator.
+RoamingNetworkTrustAnchor.TryParse(scannedText, out var trustAnchor, out var error);
+
 await using var peer = new RoamingNetworkPeer(new Uri("wss://server1/RNs/rn1/history/ws"),
                                               Options: new RoamingNetworkPeerOptions {
-                                                           TrustedRoamingNetworkOperatorKeyIds = [ rnoIdentityKeyId ]
+                                                           TrustAnchor = trustAnchor
                                                        });
 await peer.StartAsync();                          // returns once caught up for the first time
 
@@ -904,10 +907,20 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
   operator's backend, or taken from elsewhere, goes there (`PushStatus`, `pushStatusUpdates`): after connecting
   the status it has differently, e.g. set while not connected, then every change, in order with the commits,
   so that a new EVSE arrives before its status. Nothing that came from the other server goes back.
-- **Trust:** `TrustedRoamingNetworkOperatorKeyIds` names keys of the roaming network operator a snapshot
-  must have; afterwards, every change set is checked by the keys in the data.
+- **Trust:** a history it starts from the other server is anchored in its `TrustAnchor` ([SPECIFICATION.md](SPECIFICATION.md),
+  sections 8.6 and 10.5): the snapshot of the head comes with the attestations of the head (`attestations`), which must be
+  signed in the role of the roaming network operator by signing keys of as many holders as the trust anchor and the key
+  statement require, each certified by an identity key the trust anchor names, as for a proof (`VerifyHead`); a
+  checkpoint it joins from must be signed so. The keys of the operator a snapshot names are public and prove nothing.
+  Without a trust anchor it starts no history from the other server (fail closed), and only continues one given to it.
+  Afterwards, every change set is checked by the keys in the data.
 - **Reconnect:** a broken connection is opened again with growing delays, and it catches up.
-  None of its commits known there starts it again from a snapshot (`OnHistoryReplaced`).
+- **No rollback:** when the other server knows none of its commits, e.g. as it compacted them away or was restored from
+  an old backup, the history is replaced (`OnHistoryReplaced`) only by one joined from a checkpoint that proves its
+  head and tips to be commits of that checkpoint or of one before it in its line (`commitProof`, section 10.4). Otherwise
+  the peer keeps its history with its commits not pushed yet, tells why (`OnHistoryReplacementRefused`), and asks again
+  with growing delays. `ResetHistoryAsync()` starts it anew from the other server regardless, discarding what the other
+  server does not hold, e.g. local commits not pushed yet; never to an epoch before.
 - **Options:** complete commits or announcements, following status or not, pushing commits and status or not, credentials via
   `ConfigureWebSocket`, an additional verifier of change set signatures, a verifier of commit signatures,
   the roles every commit must be signed in, limits.
@@ -917,17 +930,18 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
   its history and signed as `RequiredCheckpointSignatureRoles` require (the roaming network operator by
   default, `VerifyCheckpointSignature`), and pushes those the other server misses (`FollowCheckpoints`,
   `PushCheckpoints`). A history it starts begins with the version of the latest checkpoint carrying the signatures
-  required, or the latest one before that does, and takes the commits since (`JoinFromCheckpoint`); without a verifier
-  or such a checkpoint, from the head, and its line with the first checkpoint of a commit it holds. A witness running a peer signs with `history.TryWitness(…, witness, …)`, its journal outliving every history the peer starts anew; the signature goes to the other server.
+  required and signed as the trust anchor requires, or the latest one before that does, and takes the commits since
+  (`JoinFromCheckpoint`); without a verifier or such a checkpoint, from the head, and its line with the first checkpoint of a commit it holds. A witness running a peer signs with `history.TryWitness(…, witness, …)`, its journal outliving every history the peer starts anew; the signature goes to the other server.
 - **Attestations:** with `VerifyAttestation`, a verifier of the keys of the roaming network operator, it takes the
   attestations of the other server, so that it serves proofs of charging stations with them as well.
 - **Price statements:** after the commits, it takes the price statements of the other server and pushes those taken
   here it misses, then every new one (`FollowPriceStatements`, `PushPriceStatements`), e.g. from a server of a charging
   station operator to the one of the roaming network operator; the price statements of a checkpoint come with it.
 - **Epochs:** before catching up, it asks for the epoch of the other server. When the other server serves the next
-  epoch, a history holding the final checkpoint starts it itself, one without it from the other server; the history of
-  the epoch before stays as it is (`OnHistoryReplaced`), and the next one is kept in `EpochStore(number)`
-  (`FollowEpochs`). A history in an epoch the other server has not reached yet waits for it.
+  epoch, a history holding the final checkpoint starts it itself, one without it from the other server, anchored in the
+  trust anchor as at first; the history of the epoch before stays as it is (`OnHistoryReplaced`), and the next one is kept
+  in `EpochStore(number)` (`FollowEpochs`). A history in an epoch the other server has not reached yet waits for it; none
+  goes back to an epoch before.
 
 ## Submodules
 

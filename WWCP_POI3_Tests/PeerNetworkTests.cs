@@ -73,8 +73,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                                                  ChargingStationOperators:  [ new ChargingStationOperator(GEF,
                                                                                                           Created:        Created,
                                                                                                           ChargingPools:  [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
-                                                                                                                                             Created:  Created) ]) ]).WithKeys()
-                          );
+                                                                                                                                             Created:  Created) ]) ]).WithKeys().WithKeyStatement()
+                          ).Attesting();
 
             poiAPI.AddRoamingNetworkHistory(serverA);
 
@@ -111,6 +111,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             var peer = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"),
                                               History,
                                               Options ?? new RoamingNetworkPeerOptions {
+                                                                      TrustAnchor        = serverA!.Head.RoamingNetwork.TrustAnchor(),
                                                                       MinReconnectDelay  = TimeSpan.FromMilliseconds(50),
                                                                       MaxReconnectDelay  = TimeSpan.FromMilliseconds(200)
                                                                   });
@@ -218,7 +219,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                 using (var store = new RoamingNetworkHistoryFileStore(directory))
                 {
 
-                    var peerB     = await StartPeer(new RoamingNetworkPeerOptions { Store = store });
+                    var peerB     = await StartPeer(new RoamingNetworkPeerOptions { TrustAnchor = serverA!.Head.RoamingNetwork.TrustAnchor(), Store = store });
                     var historyB  = peerB.History!;
 
                     Assert.That(historyB.Commit(historyB.Head.RoamingNetwork.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(historyB.Head.RoamingNetwork, "dataSource", null, "v2") ],
@@ -282,18 +283,18 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
         public async Task A_snapshot_of_another_roaming_network_operator_is_not_trusted()
         {
 
-            var trusted  = TestParties.Key(TestParties.Party(RoamingNetwork_Id.Parse("rn1")), POIKeyKind.Identity).Public.Id;
+            var trusted  = serverA!.Head.RoamingNetwork.TrustAnchor();
 
             // The right key: the peer starts.
-            var peerB    = await StartPeer(new RoamingNetworkPeerOptions { TrustedRoamingNetworkOperatorKeyIds = [ trusted ] });
+            var peerB    = await StartPeer(new RoamingNetworkPeerOptions { TrustAnchor = trusted });
 
             // Another key: the peer never starts.
             var errors   = new List<String>();
             var peerC    = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"),
                                                   Options: new RoamingNetworkPeerOptions {
-                                                               TrustedRoamingNetworkOperatorKeyIds  = [ new String('0', 64) ],
-                                                               MinReconnectDelay                    = TimeSpan.FromMilliseconds(50),
-                                                               MaxReconnectDelay                    = TimeSpan.FromMilliseconds(200)
+                                                               TrustAnchor        = new RoamingNetworkTrustAnchor(trusted.Id, trusted.URLs, [ new String('0', 64) ]),
+                                                               MinReconnectDelay  = TimeSpan.FromMilliseconds(50),
+                                                               MaxReconnectDelay  = TimeSpan.FromMilliseconds(200)
                                                            });
 
             peers.Add(peerC);
@@ -307,7 +308,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                 Assert.That(async () => await peerC.StartAsync(timeout.Token), Throws.InstanceOf<OperationCanceledException>());
                 Assert.That(peerC.History,                                    Is.Null);
                 lock (errors)
-                    Assert.That(errors.Any(error => error.Contains("none of the trusted keys")),  Is.True);
+                    Assert.That(errors.Any(error => error.Contains("is not anchored in the trust anchor")),  Is.True);
             }
 
         }

@@ -41,8 +41,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                       RoamingNetworkHistory   History);
 
     /// <summary>
-    /// The peer started its history from a snapshot of the other server: at first, or because the other server
-    /// knew none of its commits.
+    /// The peer started its history from a snapshot of the other server: at first, anew as its caller asked for, in the
+    /// next epoch, or because the other server knew none of its commits and the new history follows them.
     /// </summary>
     /// <param name="Follower">The peer.</param>
     /// <param name="OldHistory">The history before, if any.</param>
@@ -50,6 +50,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
     public delegate void OnRoamingNetworkPeerHistoryReplacedDelegate(RoamingNetworkPeer   Follower,
                                                                          RoamingNetworkHistory?   OldHistory,
                                                                          RoamingNetworkHistory    NewHistory);
+
+    /// <summary>
+    /// The peer refused to replace its history by one of the other server, e.g. one not proven to follow its head:
+    /// it keeps its history with its commits not pushed yet, and asks again later.
+    /// </summary>
+    /// <param name="Follower">The peer.</param>
+    /// <param name="History">The history it keeps.</param>
+    /// <param name="Reason">Why it refused.</param>
+    public delegate void OnRoamingNetworkPeerHistoryReplacementRefusedDelegate(RoamingNetworkPeer     Follower,
+                                                                               RoamingNetworkHistory  History,
+                                                                               String                 Reason);
 
     /// <summary>
     /// Something went wrong; the peer connects again.
@@ -73,7 +84,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// misses, the status it has differently, and every new commit and status update of its own history, if allowed there,
     /// in their order; nothing that came from the other server goes back. The latest status of an entity wins everywhere.
     /// Afterwards it appends the pushed commits; one whose parents it misses, or one only announced,
-    /// makes it fetch again. None of its commits known there makes it start again from a snapshot.
+    /// makes it fetch again. A history it starts from the other server is anchored in the trust anchor of the
+    /// roaming network (SPECIFICATION.md, section 10.5). None of its commits known there makes it start again from a
+    /// checkpoint only where that is proven to follow its head and tips; else it keeps its history, with the commits
+    /// not pushed yet, tells why (OnHistoryReplacementRefused) and asks again later. Starting anew from the other server
+    /// regardless is its caller's choice (ResetHistoryAsync).
     /// When the connection breaks it connects again, waiting longer after every failure, and catches up.
     /// Change sets and status updates can also be sent to the other server, which pushes them back.
     /// </remarks>
@@ -81,6 +96,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
     {
 
         #region Data
+
+        /// <summary>
+        /// Why a history is started from the other server, and so what it may replace.
+        /// </summary>
+        private enum Replacement
+        {
+
+            /// <summary>
+            /// The first one: there is none to replace.
+            /// </summary>
+            Start,
+
+            /// <summary>
+            /// Anew, as the caller asked for: whether it follows the one held or not, but of no epoch before.
+            /// </summary>
+            Reset,
+
+            /// <summary>
+            /// The other server knows none of the commits held: only by one proven to follow them.
+            /// </summary>
+            Unknown,
+
+            /// <summary>
+            /// The next epoch, its final checkpoint not held here: only by one of a later epoch.
+            /// </summary>
+            NextEpoch
+
+        }
 
         private readonly RoamingNetworkPeerOptions  options;
         private readonly TaskCompletionSource           firstSynchronization  = new (TaskCreationOptions.RunContinuationsAsynchronously);
@@ -90,6 +133,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private          Task?                          runner;
         private          Int64                          reconnects;
         private          Boolean                        statusFromSnapshot;
+
+        // A reset asked for by the caller, until the history is replaced; and the wait before connecting again, cut short by it.
+        private          TaskCompletionSource?          reset;
+        private          CancellationTokenSource?       waiting;
 
         // The commits taken from the other server: not to be pushed back.
         private readonly ConcurrentDictionary<RoamingNetworkCommit_Id, Byte>  receivedCommits  = [];
@@ -118,7 +165,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Uri                     PeerURL      { get; }
 
         /// <summary>
-        /// The history kept in sync; null until the first snapshot. It is replaced when the other server knows none of its commits.
+        /// The history kept in sync; null until the first snapshot. It is replaced in the next epoch, at a reset, and when the
+        /// other server knows none of its commits, only by a history proven to follow them.
         /// </summary>
         public RoamingNetworkHistory?  History
             => Volatile.Read(ref history);
@@ -148,6 +196,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The follower started its history from a snapshot.
         /// </summary>
         public event OnRoamingNetworkPeerHistoryReplacedDelegate?  OnHistoryReplaced;
+
+        /// <summary>
+        /// The follower refused to replace its history by one of the other server; it keeps it, and asks again later.
+        /// </summary>
+        public event OnRoamingNetworkPeerHistoryReplacementRefusedDelegate?  OnHistoryReplacementRefused;
 
         /// <summary>
         /// Something went wrong; the follower connects again.
@@ -232,6 +285,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
             await StopAsync();
             stop?.Dispose();
+        }
+
+        #endregion
+
+        #region ResetHistoryAsync(CancellationToken = default)
+
+        /// <summary>
+        /// Start the history anew from the other server, as at first: from a checkpoint or a snapshot anchored in the trust
+        /// anchor, whether it follows this history or not, e.g. after the other server was restored from a backup. This
+        /// DISCARDS what of this history the other server does not hold, e.g. local commits not pushed yet: they are
+        /// pushed no more. The history before stays as it is (OnHistoryReplaced), never one of an epoch before. The
+        /// connection is opened anew; returns once the history is replaced. Cancel the token to stop waiting, not the
+        /// reset.
+        /// </summary>
+        /// <param name="CancellationToken">An optional cancellation token.</param>
+        public async Task ResetHistoryAsync(CancellationToken CancellationToken = default)
+        {
+
+            if (runner is null)
+                throw new InvalidOperationException("The follower has not been started!");
+
+            var resetting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            resetting     = Interlocked.CompareExchange(ref reset, resetting, null) ?? resetting;
+
+            // Not after the wait before connecting again, nor on the connection open now.
+            try
+            {
+                Volatile.Read(ref waiting)?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            { }
+
+            Volatile.Read(ref connection)?.Abort();
+
+            await resetting.Task.WaitAsync(CancellationToken);
+
         }
 
         #endregion
@@ -484,13 +573,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 Interlocked.Increment(ref reconnects);
 
-                try
+                // A reset asked for does not wait.
+                using (var wait = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken))
                 {
-                    await Task.Delay(delay, CancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    break;
+
+                    Interlocked.Exchange(ref waiting, wait);
+
+                    try
+                    {
+                        if (Volatile.Read(ref reset) is null)
+                            await Task.Delay(delay, wait.Token);
+                    }
+                    catch (OperationCanceledException) when (!CancellationToken.IsCancellationRequested)
+                    { }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    finally
+                    {
+                        Interlocked.CompareExchange(ref waiting, null, wait);
+                    }
+
                 }
 
                 delay = TimeSpan.FromTicks(Math.Min(delay.Ticks * 2, options.MaxReconnectDelay.Ticks));
@@ -544,7 +648,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             statusFromSnapshot = false;
 
             if (History is null)
-                await StartFromSnapshotAsync(Connection, CancellationToken);
+                await StartFromSnapshotAsync(Connection, Replacement.Start, CancellationToken);
+
+            // Anew, as the caller asked for.
+            else if (Volatile.Read(ref reset) is not null)
+                await StartFromSnapshotAsync(Connection, Replacement.Reset, CancellationToken);
 
             // In the epoch of the other server, from the final checkpoint of the one before.
             else
@@ -855,7 +963,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Append all commits of the other server missing here, page by page, naming the commits held here,
-        /// until there are no more. None of them known there makes the peer start again from a snapshot.
+        /// until there are no more. None of them known there makes the peer start again from a checkpoint
+        /// proven to follow them; without one, it refuses and keeps its history.
         /// </summary>
         private async Task CatchUpAsync(Connection         Connection,
                                         CancellationToken  CancellationToken)
@@ -877,7 +986,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (answer.ErrorCode == POIWebSocketErrorCodes.NotFound)
                     {
-                        await StartFromSnapshotAsync(Connection, CancellationToken);
+                        await StartFromSnapshotAsync(Connection, Replacement.Unknown, CancellationToken);
                         continue;
                     }
 
@@ -911,19 +1020,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) StartFromSnapshotAsync(Connection, CancellationToken)
+        #region (private) StartFromSnapshotAsync(Connection, Reason, CancellationToken)
 
         /// <summary>
-        /// Start a history anew: from the version of the latest checkpoint of the other server carrying the signatures
-        /// required, when the peer joins from checkpoints (SPECIFICATION.md, section 10.5), from a snapshot of its head
-        /// otherwise. The commits since come with catching up.
+        /// Start a history anew, anchored in the trust anchor (SPECIFICATION.md, section 10.5): from the version of the
+        /// latest checkpoint of the other server carrying the signatures required and signed as the trust anchor requires,
+        /// when the peer joins from checkpoints, from a snapshot of its head attested so otherwise. The commits since come
+        /// with catching up. The history held here, if any, is replaced only as the reason allows: by one of no epoch before,
+        /// in the next epoch only by one of a later epoch, and, as the other server knows none of its commits, only by one
+        /// proven to follow its head and its tips. Else the peer refuses: it keeps its history with its commits not pushed
+        /// yet, tells why (OnHistoryReplacementRefused), and asks again after waiting, as after every failure.
         /// </summary>
         private async Task StartFromSnapshotAsync(Connection         Connection,
+                                                  Replacement        Reason,
                                                   CancellationToken  CancellationToken)
         {
 
-            var newHistory      = await TryJoinFromCheckpointAsync(Connection, CancellationToken);
-            var statusSnapshot  = false;
+            var currentHistory  = Reason == Replacement.Start ? null : History;
+
+            // Fail closed: no history of the other server without the trust anchor of the roaming network.
+            if (options.TrustAnchor is not RoamingNetworkTrustAnchor trustAnchor)
+                throw Refused(currentHistory, "Without the trust anchor of the roaming network (RoamingNetworkPeerOptions.TrustAnchor) the peer starts no history from the other server!");
+
+            var (newHistory, checkpoint)  = await TryJoinFromCheckpointAsync(Connection, trustAnchor, CancellationToken);
+            var statusSnapshot            = false;
 
             if (newHistory is null)
             {
@@ -934,21 +1054,43 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             CancellationToken);
 
                 if (!RoamingNetworkHistory.TryFromSnapshot(snapshot, out newHistory, out var errorResponse, options.ChangeSetLimits))
-                    throw new InvalidOperationException("Invalid snapshot of the other server: " + errorResponse);
+                    throw Refused(currentHistory, "Invalid snapshot of the other server: " + errorResponse);
+
+                // Its head as the roaming network operator attested it: the keys of the operator it names are public.
+                var attestations = new List<RoamingNetworkAttestation>();
+
+                foreach (var attestationJSON in snapshot[RoamingNetworkHistory.PropertyKeys.Attestations]?.OfType<JObject>() ?? [])
+                    if (RoamingNetworkAttestation.TryParse(attestationJSON, out var attestation, out _))
+                        attestations.Add(attestation);
+
+                if (!newHistory.VerifyHead(trustAnchor, out var anchorError, attestations))
+                    throw Refused(currentHistory, $"The snapshot of the other server is not anchored in the trust anchor of the roaming network '{trustAnchor.Id}': {anchorError}");
 
                 statusSnapshot = options.FollowStatus;
 
             }
 
             if (!RoamingNetworkHistory.CheckSignatures(newHistory.Head.Commit, options.VerifyCommitSignature, options.RequiredSignatureRoles, out var signatureError))
-                throw new InvalidOperationException("The snapshot of the other server is not signed as required: " + signatureError);
+                throw Refused(currentHistory, "The snapshot of the other server is not signed as required: " + signatureError);
 
-            // The trust anchor: the snapshot must be one of the roaming network the keys of its operator name.
-            if (options.TrustedRoamingNetworkOperatorKeyIds is { Count: > 0 } trustedKeyIds &&
-                !(newHistory.Head.RoamingNetwork.Operator is RoamingNetworkOperator roamingNetworkOperator &&
-                  roamingNetworkOperator.IdentityKeys.Concat(roamingNetworkOperator.SigningKeys).Any(key => trustedKeyIds.Contains(key.Id))))
+            if (currentHistory is not null)
             {
-                throw new InvalidOperationException("The snapshot of the other server names none of the trusted keys of the roaming network operator!");
+
+                // Never back to an epoch before; into the next one only forward.
+                if (newHistory.Epoch.Number < currentHistory.Epoch.Number ||
+                   (Reason == Replacement.NextEpoch && newHistory.Epoch.Number == currentHistory.Epoch.Number))
+                {
+                    throw Refused(currentHistory, $"The other server gives a history of the epoch {newHistory.Epoch.Number}, this one is of the epoch {currentHistory.Epoch.Number}!");
+                }
+
+                // Of the same epoch, unknown there: only one following everything held here.
+                if (Reason == Replacement.Unknown &&
+                    newHistory.Epoch.Number == currentHistory.Epoch.Number &&
+                    await WhyNotFollowingAsync(Connection, currentHistory, newHistory, checkpoint, CancellationToken) is String notFollowing)
+                {
+                    throw Refused(currentHistory, notFollowing);
+                }
+
             }
 
             if (options.Retention is not null)
@@ -981,7 +1123,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             statusFromSnapshot = statusSnapshot;
 
+            // A reset asked for is done.
+            if (Reason is Replacement.Start or Replacement.Reset)
+                Interlocked.Exchange(ref reset, null)?.TrySetResult();
+
             OnHistoryReplaced?.Invoke(this, oldHistory, newHistory);
+
+        }
+
+        #endregion
+
+        #region (private) Refused(History, Reason)
+
+        /// <summary>
+        /// The error of a history of the other server not taken: the history held here, if any, stays, and is told of
+        /// (OnHistoryReplacementRefused). Thrown, it ends the connection, and the peer asks again after waiting.
+        /// </summary>
+        private InvalidOperationException Refused(RoamingNetworkHistory?  History,
+                                                  String                  Reason)
+        {
+
+            if (History is not null)
+            {
+                try
+                {
+                    OnHistoryReplacementRefused?.Invoke(this, History, Reason);
+                }
+                catch
+                { }
+            }
+
+            return new InvalidOperationException(Reason);
 
         }
 
@@ -1419,6 +1591,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     closed.Cancel();
                 }
 
+            }
+
+            #endregion
+
+            #region Abort()
+
+            /// <summary>
+            /// End the connection at once, e.g. for a reset: what waits for an answer fails, and the pushes end.
+            /// </summary>
+            public void Abort()
+            {
+                try
+                {
+                    closed.Cancel();
+                    webSocket.Abort();
+                }
+                catch (ObjectDisposedException)
+                { }
             }
 
             #endregion

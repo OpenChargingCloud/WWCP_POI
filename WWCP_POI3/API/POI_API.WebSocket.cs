@@ -280,9 +280,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
+                // With the attestations of its head: whoever starts from it checks it against its trust anchor.
                 return Task.FromResult(
-                           request.Respond(() => History.ToSnapshotJSON(includeRuntimeStatus),
-                                           () => History.ToSnapshotCBOR(includeRuntimeStatus))
+                           request.Respond(() => History.ToSnapshotJSON(includeRuntimeStatus, IncludeAttestations: true),
+                                           () => History.ToSnapshotCBOR(includeRuntimeStatus, IncludeAttestations: true))
                        );
 
             });

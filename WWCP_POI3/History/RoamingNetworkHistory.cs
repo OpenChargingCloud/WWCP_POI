@@ -198,6 +198,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  RuntimeStatus         = "runtimeStatus";
 
             /// <summary>
+            /// The property of the attestations of the head of a snapshot, valid when it was made.
+            /// </summary>
+            public const String  Attestations          = "attestations";
+
+            /// <summary>
             /// The property of the checkpoint of a snapshot started from a checkpoint.
             /// </summary>
             public const String  Checkpoint            = "checkpoint";
@@ -580,18 +585,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToSnapshotJSON(IncludeRuntimeStatus = true)
+        #region ToSnapshotJSON(IncludeRuntimeStatus = true, IncludeAttestations = false)
 
         /// <summary>
         /// A snapshot of the head, now and complete: its commit, the complete version of the roaming network,
         /// and the current admin status and status of its entities, from which another server starts its history.
         /// The commit and the network can be verified by the ETags of the commit; the runtime status is not content.
+        /// With its attestations, it is a snapshot of the head as far as it is attested here, with the attestations of
+        /// it valid now, so that whoever starts from it checks it against the trust anchor of the roaming network
+        /// (SPECIFICATION.md, section 10.5); the head a moment later may not be attested yet.
         /// </summary>
         /// <param name="IncludeRuntimeStatus">Whether to include the runtime status.</param>
-        public JObject ToSnapshotJSON(Boolean IncludeRuntimeStatus = true)
+        /// <param name="IncludeAttestations">Whether to include the attestations of the head, unless none.</param>
+        public JObject ToSnapshotJSON(Boolean IncludeRuntimeStatus  = true,
+                                      Boolean IncludeAttestations   = false)
         {
 
-            var head = Head;
+            var (head, attestations) = IncludeAttestations
+                                           ? AttestedHead(null)
+                                           : (Head, (IReadOnlyList<RoamingNetworkAttestation>) []);
 
             var json = new JObject(
                            new JProperty(PropertyKeys.Timestamp,       Timestamp.Now.ToISO8601()),
@@ -609,6 +621,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (IncludeRuntimeStatus)
                 json.Add(PropertyKeys.RuntimeStatus, new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON(Embedded: true))));
 
+            if (attestations.Count > 0)
+                json.Add(PropertyKeys.Attestations,  new JArray(attestations.Select(attestation => attestation.ToJSON(Embedded: true))));
+
             // The roaming network and the runtime status write whole numbers as integers themselves (POIJSON.Number);
             // this holds for anything else in it, too, so that ToString() of it is read back with its ETags.
             return POIJSON.WholeNumbersAsIntegers(json);
@@ -618,17 +633,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region ToSnapshotCBOR(IncludeRuntimeStatus = true)
+        #region ToSnapshotCBOR(IncludeRuntimeStatus = true, IncludeAttestations = false)
 
         /// <summary>
         /// A snapshot of the head in CBOR, see ToSnapshotJSON(), with the keys of the JSON snapshot.
         /// Write it with CBORWriterOptions.Canonical for deterministic bytes.
         /// </summary>
         /// <param name="IncludeRuntimeStatus">Whether to include the runtime status.</param>
-        public CBORValue ToSnapshotCBOR(Boolean IncludeRuntimeStatus = true)
+        /// <param name="IncludeAttestations">Whether to include the attestations of the head, unless none.</param>
+        public CBORValue ToSnapshotCBOR(Boolean IncludeRuntimeStatus  = true,
+                                        Boolean IncludeAttestations   = false)
         {
 
-            var head     = Head;
+            var (head, attestations) = IncludeAttestations
+                                           ? AttestedHead(null)
+                                           : (Head, (IReadOnlyList<RoamingNetworkAttestation>) []);
 
             var entries  = new List<KeyValuePair<CBORValue, CBORValue>> {
                                new (CBORValue.FromText(PropertyKeys.Timestamp),       CBORValue.FromText(Timestamp.Now.ToISO8601())),
@@ -642,6 +661,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (IncludeRuntimeStatus)
                 entries.Add(new (CBORValue.FromText(PropertyKeys.RuntimeStatus),
                                  CBORJSON.ToCBOR(new JArray(RoamingNetworkRuntimeStatus.Of(head.RoamingNetwork).Select(status => status.ToJSON(Embedded: true))))));
+
+            if (attestations.Count > 0)
+                entries.Add(new (CBORValue.FromText(PropertyKeys.Attestations),
+                                 CBORValue.FromArray(attestations.Select(attestation => attestation.ToCBOR(Embedded: true)))));
 
             return CBORValue.FromMap(entries);
 

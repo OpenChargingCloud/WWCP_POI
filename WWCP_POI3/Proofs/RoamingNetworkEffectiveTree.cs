@@ -107,6 +107,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region RootProof(CommitId = null, Revision = null, Attestations = null)
+
+        /// <summary>
+        /// The proof of the root alone: the roaming network pruned, giving completely its own properties with its operator,
+        /// its keys, its key statement and the certificates of its signing keys, every child array pruned. It proves the
+        /// version as a whole, e.g. the head of a snapshot against a trust anchor (SPECIFICATION.md, section 10.5), and none
+        /// of its entities.
+        /// </summary>
+        /// <param name="CommitId">The commit of the version, if known.</param>
+        /// <param name="Revision">The revision of the commit, if known.</param>
+        /// <param name="Attestations">The attestations of the version to embed.</param>
+        public RoamingNetworkProof RootProof(RoamingNetworkCommit_Id?                 CommitId       = null,
+                                             UInt64?                                  Revision       = null,
+                                             IEnumerable<RoamingNetworkAttestation>?  Attestations   = null)
+
+            => new (HashAlgorithm,
+                    (JObject) Root.Skeleton.DeepClone(),
+                    CommitId,
+                    Revision,
+                    [ .. (Attestations ?? []).Where(attestation => attestation.ETag.Equals(ETag)) ]);
+
+        #endregion
+
         #region TryGetChargingStationProof(ChargingStationId, out Proof, out ErrorResponse, CommitId = null, Revision = null, Attestations = null)
 
         /// <summary>

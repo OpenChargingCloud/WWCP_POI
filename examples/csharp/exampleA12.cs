@@ -69,8 +69,9 @@ public static class ExampleA12
 
         Console.WriteLine($"OCC serves {qa}, revision {A11.History.Head.Commit.Revision} of epoch {A11.History.Epoch.Number}: {occURL}");
 
-        // The mirror, e.g. of a National Access Point, trusts the trust anchor of epoch 2 it scanned: the snapshot it starts
-        // from must name its keys, and every commit must be signed by signing keys of the quorum. It passes on, it changes
+        // The mirror, e.g. of a National Access Point, trusts the trust anchor of epoch 2 it scanned: the head of the snapshot
+        // it starts from must be attested by OCC with signing keys of the quorum its keys certify, as a proof is, and every
+        // commit must be signed by signing keys of the quorum. It passes on, it changes
         // nothing: it pushes no commits, no status and no price statements back. It takes those of OCC: of the algorithms of
         // epoch 2, as OCC took along only those, as every server starting epoch 2 does.
         if (!RoamingNetworkTrustAnchor.TryParse(File.ReadAllText("published/QA-trustAnchor-mldsa.txt"), out var anchor, out var error))
@@ -85,15 +86,15 @@ public static class ExampleA12
 
         await using var mirror = new RoamingNetworkPeer(occURL,
                                                         Options: new RoamingNetworkPeerOptions {
-                                                                     TrustedRoamingNetworkOperatorKeyIds  = anchor.Keys,
-                                                                     VerifyCommitSignature                = (commit, signature) => ExampleA4.SigningKeyOf(anchor, follower?.History?.Head.RoamingNetwork ?? published, signature) is POIPublicKey key &&
-                                                                                                                                  commit.VerifySignature(signature, key.Key, key.Id, out _),
-                                                                     RequiredSignatureRoles               = [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ],
-                                                                     FollowCheckpoints                    = false,
-                                                                     PushCommits                          = false,
-                                                                     PushStatus                           = false,
-                                                                     PushCheckpoints                      = false,
-                                                                     PushPriceStatements                  = false
+                                                                     TrustAnchor             = anchor,
+                                                                     VerifyCommitSignature   = (commit, signature) => ExampleA4.SigningKeyOf(anchor, follower?.History?.Head.RoamingNetwork ?? published, signature) is POIPublicKey key &&
+                                                                                                                     commit.VerifySignature(signature, key.Key, key.Id, out _),
+                                                                     RequiredSignatureRoles  = [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ],
+                                                                     FollowCheckpoints       = false,
+                                                                     PushCommits             = false,
+                                                                     PushStatus              = false,
+                                                                     PushCheckpoints         = false,
+                                                                     PushPriceStatements     = false
                                                                  });
 
         follower = mirror;

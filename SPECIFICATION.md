@@ -1125,6 +1125,11 @@ has an example.
   and the WebSocket action `attestations`, and pushes every attestation the history takes on the topic
   `attestations` (action `attestation`); a proof embeds those it was made for. A peer verifying attestations
   with keys it trusts takes those of the other server, so that every server serves proofs with them.
+- A **snapshot of the head** (`GET ~/RNs/{RN_Id}/history/snapshot`, the WebSocket action `snapshot`) carries the
+  attestations of its head valid when it was made, as `attestations`, absent when there are none, and is of the head
+  as far as it is attested: a server attesting its heads itself serves the head it attested last while it attests a
+  new one. So whoever starts from it checks its head against the trust anchor (10.5) with the snapshot alone, which a
+  second request for the attestations could not, the head having moved on in between.
 
 ### 8.6 Key statements and trust anchors
 
@@ -1616,6 +1621,27 @@ version against the checkpoint's `eTags`, and then the commits since, as from a 
 - **Afterwards:** the checkpoint is the first of its line (10.1), not signed by a witness joining so (10.2), the price statements it names are checked
   when they come along with it (12.3), the commits since are taken as they come (5.2), and the runtime
   status is the one of the head of the other server.
+- **Anchored:** a server or client takes a history of another server, from a checkpoint or from a snapshot of the head,
+  only anchored in the trust anchor of the roaming network (8.6); without one it MUST NOT take any (fail closed). The keys
+  of the operator a version names are public and prove nothing: whoever forged the version names them as well. The
+  checkpoint it joins from MUST be signed in the role `roamingNetworkOperator` by signing keys of as many holders as the
+  trust anchor and the key statement of its version require, each certified by an identity key the trust anchor names, or
+  that a statement signed by them names, valid when it signed and when checked, and allowed to sign for the `party`,
+  counted per holder as for attestations (8.5, 8.6); the checkpoint's `eTags` MUST be the ones of that version. Without
+  such a checkpoint it starts from the head: the snapshot (8.5) MUST carry attestations of its head that verify against
+  the trust anchor as a proof of its root does (8.4, 8.6): the roaming network pruned to its own properties, with its
+  operator and its keys, every child array pruned. A checkpoint or snapshot not anchored is refused, and asked for again
+  later.
+- **Replacing a history:** a server or client holding a history replaces it by one of the other server only (a) in the
+  next epoch (11.4), or (b) when the other server knows none of its commits (`commits {have}` answering `NotFound`, e.g.
+  as it compacted them away, 10.6) by a history joined from a checkpoint proving to follow its head and every tip: each is
+  a commit the new history holds, or one of the commits of that checkpoint or of one before it in its line, as its proof
+  tells (10.4, `commitProof {commitId}`), every checkpoint between named by the one after it as its `previousId`. A
+  snapshot of the head proves nothing of the commits before it, and a commit not pushed yet is known nowhere else.
+  Otherwise it MUST refuse: it keeps its history, with its commits not pushed yet, and asks again after waiting longer,
+  as after any failure, so that a server rolled back, restored from an old backup or made up rolls back none of its
+  peers. It MUST NOT replace it by one of an epoch before. Starting anew regardless, discarding what the other server does
+  not hold, is the explicit choice of whoever runs it (`ResetHistoryAsync` of POI3).
 
 ### 10.6 Compaction and archives
 
@@ -1735,8 +1761,11 @@ epochs, as none holds it as the current one there (12.2).
   the same URL, and the old epoch stays readable.
 - **A peer** asks the other server for its epoch (`epoch`) before it catches up. When the other server
   is in the next epoch, a history holding the final checkpoint starts the next epoch itself; one without
-  it starts from the other server, as from its start (10.5). A history in an epoch the other server has
-  not reached yet waits for it, and asks again later.
+  it starts from the other server, as from its start, anchored in the trust anchor as there (10.5), and only in a later
+  epoch. Its head is checked against the trust anchor the peer holds: an operator changing its identity keys with the
+  epoch, e.g. to post-quantum ones, names them in a key statement signed by identity keys that trust anchor names, which
+  the peer then trusts as well (8.6, succession), or its peers are given the trust anchor of the new keys. A history in an epoch the other server has
+  not reached yet waits for it, and asks again later; none goes back to an epoch before.
 - **Status of an epoch:** `active`, `closing` (final checkpoint there, witnesses still signing, the next
   epoch not started here), `closed` (the next epoch started here).
 

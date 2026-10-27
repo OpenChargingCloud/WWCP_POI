@@ -359,6 +359,90 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region TryGetRootProof(out Proof, out ErrorResponse, HashAlgorithm = null, Attestations = null, At = null)
+
+        /// <summary>
+        /// Try to make the proof of the root of the head alone (RoamingNetworkEffectiveTree.RootProof), with the tree of the
+        /// given hash algorithm, the first one of the roaming network by default: for the given attestations of the head,
+        /// e.g. those its snapshot came with, or for the attestations of the head valid at the given time.
+        /// </summary>
+        /// <param name="Proof">The proof.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="HashAlgorithm">One of the tree hash algorithms of the roaming network, its first one by default.</param>
+        /// <param name="Attestations">The attestations of the head to embed, those of this history otherwise.</param>
+        /// <param name="At">When the attestations of this history must be valid, now by default.</param>
+        public Boolean TryGetRootProof([NotNullWhen(true)]  out RoamingNetworkProof?      Proof,
+                                       [NotNullWhen(false)] out String?                   ErrorResponse,
+                                       ETagHashAlgorithm?                                 HashAlgorithm   = null,
+                                       IEnumerable<RoamingNetworkAttestation>?            Attestations    = null,
+                                       DateTimeOffset?                                    At              = null)
+        {
+
+            Proof = null;
+
+            var (head, attestations) = Attestations is null
+                                           ? AttestedHead(At)
+                                           : (Head, (IReadOnlyList<RoamingNetworkAttestation>) [ .. Attestations ]);
+
+            if (!TryGetEffectiveTree(head.RoamingNetwork, HashAlgorithm, out var tree, out ErrorResponse))
+                return false;
+
+            Proof = tree.RootProof(head.Commit.Id,
+                                   head.Commit.Revision,
+                                   attestations);
+
+            return true;
+
+        }
+
+        #endregion
+
+        #region VerifyHead(TrustAnchor, out ErrorResponse, Attestations = null, At = null)
+
+        /// <summary>
+        /// Verify the head against the given trust anchor of its roaming network (SPECIFICATION.md, sections 8.6 and 10.5):
+        /// its root, with the tree of one of the tree hash algorithms of the roaming network, must be attested in the role of
+        /// the roaming network operator by signing keys of as many holders as the trust anchor and the key statement of the
+        /// head require, each certified by a trusted identity key of its holder, as a proof is verified
+        /// (RoamingNetworkProof.Verify(TrustAnchor, …)): by the given attestations of the head, e.g. those its snapshot came
+        /// with, or by the attestations of this history, valid at the given time, now by default. So a history started from a
+        /// snapshot of another server is one of the roaming network the trust anchor names, as its operator signed it, and
+        /// not one a server made up naming the keys of the operator, which are public.
+        /// </summary>
+        /// <param name="TrustAnchor">The trust anchor of the roaming network.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="Attestations">The attestations of the head, those of this history otherwise.</param>
+        /// <param name="At">When they must be valid, now by default.</param>
+        public Boolean VerifyHead(RoamingNetworkTrustAnchor                TrustAnchor,
+                                  [NotNullWhen(false)] out String?         ErrorResponse,
+                                  IEnumerable<RoamingNetworkAttestation>?  Attestations   = null,
+                                  DateTimeOffset?                          At             = null)
+        {
+
+            var at            = At ?? Timestamp.Now;
+            var head          = Head;
+            var attestations  = Attestations?.ToArray() ?? [ .. AttestationsOf(head.Commit.Id, at) ];
+
+            ErrorResponse     = $"No attestation of the head '{head.Commit.Id}' of the roaming network '{head.RoamingNetwork.Id}' is given!";
+
+            // With the tree of the hash algorithm of an attestation: one proof per tree hash algorithm the attestations name.
+            foreach (var hashAlgorithm in head.RoamingNetwork.TreeHashAlgorithms.Where(hashAlgorithm => attestations.Any(attestation => attestation.ETag.HashAlgorithm == hashAlgorithm)))
+            {
+
+                if (!TryGetRootProof(out var proof, out ErrorResponse, hashAlgorithm, attestations))
+                    return false;
+
+                if (proof.Verify(TrustAnchor, out _, out ErrorResponse, at))
+                    return true;
+
+            }
+
+            return false;
+
+        }
+
+        #endregion
+
 
         #region (private) AttestHead(Signers, At)
 

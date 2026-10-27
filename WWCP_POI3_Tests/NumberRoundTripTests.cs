@@ -172,10 +172,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             await using var httpServer  = new HTTPServer(IPAddress: IPv4Address.Localhost, TCPPort: IPPort.Zero, AutoStart: true);
             await using var poiAPI      = new POI_API(httpServer);
 
-            var leader = RoamingNetworkHistory.Start(NewNetwork());
+            var leader = RoamingNetworkHistory.Start(NewNetwork().WithKeyStatement()).Attesting();
             poiAPI.AddRoamingNetworkHistory(leader);
 
-            await using var follower = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer.TCPPort}/RNs/rn1/history/ws"));
+            await using var follower = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer.TCPPort}/RNs/rn1/history/ws"),
+                                                              Options: new RoamingNetworkPeerOptions { TrustAnchor = leader.Head.RoamingNetwork.TrustAnchor() });
 
             await follower.StartAsync(new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);
 

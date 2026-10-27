@@ -43,10 +43,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
         private const           String          Operator  = nameof(ChargingStationOperator);
         private static readonly DateTimeOffset  T0        = DateTimeOffset.Parse("2026-10-11T12:00:00Z");
 
-        private HTTPServer?              httpServer;
-        private POI_API?                 poiAPI;
-        private RoamingNetworkHistory?   leader;
-        private RoamingNetworkPeer?      peer;
+        private HTTPServer?                         httpServer;
+        private POI_API?                            poiAPI;
+        private RoamingNetworkHistory?              leader;
+        private RoamingNetworkPeer?                 peer;
+
+        /// <summary>
+        /// Verifies the signatures of the operator of the roaming network, which signs the checkpoints, and of the witness.
+        /// </summary>
+        private VerifyCheckpointSignatureDelegate?  verify;
 
         #endregion
 
@@ -58,11 +63,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
             httpServer                         = new HTTPServer(IPAddress: IPv4Address.Localhost, TCPPort: IPPort.Zero, AutoStart: true);
             poiAPI                             = new POI_API(httpServer);
-            leader                             = RoamingNetworkHistory.Start(Proofs.StationProofTests.NewNetwork());
+            leader                             = RoamingNetworkHistory.Start(Proofs.StationProofTests.NewNetwork().WithKeyStatement()).Attesting();
+            verify                             = TestParties.VerifyOperatorCheckpointSignature(leader.Head.RoamingNetwork, History.CheckpointTests.Verify);
 
-            leader.CheckpointSigners           = [ History.CheckpointTests.RNOSigner ];
+            // The operator of the roaming network signs the checkpoints with its certified signing key: anchored in its trust anchor.
+            leader.CheckpointSigners           = [ leader.Head.RoamingNetwork.OperatorSigner() ];
             leader.PriceStatementSigners       = [ Proofs.PriceStatementTests.Signer(ChargingStationOperator_Id.Parse("DE*GEF")) ];
-            poiAPI.VerifyCheckpointSignature   = History.CheckpointTests.Verify;
+            poiAPI.VerifyCheckpointSignature   = verify;
 
             poiAPI.AddRoamingNetworkHistory(leader);
 
@@ -150,14 +157,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
         #endregion
 
-        #region (static) Options(Verify = true, RequiredRoles = null, Join = true)
+        #region Options(Verify = true, RequiredRoles = null, Join = true)
 
-        private static RoamingNetworkPeerOptions Options(Boolean                       Verify          = true,
-                                                         IReadOnlyCollection<String>?  RequiredRoles   = null,
-                                                         Boolean                       Join            = true)
+        private RoamingNetworkPeerOptions Options(Boolean                       Verify          = true,
+                                                  IReadOnlyCollection<String>?  RequiredRoles   = null,
+                                                  Boolean                       Join            = true)
 
             => new () {
-                   VerifyCheckpointSignature         = Verify ? History.CheckpointTests.Verify : null,
+                   TrustAnchor                       = leader!.Head.RoamingNetwork.TrustAnchor(),
+                   VerifyCheckpointSignature         = Verify ? verify : null,
                    RequiredCheckpointSignatureRoles  = RequiredRoles ?? [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ],
                    JoinFromCheckpoint                = Join,
                    MinReconnectDelay                 = TimeSpan.FromMilliseconds(50),
@@ -206,7 +214,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             var joined      = RoamingNetworkHistory.TryFromCheckpointSnapshot(text,
                                                                               out var history,
                                                                               out var joinError,
-                                                                              History.CheckpointTests.Verify,
+                                                                              verify,
                                                                               [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ],
                                                                               leader.PriceStatementsOf(checkpoint.Id));
 
@@ -241,17 +249,17 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                 Assert.That(RoamingNetworkHistory.TryFromCheckpointSnapshot(text, out _, out var noVerifier),                                                       Is.False);
                 Assert.That(noVerifier,                                              Does.Contain("no verifier of checkpoint signatures"));
 
-                Assert.That(RoamingNetworkHistory.TryFromCheckpointSnapshot(text, out _, out var noWitness, History.CheckpointTests.Verify,
+                Assert.That(RoamingNetworkHistory.TryFromCheckpointSnapshot(text, out _, out var noWitness, verify,
                                                                             [ RoamingNetworkCommitSignatureRoles.Witness ]),                                         Is.False);
                 Assert.That(noWitness,                                               Does.Contain("is not signed in the role 'witness'"));
 
-                Assert.That(RoamingNetworkHistory.TryFromCheckpointSnapshot(otherVersion, out _, out var otherError, History.CheckpointTests.Verify),             Is.False);
+                Assert.That(RoamingNetworkHistory.TryFromCheckpointSnapshot(otherVersion, out _, out var otherError, verify),                                    Is.False);
                 Assert.That(otherError,                                              Does.Contain("is not the version of the commit"));
 
-                Assert.That(RoamingNetworkHistory.TryFromCheckpointSnapshot(tampered, out _, out var tamperedError, History.CheckpointTests.Verify),                  Is.False);
+                Assert.That(RoamingNetworkHistory.TryFromCheckpointSnapshot(tampered, out _, out var tamperedError, verify),                                         Is.False);
                 Assert.That(tamperedError,                                           Does.Contain("do not match its content"));
 
-                Assert.That(RoamingNetworkHistory.TryFromCheckpointSnapshot(withoutCheckpoint, out _, out var missingError, History.CheckpointTests.Verify),       Is.False);
+                Assert.That(RoamingNetworkHistory.TryFromCheckpointSnapshot(withoutCheckpoint, out _, out var missingError, verify),                              Is.False);
                 Assert.That(missingError,                                            Does.Contain("needs its checkpoint"));
 
             }
@@ -327,6 +335,46 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                 Assert.That(follower.History.Head.Commit.Id,             Is.EqualTo(leader.Head.Commit.Id));
                 Assert.That(follower.History.LatestCheckpoint?.Id,       Is.EqualTo(witnessed.Id));
                 Assert.That(unwitnessed.Signatures,                      Has.Length.EqualTo(1));
+            }
+
+        }
+
+        #endregion
+
+        #region A_peer_joins_only_from_a_checkpoint_anchored_in_its_trust_anchor()
+
+        /// <summary>
+        /// A checkpoint whose signature in the role of the roaming network operator is valid, but of a key no identity key of
+        /// the trust anchor certifies, is not joined from (POI3-ISSUES.md S10): the peer starts from the head, attested by the
+        /// operator.
+        /// </summary>
+        [Test]
+        public async Task A_peer_joins_only_from_a_checkpoint_anchored_in_its_trust_anchor()
+        {
+
+            leader!.CheckpointSigners  = [ History.CheckpointTests.RNOSigner ];
+
+            Publish("v1");
+            var checkpoint             = MakeCheckpoint();
+            var head                   = Publish("v2");
+
+            var errors                 = new List<String>();
+
+            peer                       = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"), null, Options());
+            peer.OnError              += (_, description, _) => { lock (errors) errors.Add(description); };
+
+            using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
+                await peer.StartAsync(timeout.Token);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(verify!(checkpoint, checkpoint.Signatures.Single()),  Is.True, "Its signature is valid.");
+                Assert.That(peer.History!.Root.Id,                                Is.EqualTo(head.Id), "Not from the checkpoint.");
+
+                lock (errors)
+                    Assert.That(errors.Any(error => error.Contains($"The checkpoint '{checkpoint.Id}' of the other server is not anchored")),  Is.True);
+
             }
 
         }

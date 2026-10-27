@@ -609,15 +609,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) SnapshotResponse(Request, History, IncludeRuntimeStatus)
 
         /// <summary>
-        /// A snapshot of the head of the given history, in JSON or in CBOR as the request prefers.
+        /// A snapshot of the head of the given history, in JSON or in CBOR as the request prefers, with the attestations of
+        /// its head: whoever starts from it checks it against its trust anchor.
         /// </summary>
         private static HTTPResponse SnapshotResponse(HTTPRequest            Request,
                                                      RoamingNetworkHistory  History,
                                                      Boolean                IncludeRuntimeStatus)
 
             => WantsCBOR(Request)
-                   ? JSONResponse(Request, HTTPStatusCode.OK, new JObject(), () => History.ToSnapshotCBOR(IncludeRuntimeStatus))
-                   : JSONResponse(Request, HTTPStatusCode.OK, History.ToSnapshotJSON(IncludeRuntimeStatus));
+                   ? JSONResponse(Request, HTTPStatusCode.OK, new JObject(), () => History.ToSnapshotCBOR(IncludeRuntimeStatus, IncludeAttestations: true))
+                   : JSONResponse(Request, HTTPStatusCode.OK, History.ToSnapshotJSON(IncludeRuntimeStatus, IncludeAttestations: true));
 
         #endregion
 

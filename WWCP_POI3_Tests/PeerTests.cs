@@ -64,7 +64,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                           );
 
             poiAPI      = new POI_API(httpServer);
-            leader      = NewHistory();
+            leader      = NewHistory().Attesting();
 
             poiAPI.AddRoamingNetworkHistory(leader);
             poiAPI.TryGetHistoryWebSocketServer(leader.RoamingNetworkId, out webSocketServer);
@@ -103,8 +103,18 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                        ChargingStationOperators:  [ new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF"),
                                                                                 I18NString.Create(Languages.en, "GraphDefined"),
                                                                                 Created: DateTimeOffset.Parse("2026-01-01T00:00:00Z")) ]
-                   ).WithKeys()
+                   ).WithKeys().WithKeyStatement()
                );
+
+        #endregion
+
+        #region TrustAnchor
+
+        /// <summary>
+        /// The trust anchor of the roaming network of the leader: the identity key of its operator.
+        /// </summary>
+        private RoamingNetworkTrustAnchor TrustAnchor
+            => leader!.Head.RoamingNetwork.TrustAnchor();
 
         #endregion
 
@@ -131,6 +141,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             follower = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"),
                                                   History,
                                                   Options ?? new RoamingNetworkPeerOptions {
+                                                                 TrustAnchor        = TrustAnchor,
                                                                  MinReconnectDelay  = TimeSpan.FromMilliseconds(50),
                                                                  MaxReconnectDelay  = TimeSpan.FromMilliseconds(200)
                                                              });
@@ -192,6 +203,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             Assert.That(leader.TryMakeCheckpoint(out var cp0, out var cp0Error, CreatedAt: T0.AddHours(1)),  Is.True, cp0Error);
 
             var peer      = await StartFollower(Options: new RoamingNetworkPeerOptions {
+                                                             TrustAnchor                = TrustAnchor,
                                                              VerifyCheckpointSignature  = verify,
                                                              MinReconnectDelay          = TimeSpan.FromMilliseconds(50),
                                                              MaxReconnectDelay          = TimeSpan.FromMilliseconds(200)
@@ -240,17 +252,21 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
         public async Task Attestations_reach_peers_that_trust_their_key()
         {
 
-            leader!.AttestationSigners = [ Proofs.StationProofTests.RNOSigner ];
+            // Its operator anchors the snapshot; the peer takes the attestations of the key it trusts besides.
+            leader!.AttestationSigners = [ leader.Head.RoamingNetwork.OperatorSigner(), Proofs.StationProofTests.RNOSigner ];
 
-            Assert.That(leader.TryAttest(out var first, out var attestError), Is.True, attestError);
+            Assert.That(leader.TryAttest(out var attested, out var attestError), Is.True, attestError);
+
+            var first      = attested!.Single(attestation => attestation.KeyId == Proofs.StationProofTests.RNOSigner.KeyId);
 
             var peer       = await StartFollower(Options: new RoamingNetworkPeerOptions {
+                                                              TrustAnchor        = TrustAnchor,
                                                               VerifyAttestation  = Proofs.StationProofTests.Trusted,
                                                               MinReconnectDelay  = TimeSpan.FromMilliseconds(50),
                                                               MaxReconnectDelay  = TimeSpan.FromMilliseconds(200)
                                                           });
 
-            var tookFirst  = await Eventually(() => peer.History?.CurrentAttestations().Any(attestation => attestation.Value == first!.Single().Value) == true);
+            var tookFirst  = await Eventually(() => peer.History?.CurrentAttestations().Any(attestation => attestation.Value == first.Value) == true);
 
             // A new head is attested there, and the attestation follows the commit.
             var c2         = Publish("v2");
@@ -278,7 +294,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             leader!.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, Operator, "DE*GEF", "offline", T0, out _, out _);
 
             var replaced  = 0;
-            var follower  = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"));
+            var follower  = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"),
+                                                   Options: new RoamingNetworkPeerOptions { TrustAnchor = TrustAnchor });
             this.follower = follower;
 
             follower.OnHistoryReplaced += (_, oldHistory, newHistory) => replaced++;
@@ -323,6 +340,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             poiAPI!.MaxPushedCommitSize = 100;
 
             await StartFollower(Options: new RoamingNetworkPeerOptions {
+                                             TrustAnchor          = TrustAnchor,
                                              PushCompleteCommits  = PushCompleteCommits,
                                              MinReconnectDelay    = TimeSpan.FromMilliseconds(50)
                                          });
@@ -366,27 +384,69 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
         #endregion
 
-        #region A_follower_of_a_head_unknown_to_the_leader_starts_again()
+        #region A_follower_of_a_head_unknown_to_the_leader_keeps_it_until_reset()
 
+        /// <summary>
+        /// A follower whose history the leader knows nothing of keeps it: a snapshot of the head of the leader does not prove
+        /// to follow it (POI3-ISSUES.md S10). It tells why, and asks again after waiting; only its caller starts it anew.
+        /// </summary>
         [Test]
-        public async Task A_follower_of_a_head_unknown_to_the_leader_starts_again()
+        public async Task A_follower_of_a_head_unknown_to_the_leader_keeps_it_until_reset()
         {
 
             // The same roaming network, but another history: its head is unknown to the leader.
             var other     = NewHistory("other");
+            var otherHead = other.Head.Commit.Id;
             var replaced  = new List<(RoamingNetworkHistory? Old, RoamingNetworkHistory New)>();
+            var refused   = new List<(RoamingNetworkHistory History, String Reason)>();
 
-            follower = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"), other);
-            follower.OnHistoryReplaced += (_, oldHistory, newHistory) => replaced.Add((oldHistory, newHistory));
+            follower = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"),
+                                              other,
+                                              new RoamingNetworkPeerOptions {
+                                                  TrustAnchor        = TrustAnchor,
+                                                  MinReconnectDelay  = TimeSpan.FromMilliseconds(50),
+                                                  MaxReconnectDelay  = TimeSpan.FromMilliseconds(200)
+                                              });
 
-            await follower.StartAsync(new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);
+            follower.OnHistoryReplaced           += (_, oldHistory, newHistory) => { lock (replaced) replaced.Add((oldHistory, newHistory)); };
+            follower.OnHistoryReplacementRefused += (_, history,    reason)     => { lock (refused)  refused. Add((history,    reason));     };
+
+            using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(1)))
+                Assert.That(async () => await follower.StartAsync(timeout.Token), Throws.InstanceOf<OperationCanceledException>());
+
+            Int32 refusals;
+            lock (refused)
+                refusals = refused.Count;
+
+            var keptHistory  = follower.History;
+            var reconnects   = follower.Reconnects;
+
+            // The caller decides: anew from the leader.
+            await follower.ResetHistoryAsync(new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(replaced.Count,             Is.EqualTo(1));
-                Assert.That(replaced[0].Old,            Is.SameAs(other));
+
+                Assert.That(keptHistory,                Is.SameAs(other),      "The follower replaced its history.");
+                Assert.That(other.Head.Commit.Id,       Is.EqualTo(otherHead));
+                Assert.That(refusals,                   Is.GreaterThan(0));
+                Assert.That(refusals,                   Is.LessThanOrEqualTo(reconnects + 1), "The follower asked again without waiting.");
+
+                lock (refused)
+                {
+                    Assert.That(refused[0].History,     Is.SameAs(other));
+                    Assert.That(refused[0].Reason,      Does.Contain("does not prove to follow"));
+                }
+
+                lock (replaced)
+                {
+                    Assert.That(replaced.Count,         Is.EqualTo(1));
+                    Assert.That(replaced[0].Old,        Is.SameAs(other));
+                }
+
                 Assert.That(follower.History,           Is.Not.SameAs(other));
-                Assert.That(InSync(),                   Is.True);
+                Assert.That(await Eventually(InSync),   Is.True);
+
             }
 
         }
@@ -490,6 +550,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             Publish("v1");
 
             var follower   = await StartFollower(Options: new RoamingNetworkPeerOptions {
+                                                               TrustAnchor             = TrustAnchor,
                                                                VerifyCommitSignature   = verify,
                                                                RequiredSignatureRoles  = [ RoamingNetworkCommitSignatureRoles.Leader ],
                                                                MinReconnectDelay       = TimeSpan.FromMilliseconds(50),

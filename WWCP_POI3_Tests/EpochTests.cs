@@ -650,22 +650,27 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         public async Task A_peer_follows_the_server_into_the_next_epoch()
         {
 
-            var leader                 = NewHistory();
+            // The operator of the roaming network attests its head and signs its checkpoints: anchored in its trust anchor.
+            var leader                 = RoamingNetworkHistory.Start(Proofs.StationProofTests.NewNetwork().WithKeyStatement()).Attesting();
+            var verify                 = TestParties.VerifyOperatorCheckpointSignature(leader.Head.RoamingNetwork, CheckpointTests.Verify);
+
+            leader.CheckpointSigners   = [ leader.Head.RoamingNetwork.OperatorSigner() ];
 
             await using var httpServer = new HTTPServer(IPAddress: IPv4Address.Localhost, TCPPort: IPPort.Zero, AutoStart: true);
-            await using var poiAPI     = new POI_API(httpServer) { VerifyCheckpointSignature = CheckpointTests.Verify };
+            await using var poiAPI     = new POI_API(httpServer) { VerifyCheckpointSignature = verify };
 
             poiAPI.AddRoamingNetworkHistory(leader);
 
             Assert.That(Commit(leader, "v1", 1).IsCommitted);
-            Assert.That(leader.TryMakeCheckpoint(out _, out var checkpointError, CreatedAt: T0.AddMinutes(2)),  Is.True, checkpointError);
+            Assert.That(leader.TryMakeCheckpoint(out var checkpoint, out var checkpointError, CreatedAt: T0.AddMinutes(2)),  Is.True, checkpointError);
 
             var replaced               = new List<(UInt32 Old, UInt32 New)>();
 
             await using var peer       = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer.TCPPort}/RNs/rn1/history/ws"),
                                                                 null,
                                                                 new RoamingNetworkPeerOptions {
-                                                                    VerifyCheckpointSignature  = CheckpointTests.Verify,
+                                                                    TrustAnchor                = leader.Head.RoamingNetwork.TrustAnchor(),
+                                                                    VerifyCheckpointSignature  = verify,
                                                                     MinReconnectDelay          = TimeSpan.FromMilliseconds(50),
                                                                     MaxReconnectDelay          = TimeSpan.FromMilliseconds(200)
                                                                 });
@@ -674,6 +679,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
                 await peer.StartAsync(timeout.Token);
+
+            var joined                 = peer.History!.Root.Id == checkpoint!.CommitId;
 
             var v2                     = Commit(leader, "v2", 3).Commit!;
 
@@ -708,6 +715,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             using (Assert.EnterMultipleScope())
             {
 
+                Assert.That(joined,                                             Is.True, "The peer did not join from the checkpoint.");
                 Assert.That(tookFinal,                                          Is.True, "The peer did not take the final checkpoint.");
                 Assert.That(moved,                                              Is.True, "The peer did not move to the next epoch.");
                 Assert.That(peer.History!.Root.Id,                              Is.EqualTo(next.Root.Id), "The genesis it made is the one of the server.");

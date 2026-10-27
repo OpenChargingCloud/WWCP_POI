@@ -449,58 +449,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Attestation = null;
 
-            if (!TryGetKeyStatement(out var keyStatement, out var operatorIdentityKeys, out ErrorResponse) ||
-                !TryGetSigningKeyCertificates(out var certificates, out ErrorResponse))
-            {
-                return false;
-            }
-
             var at = At ?? Timestamp.Now;
 
-            // A key statement trusted names identity keys to trust, e.g. those replacing pinned ones, with their holders.
-            if (!keyStatement.TryVerify(TrustedHolders, operatorIdentityKeys, out var holderOf, out ErrorResponse, MinConsensus, at))
+            if (!TryGetCertifiedSigningKeys(TrustedHolders, MinConsensus, at, out var signingKeyOf, out var required, out ErrorResponse))
                 return false;
-
-            var identityKeys  = keyStatement.IdentityKeys.Concat(operatorIdentityKeys).ToArray();
-            var trustedIds    = holderOf.Keys.ToHashSet(StringComparer.Ordinal);
-
-            // Of the operator the proof gives: a statement or a certificate its holders made for another one, e.g. of another
-            // roaming network sharing them, is none of it (csharp-review 19, WWCPPOIConformanceTests D6).
-            var operatorId    = RoamingNetwork[POI.RoamingNetwork.PropertyKeys.Operator]?[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>();
 
             // The signing key of an attestation, certified by a trusted identity key of its holder, and that holder. Valid
             // when the attestation was signed and at the time it is verified: its signedAt is the signer's choice.
             (POIPublicKey SigningKey, String Holder)? CertifiedSigningKeyOf(RoamingNetworkAttestation Attestation)
-            {
-
-                foreach (var certificate in certificates)
-                    if (certificate.SigningKey.Id == Attestation.KeyId              &&
-                        certificate.RoamingNetworkOperatorId.ToString() == operatorId &&
-                        certificate.SigningKey.IsValidAt(Attestation.SignedAt)      &&
-                        certificate.SigningKey.IsValidAt(at)                        &&
-                        certificate.SigningKey.MaySign(POIKeyUsages.Party)          &&
-                        certificate.TryVerify(identityKeys, out var identityKey, out _, trustedIds))
-                    {
-                        return (certificate.SigningKey, holderOf[identityKey.Id]);
-                    }
-
-                return null;
-
-            }
-
-            if (keyStatement.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
-            {
-                ErrorResponse = $"The key statement is one of the roaming network '{keyStatement.RoamingNetworkId}'!";
-                return false;
-            }
-
-            if (keyStatement.RoamingNetworkOperatorId.ToString() != operatorId)
-            {
-                ErrorResponse = $"The key statement is one of the roaming network operator '{keyStatement.RoamingNetworkOperatorId}', not of '{operatorId}'!";
-                return false;
-            }
-
-            var required = Math.Max(MinConsensus, keyStatement.MinConsensus);
+                => signingKeyOf(Attestation.KeyId, Attestation.SignedAt);
 
             if (required == 1)
                 return Verify(attestation => CertifiedSigningKeyOf(attestation) is var (signingKey, _) &&
@@ -537,6 +494,154 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return false;
 
             #endregion
+
+        }
+
+        #endregion
+
+        #region Verify(Checkpoint, TrustAnchor, out ErrorResponse, At = null)
+
+        /// <summary>
+        /// Verify the given checkpoint against the given trust anchor of its roaming network with this proof of the version of
+        /// its commit, e.g. the root proof of the snapshot of the checkpoint a peer joins from (SPECIFICATION.md, section
+        /// 10.5): this proof must lead to the effectiveTree ETag of its hash algorithm the checkpoint names, and the checkpoint
+        /// be signed in the role of the roaming network operator by signing keys of as many holders as the trust anchor and the
+        /// key statement of the operator this proof gives require, each certified by a trusted identity key of its holder,
+        /// valid when it signed and at the given time, now by default, and allowed to sign for the party: as the attestations
+        /// of a version are verified (Verify(TrustedHolders, …)). The other signatures of the checkpoint, e.g. of witnesses,
+        /// are not checked here.
+        /// </summary>
+        /// <param name="Checkpoint">The checkpoint.</param>
+        /// <param name="TrustAnchor">The trust anchor.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="At">When the keys must be valid, now by default.</param>
+        public Boolean Verify(RoamingNetworkCheckpoint          Checkpoint,
+                              RoamingNetworkTrustAnchor         TrustAnchor,
+                              [NotNullWhen(false)] out String?  ErrorResponse,
+                              DateTimeOffset?                   At   = null)
+        {
+
+            if (TrustAnchor.Id.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>() ||
+                TrustAnchor.Id            != Checkpoint.RoamingNetworkId)
+            {
+                ErrorResponse = $"The trust anchor is one of the roaming network '{TrustAnchor.Id}'!";
+                return false;
+            }
+
+            if (CommitId.HasValue && CommitId.Value != Checkpoint.CommitId)
+            {
+                ErrorResponse = $"The checkpoint '{Checkpoint.Id}' is one of the commit '{Checkpoint.CommitId}', not of '{CommitId.Value}'!";
+                return false;
+            }
+
+            var eTag = Checkpoint.ETags.FirstOrDefault(eTag => eTag.Format == ETagFormat.EffectiveTree && eTag.HashAlgorithm == HashAlgorithm);
+
+            if (!eTag.IsValid)
+            {
+                ErrorResponse = $"The checkpoint '{Checkpoint.Id}' names no effectiveTree ETag of {HashAlgorithm.ToText()}!";
+                return false;
+            }
+
+            if (!Verify(eTag, out ErrorResponse))
+                return false;
+
+            if (!TryGetCertifiedSigningKeys(TrustAnchor.Holders, TrustAnchor.MinConsensus, At ?? Timestamp.Now, out var signingKeyOf, out var required, out ErrorResponse))
+                return false;
+
+            var holders = new HashSet<String>(StringComparer.Ordinal);
+
+            foreach (var signature in Checkpoint.Signatures)
+                if (signature.Role == RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator    &&
+                    signingKeyOf(signature.KeyId, signature.SignedAt) is var (signingKey, holder) &&
+                    Checkpoint.VerifySignature(signature, signingKey.Key, signingKey.Id, out _))
+                {
+                    holders.Add(holder);
+                }
+
+            if (holders.Count >= required)
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            ErrorResponse = $"Valid signatures of trusted keys of {holders.Count} holder{(holders.Count == 1 ? "" : "s")} sign the checkpoint '{Checkpoint.Id}' as its roaming network operator, not of {required}!";
+            return false;
+
+        }
+
+        #endregion
+
+        #region (private) TryGetCertifiedSigningKeys(TrustedHolders, MinConsensus, At, out SigningKeyOf, out Required, out ErrorResponse)
+
+        /// <summary>
+        /// The signing keys of the roaming network operator this proof gives, as a verifier trusting the given identity keys
+        /// per holder finds them (SPECIFICATION.md, sections 4.1, 8.5 and 8.6): the key statement of the operator must be
+        /// signed by trusted identity keys of as many holders as the given minConsensus and its own require, name their
+        /// holders as the verifier knows them, and be valid at the given time; its identity keys are trusted then as well.
+        /// SigningKeyOf gives the signing key of a signature by its key identification and the time it was signed, certified
+        /// by a trusted identity key of its holder, valid at that time and at the given one, and allowed to sign for the
+        /// party, with the holder of that identity key as the verifier knows it; Required how many holders must sign.
+        /// </summary>
+        private Boolean TryGetCertifiedSigningKeys(IEnumerable<IEnumerable<String>>                                                     TrustedHolders,
+                                                   Byte                                                                                 MinConsensus,
+                                                   DateTimeOffset                                                                       At,
+                                                   [NotNullWhen(true)]  out Func<String, DateTimeOffset, (POIPublicKey SigningKey, String Holder)?>?  SigningKeyOf,
+                                                   out Byte                                                                             Required,
+                                                   [NotNullWhen(false)] out String?                                                     ErrorResponse)
+        {
+
+            SigningKeyOf  = null;
+            Required      = 0;
+
+            if (!TryGetKeyStatement(out var keyStatement, out var operatorIdentityKeys, out ErrorResponse) ||
+                !TryGetSigningKeyCertificates(out var certificates, out ErrorResponse))
+            {
+                return false;
+            }
+
+            // A key statement trusted names identity keys to trust, e.g. those replacing pinned ones, with their holders.
+            if (!keyStatement.TryVerify(TrustedHolders, operatorIdentityKeys, out var holderOf, out ErrorResponse, MinConsensus, At))
+                return false;
+
+            var identityKeys  = keyStatement.IdentityKeys.Concat(operatorIdentityKeys).ToArray();
+            var trustedIds    = holderOf.Keys.ToHashSet(StringComparer.Ordinal);
+
+            // Of the operator the proof gives: a statement or a certificate its holders made for another one, e.g. of another
+            // roaming network sharing them, is none of it (csharp-review 19, WWCPPOIConformanceTests D6).
+            var operatorId    = RoamingNetwork[POI.RoamingNetwork.PropertyKeys.Operator]?[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>();
+
+            if (keyStatement.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
+            {
+                ErrorResponse = $"The key statement is one of the roaming network '{keyStatement.RoamingNetworkId}'!";
+                return false;
+            }
+
+            if (keyStatement.RoamingNetworkOperatorId.ToString() != operatorId)
+            {
+                ErrorResponse = $"The key statement is one of the roaming network operator '{keyStatement.RoamingNetworkOperatorId}', not of '{operatorId}'!";
+                return false;
+            }
+
+            SigningKeyOf  = (keyId, signedAt) => {
+
+                                foreach (var certificate in certificates)
+                                    if (certificate.SigningKey.Id == keyId                          &&
+                                        certificate.RoamingNetworkOperatorId.ToString() == operatorId &&
+                                        certificate.SigningKey.IsValidAt(signedAt)                  &&
+                                        certificate.SigningKey.IsValidAt(At)                        &&
+                                        certificate.SigningKey.MaySign(POIKeyUsages.Party)          &&
+                                        certificate.TryVerify(identityKeys, out var identityKey, out _, trustedIds))
+                                    {
+                                        return (certificate.SigningKey, holderOf[identityKey.Id]);
+                                    }
+
+                                return null;
+
+                            };
+
+            Required      = Math.Max(MinConsensus, keyStatement.MinConsensus);
+
+            return true;
 
         }
 

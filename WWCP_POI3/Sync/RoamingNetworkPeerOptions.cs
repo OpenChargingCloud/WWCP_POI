@@ -76,10 +76,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public IRoamingNetworkHistoryArchive?     Archive                     { get; init; }
 
         /// <summary>
-        /// The identifications of keys of the roaming network operator a snapshot must name, e.g. its identity key:
-        /// the trust anchor of a history started from the snapshot of another server. Not checked, unless given.
+        /// The trust anchor of the roaming network (SPECIFICATION.md, section 8.6), e.g. as scanned from the QR code of its
+        /// operator: a history the peer starts from the other server, at first, anew or in the next epoch, is taken only
+        /// when it is anchored in it (section 10.5). The head of a snapshot must be attested in the role of the roaming
+        /// network operator by signing keys of as many holders as the trust anchor and the key statement require, each
+        /// certified by an identity key it names; the checkpoint a history joins from must be signed so. Without it, the
+        /// peer starts no history from the other server: it only continues the one given to it.
         /// </summary>
-        public IReadOnlyCollection<String>?        TrustedRoamingNetworkOperatorKeyIds  { get; init; }
+        public RoamingNetworkTrustAnchor?          TrustAnchor                 { get; init; }
 
         /// <summary>
         /// The number of commits asked for at once while catching up.
@@ -140,14 +144,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Whether a history the peer starts begins with the version of the latest checkpoint of the other server carrying
         /// the signatures required, and takes the commits since from there (SPECIFICATION.md, section 10.5), rather than with
         /// the head: a witnessed version to start from, and its line of checkpoints with it. Only while following
-        /// checkpoints with a VerifyCheckpointSignature; without such a checkpoint, it starts from the head. Default: yes.
+        /// checkpoints with a VerifyCheckpointSignature, and only from a checkpoint signed as the TrustAnchor requires;
+        /// without such a checkpoint, it starts from the head. Only a history joined so is proven to follow the one held
+        /// here when the other server knows none of its commits. Default: yes.
         /// </summary>
         public Boolean                             JoinFromCheckpoint          { get; init; } = true;
 
         /// <summary>
         /// Whether to follow the other server into its next epoch (SPECIFICATION.md, section 11): a history whose final
-        /// checkpoint closed its epoch starts the next one itself, one without it from the other server; the history of
-        /// the epoch before stays as it is (OnHistoryReplaced). Default: yes.
+        /// checkpoint closed its epoch starts the next one itself, one without it from the other server, anchored in the
+        /// TrustAnchor, never in an epoch before; the history of the epoch before stays as it is (OnHistoryReplaced).
+        /// Default: yes.
         /// </summary>
         public Boolean                             FollowEpochs                { get; init; } = true;
 
