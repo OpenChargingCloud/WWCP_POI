@@ -203,23 +203,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 var priceStatements = await TryGetCheckpointPriceStatementsAsync(Connection, checkpoint, CancellationToken);
 
-                if (!RoamingNetworkHistory.TryFromCheckpointSnapshot(snapshotJSON,
-                                                                     out var joined,
-                                                                     out var errorResponse,
-                                                                     verify,
-                                                                     options.RequiredCheckpointSignatureRoles,
-                                                                     priceStatements,
-                                                                     options.ChangeSetLimits))
+                // Signed by the roaming network operator as the trust anchor requires, with the keys its version gives.
+                if (!RoamingNetworkHistory.TryFromAnchoredCheckpointSnapshot(snapshotJSON,
+                                                                             TrustAnchor,
+                                                                             out var joined,
+                                                                             out var errorResponse,
+                                                                             verify,
+                                                                             options.RequiredCheckpointSignatureRoles,
+                                                                             priceStatements,
+                                                                             Limits: options.ChangeSetLimits))
                 {
-                    RaiseError($"The snapshot of the checkpoint '{checkpoint.Id}' of the other server can not be taken: {errorResponse}", null);
+                    RaiseError($"The checkpoint '{checkpoint.Id}' of the other server is not anchored in the trust anchor of the roaming network '{TrustAnchor.Id}': {errorResponse}", null);
                     continue;
                 }
 
-                // Signed by the roaming network operator as the trust anchor requires, with the keys its version gives.
-                if (!joined.TryGetRootProof(out var rootProof, out errorResponse) ||
-                    !rootProof.Verify(checkpoint, TrustAnchor, out errorResponse))
+                if (joined.Checkpoints[0].Id != checkpoint.Id)
                 {
-                    RaiseError($"The checkpoint '{checkpoint.Id}' of the other server is not anchored in the trust anchor of the roaming network '{TrustAnchor.Id}': {errorResponse}", null);
+                    RaiseError($"The other server gives the snapshot of the checkpoint '{joined.Checkpoints[0].Id}' for '{checkpoint.Id}'!", null);
                     continue;
                 }
 

@@ -1053,17 +1053,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             new JObject(new JProperty(POI_API.PropertyKeys.RuntimeStatus, options.FollowStatus)),
                                             CancellationToken);
 
-                if (!RoamingNetworkHistory.TryFromSnapshot(snapshot, out newHistory, out var errorResponse, options.ChangeSetLimits))
-                    throw Refused(currentHistory, "Invalid snapshot of the other server: " + errorResponse);
-
                 // Its head as the roaming network operator attested it: the keys of the operator it names are public.
-                var attestations = new List<RoamingNetworkAttestation>();
-
-                foreach (var attestationJSON in snapshot[RoamingNetworkHistory.PropertyKeys.Attestations]?.OfType<JObject>() ?? [])
-                    if (RoamingNetworkAttestation.TryParse(attestationJSON, out var attestation, out _))
-                        attestations.Add(attestation);
-
-                if (!newHistory.VerifyHead(trustAnchor, out var anchorError, attestations))
+                if (!RoamingNetworkHistory.TryFromAnchoredSnapshot(snapshot, trustAnchor, out newHistory, out var anchorError, Limits: options.ChangeSetLimits))
                     throw Refused(currentHistory, $"The snapshot of the other server is not anchored in the trust anchor of the roaming network '{trustAnchor.Id}': {anchorError}");
 
                 statusSnapshot = options.FollowStatus;

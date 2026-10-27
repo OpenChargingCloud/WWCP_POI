@@ -1153,7 +1153,9 @@ has an example.
   attestations of its head valid when it was made, as `attestations`, absent when there are none, and is of the head
   as far as it is attested: a server attesting its heads itself serves the head it attested last while it attests a
   new one. So whoever starts from it checks its head against the trust anchor (10.5) with the snapshot alone, which a
-  second request for the attestations could not, the head having moved on in between.
+  second request for the attestations could not, the head having moved on in between. Its `attestations` are read as
+  those of a proof: a snapshot whose `attestations` is not an array of attestations that can all be read is refused,
+  even where the others attest its head (`TryFromAnchoredSnapshot` of POI3).
 
 ### 8.6 Key statements and trust anchors
 
@@ -1655,7 +1657,7 @@ version against the checkpoint's `eTags`, and then the commits since, as from a 
   such a checkpoint it starts from the head: the snapshot (8.5) MUST carry attestations of its head that verify against
   the trust anchor as a proof of its root does (8.4, 8.6): the roaming network pruned to its own properties, with its
   operator and its keys, every child array pruned. A checkpoint or snapshot not anchored is refused, and asked for again
-  later.
+  later. POI3 starts so in `TryFromAnchoredCheckpointSnapshot` and `TryFromAnchoredSnapshot`, which its peer uses.
 - **Replacing a history:** a server or client holding a history replaces it by one of the other server only (a) in the
   next epoch (11.4), or (b) when the other server knows none of its commits (`commits {have}` answering `NotFound`, e.g.
   as it compacted them away, 10.6) by a history joined from a checkpoint proving to follow its head and every tip: each is
