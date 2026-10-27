@@ -107,7 +107,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(history + "/commits",
                        HTTPMethod:    HTTPMethod.POST,
-                       HTTPDelegate:  request => Task.FromResult(SubmitCommits(request)));
+                       HTTPDelegate:  Changes(SubmitCommits));
 
             #endregion
 
@@ -136,7 +136,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
                 json = Request.HTTPBody is { Length: > 0 } body
-                           ? Request.ContentType == HTTPContentType.Application.CBOR
+                           ? HasCBORBody(Request)
                                  ? CBORJSON.ToJSON(CBORValue.Parse(body)) as JObject
                                  : POIJSON.Read(Encoding.UTF8.GetString(body)) as JObject
                            : null;

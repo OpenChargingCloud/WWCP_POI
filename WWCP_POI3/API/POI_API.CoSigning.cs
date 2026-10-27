@@ -87,7 +87,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(pending,
                        HTTPMethod:    HTTPMethod.POST,
-                       HTTPDelegate:  request => Task.FromResult(SubmitPendingChangeSet(request)));
+                       HTTPDelegate:  Changes(SubmitPendingChangeSet));
 
             #endregion
 
@@ -112,7 +112,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(pending + "/{changeSetId}/signatures",
                        HTTPMethod:    HTTPMethod.POST,
-                       HTTPDelegate:  request => Task.FromResult(SubmitPendingSignatures(request)));
+                       HTTPDelegate:  Changes(SubmitPendingSignatures));
 
             #endregion
 
@@ -120,7 +120,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(pending + "/{changeSetId}",
                        HTTPMethod:    HTTPMethod.DELETE,
-                       HTTPDelegate:  request => Task.FromResult(WithdrawPendingChangeSet(request)));
+                       HTTPDelegate:  Changes(WithdrawPendingChangeSet));
 
             #endregion
 
@@ -148,7 +148,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             RoamingNetworkChangeSet? changeSet;
             String?                  changeSetError;
 
-            if (Request.ContentType == HTTPContentType.Application.CBOR
+            if (HasCBORBody(Request)
                     ? !RoamingNetworkChangeSet.TryParseCBOR(body,                          out changeSet, out changeSetError, ChangeSetLimits)
                     : !RoamingNetworkChangeSet.TryParse    (Encoding.UTF8.GetString(body), out changeSet, out changeSetError, ChangeSetLimits))
             {
@@ -436,7 +436,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
                 JSON = Request.HTTPBody is { Length: > 0 } body
-                           ? Request.ContentType == HTTPContentType.Application.CBOR
+                           ? HasCBORBody(Request)
                                  ? CBORJSON.ToJSON(CBORValue.Parse(body)) as JObject
                                  : POIJSON.Read(Encoding.UTF8.GetString(body)) as JObject
                            : null;

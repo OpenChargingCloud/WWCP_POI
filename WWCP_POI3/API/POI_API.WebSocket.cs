@@ -186,6 +186,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public AuthorizeStatusUpdateDelegate? AuthorizeStatusPush { get; set; }
 
         /// <summary>
+        /// The origins besides this server's own whose pages may open the WebSocket of a history in a browser,
+        /// "https://map.example.org"; none by default.
+        /// </summary>
+        /// <remarks>
+        /// A browser sends the cookies, the Basic auth and the client certificate it has for this server with the upgrade
+        /// request of any page, and says whose page it is in its Origin header (POI3-ISSUES.md S23). So an upgrade request
+        /// with an Origin is refused with 403 unless the Origin is this server's own - the host and port it was sent to,
+        /// or the host HostAskedFor says - or one of these. Peers, followers and other programs send no Origin, and are
+        /// not asked.
+        /// </remarks>
+        public IEnumerable<String> AllowedOrigins { get; set; } = [];
+
+        /// <summary>
+        /// What a reverse proxy in front of this server, one it believes, says a browser asked for - "hub.example.org",
+        /// from Forwarded or X-Forwarded-Host - so that a page of this server's own behind it is not another site's to
+        /// the WebSocket; null, or a function that answers null, where the Host of the request says it.
+        /// </summary>
+        public Func<HTTPRequest, String?>? HostAskedFor { get; set; }
+
+        /// <summary>
         /// The maximum size of a commit pushed completely to the subscribers of "commits", as JSON text.
         /// A larger one is pushed there as a commitAnnouncement, and fetched by whoever wants it.
         /// </summary>
@@ -222,6 +242,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                            !TryGetHistory(request, out var roamingNetworkHistory, out var errorResponse)
                                ? Task.FromResult(errorResponse)
+
+                               // Before the upgrade, and before anybody is authenticated: a page of another site
+                               // opens nothing here, whoever's credentials the browser sends with it.
+                               : !request.AllowsOrigin(AllowedOrigins, HostAskedFor?.Invoke(request))
+                                     ? Task.FromResult(ErrorResponse(request, HTTPStatusCode.Forbidden, $"The origin '{request.GetHeaderField("Origin")}' may not open the WebSocket of a history here!"))
 
                                : historyWebSocketServers.TryGetValue(roamingNetworkHistory.RoamingNetworkId, out var webSocketServer)
                                      ? WebSocketUpgrade.For(webSocketServer)(request)

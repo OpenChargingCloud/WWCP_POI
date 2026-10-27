@@ -748,6 +748,9 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/history/epochs/{epoch}/commits/{commitId}[/proof]` | a commit of an epoch, and its proof in a checkpoint |
 
 Archived commits are served by `GET …/commits/{commitId}` and proved by `GET …/commits/{commitId}/proof` as well.
+The requests that change something - `COMMIT`, `POST` and `DELETE` above - take a body of `application/json` or
+`application/cbor` (a `charset` aside) and answer any other `Content-Type`, or none, with 415: what a page of
+another site may make a browser send without asking first is neither.
 
 It also serves the roaming networks and their entities, readable from every origin (CORS `*`), each in canonical
 JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json:sha256:hex:…"`); a known
@@ -890,6 +893,9 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 - **Errors:** the codes of OCPP-J plus `NotFound`; an unreadable frame is answered on id `"-1"`.
 - **Access:** open like the HTTP reads, unless `AuthenticateWebSocketClient` is set;
   `commitChangeSet` and the co-signing actions ask `AuthorizeChangeSetSubmission` with the upgrade request.
+  An upgrade request with an `Origin` - a browser's - is refused with 403 unless the origin is the server's own
+  (the host and port of its `Host`, or the host `HostAskedFor` says a trusted proxy names) or in `AllowedOrigins`;
+  programs send no `Origin`.
 
 ### Peer
 

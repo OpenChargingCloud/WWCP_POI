@@ -131,7 +131,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(History + "/priceStatements",
                        HTTPMethod:    HTTPMethod.POST,
-                       HTTPDelegate:  request => Task.FromResult(SubmitPriceStatements(request)));
+                       HTTPDelegate:  Changes(SubmitPriceStatements));
 
             #endregion
 

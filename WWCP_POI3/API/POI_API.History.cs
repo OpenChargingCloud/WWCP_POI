@@ -392,7 +392,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(history + "/changeSets",
                        HTTPMethod:    COMMIT,
-                       HTTPDelegate:  request => Task.FromResult(SubmitChangeSet(request)));
+                       HTTPDelegate:  Changes(SubmitChangeSet));
 
             #endregion
 
@@ -400,7 +400,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(history + "/commits/{commitId}/signatures",
                        HTTPMethod:    HTTPMethod.POST,
-                       HTTPDelegate:  request => Task.FromResult(SubmitCommitSignatures(request)));
+                       HTTPDelegate:  Changes(SubmitCommitSignatures));
 
             #endregion
 
@@ -461,7 +461,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
                 json = Request.HTTPBody is { Length: > 0 } body
-                           ? Request.ContentType == HTTPContentType.Application.CBOR
+                           ? HasCBORBody(Request)
                                  ? CBORJSON.ToJSON(CBORValue.Parse(body)) as JObject
                                  // signedAt is signed as the text it is.
                                  : POIJSON.Read(Encoding.UTF8.GetString(body)) as JObject
@@ -566,7 +566,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             RoamingNetworkChangeSet? changeSet;
             String?                  changeSetError;
 
-            if (Request.ContentType == HTTPContentType.Application.CBOR
+            if (HasCBORBody(Request)
                     ? !RoamingNetworkChangeSet.TryParseCBOR(body,                          out changeSet, out changeSetError, ChangeSetLimits)
                     : !RoamingNetworkChangeSet.TryParse    (Encoding.UTF8.GetString(body), out changeSet, out changeSetError, ChangeSetLimits))
             {
@@ -786,6 +786,52 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          CacheControl    = "no-store",
                          Vary            = "Accept"
                      }.AsImmutable;
+
+        #endregion
+
+        #region (private static) HasCBORBody  (Request)
+
+        /// <summary>
+        /// Whether the body of the request is CBOR by its Content-Type, whatever the case it is written in.
+        /// </summary>
+        private static Boolean HasCBORBody(HTTPRequest Request)
+
+            => String.Equals(Request.ContentType?.MediaType, HTTPContentType.Application.CBOR.MediaType, StringComparison.OrdinalIgnoreCase);
+
+        #endregion
+
+        #region (private static) HasJSONBody  (Request)
+
+        /// <summary>
+        /// Whether the body of the request is JSON by its Content-Type, whatever the case it is written in.
+        /// </summary>
+        private static Boolean HasJSONBody(HTTPRequest Request)
+
+            => String.Equals(Request.ContentType?.MediaType, HTTPContentType.Application.JSON_UTF8.MediaType, StringComparison.OrdinalIgnoreCase);
+
+        #endregion
+
+        #region (private)        Changes      (Handler)
+
+        /// <summary>
+        /// The given handler of a request that changes something, behind a 415 Unsupported Media Type for every request
+        /// whose Content-Type is neither application/json nor application/cbor - parameters such as a charset aside.
+        /// </summary>
+        /// <remarks>
+        /// A handler read every body that did not say CBOR as JSON. So "text/plain", which a page of another site may make
+        /// a browser send without asking first, reached it (POI3-ISSUES.md S23). What a change says is signed by its owners,
+        /// but a server may also let in by a cookie, Basic auth, a client certificate or an address, which go with such a
+        /// request. Neither of the two media types a browser sends for another site's page without a CORS preflight first.
+        /// </remarks>
+        private HTTPDelegate Changes(Func<HTTPRequest, HTTPResponse> Handler)
+
+            => request => Task.FromResult(
+                              HasJSONBody(request) || HasCBORBody(request)
+                                  ? Handler(request)
+                                  : ErrorResponse(request,
+                                                  HTTPStatusCode.UnsupportedMediaType,
+                                                  "The request body must be application/json or application/cbor!")
+                          );
 
         #endregion
 

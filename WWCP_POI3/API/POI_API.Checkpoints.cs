@@ -143,7 +143,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(History + "/checkpoints",
                        HTTPMethod:    HTTPMethod.POST,
-                       HTTPDelegate:  request => Task.FromResult(SubmitCheckpoints(request)));
+                       HTTPDelegate:  Changes(SubmitCheckpoints));
 
             #endregion
 
@@ -224,7 +224,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(History + "/checkpoints/{checkpointId}/signatures",
                        HTTPMethod:    HTTPMethod.POST,
-                       HTTPDelegate:  request => Task.FromResult(SubmitCheckpointSignatures(request)));
+                       HTTPDelegate:  Changes(SubmitCheckpointSignatures));
 
             #endregion
 
@@ -620,7 +620,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Request.HTTPBody is not { Length: > 0 } body)
                     return false;
 
-                var json = Request.ContentType == HTTPContentType.Application.CBOR
+                var json = HasCBORBody(Request)
                                ? CBORJSON.ToJSON(CBORValue.Parse(body)) as JObject
                                : POIJSON.Read(Encoding.UTF8.GetString(body)) as JObject;
 
