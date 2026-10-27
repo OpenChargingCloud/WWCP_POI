@@ -481,8 +481,9 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
   a server through `Start(network, Signers: […])` or `history.Signers`, a roaming network operator that
   checked the data of a charging station operator later through `commit.CreateSignature(…)` and
   `TryAddSignatures(…)`. A signature covers the commit and the signatures of its change set; adding one
-  does not change the commit id. `TryAppend` verifies every signature (`VerifyCommitSignature`) and
-  may require roles (`RequiredSignatureRoles`); `OnCommitSignatures` tells of new ones.
+  does not change the commit id. `TryAppend` verifies every signature (`VerifyCommitSignature`, given the commit, the
+  version it leads to and the signature) and may require roles (`RequiredSignatureRoles`); `OnCommitSignatures` tells of
+  new ones.
 - **Appending:** a commit's parents must be known; one with one parent must be signed by its owners and
   lead to its ETags, a merge commit must be the merge of its parents.
 - **Snapshot:** now and complete, for the first sync: `{timestamp, commit, roamingNetwork, effectiveLastChanges?,

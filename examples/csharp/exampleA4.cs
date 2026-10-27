@@ -97,7 +97,7 @@ public static class ExampleA4
         // d) The commits since, each checked as every commit is: its change set signed by its owners and leading to its
         //    ETags, the commit signed as the roaming network operator.
         foreach (var commit in CommitsSince(0))
-            Append(joined, commit, anchor, network);
+            Append(joined, commit, anchor);
 
         // e) The head is the published one.
         if (!RoamingNetworkCommit.TryParse(Helpers.ReadJSON("published/QA-commit.json"), out var head, out error))
@@ -352,15 +352,16 @@ public static class ExampleA4
 
     }
 
-    // Appends the given commit of the server of QA to the given history, checked as every commit is.
-    internal static void Append(RoamingNetworkHistory History, RoamingNetworkCommit Commit, RoamingNetworkTrustAnchor Anchor, RoamingNetwork Network)
+    // Appends the given commit of the server of QA to the given history, checked as every commit is: its signatures by the
+    // signing keys of the roaming network operator in the version it leads to.
+    internal static void Append(RoamingNetworkHistory History, RoamingNetworkCommit Commit, RoamingNetworkTrustAnchor Anchor)
     {
 
         if (!History.TryAppend([ Commit ],
                                out _,
                                out var error,
-                               VerifyCommitSignature:   (commit, signature) => SigningKeyOf(Anchor, Network, signature) is POIPublicKey key &&
-                                                                               commit.VerifySignature(signature, key.Key, key.Id, out _),
+                               VerifyCommitSignature:   (commit, version, signature) => SigningKeyOf(Anchor, version, signature) is POIPublicKey key &&
+                                                                                        commit.VerifySignature(signature, key.Key, key.Id, out _),
                                RequiredSignatureRoles:  [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ]))
             Helpers.Fail(error);
 

@@ -1070,7 +1070,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            if (!RoamingNetworkHistory.CheckSignatures(newHistory.Head.Commit, options.VerifyCommitSignature, options.RequiredSignatureRoles, out var signatureError))
+            // Its head commit in the only version there is: the one of the snapshot, or of the checkpoint, it leads to.
+            if (!RoamingNetworkHistory.CheckSignatures(newHistory.Head.Commit, newHistory.Head.RoamingNetwork, options.VerifyCommitSignature, options.RequiredSignatureRoles, out var signatureError))
                 throw Refused(currentHistory, "The snapshot of the other server is not signed as required: " + signatureError);
 
             if (currentHistory is not null)

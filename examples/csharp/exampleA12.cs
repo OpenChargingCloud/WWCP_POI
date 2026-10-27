@@ -77,18 +77,13 @@ public static class ExampleA12
         if (!RoamingNetworkTrustAnchor.TryParse(File.ReadAllText("published/QA-trustAnchor-mldsa.txt"), out var anchor, out var error))
             Helpers.Fail(error);
 
-        // The version it checks the signing keys of OCC in: its own head, and QA as published before it has one, e.g. for the
-        // head commit of the snapshot it starts from.
-        if (!RoamingNetwork.TryParse(Helpers.ReadJSON($"published/{qa}.json"), out var published, out error))
-            Helpers.Fail(error);
-
-        RoamingNetworkPeer? follower = null;
-
+        // The signing keys of OCC are checked in the version a commit leads to, the one the verifier is given: for the head
+        // commit of the snapshot it starts from, the version of the snapshot.
         await using var mirror = new RoamingNetworkPeer(occURL,
                                                         Options: new RoamingNetworkPeerOptions {
                                                                      TrustAnchor             = anchor,
-                                                                     VerifyCommitSignature   = (commit, signature) => ExampleA4.SigningKeyOf(anchor, follower?.History?.Head.RoamingNetwork ?? published, signature) is POIPublicKey key &&
-                                                                                                                     commit.VerifySignature(signature, key.Key, key.Id, out _),
+                                                                     VerifyCommitSignature   = (commit, version, signature) => ExampleA4.SigningKeyOf(anchor, version, signature) is POIPublicKey key &&
+                                                                                                                              commit.VerifySignature(signature, key.Key, key.Id, out _),
                                                                      RequiredSignatureRoles  = [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ],
                                                                      FollowCheckpoints       = false,
                                                                      PushCommits             = false,
@@ -96,8 +91,6 @@ public static class ExampleA12
                                                                      PushCheckpoints         = false,
                                                                      PushPriceStatements     = false
                                                                  });
-
-        follower = mirror;
 
         mirror.OnError += (peer, description, exception) => Console.WriteLine($"The mirror: {description}");
 

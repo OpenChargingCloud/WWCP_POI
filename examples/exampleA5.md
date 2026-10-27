@@ -114,7 +114,7 @@ commits are the ones since the checkpoint before, with the Merkle root it signs,
 foreach (var commit in ExampleA4.CommitsSince(0).Concat(ExampleA4.CommitsSince(1)))
 {
 
-    ExampleA4.Append(stepwise, commit, anchor, network);
+    ExampleA4.Append(stepwise, commit, anchor);
 
     foreach (var checkpoint in checkpoints.Where(checkpoint => checkpoint.Revision == commit.Revision))
     {

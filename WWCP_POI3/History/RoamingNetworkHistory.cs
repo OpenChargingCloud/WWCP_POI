@@ -932,8 +932,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Append the given commit of another server to this history. Its parents must be known here.
         /// The change set of a commit with one parent must be signed by its owners, and lead from the version of its parent
         /// to a version with its ETags; a merge commit must be the merge of its parents, as this history calculates it.
-        /// Its revision is one more than the highest one of its parents. Its own signatures must all be valid,
-        /// and it must be signed in every required role. Afterwards, the tips are merged where they do not conflict.
+        /// Its revision is one more than the highest one of its parents. It must be signed in every required role,
+        /// and its own signatures must all be valid in the version it leads to, the one calculated for it.
+        /// Afterwards, the tips are merged where they do not conflict.
         /// A commit this history holds already is accepted, taking the signatures it has in addition.
         /// Unlike a change set, it is appended also when it conflicts with the head, and whatever version it follows:
         /// the other server took it by its own head, and refusing it here would part the histories for good.
@@ -985,8 +986,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 }
 
-                if (!Known && !CheckSignatures(Commit, VerifyCommitSignature, RequiredSignatureRoles, out ErrorResponse))
+                // Whether it is signed as required first: its signatures are verified in its version, once calculated.
+                if (!Known && SignedAsRequiredError(Commit, VerifyCommitSignature, RequiredSignatureRoles) is String signedError)
+                {
+                    ErrorResponse = signedError;
                     return false;
+                }
 
                 if (!Known && (ClosedError() ?? CommitEpochError(Commit)) is String epochError)
                 {
@@ -1070,6 +1075,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     ErrorResponse = versionError;
                     return false;
                 }
+
+                // Its signatures by the keys of the version it leads to.
+                if (!Known && !VerifySignatures(Commit, roamingNetwork, VerifyCommitSignature, out ErrorResponse))
+                    return false;
 
                 try
                 {
@@ -1162,7 +1171,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Add the given signatures to a commit of this history, e.g. the one of a roaming network operator
         /// that received the data of a charging station operator and checked it, or ones the leading server took.
-        /// Every new signature must be valid; signatures the commit has already are skipped.
+        /// Every new signature must be valid in the version of the commit; signatures the commit has already are skipped.
         /// The identification of the commit stays the same.
         /// </summary>
         /// <param name="CommitId">The identification of the commit.</param>
@@ -1208,8 +1217,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
+                // Its version is calculated only for a verifier to check them in.
+                if (VerifyCommitSignature is null)
+                {
+                    ErrorResponse = $"The commit '{CommitId}' is signed, but there is no verifier of commit signatures!";
+                    return false;
+                }
+
+                if (!TryGetVersion(CommitId, out var version, out ErrorResponse))
+                    return false;
+
                 foreach (var signature in newSignatures)
-                    if (!CheckSignature(commit, signature, VerifyCommitSignature, out ErrorResponse))
+                    if (!CheckSignature(commit, version, signature, VerifyCommitSignature, out ErrorResponse))
                         return false;
 
                 try
@@ -1253,32 +1272,81 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (static) CheckSignatures(Commit, VerifyCommitSignature, RequiredSignatureRoles, out ErrorResponse)
+        #region (static) CheckSignatures(Commit, Version, VerifyCommitSignature, RequiredSignatureRoles, out ErrorResponse)
 
         /// <summary>
-        /// Check that every signature of the given commit is valid, and that it is signed in every required role,
-        /// e.g. a commit taken from a snapshot.
+        /// Check that the given commit is signed in every required role, and that every signature of it is valid
+        /// in the given version, the one it leads to, e.g. the head commit of a snapshot in the version of the snapshot.
         /// </summary>
         /// <param name="Commit">A commit.</param>
+        /// <param name="Version">The version of the roaming network the commit leads to.</param>
         /// <param name="VerifyCommitSignature">A verifier of commit signatures using trusted keys, required for signed commits.</param>
         /// <param name="RequiredSignatureRoles">The roles the commit must be signed in, e.g. leader.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
         public static Boolean CheckSignatures(RoamingNetworkCommit              Commit,
+                                              RoamingNetwork                    Version,
                                               VerifyCommitSignatureDelegate?    VerifyCommitSignature,
                                               IReadOnlyCollection<String>?      RequiredSignatureRoles,
                                               [NotNullWhen(false)] out String?  ErrorResponse)
         {
 
-            foreach (var signature in Commit.Signatures)
-                if (!CheckSignature(Commit, signature, VerifyCommitSignature, out ErrorResponse))
-                    return false;
+            if (SignedAsRequiredError(Commit, VerifyCommitSignature, RequiredSignatureRoles) is String signedError)
+            {
+                ErrorResponse = signedError;
+                return false;
+            }
+
+            return VerifySignatures(Commit, Version, VerifyCommitSignature, out ErrorResponse);
+
+        }
+
+        #endregion
+
+        #region (private static) SignedAsRequiredError(Commit, VerifyCommitSignature, RequiredSignatureRoles)
+
+        /// <summary>
+        /// Why the given commit is not signed as required, if it is not, without verifying any signature:
+        /// signed without a verifier of commit signatures, or not signed in a required role.
+        /// </summary>
+        /// <param name="Commit">A commit.</param>
+        /// <param name="VerifyCommitSignature">A verifier of commit signatures using trusted keys, required for signed commits.</param>
+        /// <param name="RequiredSignatureRoles">The roles the commit must be signed in, e.g. leader.</param>
+        private static String? SignedAsRequiredError(RoamingNetworkCommit            Commit,
+                                                     VerifyCommitSignatureDelegate?  VerifyCommitSignature,
+                                                     IReadOnlyCollection<String>?    RequiredSignatureRoles)
+        {
+
+            if (Commit.Signatures.Length > 0 && VerifyCommitSignature is null)
+                return $"The commit '{Commit.Id}' is signed, but there is no verifier of commit signatures!";
 
             foreach (var role in RequiredSignatureRoles ?? [])
                 if (!Commit.Signatures.Any(signature => signature.Role == role))
-                {
-                    ErrorResponse = $"The commit '{Commit.Id}' is not signed in the role '{role}'!";
+                    return $"The commit '{Commit.Id}' is not signed in the role '{role}'!";
+
+            return null;
+
+        }
+
+        #endregion
+
+        #region (private static) VerifySignatures(Commit, Version, VerifyCommitSignature, out ErrorResponse)
+
+        /// <summary>
+        /// Verify every signature of the given commit in the given version, the one it leads to.
+        /// </summary>
+        /// <param name="Commit">A commit.</param>
+        /// <param name="Version">The version of the roaming network the commit leads to.</param>
+        /// <param name="VerifyCommitSignature">A verifier of commit signatures using trusted keys, required for signed commits.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        private static Boolean VerifySignatures(RoamingNetworkCommit              Commit,
+                                                RoamingNetwork                    Version,
+                                                VerifyCommitSignatureDelegate?    VerifyCommitSignature,
+                                                [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            foreach (var signature in Commit.Signatures)
+                if (!CheckSignature(Commit, Version, signature, VerifyCommitSignature, out ErrorResponse))
                     return false;
-                }
 
             ErrorResponse = null;
             return true;
@@ -1287,9 +1355,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) CheckSignature(Commit, Signature, VerifyCommitSignature, out ErrorResponse)
+        #region (private static) CheckSignature(Commit, Version, Signature, VerifyCommitSignature, out ErrorResponse)
 
         private static Boolean CheckSignature(RoamingNetworkCommit              Commit,
+                                              RoamingNetwork                    Version,
                                               RoamingNetworkCommitSignature     Signature,
                                               VerifyCommitSignatureDelegate?    VerifyCommitSignature,
                                               [NotNullWhen(false)] out String?  ErrorResponse)
@@ -1301,7 +1370,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!VerifyCommitSignature(Commit, Signature))
+            if (!VerifyCommitSignature(Commit, Version, Signature))
             {
                 ErrorResponse = $"The signature of the commit '{Commit.Id}' by {Signature} is invalid, or its key is not trusted!";
                 return false;

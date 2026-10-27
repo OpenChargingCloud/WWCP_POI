@@ -35,10 +35,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// e.g. by resolving the key of its key identification and calling VerifySignature.
     /// The key must be one trusted for the role and the signer the signature names: the roles a commit must be signed in
     /// are counted as its verified signatures name them (example A4).
+    /// The keys of the roaming network are looked up in the given version, the one the commit leads to: for the head commit
+    /// of a snapshot the version of the snapshot, for a commit appended the version calculated for it, for signatures added
+    /// later to a commit held the version of that commit. A snapshot has only the version of its head,
+    /// and an attestation is checked in the version it attests, too.
     /// </summary>
     /// <param name="Commit">The signed commit.</param>
+    /// <param name="Version">The version of the roaming network the commit leads to.</param>
     /// <param name="Signature">One of its signatures.</param>
     public delegate Boolean VerifyCommitSignatureDelegate(RoamingNetworkCommit           Commit,
+                                                          RoamingNetwork                 Version,
                                                           RoamingNetworkCommitSignature  Signature);
 
 

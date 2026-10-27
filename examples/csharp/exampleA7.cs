@@ -183,7 +183,7 @@ public static class ExampleA7
             Console.WriteLine($"Segment {info.Number}, from revision {history.Head.Commit.Revision}:");
 
             foreach (var commit in segment.Commits)
-                ExampleA4.Append(history, commit, anchor, network);
+                ExampleA4.Append(history, commit, anchor);
 
             var checkpoint  = checkpoints.Single(checkpoint => checkpoint.CommitId == info.EndId);
 

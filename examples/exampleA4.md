@@ -176,11 +176,11 @@ if (!RoamingNetworkHistory.TryFromCheckpointSnapshot(File.ReadAllText("published
 ```
 
 d) The commits since, each checked as every commit is: its change set signed by its owners and leading to its ETags,
-the commit signed as the roaming network operator:
+the commit signed as the roaming network operator, by signing keys certified in the version it leads to:
 
 ```csharp
 foreach (var commit in CommitsSince(0))
-    Append(joined, commit, anchor, network);
+    Append(joined, commit, anchor);
 ```
 
 e) The head reached is the published one:

@@ -55,9 +55,19 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                                                                                   { "rno",    RNOKey.   GeneratePublicKey() }
                                                                               };
 
-        internal static readonly VerifyCommitSignatureDelegate VerifyCommit = (commit, signature) =>
+        /// <summary>
+        /// Verifies commit signatures with the trusted keys, whatever the version.
+        /// </summary>
+        internal static readonly VerifyCommitSignatureDelegate VerifyCommit = (commit, version, signature) =>
             TrustedKeys.TryGetValue(signature.KeyId, out var publicKey) &&
             commit.VerifySignature(signature, publicKey, signature.KeyId, out _);
+
+        /// <summary>
+        /// Verifies commit signatures with the signing keys the roaming network operator certifies in the given version only.
+        /// </summary>
+        internal static readonly VerifyCommitSignatureDelegate VerifyByCertifiedKeys = (commit, version, signature) =>
+            version.Operator?.SigningKeyCertificates.FirstOrDefault(certificate => certificate.SigningKey.Id == signature.KeyId) is RoamingNetworkSigningKeyCertificate certificate &&
+            commit.VerifySignature(signature, certificate.SigningKey.Key, certificate.SigningKey.Id, out _);
 
         #endregion
 
@@ -139,8 +149,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(leader.Root.Signatures.Select(signature => signature.Role),    Is.EqualTo(new[] { "leader" }));
                 Assert.That(commit.Signatures.Select(signature => signature.Role),         Is.EqualTo(new[] { "leader" }));
                 Assert.That(commit.Signatures[0].Signer,                                   Is.EqualTo("leader.example.org"));
-                Assert.That(VerifyCommit(leader.Root, leader.Root.Signatures[0]),          Is.True);
-                Assert.That(VerifyCommit(commit,      commit.Signatures[0]),               Is.True);
+                Assert.That(VerifyCommit(leader.Root, NewNetwork(), leader.Root.Signatures[0]),           Is.True);
+                Assert.That(VerifyCommit(commit,      leader.Head.RoamingNetwork, commit.Signatures[0]),  Is.True);
                 Assert.That(leader.Head.Commit,                                            Is.SameAs(commit));
 
                 // Signatures are not part of the content the identification is calculated over.
@@ -153,7 +163,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(RoamingNetworkCommit.TryParse(commit.ToCBOR(), out var fromCBOR, out var cborError),     Is.True, cborError);
                 Assert.That(fromJSON!.Signatures,                                          Is.EqualTo(commit.Signatures));
                 Assert.That(fromCBOR!.Signatures,                                          Is.EqualTo(commit.Signatures));
-                Assert.That(VerifyCommit(fromCBOR, fromCBOR.Signatures[0]),                Is.True);
+                Assert.That(VerifyCommit(fromCBOR, leader.Head.RoamingNetwork, fromCBOR.Signatures[0]),  Is.True);
 
             }
 
@@ -191,7 +201,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             Boolean Verifies(JObject JSON)
                 => RoamingNetworkCommit.TryParse(JSON, out var parsed, out var error) &&
-                   VerifyCommit(parsed, parsed.Signatures[0]);
+                   VerifyCommit(parsed, leader.Head.RoamingNetwork, parsed.Signatures[0]);
 
             using (Assert.EnterMultipleScope())
             {
@@ -199,7 +209,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(Verifies(json),                                                                Is.True);
                 Assert.That(RoamingNetworkCommit.TryParse(forgedChangeSet, out var forged, out _),         Is.True);
                 Assert.That(forged!.Id,                                                                    Is.EqualTo(commit.Id));
-                Assert.That(VerifyCommit(forged, forged.Signatures[0]),                                    Is.False);
+                Assert.That(VerifyCommit(forged, leader.Head.RoamingNetwork, forged.Signatures[0]),        Is.False);
                 Assert.That(Verifies(forgedRole),                                                          Is.False);
                 Assert.That(Verifies(forgedSigner),                                                        Is.False);
                 Assert.That(Verifies(forgedTime),                                                          Is.False);
@@ -208,7 +218,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(formatError,                                                                   Does.Contain("yyyy-MM-ddTHH:mm:ss.fffZ"));
 
                 // A signature of another key under the trusted key identification.
-                Assert.That(VerifyCommit(commit, RNOSignature(commit, Key: CSOKey)),                       Is.False);
+                Assert.That(VerifyCommit(commit, leader.Head.RoamingNetwork, RNOSignature(commit, Key: CSOKey)),  Is.False);
 
             }
 
@@ -262,7 +272,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(told.Select(t => t.NewSignatures.Count),             Is.EqualTo(new[] { 1 }));
 
                 // Every signature on its own: the one of the leader stays valid.
-                Assert.That(signed.Signatures.All(signature => VerifyCommit(signed, signature)),  Is.True);
+                Assert.That(signed.Signatures.All(signature => VerifyCommit(signed, leader.Head.RoamingNetwork, signature)),  Is.True);
 
             }
 
@@ -313,8 +323,171 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(follower3.Head.Commit.Id,                    Is.EqualTo(signed!.Id));
                 Assert.That(follower3.Head.Commit.Signatures,            Has.Length.EqualTo(2));
 
-                Assert.That(RoamingNetworkHistory.CheckSignatures(follower3.Head.Commit, VerifyCommit, [ "leader", "roamingNetworkOperator" ], out var checkError),
+                Assert.That(RoamingNetworkHistory.CheckSignatures(follower3.Head.Commit, follower3.Head.RoamingNetwork, VerifyCommit, [ "leader", "roamingNetworkOperator" ], out var checkError),
                             Is.True, checkError);
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_verifier_is_given_the_version_a_commit_leads_to()
+
+        [Test]
+        public void A_verifier_is_given_the_version_a_commit_leads_to()
+        {
+
+            // Keeping the versions of the root and the head only: those of older commits are calculated again.
+            var leader     = RoamingNetworkHistory.Start(NewNetwork(),
+                                                         [ LeaderSigner ],
+                                                         Retention: new RoamingNetworkHistoryRetention {
+                                                                        VersionCheckpointInterval  = 0,
+                                                                        RecentVersions             = 1
+                                                                    });
+
+            RoamingNetworkHistory NewFollower()
+            {
+                Assert.That(RoamingNetworkHistory.TryFromSnapshot(leader.ToSnapshotJSON(), out var follower, out var error), Is.True, error);
+                return follower!;
+            }
+
+            var follower1  = NewFollower();
+            var follower2  = NewFollower();
+
+            var commit1    = Publish(leader, "v1");
+            var commit2    = Publish(leader, "v2");
+            var commit3    = Publish(leader, "v3");
+
+            var given      = new List<(RoamingNetworkCommit_Id CommitId, String? DataSource, Boolean HasItsETags)>();
+
+            Boolean Recording(RoamingNetworkCommit Commit, RoamingNetwork Version, RoamingNetworkCommitSignature Signature)
+            {
+                given.Add((Commit.Id, Version.DataSource, Version.MatchesCommitETags(Commit.ETags)));
+                return VerifyCommit(Commit, Version, Signature);
+            }
+
+            // a) Appended: each one in the version calculated for it, neither in the head before nor in the one after.
+            var appended    = follower1.TryAppend([ commit1, commit2, commit3 ], out var count, out var appendError, VerifyCommitSignature: Recording, RequiredSignatureRoles: [ "leader" ]);
+            var ofAppended  = given.ToArray();
+            given.Clear();
+
+            // b) Signatures added later to local commits: to the head, and to an older one, whose version is not kept.
+            var toHead      = leader.TryAddSignatures(commit3.Id, [ RNOSignature(commit3) ], Recording, out _,           out _, out var toHeadError);
+            var toOlder     = leader.TryAddSignatures(commit1.Id, [ RNOSignature(commit1) ], Recording, out var signed1, out _, out var toOlderError);
+            var ofAdded     = given.ToArray();
+            given.Clear();
+
+            // ...and to a commit held already, appended again with them.
+            var again       = follower1.TryAppend(signed1!, out var againError, VerifyCommitSignature: Recording);
+            var ofAgain     = given.ToArray();
+            given.Clear();
+
+            // c) The head commit of a snapshot: in the version of the snapshot, the only one it has.
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(leader.ToSnapshotJSON(), out var fromSnapshot, out var snapshotError), Is.True, snapshotError);
+
+            var ofSnapshot  = RoamingNetworkHistory.CheckSignatures(fromSnapshot!.Head.Commit, fromSnapshot.Head.RoamingNetwork, Recording, [ "leader", "roamingNetworkOperator" ], out var snapshotCheckError);
+            var ofHead      = given.ToArray();
+            given.Clear();
+
+            // d) A commit with an invalid signature is refused once its version is calculated, and nothing is kept of it.
+            var forged      = follower2.TryAppend(commit1.WithSignatures([ RNOSignature(commit1, Key: CSOKey) ]), out var forgedError, VerifyCommitSignature: Recording);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(appended,                                    Is.True, appendError);
+                Assert.That(count,                                       Is.EqualTo(3));
+                Assert.That(ofAppended,                                  Is.EqualTo(new[] { (commit1.Id, (String?) "v1", true),
+                                                                                            (commit2.Id, (String?) "v2", true),
+                                                                                            (commit3.Id, (String?) "v3", true) }));
+
+                Assert.That(toHead,                                      Is.True, toHeadError);
+                Assert.That(toOlder,                                     Is.True, toOlderError);
+                Assert.That(ofAdded,                                     Is.EqualTo(new[] { (commit3.Id, (String?) "v3", true),
+                                                                                            (commit1.Id, (String?) "v1", true) }));
+
+                Assert.That(again,                                       Is.True, againError);
+                Assert.That(ofAgain,                                     Is.EqualTo(new[] { (commit1.Id, (String?) "v1", true) }));
+
+                Assert.That(ofSnapshot,                                  Is.True, snapshotCheckError);
+                Assert.That(ofHead,                                      Is.EqualTo(new[] { (commit3.Id, (String?) "v3", true),
+                                                                                            (commit3.Id, (String?) "v3", true) }));
+
+                Assert.That(forged,                                      Is.False);
+                Assert.That(forgedError,                                 Does.Contain("is invalid"));
+                Assert.That(follower2.Contains(commit1.Id),              Is.False);
+                Assert.That(follower2.Head.Commit.Revision,              Is.Zero);
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_signing_key_a_later_commit_removes_still_verifies_the_commits_it_signed()
+
+        [Test]
+        public void A_signing_key_a_later_commit_removes_still_verifies_the_commits_it_signed()
+        {
+
+            var network   = NewNetwork();
+            var leader    = RoamingNetworkHistory.Start(network, [ network.OperatorSigner() ]);
+
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(leader.ToSnapshotJSON(), out var follower, out var snapshotError), Is.True, snapshotError);
+
+            var first     = Publish(leader, "v1");
+
+            // The operator replaces its signing key by its next one, certified by its identity key, and signs with it from
+            // the commit replacing it on: that commit is signed by a key its parent does not name.
+            var rno       = leader.Head.RoamingNetwork.Operator!;
+            var identity  = TestParties.Key(TestParties.Party(network), POIKeyKind.Identity);
+            var next      = TestParties.Key(new POIPartyId(nameof(RoamingNetworkOperator), $"{rno.Id}/next"));
+
+            leader.Signers = [ new RoamingNetworkCommitSigner(next.Private, next.Public.Id, COSEAlgorithm.ES256, RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator) ];
+
+            var rotated   = leader.Commit(leader.Head.RoamingNetwork.CreateSignedChangeSet(
+                                [ RoamingNetworkChange.UpdateProperty(rno,
+                                                                      RoamingNetworkSigningKeyCertificate.JSONProperty,
+                                                                      null,
+                                                                      new JArray(RoamingNetworkSigningKeyCertificate.Create(identity.Private, COSEAlgorithm.ES512, rno.Id, next.Public, T0).ToJSON(Embedded: true))) ],
+                                CreatedAt: T0.AddMinutes((Double) leader.Head.Commit.Revision)
+                            ));
+
+            Assert.That(rotated.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), rotated.ErrorResponse);
+
+            // Its change sets are signed by the next key from then on, as well.
+            var published = leader.Commit(leader.Head.RoamingNetwork.CreateChangeSet(
+                                [ RoamingNetworkChange.UpdateProperty(leader.Head.RoamingNetwork, "dataSource", null, "v3") ],
+                                CreatedAt: T0.AddMinutes((Double) leader.Head.Commit.Revision)
+                            ).Sign(next.Private, next.Public.Id, COSEAlgorithm.ES256));
+
+            Assert.That(published.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), published.ErrorResponse);
+
+            var second    = rotated.Commit!;
+            var third     = published.Commit!;
+
+            // Appended in their order, each checked by the signing keys certified in its own version only.
+            var appended  = follower!.TryAppend([ first, second, third ],
+                                                out var count,
+                                                out var appendError,
+                                                VerifyCommitSignature:   VerifyByCertifiedKeys,
+                                                RequiredSignatureRoles:  [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ]);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(appended,                                                                Is.True, appendError);
+                Assert.That(count,                                                                   Is.EqualTo(3));
+                Assert.That(follower.Head.Commit.Id,                                                 Is.EqualTo(third.Id));
+
+                Assert.That(first. Signatures.Single().KeyId,                                        Is.EqualTo(TestParties.Key(TestParties.Party(network)).Public.Id));
+                Assert.That(second.Signatures.Single().KeyId,                                        Is.EqualTo(next.Public.Id));
+                Assert.That(third. Signatures.Single().KeyId,                                        Is.EqualTo(next.Public.Id));
+
+                // In the head, the key of the first commit is certified no longer; before the second, the next one was not yet.
+                Assert.That(VerifyByCertifiedKeys(first,  follower.Head.RoamingNetwork, first. Signatures[0]),  Is.False);
+                Assert.That(VerifyByCertifiedKeys(second, network,                      second.Signatures[0]),  Is.False);
 
             }
 

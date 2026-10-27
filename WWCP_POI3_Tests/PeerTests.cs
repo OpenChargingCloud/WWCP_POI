@@ -17,6 +17,8 @@
 
 #region Usings
 
+using System.Collections.Concurrent;
+
 using Newtonsoft.Json.Linq;
 
 using NUnit.Framework;
@@ -599,6 +601,54 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                 Assert.That(await Eventually(() => follower.History.Head.Commit.Signatures.Length == 2),
                             Is.True,
                             "The follower did not take the pushed commit signature.");
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_follower_checks_the_head_commit_of_its_snapshot_in_the_version_of_the_snapshot()
+
+        [Test]
+        public async Task A_follower_checks_the_head_commit_of_its_snapshot_in_the_version_of_the_snapshot()
+        {
+
+            // Signed by the certified signing key of the operator, which the verifier looks up in the version it is given only:
+            // no network from elsewhere, before the follower has a history of its own.
+            leader!.Signers = [ leader.Head.RoamingNetwork.OperatorSigner() ];
+
+            Publish("v1");
+
+            var head      = leader.Head.Commit;
+            var given     = new ConcurrentQueue<(RoamingNetworkCommit_Id CommitId, String? DataSource, Boolean HasItsETags)>();
+
+            var follower  = await StartFollower(Options: new RoamingNetworkPeerOptions {
+                                                              TrustAnchor             = TrustAnchor,
+                                                              VerifyCommitSignature   = (commit, version, signature) => {
+                                                                                            given.Enqueue((commit.Id, version.DataSource, version.MatchesCommitETags(commit.ETags)));
+                                                                                            return History.CommitSignatureTests.VerifyByCertifiedKeys(commit, version, signature);
+                                                                                        },
+                                                              RequiredSignatureRoles  = [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ],
+                                                              MinReconnectDelay       = TimeSpan.FromMilliseconds(50),
+                                                              MaxReconnectDelay       = TimeSpan.FromMilliseconds(200)
+                                                          });
+
+            var started   = follower.History?.Head.Commit.Id;
+
+            // A commit pushed afterwards: in the version calculated for it.
+            Publish("v2");
+
+            var inSync    = await Eventually(InSync);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(started,                Is.EqualTo(head.Id));
+                Assert.That(inSync,                 Is.True, "The follower did not take the signed commit.");
+                Assert.That(given.First(),          Is.EqualTo((head.Id, (String?) "v1", true)));
+                Assert.That(given,                  Does.Contain((leader.Head.Commit.Id, (String?) "v2", true)));
+                Assert.That(given.All(call => call.HasItsETags),  Is.True);
 
             }
 

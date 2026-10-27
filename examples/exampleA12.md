@@ -62,16 +62,17 @@ occAPI.AddRoamingNetworkHistory(A11.History);
 The mirror trusts the trust anchor of epoch 2 it scanned, `published/QA-trustAnchor-mldsa.txt`: the snapshot it starts
 from comes with the attestations of its head, which must be signed by signing keys of `OCC` of the quorum, certified by
 the keys of the trust anchor, as for a proof (sections 8.6 and 10.5); the keys of the operator the snapshot names are
-public and prove nothing. Every commit must be signed by signing keys of `OCC` certified by them as well. Without its
-trust anchor, the mirror would start from nothing. It passes on and changes nothing, so it pushes nothing back. Once it
-caught up, its own `POI_API` serves its copy, with a WebSocket of its own.
+public and prove nothing. Every commit must be signed by signing keys of `OCC` certified by them as well, in the
+version the commit leads to, which the verifier is given: for the head commit of the snapshot, the version of the
+snapshot. Without its trust anchor, the mirror would start from nothing. It passes on and changes nothing, so it pushes
+nothing back. Once it caught up, its own `POI_API` serves its copy, with a WebSocket of its own.
 
 ```csharp
 var mirror = new RoamingNetworkPeer(occURL,
                                     Options: new RoamingNetworkPeerOptions {
                                                  TrustAnchor             = anchor,
-                                                 VerifyCommitSignature   = (commit, signature) => ExampleA4.SigningKeyOf(anchor, follower?.History?.Head.RoamingNetwork ?? published, signature) is POIPublicKey key &&
-                                                                                                 commit.VerifySignature(signature, key.Key, key.Id, out _),
+                                                 VerifyCommitSignature   = (commit, version, signature) => ExampleA4.SigningKeyOf(anchor, version, signature) is POIPublicKey key &&
+                                                                                                          commit.VerifySignature(signature, key.Key, key.Id, out _),
                                                  RequiredSignatureRoles  = [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ],
                                                  FollowCheckpoints       = false,
                                                  PushCommits             = false,
@@ -216,9 +217,6 @@ Checkpoint 0 of epoch 2 holds runtime status: False
 - The price statements of epoch 1, signed with ES256, did not go into epoch 2 (section 11.4); the price status they set
   did, with the runtime status. Until `DE*GEF` states it anew with a key of epoch 2, as it did for `DE*GEF*E1*1` in
   [example A11](exampleA11.md), the price status of its other entities is runtime status only, without a statement.
-- A verifier of commit signatures is given the commit and the signature, not the version it is checked in; before the
-  mirror has a history of its own, e.g. for the head commit of the snapshot it starts from, it checks the signing keys of
-  `OCC` in `QA` as published, whose key statement it verifies against the trust anchor of epoch 2 first.
 - A token per operator is the simplest login; a server may as well use client certificates
   (`RoamingNetworkPeerOptions.ConfigureWebSocket`, `AuthenticateWebSocketClient`).
 - The hub serves its roaming networks by the same `POI_API`, with their WebSockets; it lets nobody set a status over

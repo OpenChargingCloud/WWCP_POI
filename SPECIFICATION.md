@@ -665,7 +665,10 @@ change set and **the signatures of the change set**: whoever signs a commit conf
 together with who signed it. The verification rules of section 4 apply.
 
 A server MUST verify every signature of a commit before it takes the commit,
-and MAY require signatures in certain roles. Signatures added later are sent with
+and MAY require signatures in certain roles. A signature is verified by the keys of the version
+the commit leads to: for the head of a snapshot the version of the snapshot, as an attestation is
+verified in the version it attests; a signature added later to a commit, in the version of that
+commit. Signatures added later are sent with
 `signCommit` over the WebSocket or `POST …/history/commits/{commitId}/signatures`, and pushed
 on the topic `commitSignatures`.
 

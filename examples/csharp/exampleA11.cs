@@ -574,7 +574,7 @@ public static class ExampleA11
         if (!RoamingNetworkCommit.TryParse((JObject) Helpers.ReadJSONArray("published/QA-commits-since-checkpoint-5.json")[^1]!, out var ofEpoch1, out error))
             Helpers.Fail(error);
 
-        joined.TryAppend([ ofEpoch1 ], out _, out error, VerifyCommitSignature: (commit, signature) => true);
+        joined.TryAppend([ ofEpoch1 ], out _, out error, VerifyCommitSignature: (commit, version, signature) => true);
 
         Console.WriteLine($"A commit of epoch 1: {error}");
 

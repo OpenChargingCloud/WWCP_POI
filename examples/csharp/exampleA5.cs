@@ -111,7 +111,7 @@ public static class ExampleA5
         foreach (var commit in ExampleA4.CommitsSince(0).Concat(ExampleA4.CommitsSince(1)))
         {
 
-            ExampleA4.Append(stepwise, commit, anchor, network);
+            ExampleA4.Append(stepwise, commit, anchor);
 
             foreach (var checkpoint in checkpoints.Where(checkpoint => checkpoint.Revision == commit.Revision))
             {
@@ -179,7 +179,7 @@ public static class ExampleA5
             Helpers.Fail(error);
 
         foreach (var commit in ExampleA4.CommitsSince(0).Concat(ExampleA4.CommitsSince(1)))
-            if (!skipping.TryAppend([ commit ], out _, out error, VerifyCommitSignature: (c, signature) => ExampleA4.SigningKeyOf(anchor, network, signature) is POIPublicKey key && c.VerifySignature(signature, key.Key, key.Id, out _), RequiredSignatureRoles: roles))
+            if (!skipping.TryAppend([ commit ], out _, out error, VerifyCommitSignature: (c, version, signature) => ExampleA4.SigningKeyOf(anchor, version, signature) is POIPublicKey key && c.VerifySignature(signature, key.Key, key.Id, out _), RequiredSignatureRoles: roles))
                 Helpers.Fail(error);
 
         Console.WriteLine($"Checkpoint 2 without checkpoint 1: {(skipping.TryAddCheckpoint(checkpoints[2], out error, verify, roles) ? "taken" : error)}");
