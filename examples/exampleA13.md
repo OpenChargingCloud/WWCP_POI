@@ -175,3 +175,10 @@ The certificate for another model: roamingNetwork.conformityAssessmentBodies.@le
 - A certificate tells who states it: one the roaming network operator states in place of a body without keys names
   `statedBy`, also once the body has keys; which key signed which commit, the commits tell, not the station proof.
 - The transparency software checking the meter values the meter signs is not part of the example.
+
+
+## Next
+
+- The papers of a meter: the declaration of conformity of its model, the certificate of conformity of a notified
+  body and the calibration certificate of the single meter, QI-Digital documents each signed by its issuer and checked
+  against `QA`: [example A14](exampleA14.md).

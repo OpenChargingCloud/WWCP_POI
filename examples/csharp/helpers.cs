@@ -39,4 +39,11 @@ public static class Helpers
         Environment.Exit(1);
     }
 
+    // A private key from a PEM file SaveKey wrote, as its organization reads it to sign with it.
+    public static AsymmetricKeyParameter ReadKey(String File)
+    {
+        var text = System.IO.File.ReadAllText(File);
+        return Org.BouncyCastle.Security.PrivateKeyFactory.CreateKey(Convert.FromBase64String(text[PemEncoding.Find(text).Base64Data]));
+    }
+
 }

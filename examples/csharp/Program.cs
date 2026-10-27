@@ -4,7 +4,7 @@
 
 
 // What the last run wrote is removed first: its keys, what it published and its history would not fit the new keys.
-foreach (var directory in new[] { "AlphaOrg", "BetaOrg", "GammaOrg", "DE-GEF", "GraphDefined", "SAALE", "KERNBERG", "PTB", "published", "trusted", "driver", "poi", "witnesses" })
+foreach (var directory in new[] { "AlphaOrg", "BetaOrg", "GammaOrg", "DE-GEF", "GraphDefined", "SAALE", "KERNBERG", "PTB", "EM-LAB", "published", "trusted", "driver", "poi", "witnesses" })
     if (Directory.Exists(directory))
         Directory.Delete(directory, recursive: true);
 
@@ -151,3 +151,15 @@ Console.WriteLine();
 ExampleA13.Run(a11);
 
 ExampleA13.Validate();
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// The papers of a meter, digital: SAALE declares the conformity of its meter model SM-3, the PTB states its EU-type
+// examination certificate, a calibration laboratory the calibration of the meter of DE*GEF*E2*1; each signs its own,
+// and anybody checks them against QA.
+ExampleA14.Run(a11);
+
+ExampleA14.Validate();

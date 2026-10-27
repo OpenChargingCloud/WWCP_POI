@@ -213,9 +213,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region TryVerify(RoamingNetwork, out ErrorResponse)
 
         /// <summary>
-        /// Whether it is a charging station, as it is at runtime, or an energy meter of the given roaming network, of the
-        /// manufacturer, the model, the serial number, the hardware revision and the firmware version it names: a charging
-        /// station or an energy meter changed since does not match its certificate any more.
+        /// Whether it is a charging station or an energy meter of the given roaming network, each as it is at runtime, with
+        /// what its templates give it, of the manufacturer, the model, the serial number, the hardware revision and the
+        /// firmware version it names: a charging station or an energy meter changed since does not match its certificate
+        /// any more.
         /// </summary>
         public Boolean TryVerify(RoamingNetwork                    RoamingNetwork,
                                  [NotNullWhen(false)] out String?  ErrorResponse)
@@ -240,8 +241,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             else
             {
 
+                // As it is at runtime: its manufacturer, model, hardware revision and firmware version may be those of the
+                // energy meter templates of its owner.
                 if (!EnergyMeter_Id.TryParse(Id, out var energyMeterId) ||
-                    !RoamingNetwork.TryGetEnergyMeterById(energyMeterId, out var energyMeter))
+                    RoamingNetwork.AllEffectiveEnergyMeters(RoamingNetwork.ChargingStationOperators, RoamingNetwork.GridOperators).
+                                   FirstOrDefault(effectiveEnergyMeter => effectiveEnergyMeter.Id == energyMeterId) is not EnergyMeter energyMeter)
                 {
                     ErrorResponse = $"The {Text} is none of the roaming network '{RoamingNetwork.Id}'!";
                     return false;

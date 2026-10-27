@@ -60,12 +60,17 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly FirmwareVersion                 F18        = FirmwareVersion. Parse("1.8");
 
         private static readonly DigitalCertificateOfConformity_Id  TypeExamination  = DigitalCertificateOfConformity_Id.Parse("DE-26-M-PTB-0042");
+        private static readonly EnergyMeterTemplate_Id             MeterTemplate    = EnergyMeterTemplate_Id.Parse("DE*GEF*EMT_M500");
 
         #endregion
 
-        #region NewNetwork()
+        #region NewNetwork(MeterOfTemplate = false)
 
-        private static RoamingNetwork NewNetwork()
+        /// <summary>
+        /// The network of the tests; its energy meter names its manufacturer, model, hardware revision and firmware version
+        /// itself, or takes them from an energy meter template of its operator.
+        /// </summary>
+        private static RoamingNetwork NewNetwork(Boolean MeterOfTemplate = false)
 
             => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                       Created,
@@ -90,7 +95,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                   I18NString.Create(Languages.en, "EM test laboratory"),
                                                                                   Created:             Created) ],
                     ChargingStationOperators:      [ new ChargingStationOperator(GEF,
-                                                                                 Created:        Created,
+                                                                                 Created:               Created,
+                                                                                 EnergyMeterTemplates:  MeterOfTemplate
+                                                                                                            ? [ new EnergyMeterTemplate(MeterTemplate,
+                                                                                                                                        ManufacturerId:    METERS,
+                                                                                                                                        ModelId:           M500,
+                                                                                                                                        HardwareRevision:  R30,
+                                                                                                                                        FirmwareVersion:   F17,
+                                                                                                                                        Created:           Created) ]
+                                                                                                            : null,
                                                                                  ChargingPools:  [ new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P1"),
                                                                                                                     Created:           Created,
                                                                                                                     ChargingStations:  [ new ChargingStation(S1,
@@ -100,13 +113,18 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                              FirmwareVersion:   FirmwareVersion. Parse("4.3"),
                                                                                                                                                              Created:           Created,
                                                                                                                                                              EVSEs:             [ new EVSE(EVSE_Id.Parse("DE*GEF*E1*1"),
-                                                                                                                                                                                           EnergyMeter:  new EnergyMeter(Meter1,
-                                                                                                                                                                                                                         ManufacturerId:    METERS,
-                                                                                                                                                                                                                         ModelId:           M500,
-                                                                                                                                                                                                                         SerialNumber:      SerialNumber.Parse("M500-000815"),
-                                                                                                                                                                                                                         HardwareRevision:  R30,
-                                                                                                                                                                                                                         FirmwareVersion:   F17,
-                                                                                                                                                                                                                         Created:           Created),
+                                                                                                                                                                                           EnergyMeter:  MeterOfTemplate
+                                                                                                                                                                                                             ? new EnergyMeter(Meter1,
+                                                                                                                                                                                                                               SerialNumber:      SerialNumber.Parse("M500-000815"),
+                                                                                                                                                                                                                               TemplateIds:       [ MeterTemplate ],
+                                                                                                                                                                                                                               Created:           Created)
+                                                                                                                                                                                                             : new EnergyMeter(Meter1,
+                                                                                                                                                                                                                               ManufacturerId:    METERS,
+                                                                                                                                                                                                                               ModelId:           M500,
+                                                                                                                                                                                                                               SerialNumber:      SerialNumber.Parse("M500-000815"),
+                                                                                                                                                                                                                               HardwareRevision:  R30,
+                                                                                                                                                                                                                               FirmwareVersion:   F17,
+                                                                                                                                                                                                                               Created:           Created),
                                                                                                                                                                                            Created:      Created) ]) ]) ]) ]).WithKeys();
 
         #endregion
@@ -374,6 +392,33 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(dcc.TryVerify(network, out var error, T0),  Is.True, error);
                 Assert.That(dcc.Item.Type,                              Is.EqualTo(nameof(ChargingStation)));
                 Assert.That(dcc.Item.FirmwareVersion,                   Is.EqualTo(FirmwareVersion.Parse("4.3")));
+            }
+
+        }
+
+        #endregion
+
+        #region A_DCC_of_an_energy_meter_matches_it_as_it_is_at_runtime()
+
+        [Test]
+        public void A_DCC_of_an_energy_meter_matches_it_as_it_is_at_runtime()
+        {
+
+            // The meter names only its serial number and its template; its manufacturer, model, hardware revision and
+            // firmware version are the template's.
+            var network = NewNetwork(MeterOfTemplate: true);
+            network.TryGetChargingStationOperatorById(GEF, out var gef);
+            gef!.TryGetEffectiveEVSE(EVSE_Id.Parse("DE*GEF*E1*1"), out var evse);
+
+            var dcc     = SignedBy(NewDCC(network, QIDigitalItem.Of(evse!.EnergyMeter!)), TestParties.Party(LAB));
+            var dcoc    = SignedBy(NewDCoC(), TestParties.Party(PTB));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(dcc.TryVerify(network, out var error1, T0),  Is.True, error1);
+                Assert.That(dcc.Item.ModelId,                            Is.EqualTo(M500.ToString()));
+                Assert.That(dcc.Item.FirmwareVersion,                    Is.EqualTo(F17));
+                Assert.That(dcoc.TryCover(dcc.Item, out var error2),     Is.True, error2);
             }
 
         }
