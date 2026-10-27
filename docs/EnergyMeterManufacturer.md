@@ -74,7 +74,7 @@ names who made it, so it names none (`manufacturerId` is refused).
 | `maxCurrent` | number | update/remove | The maximum current it measures, in A; positive. |
 | `accuracyClass` | string | update/remove | The accuracy class of its type examination, e.g. `A`, `B` or `C` of the Measuring Instruments Directive (2014/32/EU, Annex V); not empty. |
 | `measurands` | string[] | update/remove | What it measures, e.g. OBIS codes as `1-0:1.8.0`; each once, ordered ordinally. |
-| `signatureMethods` | string[] | update/remove | How its meters sign their measurements, as a transparency software verifies them, e.g. `OCMF`; as of an [energy meter](EnergyMeter.md). |
+| `signatureMethods` | string[] | update/remove | How its meters sign their measurements, as a transparency software verifies them, e.g. `OCMF`; as of an [energy meter](EnergyMeter.md). A meter of it signs with these only, where it names any (SPECIFICATION.md 4.1, *What a model rates*; `EnergyMeterModelComparer`); its other data describe it. |
 | `customData` | object | update/remove | |
 
 - `RoamingNetworkChange.Add(model, manufacturerId)`, `Remove(modelId, manufacturerId)`,
@@ -97,13 +97,14 @@ it names `models`.
 
 | Who | JSON key | Rule |
 |---|---|---|
-| [EnergyMeter](EnergyMeter.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | `manufacturerId` names a manufacturer of the network; `modelId` a model of it, and only with its manufacturer; `hardwareRevision` one of the `hardwareRevisions` of the model, `firmwareVersion` one of its `firmwareVersions`, each only with the model: as the meter is at runtime, with what its templates give it. |
+| [EnergyMeter](EnergyMeter.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | `manufacturerId` names a manufacturer of the network; `modelId` a model of it, and only with its manufacturer; `hardwareRevision` one of the `hardwareRevisions` of the model, `firmwareVersion` one of its `firmwareVersions`, each only with the model: as the meter is at runtime, with what its templates give it. Its `signatureMethods` are those of the model, where the model names any. |
 | [EnergyMeterTemplate](EnergyMeterTemplate.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | the same, of the template; a hardware revision or firmware version without a model it gives to meters of their own model, checked at them. |
 | certificate of an energy meter model ([ConformityAssessmentBody](ConformityAssessmentBody.md#certificates)) | `energyMeterManufacturerId`, `energyMeterModel`, `hardwareRevisions`, `firmwareVersions` | the manufacturer names a manufacturer of the network, the model one of its models, each hardware revision one of its `hardwareRevisions`, each firmware version one of its `firmwareVersions`. |
 | certificate of a charging station model | `energyMeters`: `manufacturerId`, `modelId`, `hardwareRevisions`, `firmwareVersions` | the same, of each energy meter it was issued with. |
 
 The references are checked after every change set: a manufacturer, a model, a hardware revision or a firmware version
-still named can not be removed, and a meter or template can not name an unknown one.
+still named can not be removed, and a meter or template can not name an unknown one; nor can a model drop a signature
+method a meter naming it signs with.
 
 
 ## Change sets

@@ -86,12 +86,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region NewNetwork(StationModel = DC300, MeterModel = M500, StationFirmware = "4.3", MeterRevision = "3.0")
+        #region NewNetwork(StationModel = DC300, MeterModel = M500, StationFirmware = "4.3", MeterRevision = "3.0", MeterSignatureMethods = null)
 
-        private static RoamingNetwork NewNetwork(ChargingStationModel_Id?  StationModel      = null,
-                                                 EnergyMeterModel_Id?      MeterModel        = null,
-                                                 String                    StationFirmware   = "4.3",
-                                                 String                    MeterRevision     = "3.0")
+        private static RoamingNetwork NewNetwork(ChargingStationModel_Id?       StationModel            = null,
+                                                 EnergyMeterModel_Id?           MeterModel              = null,
+                                                 String                         StationFirmware         = "4.3",
+                                                 String                         MeterRevision           = "3.0",
+                                                 IEnumerable<SignatureMethod>?  MeterSignatureMethods   = null)
 
             => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                       Created,
@@ -113,6 +114,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                                                                                          ModelId:           MeterModel ?? M500,
                                                                                                                                                                                                                          HardwareRevision:  MeterModel is null ? HardwareRevision.Parse(MeterRevision) : null,
                                                                                                                                                                                                                          FirmwareVersion:   MeterModel is null ? FirmwareVersion.Parse("1.7")         : null,
+                                                                                                                                                                                                                         SignatureMethods:  MeterSignatureMethods,
                                                                                                                                                                                                                          Created:           Created),
                                                                                                                                                                                            Created:      Created) ]) ]) ]) ]).WithKeys();
 
@@ -442,6 +444,63 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(ErrorOf(rn1, TestParties.Party(ACME), RoamingNetworkChange.UpdateProperty(dc300!, ACME, "firmwareVersions", new JArray("4.2", "4.3"), new JArray("4.2", "4.3", "4.4"))),
                             Is.Null);
+
+            }
+
+        }
+
+        #endregion
+
+        #region Stations_and_meters_do_not_contradict_their_models()
+
+        /// <summary>
+        /// A charging station and each of its EVSEs deliver no more than the maxPower of its model, an energy meter signs with
+        /// the signature methods of its model only, where its model names any (ChargingStationModelComparer,
+        /// EnergyMeterModelComparer; SPECIFICATION.md section 4.1, "What a model rates"): checked of every version, after a
+        /// change of the station, of an EVSE or of the model. What a model only describes is not compared: the station has
+        /// one EVSE, its model two.
+        /// </summary>
+        [Test]
+        public void Stations_and_meters_do_not_contradict_their_models()
+        {
+
+            var rn1      = NewNetwork(MeterSignatureMethods: [ SignatureMethod.OCMF ]);
+            var station  = rn1.ChargingStationOperators.Single().ChargingStations.Single();
+            var evse     = station.EVSEs.Single();
+
+            rn1.TryGetChargingStationManufacturerById(ACME,   out var acme);
+            rn1.TryGetEnergyMeterManufacturerById    (METERS, out var meters);
+            acme!.  TryGetModel(DC300, out var dc300);
+            meters!.TryGetModel(M500,  out var m500);
+
+            var rn2      = Apply(rn1, RoamingNetworkChange.UpdateProperty(station, "maxPower", null, 150000));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(dc300!.NumberOfEVSEs,                                                   Is.EqualTo(2));
+                Assert.That(station.EVSEs.Count(),                                                  Is.EqualTo(1), "A station of fewer EVSEs than its model is taken.");
+
+                // The station, up to the 300 kW of its model, and an EVSE of it.
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.UpdateProperty(station, "maxPower", null, 300000)),  Throws.Nothing);
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.UpdateProperty(station, "maxPower", null, 300500)),
+                            Throws.ArgumentException.With.Message.Contains("The maximum power of the charging station 'DE*GEF*S1', 300.5 kW, is above the one of its model 'DC-300' of 'ACME', 300 kW!"));
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.UpdateProperty(evse,    "maxPower", null, 350000)),
+                            Throws.ArgumentException.With.Message.Contains("The maximum power of the EVSE 'DE*GEF*E1*1', 350 kW, is above the one of the model 'DC-300' of 'ACME' of its charging station 'DE*GEF*S1', 300 kW!"));
+
+                // The model, by its manufacturer: not below its station.
+                Assert.That(ErrorOf(rn2, TestParties.Party(ACME), RoamingNetworkChange.UpdateProperty(dc300, ACME, "maxPower", 300000, 44000)),
+                            Does.Contain("The maximum power of the charging station 'DE*GEF*S1', 150 kW, is above the one of its model 'DC-300' of 'ACME', 44 kW!"));
+                Assert.That(ErrorOf(rn2, TestParties.Party(ACME), RoamingNetworkChange.UpdateProperty(dc300, ACME, "maxPower", 300000, 150000)),  Is.Null);
+                Assert.That(ErrorOf(rn2, TestParties.Party(ACME), RoamingNetworkChange.RemoveProperty(dc300, ACME, "maxPower", 300000)),          Is.Null, "A model without a maxPower limits nothing.");
+
+                // The meter signs with OCMF, a method of its model.
+                Assert.That(() => NewNetwork(MeterSignatureMethods: [ SignatureMethod.OCMF, SignatureMethod.EDL40 ]),
+                            Throws.ArgumentException.With.Message.Contains("The energy meter 'meter-1' signs with 'EDL40', no signature method of its model 'M-500' of 'METERS'!"));
+                Assert.That(ErrorOf(rn1, TestParties.Party(METERS), RoamingNetworkChange.UpdateProperty(m500!, METERS, "signatureMethods", new JArray("OCMF"), new JArray("EDL40"))),
+                            Does.Contain("The energy meter 'meter-1' signs with 'OCMF', no signature method of its model 'M-500' of 'METERS'!"));
+                Assert.That(ErrorOf(rn1, TestParties.Party(METERS), RoamingNetworkChange.RemoveProperty(m500!, METERS, "signatureMethods", new JArray("OCMF"))),
+                            Is.Null, "A model naming no signature method limits nothing.");
 
             }
 

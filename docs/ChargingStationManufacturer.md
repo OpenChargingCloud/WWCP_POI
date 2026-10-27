@@ -87,7 +87,9 @@ The address is replaced or removed as a whole: `UpdateProperty(manufacturer, "ad
 context `https://open.charging.cloud/contexts/wwcp/roamingNetwork/chargingStationModel/v1`: a model of charging
 stations, as its manufacturer states it, e.g. `GD-DC300`. Without runtime status and timestamps; its manufacturer,
 which embeds it, names who made it, so it names none (`manufacturerId` is refused). Its technical data are the
-ratings of the model; a charging station of it may have less, its EVSEs say what they have.
+ratings of the model; a charging station of it may have less, its EVSEs say what they have. Its `maxPower` is a limit:
+neither a station of it nor one of its EVSEs has more (SPECIFICATION.md 4.1, *What a model rates*;
+`ChargingStationModelComparer`). Its other data describe it: a station of it may differ.
 
 | JSON key | Type | Change set | Description |
 |---|---|---|---|
@@ -99,7 +101,7 @@ ratings of the model; a charging station of it may have less, its EVSEs say what
 | `productURL` | URL | update/remove | Its product page. |
 | `datasheetURL` | URL | update/remove | Its datasheet. |
 | `images` | object[] | update/remove | Images of it, as of a charging station; each URL once. |
-| `maxPower` | number | update/remove | The maximum power of a charging station of it, in W; positive. |
+| `maxPower` | number | update/remove | The maximum power of a charging station of it, in W; positive. Neither a station of it nor one of its EVSEs has more. |
 | `currentTypes` | string[] | update/remove | Its current types: `AC_OnePhase`, `AC_ThreePhases`, `DC`. |
 | `connectorTypes` | string[] | update/remove | The types of its charging connectors, `ChargingConnectorType`s, e.g. `IEC_62196_T2_COMBO`; ordered by identification, each once. |
 | `numberOfEVSEs` | integer | update/remove | The number of EVSEs of a charging station of it; at least 1. |
@@ -126,12 +128,13 @@ names `models`, its own properties only when it names `party` (SPECIFICATION.md,
 
 | Who | JSON key | Rule |
 |---|---|---|
-| [ChargingStation](ChargingStation.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | `manufacturerId` names a manufacturer of the network; `modelId` a model of it, and only with its manufacturer; `hardwareRevision` one of the `hardwareRevisions` of the model, `firmwareVersion` one of its `firmwareVersions`, each only with the model: as the station is at runtime, with what its templates give it. |
+| [ChargingStation](ChargingStation.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | `manufacturerId` names a manufacturer of the network; `modelId` a model of it, and only with its manufacturer; `hardwareRevision` one of the `hardwareRevisions` of the model, `firmwareVersion` one of its `firmwareVersions`, each only with the model: as the station is at runtime, with what its templates give it. Its `maxPower`, and the one of each of its EVSEs, is not above the `maxPower` of the model. |
 | [ChargingStationTemplate](ChargingStationTemplate.md) | `manufacturerId`, `modelId`, `hardwareRevision`, `firmwareVersion` | the same, of the template; a hardware revision or firmware version without a model it gives to stations of their own model, checked at them. |
 | certificate of a charging station model ([ConformityAssessmentBody](ConformityAssessmentBody.md#certificates)) | `chargingStationManufacturerId`, `chargingStationModel`, `hardwareRevisions`, `firmwareVersions` | the manufacturer, mandatory, names a manufacturer of the network, the model one of its models, each hardware revision one of its `hardwareRevisions`, each firmware version one of its `firmwareVersions`. |
 
 The references are checked after every change set: a manufacturer, a model, a hardware revision or a firmware version
-still named can not be removed, and a station, template or certificate can not name an unknown one.
+still named can not be removed, and a station, template or certificate can not name an unknown one; nor can a model be
+lowered below a station naming it.
 
 
 ## Change sets

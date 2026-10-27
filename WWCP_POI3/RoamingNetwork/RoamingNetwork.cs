@@ -393,6 +393,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (UnknownManufacturer(chargingStationOperators, chargingStationManufacturers.Index) is String unknownManufacturer)
                 throw new ArgumentException(unknownManufacturer, nameof(ChargingStationManufacturers));
 
+            // And no charging station contradicts its model.
+            if (ContradictedChargingStationModel(chargingStationOperators, chargingStationManufacturers.Index) is String contradictedModel)
+                throw new ArgumentException(contradictedModel, nameof(ChargingStationOperators));
+
             this.eMobilityProviders = new (EMobilityProviders, entity => entity.Id, "e-mobility provider");
 
             this.gridOperators = new (GridOperators, entity => entity.Id, "grid operator");
@@ -473,6 +477,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // with what its templates give it.
             if (UnknownEnergyMeterManufacturer(AllEffectiveEnergyMeters(chargingStationOperators, gridOperators), energyMeterManufacturers.Index) is String unknownEnergyMeterManufacturer)
                 throw new ArgumentException(unknownEnergyMeterManufacturer, nameof(EnergyMeterManufacturers));
+
+            // And no energy meter contradicts its model.
+            if (ContradictedEnergyMeterModel(AllEffectiveEnergyMeters(chargingStationOperators, gridOperators), energyMeterManufacturers.Index) is String contradictedMeterModel)
+                throw new ArgumentException(contradictedMeterModel, nameof(EnergyMeterManufacturers));
 
             foreach (var energyMeterGroup in AllEnergyMeterGroups(chargingStationOperators, gridOperators))
                 energyMeterGroups.TryAdd(energyMeterGroup.Id, energyMeterGroup);
@@ -2861,6 +2869,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
+        /// The error, when an energy meter of the given ones contradicts the model it names (EnergyMeterModelComparer): as
+        /// it is at runtime, with what its templates give it. One naming an unknown model is UnknownEnergyMeterManufacturer's.
+        /// </summary>
+        internal static String? ContradictedEnergyMeterModel(IEnumerable<EnergyMeter>                                                  EnergyMeters,
+                                                             IReadOnlyDictionary<EnergyMeterManufacturer_Id, EnergyMeterManufacturer>  EnergyMeterManufacturers)
+        {
+
+            foreach (var energyMeter in EnergyMeters)
+                if (energyMeter.ManufacturerId is EnergyMeterManufacturer_Id manufacturerId                            &&
+                    energyMeter.ModelId        is EnergyMeterModel_Id        modelId                                   &&
+                    EnergyMeterManufacturers.TryGetValue(manufacturerId, out var manufacturer)                         &&
+                    manufacturer.TryGetModel(modelId, out var model)                                                   &&
+                    EnergyMeterModelComparer.Contradiction(energyMeter, model, manufacturer.Id) is String contradiction)
+                {
+                    return contradiction;
+                }
+
+            return null;
+
+        }
+
+        /// <summary>
         /// The error, when what is given names an unknown energy meter manufacturer, a model without its manufacturer or
         /// one its manufacturer does not have, or a hardware revision or firmware version without its model or one its
         /// model does not have.
@@ -3186,6 +3216,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 ChargingStationManufacturers) is String error)
                 {
                     return error;
+                }
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// The error, when a charging station of the given operators contradicts the model it names
+        /// (ChargingStationModelComparer): as it is at runtime, with what its templates give it. One naming an unknown model
+        /// is UnknownManufacturer's.
+        /// </summary>
+        internal static String? ContradictedChargingStationModel(IEnumerable<ChargingStationOperator>                                              ChargingStationOperators,
+                                                                 IReadOnlyDictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>  ChargingStationManufacturers)
+        {
+
+            foreach (var chargingStation in ChargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EffectiveChargingStations))
+                if (chargingStation.ManufacturerId is ChargingStationManufacturer_Id manufacturerId                            &&
+                    chargingStation.ModelId        is ChargingStationModel_Id        modelId                                   &&
+                    ChargingStationManufacturers.TryGetValue(manufacturerId, out var manufacturer)                             &&
+                    manufacturer.TryGetModel(modelId, out var model)                                                           &&
+                    ChargingStationModelComparer.Contradiction(chargingStation, model, manufacturer.Id) is String contradiction)
+                {
+                    return contradiction;
                 }
 
             return null;

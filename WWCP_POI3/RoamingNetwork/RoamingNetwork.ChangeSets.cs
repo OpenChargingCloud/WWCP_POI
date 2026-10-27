@@ -1286,6 +1286,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    UnknownEnergyMeterTemplateReference(allEnergyMeterTemplates, MeterManufacturers, Softwares, Certificates) ??
                    UnknownEnergyMeterManufacturer     (AllEffectiveEnergyMeters(operators.Values, gridOps.Values), MeterManufacturers);
 
+            // No charging station and no energy meter contradicts the model it names (SPECIFICATION.md 4.1, "What a model
+            // rates"): after a change of either, of a template giving them their values, or of the model.
+            if ((ContradictedChargingStationModel(operators.Values, manufacturers) ??
+                 ContradictedEnergyMeterModel    (AllEffectiveEnergyMeters(operators.Values, gridOps.Values), meterManufacturers)) is String contradiction)
+            {
+                ErrorResponse = contradiction;
+                return false;
+            }
+
             RoamingNetwork = new RoamingNetwork(
                                  Id,
                                  name,

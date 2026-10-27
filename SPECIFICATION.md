@@ -378,6 +378,14 @@ while another party still names it MUST be refused, also one of the RNO. The par
 both change it in one change set, which then needs the signatures of both: so the RNO removes a party another one still
 names only together with that party. A reader SHOULD say so when it refuses a change set for it.
 
+**What a model rates** limits what names it: a version MUST NOT hold a charging station whose `maxPower`, or that of
+one of its EVSEs, is above the `maxPower` of the model it names, nor an energy meter signing with a signature method its
+model does not name, where the model names any; each as it is at runtime, with what its templates give it. So a change
+set raising one of them above its model, or a manufacturer's lowering its model below one of them, MUST be refused; the
+manufacturer changes the model together with the party naming it, as above. The other data of a model describe it, a
+station or a meter may differ from them: e.g. its `currentTypes`, `connectorTypes` and `numberOfEVSEs`, its
+`maxCurrent`, `accuracyClass` and `measurands`.
+
 **When a server takes a change set**, to commit it or to let it wait (4.2), every key it counts MUST also be valid
 when the server takes it, by its clock, and its `createdAt` MUST NOT be later than then, a few minutes of clock skew
 aside: a `createdAt` chosen before lets no key sign once it expired. Made for another version than the head, it MUST
