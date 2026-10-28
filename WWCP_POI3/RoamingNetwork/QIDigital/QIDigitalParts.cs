@@ -89,7 +89,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 if (!QIDigitalJSON.TryOnly(JSON, "a standard", out ErrorResponse, PropertyKeys.Reference, PropertyKeys.Title) ||
-                    !POIJSON.TryParseI18N(JSON, PropertyKeys.Title, "title of a standard", out var title, out ErrorResponse))
+                    !QIDigitalJSON.TryParseI18N(JSON, PropertyKeys.Title, "title of a standard", out var title, out ErrorResponse))
                 {
                     return false;
                 }

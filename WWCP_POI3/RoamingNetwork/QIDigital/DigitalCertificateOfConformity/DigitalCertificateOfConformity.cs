@@ -678,8 +678,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseObjects<QIDigitalStandard>      (JSON, PropertyKeys.Standards,          "standard",              QIDigitalStandard.    TryParse,                     out var standards,        out ErrorResponse) ||
                     !POIJSON.TryParseObjects<QIDigitalQuantity>      (JSON, PropertyKeys.Characteristics,    "characteristic",        QIDigitalQuantity.    TryParse,                     out var characteristics,  out ErrorResponse) ||
                     !POIJSON.TryParseString                          (JSON, PropertyKeys.NotifiedBodyNumber, "notified body number",                                                      out var number,           out ErrorResponse) ||
-                    !POIJSON.TryParseI18N                            (JSON, PropertyKeys.Conclusion,         "conclusion",                                                                out var conclusion,       out ErrorResponse) ||
-                    !POIJSON.TryParseI18N                            (JSON, PropertyKeys.Comment,            "comment",                                                                   out var comment,          out ErrorResponse) ||
+                    !QIDigitalJSON.TryParseI18N                      (JSON, PropertyKeys.Conclusion,         "conclusion",                                                                out var conclusion,       out ErrorResponse) ||
+                    !QIDigitalJSON.TryParseI18N                      (JSON, PropertyKeys.Comment,            "comment",                                                                   out var comment,          out ErrorResponse) ||
                     !POIJSON.TryParseText                            (JSON, PropertyKeys.DocumentURL,        "document URL",          URL.TryParse,                                       out URL? documentURL,     out ErrorResponse) ||
                     !QIDigitalJSON.TryParseTimestamp                 (JSON, PropertyKeys.ValidFrom,          "beginning of its validity",                                                 out var validFrom,        out ErrorResponse) ||
                     !QIDigitalJSON.TryParseTimestamp                 (JSON, PropertyKeys.ValidUntil,         "end of its validity",                                                       out var validUntil,       out ErrorResponse) ||
@@ -729,11 +729,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     foreach (var conditionJSON in conditionsArray)
                     {
 
-                        if (conditionJSON is not JObject conditionObject || !ImmutableI18NString.TryParse(conditionObject, out var condition, out var conditionError))
+                        if (conditionJSON is not JObject conditionObject)
                         {
                             ErrorResponse = $"Invalid condition of a digital certificate of conformity '{conditionJSON}'!";
                             return false;
                         }
+
+                        if (!QIDigitalJSON.TryParseI18N(conditionObject, $"Invalid condition of a digital certificate of conformity '{conditionJSON}': ", out var condition, out ErrorResponse))
+                            return false;
 
                         conditions.Add(condition);
 

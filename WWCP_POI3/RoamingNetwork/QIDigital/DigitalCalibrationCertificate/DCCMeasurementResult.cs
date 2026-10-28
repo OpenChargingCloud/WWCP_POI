@@ -167,7 +167,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 if (!QIDigitalJSON.TryOnly(JSON, "a result", out ErrorResponse, PropertyKeys.Name, PropertyKeys.RefType, PropertyKeys.Quantities) ||
-                    !POIJSON.TryParseI18N                       (JSON, PropertyKeys.Name,       "name of a result",  out var name,                                    out ErrorResponse) ||
+                    !QIDigitalJSON.TryParseI18N                 (JSON, PropertyKeys.Name,       "name of a result",  out var name,                                    out ErrorResponse) ||
                     !POIJSON.TryParseString                     (JSON, PropertyKeys.RefType,    "refType",           out var refType,                                 out ErrorResponse) ||
                     !POIJSON.TryParseObjects<QIDigitalQuantity> (JSON, PropertyKeys.Quantities, "quantity",          QIDigitalQuantity.TryParse, out var quantities,  out ErrorResponse))
                 {
@@ -345,7 +345,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!QIDigitalJSON.TryOnly(JSON, "a measurement", out ErrorResponse,
                                            PropertyKeys.Name, PropertyKeys.UsedMethods, PropertyKeys.InfluenceConditions, PropertyKeys.Results) ||
-                    !POIJSON.TryParseI18N                       (JSON, PropertyKeys.Name,                "name of a measurement", out var name,                                              out ErrorResponse) ||
+                    !QIDigitalJSON.TryParseI18N                 (JSON, PropertyKeys.Name,                "name of a measurement", out var name,                                              out ErrorResponse) ||
                     !POIJSON.TryParseObjects<QIDigitalStandard> (JSON, PropertyKeys.UsedMethods,         "used method",           QIDigitalStandard.TryParse, out var usedMethods,           out ErrorResponse) ||
                     !POIJSON.TryParseObjects<QIDigitalQuantity> (JSON, PropertyKeys.InfluenceConditions, "influence condition",   QIDigitalQuantity.TryParse, out var influenceConditions,   out ErrorResponse) ||
                     !POIJSON.TryParseObjects<DCCResult>         (JSON, PropertyKeys.Results,             "result",                DCCResult.        TryParse, out var results,               out ErrorResponse))
@@ -476,7 +476,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (!QIDigitalJSON.TryOnly(JSON, "a statement", out ErrorResponse,
                                            PropertyKeys.Declaration, PropertyKeys.RefType, PropertyKeys.Norm, PropertyKeys.Conformity) ||
-                    !POIJSON.TryParseI18N                     (JSON, PropertyKeys.Declaration, "declaration of a statement", out var declaration, out ErrorResponse) ||
+                    !QIDigitalJSON.TryParseI18N               (JSON, PropertyKeys.Declaration, "declaration of a statement", out var declaration, out ErrorResponse) ||
                     !POIJSON.TryParseString                   (JSON, PropertyKeys.RefType,     "refType",                    out var refType,     out ErrorResponse) ||
                     !POIJSON.TryParseString                   (JSON, PropertyKeys.Norm,        "norm of a statement",        out var norm,        out ErrorResponse) ||
                     !POIJSON.TryParseEnum<QIDigitalConformity>(JSON, PropertyKeys.Conformity,  "conformity",                 out var conformity,  out ErrorResponse))

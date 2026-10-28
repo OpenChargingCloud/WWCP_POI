@@ -171,21 +171,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (static) Of(ChargingStation, SerialNumber = null)
+        #region (static) Of(ChargingStation)
 
         /// <summary>
-        /// The given charging station as it is, e.g. as it is at runtime with its templates, with the given serial number.
+        /// The given charging station as it is, e.g. as it is at runtime with its templates, with its serial number: no
+        /// template gives it, it belongs to the single station.
         /// </summary>
         /// <param name="ChargingStation">A charging station.</param>
-        /// <param name="SerialNumber">Its serial number, as its manufacturer marked it.</param>
-        public static QIDigitalItem Of(ChargingStation  ChargingStation,
-                                       SerialNumber?    SerialNumber   = null)
+        public static QIDigitalItem Of(ChargingStation ChargingStation)
 
             => new (ChargingStationType,
                     ChargingStation.Id.ToString(),
                     ChargingStation.ManufacturerId?.ToString(),
                     ChargingStation.ModelId?.       ToString(),
-                    SerialNumber,
+                    ChargingStation.SerialNumber,
                     ChargingStation.HardwareRevision,
                     ChargingStation.FirmwareVersion);
 
@@ -235,7 +234,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                actual = Of(chargingStation, SerialNumber);
+                // Its own serial number, as the roaming network names it: a station replaced by another one of the same
+                // identification, model and versions is not the one calibrated (csharp-review 23).
+                actual = Of(chargingStation);
 
             }
             else

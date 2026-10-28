@@ -232,6 +232,100 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region TryParseI18N(JSON, PropertyName, Description, out Value, out ErrorResponse)
+
+        /// <summary>
+        /// The languages of Styx (Languages) by their names, in any case: not by their numbers.
+        /// </summary>
+        private static readonly HashSet<String> LanguageNames = new (Enum.GetNames<Languages>(), StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// An optional text in languages, e.g. the name of a measurement: an object of languages of Styx (Languages),
+        /// written in any case, each once, and their texts. What ImmutableI18NString.TryParse leaves out silently, a key
+        /// that is no language or a value that is no text, is refused here: no part of what is signed, it would travel
+        /// with a signed document.
+        /// </summary>
+        public static Boolean TryParseI18N(JObject                           JSON,
+                                           String                            PropertyName,
+                                           String                            Description,
+                                           out ImmutableI18NString?          Value,
+                                           [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            Value = null;
+
+            if (JSON[PropertyName] is not JToken token || token.Type == JTokenType.Null)
+            {
+                ErrorResponse = null;
+                return true;
+            }
+
+            if (token is not JObject texts)
+            {
+                ErrorResponse = $"JSON property '{PropertyName}' is not an object!";
+                return false;
+            }
+
+            if (!TryParseI18N(texts, $"JSON property '{PropertyName}' ({Description}) could not be parsed: ", out var value, out ErrorResponse))
+                return false;
+
+            Value = value;
+            return true;
+
+        }
+
+        #endregion
+
+        #region TryParseI18N(Texts, Prefix, out Value, out ErrorResponse)
+
+        /// <summary>
+        /// A text in languages, e.g. a condition of a certificate of conformity: each key a language of Styx (Languages),
+        /// written in any case, each once, each value a text; an error response begins with the given prefix.
+        /// </summary>
+        public static Boolean TryParseI18N(JObject                                        Texts,
+                                           String                                         Prefix,
+                                           [NotNullWhen(true)]  out ImmutableI18NString?  Value,
+                                           [NotNullWhen(false)] out String?               ErrorResponse)
+        {
+
+            Value = null;
+
+            var i18NText   = new I18NString();
+            var languages  = new HashSet<Languages>();
+
+            foreach (var text in Texts.Properties())
+            {
+
+                if (!LanguageNames.Contains(text.Name) || !Enum.TryParse(text.Name, true, out Languages language))
+                {
+                    ErrorResponse = $"{Prefix}'{text.Name}' is no language!";
+                    return false;
+                }
+
+                if (text.Value.Type != JTokenType.String)
+                {
+                    ErrorResponse = $"{Prefix}the text in '{text.Name}' must be a text!";
+                    return false;
+                }
+
+                if (!languages.Add(language))
+                {
+                    ErrorResponse = $"{Prefix}the language '{language}' is given twice!";
+                    return false;
+                }
+
+                i18NText.Set(language, text.Value.Value<String>()!);
+
+            }
+
+            Value          = new ImmutableI18NString(i18NText);
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
+
         #region Timestamp(Timestamp)
 
         /// <summary>

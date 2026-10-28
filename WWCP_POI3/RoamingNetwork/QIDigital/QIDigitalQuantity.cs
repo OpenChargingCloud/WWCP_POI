@@ -308,7 +308,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !QIDigitalJSON.TryParseDecimal(JSON, PropertyKeys.ToleranceLower,       "lower tolerance limit", out var toleranceLower,       out ErrorResponse) ||
                     !QIDigitalJSON.TryParseDecimal(JSON, PropertyKeys.ToleranceUpper,       "upper tolerance limit", out var toleranceUpper,       out ErrorResponse) ||
                     !POIJSON.TryParseString       (JSON, PropertyKeys.RefType,              "refType",               out var refType,              out ErrorResponse) ||
-                    !POIJSON.TryParseI18N         (JSON, PropertyKeys.Name,                 "name of a quantity",    out var name,                 out ErrorResponse) ||
+                    !QIDigitalJSON.TryParseI18N   (JSON, PropertyKeys.Name,                 "name of a quantity",    out var name,                 out ErrorResponse) ||
                     !POIJSON.TryParseEnum<QIDigitalConformity>(JSON, PropertyKeys.Conformity, "conformity",          out var conformity,           out ErrorResponse))
                 {
                     return false;

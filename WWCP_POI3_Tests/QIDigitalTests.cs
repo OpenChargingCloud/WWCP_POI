@@ -65,13 +65,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region NewNetwork(MeterOfTemplate = false)
+        #region NewNetwork(MeterOfTemplate = false, StationSerialNumber = "DC300-0001")
 
         /// <summary>
         /// The network of the tests; its energy meter names its manufacturer, model, hardware revision and firmware version
-        /// itself, or takes them from an energy meter template of its operator.
+        /// itself, or takes them from an energy meter template of its operator; its charging station has the given serial
+        /// number, or none.
         /// </summary>
-        private static RoamingNetwork NewNetwork(Boolean MeterOfTemplate = false)
+        private static RoamingNetwork NewNetwork(Boolean  MeterOfTemplate      = false,
+                                                 String?  StationSerialNumber  = "DC300-0001")
 
             => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                       Created,
@@ -110,6 +112,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                     ChargingStations:  [ new ChargingStation(S1,
                                                                                                                                                              ManufacturerId:    ACME,
                                                                                                                                                              ModelId:           DC300,
+                                                                                                                                                             SerialNumber:      StationSerialNumber is null ? null : SerialNumber.Parse(StationSerialNumber),
                                                                                                                                                              HardwareRevision:  HardwareRevision.Parse("1.1"),
                                                                                                                                                              FirmwareVersion:   FirmwareVersion. Parse("4.3"),
                                                                                                                                                              Created:           Created,
@@ -414,13 +417,46 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             network.TryGetChargingStationOperatorById(GEF, out var gef);
             gef!.TryGetEffectiveChargingStation(S1, out var station);
 
-            var dcc     = SignedBy(NewDCC(network, QIDigitalItem.Of(station!, SerialNumber: SerialNumber.Parse("DC300-0001"))), TestParties.Party(LAB));
+            var dcc     = SignedBy(NewDCC(network, QIDigitalItem.Of(station!)), TestParties.Party(LAB));
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(dcc.TryVerify(network, out var error, T0),  Is.True, error);
                 Assert.That(dcc.Item.Type,                              Is.EqualTo(nameof(ChargingStation)));
+                Assert.That(dcc.Item.SerialNumber,                      Is.EqualTo(SerialNumber.Parse("DC300-0001")));
                 Assert.That(dcc.Item.FirmwareVersion,                   Is.EqualTo(FirmwareVersion.Parse("4.3")));
+            }
+
+        }
+
+        #endregion
+
+        #region A_DCC_of_a_charging_station_is_one_of_its_serial_number()
+
+        /// <summary>
+        /// csharp-review 23: the serial number of a charging station is the one the roaming network gives it, not the one
+        /// of its certificate - a station replaced by another one of the same identification, model and versions, or one
+        /// naming no serial number, is not the one calibrated.
+        /// </summary>
+        [Test]
+        public void A_DCC_of_a_charging_station_is_one_of_its_serial_number()
+        {
+
+            var network = NewNetwork();
+            network.TryGetChargingStationOperatorById(GEF, out var gef);
+            gef!.TryGetEffectiveChargingStation(S1, out var station);
+
+            var dcc     = SignedBy(NewDCC(network, QIDigitalItem.Of(station!)), TestParties.Party(LAB));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(dcc.TryVerify(NewNetwork(StationSerialNumber: "DC300-0002"), out var error1, T0),  Is.False);
+                Assert.That(error1,                                                                           Is.EqualTo("The charging station 'DE*GEF*S1' has the serial number 'DC300-0002', not 'DC300-0001'!"));
+
+                Assert.That(dcc.TryVerify(NewNetwork(StationSerialNumber: null),         out var error2, T0),  Is.False);
+                Assert.That(error2,                                                                           Is.EqualTo("The charging station 'DE*GEF*S1' has the serial number '', not 'DC300-0001'!"));
+
             }
 
         }
@@ -770,6 +806,62 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(QIDigitalModel.TryParse(JObject.Parse("""{ "type": "EnergyMeterModel", "manufacturerId": "METERS", "modelId": "M-500", "hardwareRevisions": [ "3.0" ], "firmwareVersions": [ " 1.7" ] }"""), out _, out var error5), Is.False);
                 Assert.That(error5,                                                                                                                      Is.EqualTo("Invalid firmware version ' 1.7'!"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Texts_of_no_language_or_no_text_are_refused()
+
+        /// <summary>
+        /// A text of a QI-Digital document under a key that is no language, or one that is no text, is refused while
+        /// reading: left out, it would be no part of what is signed, and travel with a signed document unsigned
+        /// (WWCPPOIConformanceTests D10). A language written in upper case is the language, written back in lower case.
+        /// </summary>
+        [Test]
+        public void Texts_of_no_language_or_no_text_are_refused()
+        {
+
+            var network  = NewNetwork();
+            var dcc      = SignedBy(NewDCC(network), TestParties.Party(LAB)).ToJSON();
+            var dcoc     = NewDCoC().ToJSON();
+
+            JObject WithName(String Language, JToken Text, Boolean Instead = false)
+            {
+                var copy  = (JObject) dcc.DeepClone();
+                var name  = (JObject) copy["measurementResults"]![0]!["name"]!;
+                if (Instead) name.RemoveAll();
+                name[Language] = Text;
+                return copy;
+            }
+
+            var condition = (JObject) dcoc.DeepClone();
+            ((JObject) condition["conditions"]![0]!)["xx"] = "Nur mit einer Transparenzsoftware nach PTB-A 50.7.";
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(DigitalCalibrationCertificate. TryParse(WithName("xx", "Messfehler der Wirkenergie"), out _, out var error1),  Is.False);
+                Assert.That(error1,                                                                                                      Does.EndWith("JSON property 'name' (name of a measurement) could not be parsed: 'xx' is no language!"));
+
+                Assert.That(DigitalCalibrationCertificate. TryParse(WithName("de", 5),                            out _, out var error2),  Is.False);
+                Assert.That(error2,                                                                                                      Does.EndWith("JSON property 'name' (name of a measurement) could not be parsed: the text in 'de' must be a text!"));
+
+                // A language by its name, not by its number.
+                Assert.That(DigitalCalibrationCertificate. TryParse(WithName("1", "Measurement error"),           out _, out var error3),  Is.False);
+                Assert.That(error3,                                                                                                      Does.EndWith("'1' is no language!"));
+
+                Assert.That(DigitalCalibrationCertificate. TryParse(WithName("EN", "Measurement error"),          out _, out var error4),  Is.False);
+                Assert.That(error4,                                                                                                      Does.EndWith("the language 'en' is given twice!"));
+
+                Assert.That(DigitalCertificateOfConformity.TryParse(condition,                                    out _, out var error5),  Is.False);
+                Assert.That(error5,                                                                                                      Does.EndWith("'xx' is no language!"));
+
+                // In upper case, as signed in lower case.
+                Assert.That(DigitalCalibrationCertificate. TryParse(WithName("EN", "Measurement error of the active energy", Instead: true), out var upper, out var error6), Is.True, error6);
+                Assert.That(upper!.TryVerify(network, out var error7, T0),                                                               Is.True, error7);
 
             }
 

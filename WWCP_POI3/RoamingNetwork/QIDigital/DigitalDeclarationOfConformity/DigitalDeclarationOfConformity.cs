@@ -116,7 +116,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !QIDigitalJSON.TryParseRequiredText(JSON, PropertyKeys.ConformityAssessmentBodyId, "conformity assessment body identification", ConformityAssessmentBody_Id.TryParse, out ConformityAssessmentBody_Id bodyId, out ErrorResponse) ||
                     !POIJSON.TryParseEnum<DCoCModule>  (JSON, PropertyKeys.Module,                     "module",                                                                          out var module,                      out ErrorResponse) ||
                     !POIJSON.TryParseText              (JSON, PropertyKeys.CertificateId,              "certificate of conformity identification",  DigitalCertificateOfConformity_Id.TryParse, out DigitalCertificateOfConformity_Id? certificateId, out ErrorResponse) ||
-                    !POIJSON.TryParseI18N              (JSON, PropertyKeys.Intervention,               "intervention",                                                                    out var intervention,                out ErrorResponse))
+                    !QIDigitalJSON.TryParseI18N        (JSON, PropertyKeys.Intervention,               "intervention",                                                                    out var intervention,                out ErrorResponse))
                 {
                     return false;
                 }
@@ -557,7 +557,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseObjects<QIDigitalStandard>       (JSON, PropertyKeys.Standards,             "standard",                  QIDigitalStandard.   TryParse, out var standards,              out ErrorResponse) ||
                     !POIJSON.TryParseObjects<DDoCNotifiedBody>        (JSON, PropertyKeys.NotifiedBodies,        "notified body",             DDoCNotifiedBody.    TryParse, out var notifiedBodies,         out ErrorResponse) ||
                     !POIJSON.TryParseObject<QIDigitalPerson>          (JSON, PropertyKeys.Signatory,             "signatory",                 QIDigitalPerson.     TryParse, out var signatory,              out ErrorResponse) ||
-                    !POIJSON.TryParseI18N                             (JSON, PropertyKeys.AdditionalInformation, "additional information",                                   out var additionalInformation,  out ErrorResponse) ||
+                    !QIDigitalJSON.TryParseI18N                       (JSON, PropertyKeys.AdditionalInformation, "additional information",                                   out var additionalInformation,  out ErrorResponse) ||
                     !POIJSON.TryParseString                           (JSON, PropertyKeys.PlaceOfIssue,          "place of issue",                                           out var placeOfIssue,           out ErrorResponse) ||
                     !TryParseSignature                                (JSON,                                                                                                 out var signature,              out ErrorResponse))
                 {
