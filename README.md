@@ -475,9 +475,9 @@ server2.TryAppend(commits!, out _, out _);                // and merged with the
   (`{"@conflict": {base, left, right}}`, also the `base` of a conflict there): the tips merge if they
   resolved it alike, and conflict otherwise.
 - **Exchange:** `HaveIds()` names the tips and a sample of older commits, at most `DefaultMaxHaveIds` (1,000),
-  `TryGetMissingCommits(have)` returns what is missing there, parents first, walking back from the tips and the
-  commits held at once, the higher revisions first, only as far as commits are missing; and `TryAppend(commits)`
-  takes them and merges afterwards.
+  `TryGetMissingCommits(have)` returns what is missing there, parents first, at most a page: as each commit knows how
+  many of the first commits it is or follows, only the commits after those are walked, so a page costs about what it
+  returns; and `TryAppend(commits)` takes them and merges afterwards.
 - **Readers** take an immutable view of the history and never wait for a commit, which holds the history for all of
   its time, merges and syncing to the disk included: the head, the tips with their versions, the commits, the
   attestations, the checkpoints and the proofs of commits, the snapshot of a checkpoint (a version no longer kept is
@@ -752,6 +752,14 @@ The requests that change something - `COMMIT`, `POST` and `DELETE` above - take 
 `application/cbor` (a `charset` aside) and answer any other `Content-Type`, or none, with 415: what a page of
 another site may make a browser send without asking first is neither.
 
+The reads that cost what they return - the snapshots of the head and of checkpoints, pages of commits and of their
+metadata, segments of the archive, and views without parts not kept (below) - are heavy reads: a client makes at most
+`MaxHeavyReadsPerMinute` (600) of them per minute, all at once as well, over HTTP and the WebSocket together. Beyond,
+HTTP answers 429 Too Many Requests with `Retry-After`, and the WebSocket waits for the next one, `MaxHeavyReadWait`
+(10 s) at most, and answers `GenericError` beyond (`HeavyReadsRefused` counts them). A client is its address, an IPv6
+one by its /64; behind a trusted proxy the one `ClientAddressOf` says. A page of commits costs about what it returns
+(`CommitsLookedAt` counts the commits looked at), also for a server catching up from the root, page by page.
+
 It also serves the roaming networks and their entities, readable from every origin (CORS `*`), each in canonical
 JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json:sha256:hex:…"`); a known
 `If-None-Match` is answered with 304. HEAD and OPTIONS are answered for every one:
@@ -781,8 +789,8 @@ Versions are immutable and their runtime status is no part of these representati
 once per version and format and kept as long as the version is referenced; an entity a commit does not change is
 the same object in the new version and keeps its representations. A 304 costs a lookup. Only an expanded view is
 calculated for every request. Of the views without parts (`?without=…`), every combination one of its own, at most
-`MaxOmissionViews` (16) are kept per version, the ones asked for first; another one is calculated for its request
-(`OmissionViewsNotKept` counts them).
+`MaxOmissionViews` (16) are kept per version, the ones asked for last; another one lets go of the one asked for least
+recently, and calculating one is a heavy read (`OmissionViewsCalculated` counts them).
 
 ### Query
 

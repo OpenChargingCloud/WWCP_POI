@@ -188,7 +188,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         /// <summary>
         /// The commits missing at who holds the given ones, ?have=…: at most MaxHaveIds of them, more are refused,
-        /// duplicates count once (POI3-ISSUES.md S12).
+        /// duplicates count once; "have" given more than once counts with all of its values, not with the last alone
+        /// (POI3-ISSUES.md S12).
         /// </summary>
         [Test]
         public async Task The_commits_held_are_named_and_bounded_over_HTTP()
@@ -200,9 +201,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             poiAPI!.MaxHaveIds = 2;
 
-            var twice    = await Get($"commits?have={c1.Id},{c1.Id}");
-            var tooMany  = await Get($"commits?have={root},{c1.Id},{c2.Id}");
-            var unknown  = await Get($"commits?have={new String('0', 64)}");
+            var twice            = await Get($"commits?have={c1.Id},{c1.Id}");
+            var tooMany          = await Get($"commits?have={root},{c1.Id},{c2.Id}");
+            var unknown          = await Get($"commits?have={new String('0', 64)}");
+            var repeated         = await Get($"commits?have={c2.Id}&have={root}");
+            var repeatedTooMany  = await Get($"commits?have={root},{c1.Id}&have={c2.Id}");
 
             using (Assert.EnterMultipleScope())
             {
@@ -214,6 +217,54 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(tooMany.Text,                                                       Does.Contain("At most 2"));
 
                 Assert.That(unknown.StatusCode,                                                 Is.EqualTo(HttpStatusCode.NotFound));
+
+                // The head held, by the first "have": nothing is missing.
+                Assert.That(repeated.StatusCode,                                                Is.EqualTo(HttpStatusCode.OK), repeated.Text);
+                Assert.That(JArray.Parse(repeated.Text),                                        Is.Empty);
+
+                Assert.That(repeatedTooMany.StatusCode,                                         Is.EqualTo(HttpStatusCode.BadRequest));
+                Assert.That(repeatedTooMany.Text,                                               Does.Contain("At most 2"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region Heavy_reads_beyond_the_limit_are_refused_over_HTTP()
+
+        /// <summary>
+        /// A client makes at most MaxHeavyReadsPerMinute heavy reads, a snapshot or a page of commits among them; beyond,
+        /// it is told to wait with 429 Too Many Requests and Retry-After. A light read, the head, is no heavy one
+        /// (POI3-ISSUES.md S12).
+        /// </summary>
+        [Test]
+        public async Task Heavy_reads_beyond_the_limit_are_refused_over_HTTP()
+        {
+
+            Publish("v1", 1);
+
+            poiAPI!.MaxHeavyReadsPerMinute = 2;
+
+            var snapshot  = await Get("snapshot");
+            var commits   = await Get("commits");
+
+            using var refused = await httpClient!.GetAsync("commitInfos");
+
+            var head      = await Get("head");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(snapshot.StatusCode,                         Is.EqualTo(HttpStatusCode.OK), snapshot.Text);
+                Assert.That(commits. StatusCode,                         Is.EqualTo(HttpStatusCode.OK), commits.Text);
+
+                Assert.That(refused.StatusCode,                          Is.EqualTo(HttpStatusCode.TooManyRequests));
+                Assert.That(refused.Headers.RetryAfter?.Delta,           Is.GreaterThanOrEqualTo(TimeSpan.FromSeconds(1)));
+                Assert.That(await refused.Content.ReadAsStringAsync(),   Does.Contain("Too many heavy reads"));
+                Assert.That(poiAPI.HeavyReadsRefused,                    Is.EqualTo(1));
+
+                Assert.That(head.StatusCode,                             Is.EqualTo(HttpStatusCode.OK), head.Text);
 
             }
 

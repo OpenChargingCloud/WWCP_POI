@@ -47,8 +47,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// One state of the commits, tips, kept versions, attestations, checkpoints and change sets waiting for
         /// signatures of a history.
         /// </summary>
+        /// <param name="FollowedPrefixes">For each commit, how many of the first commits it is or follows, one after the other
+        /// from the first: FollowedPrefixOf(…).</param>
         private sealed record ReadView(ImmutableList<RoamingNetworkCommit>                           Commits,
                                        ImmutableDictionary<RoamingNetworkCommit_Id, Int32>           CommitIndex,
+                                       ImmutableList<Int32>                                          FollowedPrefixes,
                                        ImmutableArray<RoamingNetworkCommit_Id>                       Tips,
                                        ImmutableDictionary<RoamingNetworkCommit_Id, RoamingNetwork>  Versions,
                                        ImmutableArray<RoamingNetworkAttestation>                     Attestations,
@@ -62,6 +65,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 = new ([],
                        ImmutableDictionary<RoamingNetworkCommit_Id, Int32>.Empty,
+                       [],
                        [],
                        ImmutableDictionary<RoamingNetworkCommit_Id, RoamingNetwork>.Empty,
                        [],
@@ -114,75 +118,129 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             /// <summary>
             /// The commits of this view that neither are one of the given ones nor are followed by one, in their order,
-            /// parents before their children; null when it holds none of the given ones.
+            /// parents before their children, at most the given number; null when it holds none of the given ones.
             /// </summary>
             /// <remarks>
-            /// The commits are walked from the tips and from the given ones at once, the highest revision first, as a
-            /// parent has a lower revision than its children: a commit reached is one the given ones follow once one of
-            /// them reached it, and the walk ends once only such commits are left. So it costs the commits missing and
-            /// those of their revisions, not every commit for every given one.
+            /// The first commits one of the given ones is or follows, one after the other from the first, are none of
+            /// them (FollowedPrefixes). Only the commits after those are walked: from the given ones down to there, and
+            /// then in their order until the given number is found. So a page costs the commits it returns and those the
+            /// given ones follow after their first gap, e.g. the commits next to a branch not merged yet; not the whole
+            /// history, also not for a server catching up from the root page by page, each from the last commit of the
+            /// page before.
             /// </remarks>
             /// <param name="Have">The commits held elsewhere, e.g. the tips and a sample of older commits.</param>
-            public List<RoamingNetworkCommit>? Missing(IEnumerable<RoamingNetworkCommit_Id> Have)
+            /// <param name="MaxCount">The maximum number of commits to return.</param>
+            /// <param name="LookedAt">How many commits were looked at.</param>
+            public List<RoamingNetworkCommit>? Missing(IEnumerable<RoamingNetworkCommit_Id>  Have,
+                                                       Int32                                 MaxCount,
+                                                       out Int32                             LookedAt)
             {
 
-                var known    = new HashSet<RoamingNetworkCommit_Id>();
-                var queue    = new PriorityQueue<(RoamingNetworkCommit_Id CommitId, Boolean Missing), UInt64>(Comparer<UInt64>.Create((revision1, revision2) => revision2.CompareTo(revision1)));
-                var queued   = new HashSet<RoamingNetworkCommit_Id>();
-                var missing  = new List<RoamingNetworkCommit>();
-                var waiting  = 0;
+                var held  = new List<RoamingNetworkCommit_Id>();
+                var from  = 0;
 
                 foreach (var commitId in Have)
-                    if (CommitIndex.TryGetValue(commitId, out var index) && known.Add(commitId))
-                        queue.Enqueue((commitId, false), Commits[index].Revision);
+                    if (CommitIndex.TryGetValue(commitId, out var index))
+                    {
+                        held.Add(commitId);
+                        from = Math.Max(from, FollowedPrefixes[index]);
+                    }
 
-                if (known.Count == 0)
+                LookedAt = 0;
+
+                if (held.Count == 0)
                     return null;
 
-                foreach (var tip in Tips)
-                    if (!known.Contains(tip) && queued.Add(tip))
-                    {
-                        queue.Enqueue((tip, true), Commits[CommitIndex[tip]].Revision);
-                        waiting++;
-                    }
+                var followed  = AncestorsFrom(Commits, CommitIndex, held, from);
+                var missing   = new List<RoamingNetworkCommit>();
+                var next      = from;
 
-                while (waiting > 0 && queue.TryDequeue(out var next, out _))
-                {
+                for (; next < Commits.Count && missing.Count < MaxCount; next++)
+                    if (!followed.Contains(Commits[next].Id))
+                        missing.Add(Commits[next]);
 
-                    var commit = Commits[CommitIndex[next.CommitId]];
-
-                    if (next.Missing)
-                        waiting--;
-
-                    // Known: so are its parents. Reached as missing first, and known later, it is walked as known once.
-                    if (known.Contains(next.CommitId))
-                    {
-
-                        if (!next.Missing)
-                            foreach (var parentId in commit.ParentIds)
-                                if (CommitIndex.TryGetValue(parentId, out var parentIndex) && known.Add(parentId))
-                                    queue.Enqueue((parentId, false), Commits[parentIndex].Revision);
-
-                        continue;
-
-                    }
-
-                    missing.Add(commit);
-
-                    foreach (var parentId in commit.ParentIds)
-                        if (CommitIndex.TryGetValue(parentId, out var parentIndex) && !known.Contains(parentId) && queued.Add(parentId))
-                        {
-                            queue.Enqueue((parentId, true), Commits[parentIndex].Revision);
-                            waiting++;
-                        }
-
-                }
-
-                missing.Sort((commit1, commit2) => CommitIndex[commit1.Id].CompareTo(CommitIndex[commit2.Id]));
+                LookedAt = followed.Count + next - from;
 
                 return missing;
 
             }
+
+        }
+
+        #endregion
+
+        #region (private static) FollowedPrefixOf(Commit, Commits, CommitIndex, FollowedPrefixes)
+
+        /// <summary>
+        /// How many of the first commits the given one, added after the given ones, is or follows, one after the other
+        /// from the first. A commit follows what its parents follow; a merge also the commits after that its other
+        /// parents follow, as far as they go on without a gap; and once all commits before it, itself, too.
+        /// </summary>
+        /// <param name="Commit">The commit added.</param>
+        /// <param name="Commits">The commits, the ones before it at least.</param>
+        /// <param name="CommitIndex">Their indices.</param>
+        /// <param name="FollowedPrefixes">The followed prefixes of the commits before it, one for each.</param>
+        private static Int32 FollowedPrefixOf(RoamingNetworkCommit                                     Commit,
+                                              IReadOnlyList<RoamingNetworkCommit>                      Commits,
+                                              IReadOnlyDictionary<RoamingNetworkCommit_Id, Int32>      CommitIndex,
+                                              IReadOnlyList<Int32>                                     FollowedPrefixes)
+        {
+
+            var index    = FollowedPrefixes.Count;
+            var parents  = new List<RoamingNetworkCommit_Id>(Commit.ParentIds.Length);
+            var prefix   = 0;
+
+            foreach (var parentId in Commit.ParentIds)
+                if (CommitIndex.TryGetValue(parentId, out var parentIndex) && parentIndex < index)
+                {
+                    parents.Add(parentId);
+                    prefix = Math.Max(prefix, FollowedPrefixes[parentIndex]);
+                }
+
+            // Only the commits after the longest prefix a parent follows are walked: those of the branches merged.
+            if (parents.Count > 1 && prefix < index)
+            {
+
+                var followed = AncestorsFrom(Commits, CommitIndex, parents, prefix);
+
+                while (prefix < index && followed.Contains(Commits[prefix].Id))
+                    prefix++;
+
+            }
+
+            return prefix == index
+                       ? index + 1
+                       : prefix;
+
+        }
+
+        #endregion
+
+        #region (private static) AncestorsFrom   (Commits, CommitIndex, CommitIds, From)
+
+        /// <summary>
+        /// The given commits and their ancestors from the given index on. A parent comes before its children, so the
+        /// ones there are reached by the commits there alone.
+        /// </summary>
+        /// <param name="Commits">The commits.</param>
+        /// <param name="CommitIndex">Their indices.</param>
+        /// <param name="CommitIds">The commits to start from.</param>
+        /// <param name="From">The lowest index walked.</param>
+        private static HashSet<RoamingNetworkCommit_Id> AncestorsFrom(IReadOnlyList<RoamingNetworkCommit>                  Commits,
+                                                                      IReadOnlyDictionary<RoamingNetworkCommit_Id, Int32>  CommitIndex,
+                                                                      IEnumerable<RoamingNetworkCommit_Id>                 CommitIds,
+                                                                      Int32                                                From)
+        {
+
+            var ancestors  = new HashSet<RoamingNetworkCommit_Id>();
+            var pending    = new Stack<RoamingNetworkCommit_Id>(CommitIds);
+
+            while (pending.TryPop(out var commitId))
+                if (CommitIndex.TryGetValue(commitId, out var index) && index >= From && ancestors.Add(commitId))
+                    foreach (var parentId in Commits[index].ParentIds)
+                        pending.Push(parentId);
+
+            return ancestors;
 
         }
 
@@ -276,9 +334,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         RoamingNetwork        Version)
         {
             var view = View;
-            Publish(view with { Commits      = view.Commits.    Add    (Commit),
-                                CommitIndex  = view.CommitIndex.SetItem(Commit.Id, view.Commits.Count),
-                                Versions     = view.Versions.   SetItem(Commit.Id, Version) });
+            Publish(view with { Commits           = view.Commits.         Add    (Commit),
+                                CommitIndex       = view.CommitIndex.     SetItem(Commit.Id, view.Commits.Count),
+                                FollowedPrefixes  = view.FollowedPrefixes.Add    (FollowedPrefixOf(Commit, view.Commits, view.CommitIndex, view.FollowedPrefixes)),
+                                Versions          = view.Versions.        SetItem(Commit.Id, Version) });
         }
 
         /// <summary>
@@ -295,10 +354,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// All commits and kept versions anew, e.g. after compacting.
         /// </summary>
         private void PublishCommits()
+        {
 
-            => Publish(View with { Commits      = [ .. commits ],
-                                   CommitIndex  = commitIndex.ToImmutableDictionary(),
-                                   Versions     = versions.   ToImmutableDictionary() });
+            var followedPrefixes = new List<Int32>(commits.Count);
+
+            foreach (var commit in commits)
+                followedPrefixes.Add(FollowedPrefixOf(commit, commits, commitIndex, followedPrefixes));
+
+            Publish(View with { Commits           = [ .. commits ],
+                                CommitIndex       = commitIndex.ToImmutableDictionary(),
+                                FollowedPrefixes  = [ .. followedPrefixes ],
+                                Versions          = versions.   ToImmutableDictionary() });
+
+        }
 
         /// <summary>
         /// The tips anew, and the change sets waiting for signatures when the commit making them let go of some:

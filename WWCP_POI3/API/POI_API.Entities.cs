@@ -228,7 +228,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const Int32 DefaultMaxOmissionViews = 16;
 
-        private Int64 omissionViewsNotKept;
+        private Int64 omissionViewsCalculated;
 
         #endregion
 
@@ -236,17 +236,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The maximum number of views without parts (?without=…) kept per version of an entity, all formats together:
-        /// every combination of the parts named is a view of its own, and they would be thousands. One more is calculated
-        /// for its request, and not kept.
+        /// every combination of the parts named is a view of its own, and they would be thousands. The ones asked for
+        /// last are kept; one more lets go of the one asked for least recently. Calculating one is a heavy read.
         /// </summary>
         public Int32 MaxOmissionViews { get; set; } = DefaultMaxOmissionViews;
 
         /// <summary>
-        /// The number of views without parts calculated for their request only, as MaxOmissionViews of them were kept for
-        /// the version already.
+        /// The number of views without parts calculated: once for each one kept, and again for one asked for after it
+        /// was let go.
         /// </summary>
-        public Int64 OmissionViewsNotKept
-            => Interlocked.Read(ref omissionViewsNotKept);
+        public Int64 OmissionViewsCalculated
+            => Interlocked.Read(ref omissionViewsCalculated);
 
         #endregion
 
@@ -260,7 +260,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             private readonly ConcurrentDictionary<(String View, ETagFormat Format), Lazy<POIRepresentation>> representations = new ();
 
-            private Int32 boundedViews;
+            /// <summary>
+            /// The bounded views, the one asked for last first.
+            /// </summary>
+            private readonly LinkedList<((String View, ETagFormat Format) Key, Lazy<POIRepresentation> Representation)> boundedViews = new ();
+
+            private readonly Dictionary<(String View, ETagFormat Format), LinkedListNode<((String View, ETagFormat Format) Key, Lazy<POIRepresentation> Representation)>> boundedIndex = new ();
 
             /// <summary>
             /// The representation of the given view and format, calculated by the given delegate the first time only.
@@ -272,43 +277,83 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 => representations.GetOrAdd((View, Format), _ => new Lazy<POIRepresentation>(Create)).Value;
 
             /// <summary>
-            /// The representation of the given view and format, calculated by the given delegate the first time only, as
-            /// long as no more than the given number of such views are kept, e.g. of views without parts; calculated for
-            /// this call only beyond.
+            /// The representation of the given view and format kept among the bounded views, e.g. of views without
+            /// parts, which is then the one asked for last.
+            /// </summary>
+            /// <param name="View">The view.</param>
+            /// <param name="Format">The format.</param>
+            /// <param name="Representation">The representation kept.</param>
+            public Boolean TryGetBounded(String                                        View,
+                                         ETagFormat                                    Format,
+                                         [NotNullWhen(true)] out POIRepresentation?    Representation)
+            {
+
+                Lazy<POIRepresentation>? kept = null;
+
+                lock (boundedViews)
+                {
+                    if (boundedIndex.TryGetValue((View, Format), out var node))
+                    {
+                        boundedViews.Remove  (node);
+                        boundedViews.AddFirst(node);
+                        kept = node.Value.Representation;
+                    }
+                }
+
+                Representation = kept?.Value;
+                return Representation is not null;
+
+            }
+
+            /// <summary>
+            /// The representation of the given view and format among the bounded views, e.g. of views without parts,
+            /// calculated by the given delegate unless another request added it meanwhile, as the one asked for last:
+            /// beyond the given number of them, the one asked for least recently is let go.
             /// </summary>
             /// <param name="View">The view.</param>
             /// <param name="Format">The format.</param>
             /// <param name="Create">Calculates the representation.</param>
             /// <param name="MaxViews">How many views of this kind are kept at most.</param>
-            /// <param name="Kept">Whether the representation is kept, or was calculated for this call only.</param>
-            public POIRepresentation GetOrAddBounded(String                   View,
-                                                     ETagFormat               Format,
-                                                     Func<POIRepresentation>  Create,
-                                                     Int32                    MaxViews,
-                                                     out Boolean              Kept)
+            /// <param name="Calculated">Whether this call calculated the representation.</param>
+            public POIRepresentation AddBounded(String                   View,
+                                                ETagFormat               Format,
+                                                Func<POIRepresentation>  Create,
+                                                Int32                    MaxViews,
+                                                out Boolean              Calculated)
             {
 
-                Kept = true;
+                Lazy<POIRepresentation> representation;
 
-                if (representations.TryGetValue((View, Format), out var known))
-                    return known.Value;
-
-                if (Interlocked.Increment(ref boundedViews) > MaxViews)
+                lock (boundedViews)
                 {
-                    Interlocked.Decrement(ref boundedViews);
-                    Kept = false;
-                    return Create();
+
+                    if (boundedIndex.TryGetValue((View, Format), out var node))
+                    {
+                        boundedViews.Remove  (node);
+                        boundedViews.AddFirst(node);
+                        representation  = node.Value.Representation;
+                        Calculated      = false;
+                    }
+
+                    else
+                    {
+
+                        representation  = new Lazy<POIRepresentation>(Create);
+                        Calculated      = true;
+
+                        boundedIndex[(View, Format)] = boundedViews.AddFirst(((View, Format), representation));
+
+                        while (boundedViews.Count > Math.Max(0, MaxViews) && boundedViews.Last is { } leastRecent)
+                        {
+                            boundedViews.RemoveLast();
+                            boundedIndex.Remove(leastRecent.Value.Key);
+                        }
+
+                    }
+
                 }
 
-                var created = new Lazy<POIRepresentation>(Create);
-
-                if (!representations.TryAdd((View, Format), created))
-                {
-                    Interlocked.Decrement(ref boundedViews);
-                    return representations[(View, Format)].Value;
-                }
-
-                return created.Value;
+                return representation.Value;
 
             }
 
@@ -2333,10 +2378,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       representations.GetOrAdd(View, format, () => POIRepresentation.Of(JSON(), format)),
                                       StoredETag: StoredETag);
 
-            var representation = representations.GetOrAddBounded(View, format, () => POIRepresentation.Of(JSON(), format), MaxOmissionViews, out var kept);
+            // A view not kept is calculated: a heavy read of its client.
+            if (!representations.TryGetBounded(View, format, out var representation))
+            {
 
-            if (!kept)
-                Interlocked.Increment(ref omissionViewsNotKept);
+                if (TooManyHeavyReads(Request) is HTTPResponse refused)
+                    return refused;
+
+                representation = representations.AddBounded(View, format, () => POIRepresentation.Of(JSON(), format), MaxOmissionViews, out var calculated);
+
+                if (calculated)
+                    Interlocked.Increment(ref omissionViewsCalculated);
+
+            }
 
             return EntityResponse(Request,
                                   format,

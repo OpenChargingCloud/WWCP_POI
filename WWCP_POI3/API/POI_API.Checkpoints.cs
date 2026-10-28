@@ -165,7 +165,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(History + "/checkpoints/{checkpointId}/snapshot",
                        HTTPMethod:    HTTPMethod.GET,
-                       HTTPDelegate:  request => Task.FromResult(
+                       HTTPDelegate:  HeavyRead(request => Task.FromResult(
 
                            !TryGetCheckpoint(request, out var roamingNetworkHistory, out var checkpoint, out var errorResponse)
                                ? errorResponse
@@ -174,7 +174,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      ? JSONResponse(request, HTTPStatusCode.OK, snapshot)
                                      : ErrorResponse(request, HTTPStatusCode.NotFound, snapshotError)
 
-                       ));
+                       )));
 
             #endregion
 
@@ -437,7 +437,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             );
 
-            WebSocketServer.AddCommand("checkpointSnapshot", request =>
+            WebSocketServer.AddCommand("checkpointSnapshot", HeavyCommand(request =>
 
                 Task.FromResult(
 
@@ -450,7 +450,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 )
 
-            );
+            ));
 
             WebSocketServer.AddCommand("commitProof", request => {
 

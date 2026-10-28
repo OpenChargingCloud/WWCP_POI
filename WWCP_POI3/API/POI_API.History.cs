@@ -183,7 +183,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET    ~/RNs/{roamingNetworkId}/history/commitInfos?since={commitId}&amp;max={n}   the metadata of the commits since, without changes
     /// GET    ~/RNs/{roamingNetworkId}/history/commits?since={commitId}&amp;max={n}       the complete commits since
     /// GET    ~/RNs/{roamingNetworkId}/history/commits?have={commitId,…}&amp;max={n}     the complete commits missing at who holds these,
-    ///                                                                             at most MaxHaveIds of them
+    ///                                                                             at most MaxHaveIds of them, also over
+    ///                                                                             several have=…
     /// GET    ~/RNs/{roamingNetworkId}/history/commits/{commitId}                    one complete commit
     /// COMMIT ~/RNs/{roamingNetworkId}/history/changeSets?expectedHead={commitId}&amp;rebase=true
     ///                                                                                         publish a change set as the new head commit
@@ -315,7 +316,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(history + "/snapshot",
                        HTTPMethod:    HTTPMethod.GET,
-                       HTTPDelegate:  request => Task.FromResult(
+                       HTTPDelegate:  HeavyRead(request => Task.FromResult(
 
                            !TryGetHistory(request, out var roamingNetworkHistory, out var errorResponse)
                                ? errorResponse
@@ -326,7 +327,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                      : SnapshotResponse(request, roamingNetworkHistory, request.QueryString.GetString("runtimeStatus") != "false")
 
-                       ));
+                       )));
 
             #endregion
 
@@ -334,7 +335,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(history + "/commitInfos",
                        HTTPMethod:    HTTPMethod.GET,
-                       HTTPDelegate:  request => Task.FromResult(
+                       HTTPDelegate:  HeavyRead(request => Task.FromResult(
 
                            !TryGetHistory(request, out var roamingNetworkHistory, out var errorResponse)
                                ? errorResponse
@@ -346,7 +347,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            ? JSONResponse(request, HTTPStatusCode.OK, new JArray(commitInfos.Select(commitInfo => commitInfo.ToJSON(Embedded: true))))
                                            : ErrorResponse(request, HTTPStatusCode.NotFound, error)
 
-                       ));
+                       )));
 
             #endregion
 
@@ -354,7 +355,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(history + "/commits",
                        HTTPMethod:    HTTPMethod.GET,
-                       HTTPDelegate:  request => {
+                       HTTPDelegate:  HeavyRead(request => {
 
                            if (!TryGetHistory(request, out var roamingNetworkHistory, out var errorResponse) ||
                                !TryGetSince  (request, roamingNetworkHistory, out var since, out var max, out errorResponse))
@@ -365,11 +366,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                            IReadOnlyList<RoamingNetworkCommit>? commits;
                            String?                              error;
 
-                           // The commits missing at a server holding the given ones, e.g. its tips and a sample of older commits.
-                           if (request.QueryString.GetString("have") is String haveText)
+                           // The commits missing at a server holding the given ones, e.g. its tips and a sample of older commits:
+                           // all of them, also of "have" given more than once, have=a&have=b as have=a,b.
+                           if (request.QueryString.TryGetString("have", out _))
                            {
 
-                               if (!TryParseHave(haveText, out var haveIds, out var haveError))
+                               if (!TryParseHave(new JArray(request.QueryString.GetStrings("have")), out var haveIds, out var haveError))
                                    return Task.FromResult(ErrorResponse(request, HTTPStatusCode.BadRequest, haveError));
 
                                roamingNetworkHistory.TryGetMissingCommits(haveIds, out commits, out error, max);
@@ -384,7 +386,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           : ErrorResponse(request, HTTPStatusCode.NotFound, error)
                                   );
 
-                       });
+                       }));
 
             #endregion
 

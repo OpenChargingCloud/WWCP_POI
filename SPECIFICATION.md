@@ -682,16 +682,27 @@ children, at most `max`; the server fetches the rest after the last one. Commits
 skipped; none of them known is `NotFound` (404), and it starts from a checkpoint (10.5).
 
 - A server names **at most 1,000** commits held, the tips first, and MAY refuse a request naming more (400,
-  `FormatViolation`), as a server takes them from anybody who asks. Each one counts once.
+  `FormatViolation`), as a server takes them from anybody who asks. Each one counts once, and so does every one of
+  `have` given more than once over HTTP (`have=a&have=b` is `have=a,b`).
+- A page SHOULD cost about the commits it returns, not the whole history: a server catching up from the root, or one
+  naming its root alone, asks for every commit page by page, each after the last one of the page before. POI3 keeps
+  for each commit how many of the first commits it is or follows, one after the other from the first, and walks only
+  the commits after those: down from the commits held, and then in their order until the page is full.
 - Whoever reads a history may be anybody, as the reads are public: a server SHOULD answer them from one state of the
   history without waiting for a commit, which may hold the history for long, merging or syncing to a disk, and
   bound what one request costs it. POI3 answers every read from an immutable view, checks the signatures of a change
-  set waiting (4.2) once per change set, signatures and head, keeps at most 16 views without parts per version of an
-  entity, aggregates as a batch over the WebSocket only the requests of actions that change something or set a status
+  set waiting (4.2) once per change set, signatures and head, keeps the 16 views without parts per version of an
+  entity asked for last, aggregates as a batch over the WebSocket only the requests of actions that change something or set a status
   (`setStatus`, `commitChangeSet`, `signCommit`, `signCheckpoint`, `coSignChangeSet`, `addPendingSignatures`,
   `withdrawChangeSet`; a batch of another action is refused with `NotSupported`), stops processing a batch whose
   answers exceed 4 MiB or whose connection closed, and returns at most 1,000 entries of a list searched or paged, for
   a search of at most 16 words of 256 characters together; each of these limits is the server's to choose.
+- A server MAY limit the reads that cost what they return of each client: snapshots of the head and of checkpoints,
+  pages of commits and of their metadata, segments of the archive, and views without parts it does not keep. Over
+  HTTP it answers one beyond with 429 Too Many Requests and `Retry-After`, over the WebSocket it MAY wait, and answer
+  `GenericError` where it would wait too long; a client SHOULD wait as long as told and ask again. POI3 takes 600
+  of them per client and minute, all at once as well, a client by its address, an IPv6 one by its /64, behind a
+  trusted proxy the one the proxy names; over the WebSocket it waits 10 seconds at most.
 
 
 ## 6. Examples

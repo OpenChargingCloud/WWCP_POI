@@ -291,7 +291,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #region snapshot
 
-            webSocketServer.AddCommand("snapshot", request => {
+            webSocketServer.AddCommand("snapshot", HeavyCommand(request => {
 
                 var includeRuntimeStatus = true;
 
@@ -314,13 +314,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            () => History.ToSnapshotCBOR(includeRuntimeStatus, IncludeAttestations: true))
                        );
 
-            });
+            }));
 
             #endregion
 
             #region commitInfos
 
-            webSocketServer.AddCommand("commitInfos", request =>
+            webSocketServer.AddCommand("commitInfos", HeavyCommand(request =>
 
                 Task.FromResult(
 
@@ -333,13 +333,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 )
 
-            );
+            ));
 
             #endregion
 
             #region commits
 
-            webSocketServer.AddCommand("commits", request => {
+            webSocketServer.AddCommand("commits", HeavyCommand(request => {
 
                 if (!TryGetSince(request, History, out var since, out var max, out var errorMessage))
                     return Task.FromResult(errorMessage);
@@ -366,7 +366,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : request.Error(POIWebSocketErrorCodes.NotFound, error)
                        );
 
-            });
+            }));
 
             #endregion
 

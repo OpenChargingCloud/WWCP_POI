@@ -63,7 +63,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             AddHandler(History + "/archive/{number}",
                        HTTPMethod:    HTTPMethod.GET,
-                       HTTPDelegate:  request => Task.FromResult(
+                       HTTPDelegate:  HeavyRead(request => Task.FromResult(
 
                            !TryGetHistory(request, out var roamingNetworkHistory, out var errorResponse)
                                ? errorResponse
@@ -76,7 +76,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            ? JSONResponse(request, HTTPStatusCode.OK, segment.ToJSON())
                                            : ErrorResponse(request, HTTPStatusCode.NotFound, $"The archive has no segment {number} here!")
 
-                       ));
+                       )));
 
             #endregion
 
@@ -86,8 +86,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region (private) AddArchiveCommands(WebSocketServer, History)
 
-        private static void AddArchiveCommands(POIWebSocketServer     WebSocketServer,
-                                               RoamingNetworkHistory  History)
+        private void AddArchiveCommands(POIWebSocketServer     WebSocketServer,
+                                        RoamingNetworkHistory  History)
         {
 
             WebSocketServer.AddCommand("archive", request =>
@@ -98,7 +98,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             );
 
-            WebSocketServer.AddCommand("archiveSegment", request =>
+            WebSocketServer.AddCommand("archiveSegment", HeavyCommand(request =>
 
                 Task.FromResult(
 
@@ -111,7 +111,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 )
 
-            );
+            ));
 
         }
 

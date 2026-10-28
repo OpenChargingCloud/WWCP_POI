@@ -321,6 +321,61 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.WebSockets
         #endregion
 
 
+        #region Heavy_reads_beyond_the_limit_wait_over_the_WebSocket()
+
+        /// <summary>
+        /// Over the WebSocket a heavy read beyond MaxHeavyReadsPerMinute waits for the next one its client may make,
+        /// MaxHeavyReadWait at most, and is answered with GenericError where that is not enough (POI3-ISSUES.md S12).
+        /// </summary>
+        [Test]
+        public async Task Heavy_reads_beyond_the_limit_wait_over_the_WebSocket()
+        {
+
+            Publish("v1", 1);
+
+            // One heavy read every two seconds.
+            poiAPI!.MaxHeavyReadsPerMinute  = 30;
+            poiAPI.MaxHeavyReadWait         = TimeSpan.FromSeconds(5);
+
+            await using var client = await Connect();
+
+            var answers = new List<POIWebSocketMessage>();
+
+            for (var i = 0; i < 30; i++)
+                answers.Add(await client.Request("c" + i, "commitInfos"));
+
+            var started  = DateTimeOffset.UtcNow;
+            var waited   = await client.Request("waited", "commits");
+            var took     = DateTimeOffset.UtcNow - started;
+
+            poiAPI.MaxHeavyReadsPerMinute   = 1;
+            poiAPI.MaxHeavyReadWait         = TimeSpan.Zero;
+
+            var first    = await client.Request("first",   "snapshot");
+            var refused  = await client.Request("refused", "snapshot");
+            var light    = await client.Request("light",   "head");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(answers.Select(answer => answer.MessageType),  Has.All.EqualTo(POIWebSocketMessageType.Response));
+
+                Assert.That(waited.MessageType,                            Is.EqualTo(POIWebSocketMessageType.Response), waited.ErrorDescription);
+                Assert.That(took,                                          Is.GreaterThan(TimeSpan.FromMilliseconds(300)), "The heavy read did not wait.");
+
+                Assert.That(first.MessageType,                             Is.EqualTo(POIWebSocketMessageType.Response), first.ErrorDescription);
+                Assert.That(refused.ErrorCode,                             Is.EqualTo(POIWebSocketErrorCodes.GenericError));
+                Assert.That(refused.ErrorDescription,                      Does.Contain("Too many heavy reads"));
+                Assert.That(poiAPI.HeavyReadsRefused,                      Is.EqualTo(1));
+
+                Assert.That(light.MessageType,                             Is.EqualTo(POIWebSocketMessageType.Response), light.ErrorDescription);
+
+            }
+
+        }
+
+        #endregion
+
         #region A_follower_catches_up_over_the_WebSocket()
 
         [Test]

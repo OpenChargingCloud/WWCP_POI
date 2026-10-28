@@ -552,8 +552,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
         /// <summary>
         /// Every combination of the parts an operator leaves out is a view of its own, thousands of them: at most
-        /// MaxOmissionViews of them are kept per version, the ones asked for first; one more is calculated for its request,
-        /// with the same content and ETag, and not kept (POI3-ISSUES.md S12).
+        /// MaxOmissionViews of them are kept per version, the ones asked for last, so that nobody keeps others off by
+        /// asking first; one let go is calculated again when asked for, with the same content and ETag
+        /// (POI3-ISSUES.md S12).
         /// </summary>
         [Test]
         public async Task Views_without_parts_are_kept_up_to_a_bound()
@@ -561,34 +562,79 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
             poiAPI!.MaxOmissionViews = 2;
 
-            var omissions  = new[] { "chargingPools", "chargingTariffs", "EVSETemplates", "chargingStationTemplates", "chargingPoolTemplates" };
-            var first      = new List<(HttpResponseMessage Response, Byte[] Content)>();
+            var omissions   = new[] { "chargingPools", "chargingTariffs", "EVSETemplates", "chargingStationTemplates", "chargingPoolTemplates" };
+            var first       = new List<(HttpResponseMessage Response, Byte[] Content)>();
 
             foreach (var omission in omissions)
                 first.Add(await Send(HttpMethod.Get, CSO + "?without=" + omission));
 
-            var notKept    = poiAPI.OmissionViewsNotKept;
+            var calculated  = poiAPI.OmissionViewsCalculated;
 
-            var keptAgain  = await Send(HttpMethod.Get, CSO + "?without=" + omissions[1]);
-            var keptCount  = poiAPI.OmissionViewsNotKept;
+            // Asked for last: kept.
+            var lastAgain   = await Send(HttpMethod.Get, CSO + "?without=" + omissions[^1]);
+            var keptCount   = poiAPI.OmissionViewsCalculated;
 
-            var lastAgain  = await Send(HttpMethod.Get, CSO + "?without=" + omissions[^1]);
+            // Asked for first: let go, and calculated again; then it is kept, beside the one asked for before it.
+            var firstAgain  = await Send(HttpMethod.Get, CSO + "?without=" + omissions[0]);
+            var againCount  = poiAPI.OmissionViewsCalculated;
+
+            await Send(HttpMethod.Get, CSO + "?without=" + omissions[0]);
+            await Send(HttpMethod.Get, CSO + "?without=" + omissions[^1]);
 
             using (Assert.EnterMultipleScope())
             {
 
                 Assert.That(first.Select(answer => answer.Response.StatusCode),  Has.All.EqualTo(HttpStatusCode.OK));
 
-                // Two kept, three calculated for their requests.
-                Assert.That(notKept,                                             Is.EqualTo(3));
-                Assert.That(keptCount,                                           Is.EqualTo(3), "A view kept was calculated again.");
-                Assert.That(poiAPI.OmissionViewsNotKept,                         Is.EqualTo(4), "A view beyond the bound was kept.");
+                Assert.That(calculated,                                          Is.EqualTo(5));
+                Assert.That(keptCount,                                           Is.EqualTo(5), "The view asked for last was calculated again.");
+                Assert.That(againCount,                                          Is.EqualTo(6), "A view let go was kept.");
+                Assert.That(poiAPI.OmissionViewsCalculated,                      Is.EqualTo(6), "A view asked for lately was let go.");
 
                 // Calculated again, it is the same.
-                Assert.That(HeaderOf(keptAgain.Response, "ETag"),                Is.EqualTo(HeaderOf(first[1].Response, "ETag")));
+                Assert.That(HeaderOf(firstAgain.Response, "ETag"),               Is.EqualTo(HeaderOf(first[0].Response, "ETag")));
                 Assert.That(HeaderOf(lastAgain.Response, "ETag"),                Is.EqualTo(HeaderOf(first[^1].Response, "ETag")));
-                Assert.That(HeaderOf(lastAgain.Response, "ETag"),                Is.EqualTo(ETagOf("json", lastAgain.Content)));
-                Assert.That(ParseJSON(lastAgain.Content)[omissions[^1]],         Is.Null);
+                Assert.That(HeaderOf(firstAgain.Response, "ETag"),               Is.EqualTo(ETagOf("json", firstAgain.Content)));
+                Assert.That(ParseJSON(firstAgain.Content)[omissions[0]],         Is.Null);
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_view_without_parts_calculated_is_a_heavy_read()
+
+        /// <summary>
+        /// Calculating a view without parts is a heavy read of its client: beyond MaxHeavyReadsPerMinute it is refused
+        /// with 429 Too Many Requests, while a view kept is served still (POI3-ISSUES.md S12).
+        /// </summary>
+        [Test]
+        public async Task A_view_without_parts_calculated_is_a_heavy_read()
+        {
+
+            poiAPI!.MaxHeavyReadsPerMinute = 2;
+
+            var pools     = await Send(HttpMethod.Get, CSO + "?without=chargingPools");
+            var tariffs   = await Send(HttpMethod.Get, CSO + "?without=chargingTariffs");
+            var refused   = await Send(HttpMethod.Get, CSO + "?without=EVSETemplates");
+            var kept      = await Send(HttpMethod.Get, CSO + "?without=chargingPools");
+            var whole     = await Send(HttpMethod.Get, CSO);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(pools.  Response.StatusCode,                  Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(tariffs.Response.StatusCode,                  Is.EqualTo(HttpStatusCode.OK));
+
+                Assert.That(refused.Response.StatusCode,                  Is.EqualTo(HttpStatusCode.TooManyRequests));
+                Assert.That(refused.Response.Headers.RetryAfter?.Delta,   Is.GreaterThanOrEqualTo(TimeSpan.FromSeconds(1)));
+
+                Assert.That(kept.   Response.StatusCode,                  Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(whole.  Response.StatusCode,                  Is.EqualTo(HttpStatusCode.OK));
+
+                Assert.That(poiAPI.OmissionViewsCalculated,               Is.EqualTo(2));
+                Assert.That(poiAPI.HeavyReadsRefused,                     Is.EqualTo(1));
 
             }
 

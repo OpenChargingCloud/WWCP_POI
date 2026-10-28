@@ -165,6 +165,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     IReadOnlyList<RoamingNetworkMergeConflict>>     conflictingTips      = [];
 
         private          Int64                                                      mergeCalculations;
+        private          Int64                                                      commitsLookedAt;
 
         #endregion
 
@@ -290,6 +291,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public Int64                 MergeCalculations
             => Interlocked.Read(ref mergeCalculations);
+
+        /// <summary>
+        /// The number of commits looked at to find the commits missing elsewhere, TryGetCommitsSince(…) and
+        /// TryGetMissingCommits(…): about those returned, and not the whole history for every page.
+        /// </summary>
+        public Int64                 CommitsLookedAt
+            => Interlocked.Read(ref commitsLookedAt);
 
         /// <summary>
         /// The number of commits this history holds, including its root.
@@ -2350,14 +2358,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           Int32                                                      MaxCount   = DefaultMaxCommits)
         {
 
-            if (View.Missing([ CommitId ]) is not List<RoamingNetworkCommit> missing)
+            var missing = View.Missing([ CommitId ], MaxCount, out var lookedAt);
+
+            Interlocked.Add(ref commitsLookedAt, lookedAt);
+
+            if (missing is null)
             {
                 Commits        = null;
                 ErrorResponse  = $"The commit '{CommitId}' is unknown here; start from a new snapshot!";
                 return false;
             }
 
-            Commits        = [ .. missing.Take(Math.Max(0, MaxCount)) ];
+            Commits        = missing;
             ErrorResponse  = null;
             return true;
 
@@ -2404,8 +2416,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Try to return the commits a server holding the given commits and their ancestors misses, completely,
         /// parents before their children, at most the given number; commits unknown here are skipped.
         /// None of them known here requires a new snapshot.
-        /// It costs the commits missing, not every commit for every given one (ReadView.Missing(…)); a server limits how
-        /// many it takes from another one, e.g. POI_API.MaxHaveIds.
+        /// It costs about the commits returned, not every commit for every given one nor the whole history for every page
+        /// (ReadView.Missing(…)); a server limits how many it takes from another one, e.g. POI_API.MaxHaveIds.
         /// </summary>
         /// <param name="Have">The commits the caller holds, e.g. its tips.</param>
         /// <param name="Commits">The commits it misses.</param>
@@ -2417,14 +2429,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             Int32                                                      MaxCount   = DefaultMaxCommits)
         {
 
-            if (View.Missing(Have) is not List<RoamingNetworkCommit> missing)
+            var missing = View.Missing(Have, MaxCount, out var lookedAt);
+
+            Interlocked.Add(ref commitsLookedAt, lookedAt);
+
+            if (missing is null)
             {
                 Commits        = null;
                 ErrorResponse  = "None of the given commits is known here; start from a new snapshot!";
                 return false;
             }
 
-            Commits        = [ .. missing.Take(Math.Max(0, MaxCount)) ];
+            Commits        = missing;
             ErrorResponse  = null;
             return true;
 
