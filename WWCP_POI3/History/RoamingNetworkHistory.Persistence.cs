@@ -136,7 +136,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region DetachStore()
 
         /// <summary>
-        /// Stop keeping this history in its store, e.g. when another history replaces it there.
+        /// Stop keeping this history in its store, e.g. when another history replaces it there, or before the store is
+        /// disposed: a compaction running is waited for, and one due does not start any more.
         /// </summary>
         /// <returns>The store, if there was one.</returns>
         public IRoamingNetworkHistoryStore? DetachStore()
@@ -480,8 +481,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Task.Run(() => {
                 try
                 {
-                    if (!Compact(out var error))
+
+                    String? error = null;
+
+                    // Not into a store detached meanwhile, e.g. one disposed when its server stopped.
+                    lock (historyLock)
+                    {
+                        if (Store is not null)
+                            Compact(out error);
+                    }
+
+                    if (error is not null)
                         RaiseStoreError(error, null);
+
                 }
                 finally
                 {

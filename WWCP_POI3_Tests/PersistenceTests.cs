@@ -412,6 +412,176 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region A_store_detached_is_compacted_no_more()
+
+        /// <summary>
+        /// A history compacts in the background, once the log of its store is long enough. Detaching the store, e.g. before
+        /// the server stopping disposes it, waits for the compaction running, and none starts into it afterwards: a server
+        /// started again on the same files finds them as they were left.
+        /// </summary>
+        [Test]
+        public async Task A_store_detached_is_compacted_no_more()
+        {
+
+            using var store  = new CompactionGate();
+            var history      = RoamingNetworkHistory.Start(NewNetwork(),
+                                                           Store:      store,
+                                                           Retention:  new RoamingNetworkHistoryRetention {
+                                                                           RetainCommits              = 1,
+                                                                           CompactAfterLogEntries     = 2,
+                                                                           VersionCheckpointInterval  = 1,
+                                                                           RecentVersions             = 1
+                                                                       });
+
+            store.Block();
+
+            Assert.That(Change(history, 1, "dataSource", "v2").IsCommitted);
+            Assert.That(Change(history, 2, "dataSource", "v3").IsCommitted);
+
+            // The second commit made the log long enough: compacting in the background, held up in the store.
+            Assert.That(store.Entered.Wait(TimeSpan.FromSeconds(10)), Is.True, "No compaction started.");
+
+            var detach = Task.Run(history.DetachStore);
+
+            Assert.That(detach.Wait(TimeSpan.FromMilliseconds(200)), Is.False, "Detached while a compaction was writing into the store.");
+
+            store.Release();
+
+            Assert.That(await detach, Is.SameAs(store));
+
+            var compacted = store.Compactions;
+
+            Assert.That(Change(history, 3, "dataSource", "v4").IsCommitted);
+            Assert.That(Change(history, 4, "dataSource", "v5").IsCommitted);
+            Assert.That(Change(history, 5, "dataSource", "v6").IsCommitted);
+
+            await Task.Delay(200);
+
+            Assert.That(RoamingNetworkHistory.TryLoad(store, out var loaded, out var loadError), Is.True, loadError);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(compacted,               Is.EqualTo(1));
+                Assert.That(store.Compactions,       Is.EqualTo(compacted), "Compacted into a store detached.");
+                Assert.That(loaded!.Root.Id,         Is.EqualTo(history.Root.Id));
+                Assert.That(loaded.Head.Commit.Revision,  Is.EqualTo(2));
+            }
+
+        }
+
+        #endregion
+
+        #region A_store_or_archive_disposed_takes_no_compaction(WithArchive)
+
+        /// <summary>
+        /// Once disposed, a store and an archive in files take nothing more, as their directories may belong to the ones
+        /// of a server started again: a compaction into them fails, and drops nothing, from the files or the history.
+        /// </summary>
+        [TestCase(false)]
+        [TestCase(true)]
+        public void A_store_or_archive_disposed_takes_no_compaction(Boolean WithArchive)
+        {
+
+            var store    = new RoamingNetworkHistoryFileStore(directory!);
+            var archive  = WithArchive ? new RoamingNetworkHistoryFileArchive(Path.Combine(directory!, "archive")) : null;
+            var history  = RoamingNetworkHistory.Start(NewNetwork(),
+                                                       Store:      store,
+                                                       Retention:  new RoamingNetworkHistoryRetention {
+                                                                       RetainCommits              = 1,
+                                                                       CompactAfterLogEntries     = Int64.MaxValue,
+                                                                       VersionCheckpointInterval  = 1,
+                                                                       RecentVersions             = 1
+                                                                   },
+                                                       Archive:    archive);
+
+            Assert.That(Change(history, 1, "dataSource", "v2").IsCommitted);
+            Assert.That(Change(history, 2, "dataSource", "v3").IsCommitted);
+
+            var root = history.Root.Id;
+
+            if (archive is not null)
+                archive.Dispose();
+            else
+                store.Dispose();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(history.Compact(out var compactError),  Is.False);
+                Assert.That(compactError,                           Does.StartWith("The history can not be compacted: "));
+                Assert.That(history.Root.Id,                        Is.EqualTo(root), "Dropped from the history all the same.");
+            }
+
+            history.DetachStore();
+            store.Dispose();
+
+            using var again = new RoamingNetworkHistoryFileStore(directory!);
+
+            Assert.That(RoamingNetworkHistory.TryLoad(again, out var loaded, out var loadError), Is.True, loadError);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(loaded!.Root.Id,             Is.EqualTo(root));
+                Assert.That(loaded.Head.Commit.Revision,  Is.EqualTo(2));
+            }
+
+        }
+
+        #endregion
+
+        #region (class) CompactionGate
+
+        /// <summary>
+        /// A store in memory whose compactions wait, once blocked, until released.
+        /// </summary>
+        private sealed class CompactionGate : IRoamingNetworkHistoryStore
+        {
+
+            private readonly RoamingNetworkHistoryMemoryStore  store     = new ();
+            private readonly ManualResetEventSlim              released  = new (true);
+            private          Int32                             compactions;
+
+            public ManualResetEventSlim                        Entered      { get; } = new (false);
+
+            public Int32                                       Compactions
+                => Volatile.Read(ref compactions);
+
+            public void Block()
+                => released.Reset();
+
+            public void Release()
+                => released.Set();
+
+            public RoamingNetworkHistoryStoreContent? Load()
+                => store.Load();
+
+            public void WriteBase(Newtonsoft.Json.Linq.JObject Snapshot)
+                => store.WriteBase(Snapshot);
+
+            public void Append(RoamingNetworkHistoryLogEntry Entry)
+                => store.Append(Entry);
+
+            public void Compact(Newtonsoft.Json.Linq.JObject                 Snapshot,
+                                IEnumerable<RoamingNetworkHistoryLogEntry>  Entries)
+            {
+
+                Entered.Set();
+                released.Wait();
+
+                store.Compact(Snapshot, Entries);
+                Interlocked.Increment(ref compactions);
+
+            }
+
+            public void Dispose()
+            {
+                released.Set();
+                store.Dispose();
+            }
+
+        }
+
+        #endregion
+
         #region A_merge_lost_by_a_crash_is_made_again()
 
         [Test]

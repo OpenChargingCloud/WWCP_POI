@@ -237,6 +237,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             lock (storeLock)
             {
 
+                ObjectDisposedException.ThrowIf(disposed, this);
+
                 if (File.Exists(Path.Combine(Directory, CurrentFileName)))
                     throw new InvalidOperationException($"The history store '{Directory}' is not empty!");
 
@@ -259,6 +261,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             lock (storeLock)
             {
+
+                ObjectDisposedException.ThrowIf(disposed, this);
 
                 if (log is null)
                     throw new InvalidOperationException($"The history store '{Directory}' has no base yet!");
@@ -291,6 +295,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             lock (storeLock)
             {
+
+                // Disposed, its directory may belong to another store already: the one of a server started again.
+                ObjectDisposedException.ThrowIf(disposed, this);
 
                 var oldGeneration  = generation;
                 var number         = oldGeneration is not null && oldGeneration.StartsWith("gen-") && Int32.TryParse(oldGeneration[4..], out var n) ? n + 1 : 1;

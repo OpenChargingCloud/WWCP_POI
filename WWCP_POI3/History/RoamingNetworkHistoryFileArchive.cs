@@ -54,6 +54,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly Lock                                                     archiveLock  = new ();
         private readonly FileStream                                               lockFile;
         private readonly SortedDictionary<UInt32, RoamingNetworkArchiveSegmentInfo>  segments  = [];
+        private          Boolean                                                  disposed;
 
         #endregion
 
@@ -118,6 +119,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             lock (archiveLock)
             {
+
+                // Disposed, its directory may belong to another archive already: the one of a server started again.
+                ObjectDisposedException.ThrowIf(disposed, this);
 
                 var number = Segment.Info.Number;
 
@@ -187,7 +191,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <inheritdoc/>
         public void Dispose()
         {
-            lockFile.Dispose();
+            lock (archiveLock)
+            {
+                disposed = true;
+                lockFile.Dispose();
+            }
         }
 
         #endregion
