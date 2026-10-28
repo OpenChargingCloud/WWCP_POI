@@ -1115,11 +1115,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             statusFromSnapshot = statusSnapshot;
 
-            // A reset asked for is done.
-            if (Reason is Replacement.Start or Replacement.Reset)
-                Interlocked.Exchange(ref reset, null)?.TrySetResult();
-
-            OnHistoryReplaced?.Invoke(this, oldHistory, newHistory);
+            try
+            {
+                OnHistoryReplaced?.Invoke(this, oldHistory, newHistory);
+            }
+            finally
+            {
+                // A reset asked for is done, once it was told: who waits for it sees the history replaced.
+                if (Reason is Replacement.Start or Replacement.Reset)
+                    Interlocked.Exchange(ref reset, null)?.TrySetResult();
+            }
 
         }
 

@@ -448,7 +448,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                                                   MaxReconnectDelay  = TimeSpan.FromMilliseconds(200)
                                               });
 
-            follower.OnHistoryReplaced           += (_, oldHistory, newHistory) => { lock (replaced) replaced.Add((oldHistory, newHistory)); };
+            // Slow to take it: the reset returns once it was told, not before.
+            follower.OnHistoryReplaced           += (_, oldHistory, newHistory) => { Thread.Sleep(200); lock (replaced) replaced.Add((oldHistory, newHistory)); };
             follower.OnHistoryReplacementRefused += (_, history,    reason)     => { lock (refused)  refused. Add((history,    reason));     };
 
             using (var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(1)))
