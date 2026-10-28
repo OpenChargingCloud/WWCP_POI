@@ -578,6 +578,145 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
         #endregion
 
+        #region Another_spelling_of_an_entity_is_refused_and_its_chain_is_the_one_of_the_entity()
+
+        /// <summary>
+        /// "DE*GEF*E11" is the EVSE "DE*GEF*E1*1" as identifications compare: a statement has to name it as the roaming
+        /// network does, and there is one chain of it, whatever the spelling asked for (SPECIFICATION.md, section 12.1).
+        /// </summary>
+        [Test]
+        public void Another_spelling_of_an_entity_is_refused_and_its_chain_is_the_one_of_the_entity()
+        {
+
+            var history   = NewHistory(Signing: false);
+            var signer    = Signer(GEF);
+            var t         = Timestamp.Now.AddMinutes(-10);
+
+            var s0        = signer.StatePrices(RN, EVSEType, E11,          Prices(0.29m), 0, null, t);
+            var otherOf0  = signer.StatePrices(RN, EVSEType, "DE*GEF*E11", Prices(0.99m), 0, null, t);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(history.TryAddPriceStatement(s0,       out var e0),     Is.EqualTo(POIPriceStatementResult.Taken),   e0);
+                Assert.That(history.TryAddPriceStatement(otherOf0, out var eOther), Is.EqualTo(POIPriceStatementResult.Refused), "A second chain of one EVSE.");
+                Assert.That(eOther,                                                  Does.Contain("as the roaming network does"));
+
+                Assert.That(RoamingNetworkHistory.ChainOf(EVSEType, "DE*GEF*E11"),   Is.EqualTo(RoamingNetworkHistory.ChainOf(EVSEType, E11)));
+                Assert.That(RoamingNetworkHistory.ChainOf(EVSEType, " de*gef*e1*1"), Is.EqualTo(RoamingNetworkHistory.ChainOf(EVSEType, E11)));
+                Assert.That(history.TryGetPriceStatement(EVSEType, "DE*GEF*E11", out var current) ? current.Digest : null,
+                            Is.EqualTo(s0.Digest), "One chain of the EVSE, whatever the spelling asked for.");
+                Assert.That(Digests(history.PriceStatements),                        Is.EqualTo(Digests([ s0 ])));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_sequence_far_beyond_the_current_one_or_beyond_the_highest_is_refused()
+
+        /// <summary>
+        /// A statement may skip those that did not reach this server, but not a million of them; no sequence lies beyond
+        /// 2^53 - 1, and a chain at the highest one can not go on (SPECIFICATION.md, section 12.1).
+        /// </summary>
+        [Test]
+        public void A_sequence_far_beyond_the_current_one_or_beyond_the_highest_is_refused()
+        {
+
+            var history     = NewHistory(Signing: false);
+            var signer      = Signer(GEF);
+            var t           = Timestamp.Now.AddMinutes(-10);
+            var gap         = RoamingNetworkHistory.MaxPriceStatementSequenceGap;
+            var highest     = RoamingNetworkHistory.MaxPriceStatementSequence;
+
+            var s0          = signer.StatePrices(RN, EVSEType, E11, Prices(0.29m), 0,           null,      t);
+            var tooFar      = signer.StatePrices(RN, EVSEType, E11, Prices(0.31m), gap + 1,     s0.Digest, t.AddMinutes(1));
+            var farEnough   = signer.StatePrices(RN, EVSEType, E11, Prices(0.33m), gap,         s0.Digest, t.AddMinutes(1));
+            var beyond      = signer.StatePrices(RN, EVSEType, E12, Prices(0.29m), highest + 1, s0.Digest, t);
+            var atTheEnd    = signer.StatePrices(RN, EVSEType, E21, Prices(0.29m), highest,     s0.Digest, t);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(history.TryAddPriceStatement(s0,        out var e0),      Is.EqualTo(POIPriceStatementResult.Taken),   e0);
+                Assert.That(history.TryAddPriceStatement(tooFar,    out var eTooFar), Is.EqualTo(POIPriceStatementResult.Refused));
+                Assert.That(eTooFar,                                                   Does.Contain($"more than {gap} beyond"));
+                Assert.That(history.TryAddPriceStatement(farEnough, out var eFar),    Is.EqualTo(POIPriceStatementResult.Taken),   eFar);
+                Assert.That(history.TryAddPriceStatement(beyond,    out var eBeyond), Is.EqualTo(POIPriceStatementResult.Refused));
+                Assert.That(eBeyond,                                                   Does.Contain("beyond the highest sequence"));
+                Assert.That(history.TryAddPriceStatement(atTheEnd,  out var eEnd),    Is.EqualTo(POIPriceStatementResult.Taken),   eEnd);
+
+                // Its server can not state it anew: one more would be beyond the highest sequence.
+                history.PriceStatementSigners = [ signer ];
+
+                Assert.That(history.TryStatePrices(EVSEType, E21, out _, out var eAnew), Is.False);
+                Assert.That(eAnew,                                                       Does.Contain("at its end"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region One_operator_stating_more_than_its_share_drops_its_own_statements_for_the_next_checkpoint_only()
+
+        /// <summary>
+        /// The statements for the next checkpoint are kept per operator: one stating more than its share drops its own
+        /// oldest, and those of another operator stay - they are that operator's evidence (SPECIFICATION.md, section 12.3).
+        /// </summary>
+        [Test]
+        public void One_operator_stating_more_than_its_share_drops_its_own_statements_for_the_next_checkpoint_only()
+        {
+
+            var history  = NewHistory(Signing: false);
+            var t        = Timestamp.Now.AddMinutes(-10);
+            var XYZPool  = ChargingPool_Id.  Parse("DE*XYZ*P1");
+            var XYZT1    = ChargingTariff_Id.Parse("DE*XYZ*T1");
+
+            // DE*XYZ gets a pool and a tariff of its own.
+            var result   = history.Commit(history.Head.RoamingNetwork.CreateSignedChangeSet(
+                                              [
+                                                  RoamingNetworkChange.Add(new ChargingTariff(XYZT1,
+                                                                                              Currency.EUR,
+                                                                                              [ new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.5m, StepSize: 1) ]) ],
+                                                                                              Created: t)),
+                                                  RoamingNetworkChange.Add(new ChargingPool(XYZPool, Created: t))
+                                              ],
+                                              CreatedAt: Timestamp.Now));
+
+            Assert.That(result.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), result.ErrorResponse);
+
+            history.MaxPendingPriceStatementsPerOperator = 2;
+
+            var xyz      = Signer(XYZ).StatePrices(RN, PoolType, XYZPool.ToString(), Prices(0.5m, XYZT1), 0, null, t);
+            var gef      = new[] { E11, E12, E21, P1 }.Select((entityId, index) => Signer(GEF).StatePrices(RN,
+                                                                                                             entityId == P1 ? PoolType : EVSEType,
+                                                                                                             entityId,
+                                                                                                             Prices(0.29m + index),
+                                                                                                             0,
+                                                                                                             null,
+                                                                                                             t.AddSeconds(index + 1))).ToArray();
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(history.TryAddPriceStatement(xyz, out var eXYZ), Is.EqualTo(POIPriceStatementResult.Taken), eXYZ);
+
+                foreach (var priceStatement in gef)
+                    Assert.That(history.TryAddPriceStatement(priceStatement, out var eGEF), Is.EqualTo(POIPriceStatementResult.Taken), eGEF);
+
+                Assert.That(Digests(history.PendingPriceStatements),  Is.EqualTo(Digests([ xyz, gef[2], gef[3] ])),
+                            "DE*GEF dropped its own oldest, and those of DE*XYZ stayed.");
+                Assert.That(Digests(history.PriceStatements),         Has.Length.EqualTo(5), "The current statements are not dropped.");
+
+            }
+
+        }
+
+        #endregion
+
+
         #region A_checkpoint_names_the_price_statements_taken_since_the_one_before()
 
         [Test]

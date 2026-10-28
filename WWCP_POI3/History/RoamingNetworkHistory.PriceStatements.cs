@@ -73,13 +73,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The most price statements a history keeps for its next checkpoint; it drops the oldest beyond.
+        /// The most price statements of one charging station operator a history keeps for its next checkpoint by default.
         /// </summary>
-        public const Int32 MaxPendingPriceStatements = 100_000;
+        public const Int32  DefaultMaxPendingPriceStatementsPerOperator  = 100_000;
+
+        /// <summary>
+        /// The highest sequence of a price statement a history takes or makes: 2^53 - 1, the highest integer every JSON
+        /// reader holds exactly - and one more never overflows.
+        /// </summary>
+        public const UInt64 MaxPriceStatementSequence                    = (1UL << 53) - 1;
+
+        /// <summary>
+        /// How far beyond the current statement of its entity the sequence of a price statement taken may lie: the
+        /// statements in between did not reach this history, but not a million of them.
+        /// </summary>
+        public const UInt64 MaxPriceStatementSequenceGap                 = 1_000_000;
 
         private readonly Lock                                                                                priceStatementLock         = new ();
         private readonly Dictionary<(String EntityType, String EntityId), RoamingNetworkPriceStatement>     priceStatements            = [];
         private readonly List<RoamingNetworkPriceStatement>                                                  pendingPriceStatements     = [];
+        private readonly Dictionary<ChargingStationOperator_Id, Int32>                                       pendingPerOperator         = [];
         private readonly Dictionary<RoamingNetworkCheckpoint_Id, ImmutableArray<RoamingNetworkPriceStatement>> checkpointPriceStatements = [];
 
         /// <summary>
@@ -116,6 +129,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// statements made here end: 5 minutes by default.
         /// </summary>
         public TimeSpan                                    PriceStatementRenewal    { get; set; } = TimeSpan.FromMinutes(5);
+
+        /// <summary>
+        /// The most price statements of one charging station operator this history keeps for its next checkpoint; beyond,
+        /// it drops the oldest of that operator, and never those of another one: DefaultMaxPendingPriceStatementsPerOperator
+        /// unless set.
+        /// </summary>
+        public Int32                                       MaxPendingPriceStatementsPerOperator { get; set; } = DefaultMaxPendingPriceStatementsPerOperator;
 
         /// <summary>
         /// The current price statement of every entity, by their entity types and identifications in ordinal order.
@@ -159,6 +179,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (static) ChainOf(EntityType, EntityId)
+
+        /// <summary>
+        /// The key of the chain of price statements of the given entity: its type and its identification as the
+        /// identifications compare - without '*', whitespace around it, or the case of its letters - so that two
+        /// spellings of one EVSE, "DE*GEF*E1*1" and "DE*GEF*E11", are one chain, and a split view between them is seen.
+        /// </summary>
+        /// <param name="EntityType">ChargingPool, ChargingStation or EVSE.</param>
+        /// <param name="EntityId">The identification of the entity.</param>
+        public static (String EntityType, String EntityId) ChainOf(String  EntityType,
+                                                                   String  EntityId)
+
+            => (EntityType, EntityId.Trim().Replace("*", "").ToUpperInvariant());
+
+        private static (String EntityType, String EntityId) ChainOf(RoamingNetworkPriceStatement PriceStatement)
+
+            => ChainOf(PriceStatement.EntityType, PriceStatement.EntityId);
+
+        #endregion
+
         #region TryGetPriceStatement(EntityType, EntityId, out PriceStatement)
 
         /// <summary>
@@ -173,7 +213,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
             lock (priceStatementLock)
             {
-                return priceStatements.TryGetValue((EntityType, EntityId), out PriceStatement);
+                return priceStatements.TryGetValue(ChainOf(EntityType, EntityId), out PriceStatement);
             }
         }
 
@@ -554,15 +594,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            var known = PriceStatement.EntityType switch {
-                            nameof(ChargingPool)     => chargingStationOperator.TryGetChargingPool   (ChargingPool_Id.   Parse(PriceStatement.EntityId), out _),
-                            nameof(ChargingStation)  => chargingStationOperator.TryGetChargingStation(ChargingStation_Id.Parse(PriceStatement.EntityId), out _),
-                            _                        => chargingStationOperator.TryGetEVSE           (EVSE_Id.           Parse(PriceStatement.EntityId), out _)
-                        };
+            var spelled = PriceStatement.EntityType switch {
+                              nameof(ChargingPool)     => chargingStationOperator.TryGetChargingPool   (ChargingPool_Id.   Parse(PriceStatement.EntityId), out var chargingPool)    ? chargingPool.   Id.ToString() : null,
+                              nameof(ChargingStation)  => chargingStationOperator.TryGetChargingStation(ChargingStation_Id.Parse(PriceStatement.EntityId), out var chargingStation) ? chargingStation.Id.ToString() : null,
+                              _                        => chargingStationOperator.TryGetEVSE           (EVSE_Id.           Parse(PriceStatement.EntityId), out var evse)            ? evse.           Id.ToString() : null
+                          };
 
-            if (!known)
+            if (spelled is null)
             {
                 ErrorResponse = $"The {PriceStatement.EntityType} '{PriceStatement.EntityId}' of the price statement is unknown!";
+                return false;
+            }
+
+            // One spelling per entity, the head's: another one would be a chain of its own to everybody comparing texts,
+            // and the identifications that compare equal are as many as the ways of writing them.
+            if (!String.Equals(spelled, PriceStatement.EntityId, StringComparison.Ordinal))
+            {
+                ErrorResponse = $"The price statement names the {PriceStatement.EntityType} '{spelled}' as '{PriceStatement.EntityId}': it has to name it as the roaming network does!";
                 return false;
             }
 
@@ -590,7 +638,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                            out String?                   ErrorResponse)
         {
 
-            var key = (PriceStatement.EntityType, PriceStatement.EntityId);
+            var key = ChainOf(PriceStatement);
+
+            if (PriceStatement.Sequence > MaxPriceStatementSequence)
+            {
+                ErrorResponse = $"The price statement {PriceStatement.Sequence} of the {PriceStatement.EntityType} '{PriceStatement.EntityId}' is beyond the highest sequence, {MaxPriceStatementSequence}!";
+                return POIPriceStatementResult.Refused;
+            }
 
             if (priceStatements.TryGetValue(key, out var current))
             {
@@ -616,6 +670,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (PriceStatement.Sequence == current.Sequence + 1 && !PriceStatement.Follows(current))
                 {
                     ErrorResponse = $"The price statement {PriceStatement.Sequence} of the {PriceStatement.EntityType} '{PriceStatement.EntityId}' does not name the digest of the statement {current.Sequence} before!";
+                    return POIPriceStatementResult.Refused;
+                }
+
+                // Lower than the highest sequence, so neither overflows.
+                if (PriceStatement.Sequence - current.Sequence > MaxPriceStatementSequenceGap)
+                {
+                    ErrorResponse = $"The price statement {PriceStatement.Sequence} of the {PriceStatement.EntityType} '{PriceStatement.EntityId}' lies more than {MaxPriceStatementSequenceGap} beyond the current one, {current.Sequence}!";
                     return POIPriceStatementResult.Refused;
                 }
 
@@ -663,7 +724,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private void TakeStoredPriceStatement(RoamingNetworkPriceStatement PriceStatement)
         {
 
-            var key = (PriceStatement.EntityType, PriceStatement.EntityId);
+            var key = ChainOf(PriceStatement);
 
             if (!priceStatements.TryGetValue(key, out var current) || current.Sequence < PriceStatement.Sequence)
                 priceStatements[key] = PriceStatement;
@@ -672,8 +733,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             pendingPriceStatements.Add(PriceStatement);
 
-            if (pendingPriceStatements.Count > MaxPendingPriceStatements)
-                pendingPriceStatements.RemoveRange(0, pendingPriceStatements.Count - MaxPendingPriceStatements);
+            // An operator stating more than its share drops its own oldest, never those of another one: they are the
+            // evidence of a checkpoint (SPECIFICATION.md, section 12.4).
+            var pending = pendingPerOperator[PriceStatement.Signer] = pendingPerOperator.GetValueOrDefault(PriceStatement.Signer) + 1;
+
+            if (pending > MaxPendingPriceStatementsPerOperator)
+            {
+                pendingPriceStatements.RemoveAt(pendingPriceStatements.FindIndex(priceStatement => priceStatement.Signer == PriceStatement.Signer));
+                pendingPerOperator[PriceStatement.Signer] = pending - 1;
+            }
 
         }
 
@@ -688,7 +756,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private void TakePreviousEpochPriceStatement(RoamingNetworkPriceStatement PriceStatement)
         {
 
-            var key = (PriceStatement.EntityType, PriceStatement.EntityId);
+            var key = ChainOf(PriceStatement);
 
             if (!priceStatements.ContainsKey(key))
                 previousEpochPriceStatements[key] = PriceStatement;
@@ -720,7 +788,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             lock (priceStatementLock)
             {
 
-                priceStatements.TryGetValue((EntityType, EntityId), out var current);
+                var key = ChainOf(EntityType, EntityId);
+
+                priceStatements.TryGetValue(key, out var current);
 
                 if (OnlyWhenChanged && current is not null && current.PriceStatus.Text == Prices.Text)
                 {
@@ -729,7 +799,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 // Its chain goes on across epochs, also from a statement not taken along.
-                var previous  = current ?? previousEpochPriceStatements.GetValueOrDefault((EntityType, EntityId));
+                var previous  = current ?? previousEpochPriceStatements.GetValueOrDefault(key);
+
+                if (previous is not null && previous.Sequence >= MaxPriceStatementSequence)
+                {
+                    ErrorResponse = $"The chain of price statements of the {EntityType} '{EntityId}' is at its end, {previous.Sequence}!";
+                    return false;
+                }
 
                 var statement = Signer.StatePrices(RoamingNetworkId,
                                                    EntityType,
@@ -837,7 +913,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
             lock (priceStatementLock)
             {
-                return [ .. Entities.Select(entity => priceStatements.TryGetValue(entity, out var priceStatement) ? priceStatement : null).
+                return [ .. Entities.Select(entity => priceStatements.TryGetValue(ChainOf(entity.EntityType, entity.EntityId), out var priceStatement) ? priceStatement : null).
                                      OfType<RoamingNetworkPriceStatement>() ];
             }
         }
@@ -887,6 +963,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 keyVersions.Add(previousVersion);
             }
 
+            var ofChains = new Dictionary<((String, String) Chain, UInt64 Sequence), String>();
+
             foreach (var priceStatement in ordered)
             {
 
@@ -895,6 +973,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     ErrorResponse = $"The price statement {priceStatement.Digest} is one of the roaming network '{priceStatement.RoamingNetworkId}'!";
                     return false;
                 }
+
+                if (priceStatement.Sequence > MaxPriceStatementSequence)
+                {
+                    ErrorResponse = $"The price statement {priceStatement.Digest} of the checkpoint '{Checkpoint.Id}' is beyond the highest sequence, {MaxPriceStatementSequence}!";
+                    return false;
+                }
+
+                // Two of one entity and sequence, in any spelling, are a split view a checkpoint does not name.
+                if (ofChains.TryGetValue((ChainOf(priceStatement), priceStatement.Sequence), out var other) && other != priceStatement.Digest)
+                {
+                    ErrorResponse = $"The checkpoint '{Checkpoint.Id}' names two price statements {priceStatement.Sequence} of the {priceStatement.EntityType} '{priceStatement.EntityId}', {other} and {priceStatement.Digest}: a split view!";
+                    return false;
+                }
+
+                ofChains[(ChainOf(priceStatement), priceStatement.Sequence)] = priceStatement.Digest;
 
                 if (priceStatement.SignedAt > Checkpoint.CreatedAt)
                 {
@@ -949,7 +1042,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var priceStatement in Ordered)
             {
-                var key = (priceStatement.EntityType, priceStatement.EntityId);
+                var key = ChainOf(priceStatement);
                 if (!priceStatements.TryGetValue(key, out var current) || current.Sequence < priceStatement.Sequence)
                     priceStatements[key] = priceStatement;
                 previousEpochPriceStatements.Remove(key);
@@ -957,7 +1050,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var digests = Ordered.Select(priceStatement => priceStatement.Digest).ToHashSet();
 
-            pendingPriceStatements.RemoveAll(priceStatement => digests.Contains(priceStatement.Digest));
+            RemovePendingPriceStatements(priceStatement => digests.Contains(priceStatement.Digest));
 
         }
 
@@ -972,9 +1065,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private void PrunePendingPriceStatements(RoamingNetworkCheckpoint Checkpoint)
         {
 
-            pendingPriceStatements.RemoveAll(priceStatement => priceStatement.SignedAt <= Checkpoint.CreatedAt);
+            RemovePendingPriceStatements(priceStatement => priceStatement.SignedAt <= Checkpoint.CreatedAt);
 
             Volatile.Write(ref latestCheckpointForPrices, Checkpoint);
+
+        }
+
+        #endregion
+
+        #region (private) RemovePendingPriceStatements(Match)
+
+        /// <summary>
+        /// Drop the matching price statements from those for the next checkpoint, while the price statements are locked,
+        /// and count those left per operator again.
+        /// </summary>
+        private void RemovePendingPriceStatements(Predicate<RoamingNetworkPriceStatement> Match)
+        {
+
+            if (pendingPriceStatements.RemoveAll(Match) == 0)
+                return;
+
+            pendingPerOperator.Clear();
+
+            foreach (var priceStatement in pendingPriceStatements)
+                pendingPerOperator[priceStatement.Signer] = pendingPerOperator.GetValueOrDefault(priceStatement.Signer) + 1;
 
         }
 

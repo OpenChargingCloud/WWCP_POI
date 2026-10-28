@@ -1838,8 +1838,11 @@ operator with one of its signing keys (section 4.1) when it sets the price.
 
 ### 12.1 Representation and signature
 
-- **entityType, entityId:** `ChargingPool`, `ChargingStation` or `EVSE`, and its identification. Its
-  operator is the one of the identification: `signer` names it, `role` is `chargingStationOperator`.
+- **entityType, entityId:** `ChargingPool`, `ChargingStation` or `EVSE`, and its identification, written
+  as the roaming network writes it. Identifications that are equal without `*` and whitespace, ignoring
+  case, as `DE*GEF*E11` and `DE*GEF*E1*1`, are one entity with one chain; a statement naming it in another
+  spelling is refused. Its operator is the one of the identification: `signer` names it, `role` is
+  `chargingStationOperator`.
 - **priceStatus:** the price status, signed as it is written. A reader keeps it as given, numbers with a
   fraction as decimals, and checks that it is one.
 - **validFrom, validUntil:** when it is valid, written as in section 5.4. `validFrom` is not before
@@ -1847,7 +1850,8 @@ operator with one of its signing keys (section 4.1) when it sets the price.
   longer than the key it is signed with: an operator replacing that key states the price status of its entities
   anew with the next one before it expires.
 - **Chain per entity:** `sequence` is 0 for the first statement of an entity and one more for every next
-  one; `previous` is the digest of the statement before, absent for sequence 0. The **digest** of a
+  one, at most 2^53 − 1, the highest integer every JSON reader holds exactly: a chain there ends;
+  `previous` is the digest of the statement before, absent for sequence 0. The **digest** of a
   statement is the SHA-256 of its signature input (below), `value` left out, as 64 lowercase hexadecimal
   digits. Statements are neither reordered nor withdrawn unnoticed. Without `value`, as the identifications
   of commits and checkpoints: another valid signature of the same statement, as the ECDSA twin `(r, n − s)`
@@ -1872,7 +1876,8 @@ statement of its entity, if there is one:
 - one of a lower sequence is out of date;
 - another one of the same sequence is refused: two statements of one sequence are a split view;
 - the next one MUST name the digest of the current one;
-- a later one is taken: the statements in between did not reach this server.
+- a later one is taken: the statements in between did not reach this server - up to 1,000,000 beyond the
+  current one; one further is refused, as is any beyond 2^53 − 1.
 
 Taken, it is the current statement of its entity and sets its price status as of `validFrom`. A server
 holding a signing key of an operator states every change of the price status of the entities of that
@@ -1887,13 +1892,15 @@ hash (8.2, RFC 9162) of the price statements its server took since the previous 
 signed before it (`signedAt` not after `createdAt`), in the ordinal order of their entity types and
 identifications, then of their sequences; a leaf is the 32 bytes of the digest of a statement. It is part
 of the content the checkpoint identification is calculated over. A checkpoint naming no statements has
-no `priceStatements` and is identified as before.
+no `priceStatements` and is identified as before. A server keeps a bounded number of statements per
+operator for its next checkpoint, 100,000 by default: an operator stating more drops its own oldest,
+never those of another operator.
 
 A server checks the statements a checkpoint names when it gets them along with it
 (`GET ~/RNs/{RN_Id}/history/checkpoints/{checkpointId}/priceStatements`, or `priceStatements` of
-`pushCheckpoints`): their tree is the one of the checkpoint, and every one was signed before it by a
+`pushCheckpoints`): their tree is the one of the checkpoint, every one was signed before it by a
 signing key of its operator in the version of the commit of the checkpoint or of the checkpoint before,
-valid at `signedAt`. A server that does not get them takes the checkpoint all the same; a witness signs a
+valid at `signedAt`, and no two of one entity (12.1) and sequence differ. A server that does not get them takes the checkpoint all the same; a witness signs a
 checkpoint naming price statements only after it checked them (10.2).
 
 A proof that a statement is named by a checkpoint is the statement with its index and audit path:

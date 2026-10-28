@@ -283,7 +283,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     foreach (var priceStatement in priceStatements.Values)
                         if (nextEpoch.Profiles.AllowsSignatureAlgorithm(priceStatement.Algorithm))
-                            nextHistory.priceStatements[(priceStatement.EntityType, priceStatement.EntityId)] = priceStatement;
+                            nextHistory.priceStatements[ChainOf(priceStatement)] = priceStatement;
 
                     foreach (var priceStatement in priceStatements.Values.Where(priceStatement => !nextEpoch.Profiles.AllowsSignatureAlgorithm(priceStatement.Algorithm)).
                                                                    Concat(previousEpochPriceStatements.Values))
