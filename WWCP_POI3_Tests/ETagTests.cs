@@ -471,6 +471,63 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Complex
 
         #endregion
 
+        #region The_text_form_is_read_by_TryParse_as_strictly_as_by_Parse()
+
+        /// <summary>
+        /// TryParse(String) takes exactly what Parse(String) takes: a Base64 digest only canonical, in the standard
+        /// alphabet with its padding and without whitespace, as an ETag of JSON is read (WWCPPOIConformanceTests O2).
+        /// </summary>
+        [Test]
+        public void The_text_form_is_read_by_TryParse_as_strictly_as_by_Parse()
+        {
+
+            const String Alphabet  = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+            var eTag        = ETag.Compute(ETagFormat.JSON, "{\"@id\":\"rn1\"}"u8);
+            var base64      = eTag.ToString(ETagDigestEncoding.Base64);
+            var digest      = base64.Split(':')[3];
+
+            // The last character before the padding carries two bits no byte has: set, the digest decodes to the same
+            // bytes, but is not written as Base64 writes it.
+            var last        = digest.Length - 2;
+            var unusedBits  = digest[..last] + Alphabet[Alphabet.IndexOf(digest[last]) | 1] + digest[(last + 1)..];
+            var whitespace  = $"json:sha256:base64:{digest[..20]} {digest[20..]}";
+
+            String[] taken    = [ eTag.ToString(), base64 ];
+
+            String[] refused  = [ whitespace,
+                                  $"json:sha256:base64:{digest.TrimEnd('=')}",
+                                  $"json:sha256:base64:{unusedBits}",
+                                  $"json:sha256:hex:{eTag.DigestHex.ToUpperInvariant()}",
+                                  $"json:sha256:hex:{eTag.DigestHex[..62]}",
+                                  $"json:sha256:{eTag.DigestHex}" ];
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                foreach (var text in taken)
+                {
+                    Assert.That(ETag.Parse(text),                                 Is.EqualTo(eTag),  text);
+                    Assert.That(ETag.TryParse(text, out var value, out var error), Is.True,           error);
+                    Assert.That(value,                                            Is.EqualTo(eTag),  text);
+                }
+
+                foreach (var text in refused)
+                {
+                    Assert.That(() => ETag.Parse(text),                           Throws.InstanceOf<ArgumentException>(), text);
+                    Assert.That(ETag.TryParse(text, out var value, out _),        Is.False,          text);
+                    Assert.That(value.IsValid,                                    Is.False,          text);
+                }
+
+                Assert.That(ETag.TryParse(whitespace, out _, out var error1),     Is.False);
+                Assert.That(error1,                                               Does.Contain("canonical standard alphabet and padding without whitespace"));
+
+            }
+
+        }
+
+        #endregion
+
     }
 
 }

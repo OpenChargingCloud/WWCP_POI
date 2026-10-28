@@ -175,7 +175,9 @@ public readonly struct ETag : IEquatable<ETag>
     }
 
     /// <summary>
-    /// Try to parse a human-readable identifier.
+    /// Try to parse a human-readable identifier, exactly as Parse(String) reads it: a hex digest of the length of its
+    /// algorithm in lowercase digits, a Base64 digest canonical, in the standard alphabet with its padding and without
+    /// whitespace (WWCPPOIConformanceTests O2).
     /// </summary>
     public static Boolean TryParse(String                            Text,
                                    out ETag                          Value,
@@ -195,52 +197,7 @@ public readonly struct ETag : IEquatable<ETag>
                 return false;
             }
 
-            var parsedFormat    = ParseFormat   (parts[0]);
-            var parsedAlgorithm = ParseAlgorithm(parts[1]);
-            Byte[] bytes;
-
-            switch (parts[2])
-            {
-
-                case "hex":
-                    if (parts[3].AsSpan().IndexOfAnyExcept("0123456789abcdef") >= 0)
-                    {
-                        ErrorResponse = "A HEX digest requires lowercase hexadecimal digits.";
-                        return false;
-                    }
-
-                    try
-                    {
-                        bytes = Convert.FromHexString(parts[3]);
-                    }
-                    catch
-                    {
-                        ErrorResponse = "Invalid HEX encoding!";
-                        return false;
-                    }
-
-                    break;
-
-                case "base64":
-                    try
-                    {
-                        bytes = Convert.FromBase64String(parts[3]);
-                    }
-                    catch
-                    {
-                        ErrorResponse = "Invalid Base64 encoding!";
-                        return false;
-                    }
-
-                    break;
-
-                default:
-                    ErrorResponse = "Unsupported ETag digest encoding!";
-                    return false;
-
-            }
-
-            Value          = new (parsedFormat, parsedAlgorithm, bytes);
+            Value          = FromTextParts(parts[0], parts[1], parts[2], parts[3]);
             ErrorResponse  = null;
             return true;
 
