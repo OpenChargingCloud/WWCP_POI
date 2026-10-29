@@ -451,7 +451,12 @@ payment, the signed meter values, the settlement statement and the refunds. From
   SPECIFICATION.md 4.1 (8.2 stays as it is: `evTaler` is no child array), `EVTalerTests`; example A15: `DE*GEF` accepts
   EV Taler and a station proof gives it.
 - OCPI and DATEX II publishers leave it out: they publish only the payment options they know, unchanged.
-- Left for later: the hub's frontend showing "EV Taler (…)" at pools and editing `evTaler` on the operator's card.
+- POI_API tells how charging at an EVSE or a pool is paid, `GET …/EVSEs/{EVSE_Id}/evTaler` and `…/CPs/{CP_Id}/evTaler`
+  (404 where there is none), so that no client repeats the rules of 4.3. The hub's web interface shows the merchant on
+  the operator's page and "EV Taler (…)" with the tariff of each EVSE on the pages of pools and EVSEs.
+- Not in the hub's web interface: changing `evTaler`. The hub signs only what its roaming network operator owns, and a
+  change set waits for signatures (SPECIFICATION.md, 4.2) only once an owner signed it; the operator changes its merchant
+  with its own key for `payments`, from its own software.
 
 **Phase 2, steps and evidence**, needing no Taler service:
 

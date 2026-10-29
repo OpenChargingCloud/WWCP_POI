@@ -739,6 +739,7 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/CSs/{CS_Id}/proof`, `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/proof` | the same, found by the identification alone |
 | `GET ~/RNs/{id}/CSs/{CS_Id}/priceStatements`, `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/priceStatements` | the price statements of the pool, the station and its EVSEs, or the EVSE; also below the full path of the station |
 | `GET ~/RNs/{id}/history/priceStatements` | the current price statement of every entity |
+| `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/evTaler`, `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/evTaler` | how charging there is paid with EV Taler ([concepts/EVTaler.md](concepts/EVTaler.md)): the EV Taler tariff of the EVSE, the merchant of its operator and the exchanges in the tariff's currency, each with its `paymentOptionName`; of a pool its EVSEs with an EV Taler tariff and the exchanges of all of them; 404 where none. The EVSE also below the full path of its station |
 | `POST ~/RNs/{id}/history/priceStatements` `{priceStatements: […]}` | 200 `{taken, known, outdated, refused, refusals}`, 422 when one was refused |
 | `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/priceStatements` | the price statements a checkpoint names, in the order of its tree |
 | `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/priceStatements/{digest}/proof` | the proof of one of them |

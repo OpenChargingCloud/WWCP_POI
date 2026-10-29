@@ -346,6 +346,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             RegisterCoSigningURLTemplates();
             RegisterProofURLTemplates();
             RegisterPriceStatementURLTemplates();
+            RegisterEVTalerURLTemplates();
             RegisterPeerURLTemplates();
             RegisterWebSocketURLTemplates();
 

@@ -19,7 +19,7 @@ Its identification is the operator's identification, `*P` and a suffix, e.g. `DE
 | Status | `ChargingPoolStatusType`, initially `Available` |
 | Embedded in | [ChargingStationOperator](ChargingStationOperator.md) as `chargingPools` |
 | Owner | the charging station operator its identification names (a signing key) |
-| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}`, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands/{Brand_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}`, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/Brands/{Brand_Id}`, `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/evTaler` (see [EV Taler](#ev-taler)) |
 
 The [charging pool templates](ChargingPoolTemplate.md) it names in `templateIds` may give it most of the properties
 below, so that a pool has only few of its own: at runtime it takes them, as the effective charging pool of its
@@ -108,7 +108,9 @@ naming it needs the `evTaler` merchant of its [operator](ChargingStationOperator
 [charging pool template](ChargingPoolTemplate.md) naming it, checked after the last change of a change set. Which
 tariff a step is priced by, and with which exchanges it is paid, `chargingStationOperator.TryGetEVTalerTariff(EVSEId,
 out tariff)` and `EVTalerExchangesAt(EVSEId)` tell; their `PaymentOptionName` is what drivers see, e.g.
-`EV Taler (Example Exchange, EUR)`. OCPI and DATEX II know no GNU Taler: their publishers leave it out.
+`EV Taler (Example Exchange, EUR)`. POI_API answers the same at `…/EVSEs/{EVSE_Id}/evTaler`, and for the pool, its EVSEs
+with an EV Taler tariff and the exchanges of all of them, at `…/CPs/{CP_Id}/evTaler`; 404 where there is none. OCPI
+and DATEX II know no GNU Taler: their publishers leave it out.
 
 
 ## Charging stations

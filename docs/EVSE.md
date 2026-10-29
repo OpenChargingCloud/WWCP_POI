@@ -20,7 +20,7 @@ two identifications are equal when they differ only in case or in the `*` of the
 | Energy status | `EnergyInfo`, none until reported |
 | Embedded in | [ChargingStation](ChargingStation.md) as `EVSEs` |
 | Owner | the [ChargingStationOperator](ChargingStationOperator.md) its identification names (signing key) |
-| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}`, `GET …/EVSEs/{EVSE_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET …/EVSEs/{EVSE_Id}/Brands/{Brand_Id}` |
+| HTTP | `GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}`, `GET …/EVSEs/{EVSE_Id}/Brands` (its [brands](Brand.md), searched and paged), `GET …/EVSEs/{EVSE_Id}/Brands/{Brand_Id}`, `GET …/EVSEs/{EVSE_Id}/evTaler` (how it is paid with EV Taler, see [ChargingPool](ChargingPool.md#ev-taler)) |
 
 The [EVSE templates](EVSETemplate.md) it names in `templateIds` may give it most of the properties below, so that an
 EVSE has only few of its own: at runtime it takes them, as the effective EVSE of its operator,

@@ -17,6 +17,8 @@
 
 #region Usings
 
+using System.Net;
+
 using Newtonsoft.Json.Linq;
 
 using NUnit.Framework;
@@ -24,6 +26,7 @@ using NUnit.Framework;
 using Org.BouncyCastle.Crypto.Parameters;
 
 using org.GraphDefined.Vanaheimr.Illias;
+using org.GraphDefined.Vanaheimr.Hermod;
 using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 #endregion
@@ -437,6 +440,59 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var gef      = proof!.Given("chargingStationOperators").Single();
 
             Assert.That(JToken.DeepEquals(gef["evTaler"], Merchant().ToJSON(Embedded: true)), Is.True, gef["evTaler"]?.ToString());
+
+        }
+
+        #endregion
+
+        #region An_app_asks_how_to_pay_with_EV_Taler_over_HTTP()
+
+        /// <summary>
+        /// POI_API tells how charging at an EVSE or a charging pool can be paid with EV Taler, by the rules of the operator:
+        /// the EV Taler tariff, the merchant and the exchanges in its currency, each with what drivers see; 404 where none.
+        /// </summary>
+        [Test]
+        public async Task An_app_asks_how_to_pay_with_EV_Taler_over_HTTP()
+        {
+
+            var history                = RoamingNetworkHistory.Start(NewNetwork(Merchant()));
+
+            await using var httpServer = new HTTPServer(IPAddress: IPv4Address.Localhost, TCPPort: IPPort.Zero, AutoStart: true);
+            await using var poiAPI     = new POI_API(httpServer);
+
+            poiAPI.AddRoamingNetworkHistory(history);
+
+            using var httpClient       = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{httpServer.TCPPort}/RNs/rn1/") };
+
+            var ofEVSE                 = JObject.Parse(await httpClient.GetStringAsync("EVSEs/DE*GEF*E1*1/evTaler"));
+            var ofFullPath             = JObject.Parse(await httpClient.GetStringAsync("CSOs/DE*GEF/CPs/DE*GEF*P1/CSs/DE*GEF*S1/EVSEs/DE*GEF*E1*1/evTaler"));
+            var ofPool                 = JObject.Parse(await httpClient.GetStringAsync("CSOs/DE*GEF/CPs/DE*GEF*P1/evTaler"));
+            var noneAtPool             = await httpClient.GetAsync("CSOs/DE*GEF/CPs/DE*GEF*P2/evTaler");
+            var noneAtEVSE             = await httpClient.GetAsync("EVSEs/DE*GEF*E2*1/evTaler");
+            var unknownOperator        = await httpClient.GetAsync("EVSEs/DE*XYZ*E1*1/evTaler");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(ofEVSE.Value<String>("EVSEId"),                                      Is.EqualTo(E1.ToString()));
+                Assert.That(ofEVSE.Value<String>("chargingTariffId"),                            Is.EqualTo(AdHoc.ToString()));
+                Assert.That(ofEVSE.Value<String>("currency"),                                    Is.EqualTo("EUR"));
+                Assert.That(ofEVSE.Value<String>("merchantBaseURL"),                             Is.EqualTo("https://taler.gef.example/instances/de-gef/"));
+                Assert.That(ofEVSE.Value<String>("merchantPublicKey"),                           Is.EqualTo(MerchantKey));
+                Assert.That(ofEVSE["exchanges"]!.Select(exchange => exchange.Value<String>("masterPublicKey")), Is.EqualTo(new[] { EURExchangeKey }), "only the exchange in euros");
+                Assert.That(ofEVSE["exchanges"]![0]!["paymentOptionName"]!.Value<String>("en"),  Is.EqualTo("EV Taler (Example Exchange, EUR)"));
+                Assert.That(JToken.DeepEquals(ofFullPath, ofEVSE),                               Is.True, "the same by the full path");
+
+                Assert.That(ofPool.Value<String>("chargingPoolId"),                              Is.EqualTo(P1.ToString()));
+                Assert.That(ofPool["EVSEs"]!.Select(evse => evse.Value<String>("EVSEId")),        Is.EqualTo(new[] { E1.ToString() }));
+                Assert.That(ofPool["exchanges"]!.Select(exchange => exchange.Value<String>("masterPublicKey")), Is.EqualTo(new[] { EURExchangeKey }));
+
+                Assert.That(noneAtPool.StatusCode,                                               Is.EqualTo(HttpStatusCode.NotFound), "its pool names no EVTaler");
+                Assert.That(await noneAtPool.Content.ReadAsStringAsync(),                        Does.Contain("offers no EV Taler"));
+                Assert.That(noneAtEVSE.StatusCode,                                               Is.EqualTo(HttpStatusCode.NotFound));
+                Assert.That(unknownOperator.StatusCode,                                          Is.EqualTo(HttpStatusCode.NotFound));
+
+            }
 
         }
 
