@@ -151,7 +151,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         /// <summary>
         /// The payment options are an open set of names: the predefined ones, EVTaler among them, and any other nonempty
-        /// text, read as given and written in their ordinal order; none twice, whatever its case, and none empty.
+        /// text, in their ordinal order; none twice, whatever its case, and none empty. A version giving them in another
+        /// order is refused: it would be written in theirs.
         /// </summary>
         [Test]
         public void Payment_options_are_an_open_set()
@@ -160,7 +161,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var json  = NewNetwork(Merchant()).ToJSON();
             var pool  = (JObject) OperatorJSON(json)["chargingPools"]![1]!;
 
-            pool["paymentOptions"] = new JArray("SMS", "Bitcoin", "Contract");
+            pool["paymentOptions"] = new JArray("Bitcoin", "Contract", "SMS");
 
             using (Assert.EnterMultipleScope())
             {
@@ -171,6 +172,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(RoamingNetwork.TryParse(json, out var network, out var error),           Is.True, error);
                 Assert.That(network!.GetChargingStationOperatorById(GEF)!.ChargingPools.Single(chargingPool => chargingPool.Id == P2).PaymentOptions.Select(option => option.ToString()),
                             Is.EqualTo(new[] { "Bitcoin", "Contract", "SMS" }));
+
+                pool["paymentOptions"] = new JArray("SMS", "Bitcoin", "Contract");
+                Assert.That(RoamingNetwork.TryParse(json, out _, out error),                         Is.False);
+                Assert.That(error,                                                                   Is.EqualTo("'chargingStationOperators[0].chargingPools[1].paymentOptions' is not written as the content holds it: its elements are in the order the content holds them in!"));
 
                 pool["paymentOptions"] = new JArray("Cash", "cash");
                 Assert.That(RoamingNetwork.TryParse(json, out _, out error),                         Is.False);
@@ -355,7 +360,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var party     = Key("party",    POIKeyUsages.Party);
             var json      = NewNetwork(Merchant()).ToJSON(IncludeETags: false);
 
-            OperatorJSON(json)[POIPartyKeys.SigningKeysProperty] = new JArray(payments.Public.ToJSON(Embedded: true), party.Public.ToJSON(Embedded: true));
+            OperatorJSON(json)[POIPartyKeys.SigningKeysProperty] = new JArray(new[] { payments.Public, party.Public }.OrderBy(key => key.Id, StringComparer.Ordinal).Select(key => key.ToJSON(Embedded: true)));
 
             Assert.That(RoamingNetwork.TryParse(json, out var network, out var parseError), Is.True, parseError);
 

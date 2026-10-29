@@ -169,7 +169,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                         POIPartyId  Party)
         {
 
-            JSON[POIPartyKeys.IdentityKeysProperty]  = new JArray(Key(Party, POIKeyKind.Identity).Public.ToJSON());
+            JSON[POIPartyKeys.IdentityKeysProperty]  = new JArray(Key(Party, POIKeyKind.Identity).Public.ToJSON(Embedded: true));
 
             // The signing keys of the roaming network operator are those of its certificates.
             if (Party.EntityType == nameof(RoamingNetworkOperator))
@@ -182,7 +182,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                DateTimeOffset.Parse("2026-01-01T00:00:00Z")).ToJSON(Embedded: true));
             }
             else
-                JSON[POIPartyKeys.SigningKeysProperty]   = new JArray(Key(Party, POIKeyKind.Signing). Public.ToJSON());
+                JSON[POIPartyKeys.SigningKeysProperty]   = new JArray(Key(Party, POIKeyKind.Signing). Public.ToJSON(Embedded: true));
 
             return JSON;
 
@@ -201,8 +201,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             var json = Network.ToJSON();
 
-            json[RoamingNetwork.PropertyKeys.Operator] = WithKeys(json[RoamingNetwork.PropertyKeys.Operator] as JObject ?? new JObject(new JProperty("@id",      OperatorId(Network.Id).ToString()),
-                                                                                                                                      new JProperty("created",  json["created"])),
+            json[RoamingNetwork.PropertyKeys.Operator] = WithKeys(json[RoamingNetwork.PropertyKeys.Operator] as JObject ?? new JObject(new JProperty("@id",         OperatorId(Network.Id).ToString()),
+                                                                                                                                      new JProperty("created",     json["created"]),
+                                                                                                                                      new JProperty("lastChange",  json["created"])),
                                                                  Party(Network));
 
             foreach (var (array, type) in new[] { ("chargingStationOperators", nameof(ChargingStationOperator)),

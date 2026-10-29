@@ -74,6 +74,18 @@ other than `Expanded` writes `chargingStationOperatorIds` (or nothing for `Hidde
 pass through to the operators. The content, hashed into the ETags, is `ToJSON(Embedded: false, IncludeETags: false)`
 with the default view options ([SPECIFICATION.md](../SPECIFICATION.md#2-the-content-of-a-version)).
 
+**As written.** `TryParse` takes a version only as it writes it again: read and written by `ToJSON(IncludeETags:
+false)`, or of CBOR by `ToCBOR(IncludeETags: false)`, both compared as JSON, it is the canonical JSON it was given,
+its `eTags` aside and its `@context` where it names none (SPECIFICATION.md 2, "Written forms"). Otherwise it is
+refused, naming the first value written otherwise and why, in the words of WWCP_POI.TS: e.g.
+"'chargingStationOperators[0].chargingPools[0].paymentOptions' is not written as the content holds it: its elements
+are in the order the content holds them in!", "… the texts of its elements are trimmed", "… a text in languages names each language as Styx writes it, in lower case, with a text",
+"… a timestamp is UTC to the millisecond, yyyy-MM-ddTHH:mm:ss.fffZ", "… a list without elements is left out", "… a
+property without a value is left out", "… embedded, an object names no JSON-LD context", "… the content leaves it out"
+(a property its type does not define), and "… the content holds it as '…'" for any other value. An entity read
+alone, e.g. by `ChargingStationOperator.TryParse`, is not held to it; a version read by a reader making dates of its
+timestamps, e.g. `JObject.Parse`, has them compared by their instants.
+
 **Derived (not serialized)**
 
 - `EnergyMeters` — the energy meters of all pools, grid connection points, stations and EVSEs; `TryGetEnergyMeterById`.
@@ -106,8 +118,10 @@ Operators and pools have their own `dataLicenses`.
 | `description` | I18N text | Omitted when empty. |
 | `URLs` | string[] | More information, ordered (ordinal); omitted when empty. |
 
-- **Reading:** complete objects in `dataLicenses` and/or the identifications of well-known licenses in
-  `dataLicenseIds`; an unknown identification there is an error. A license given twice, also across both, is an error.
+- **Reading:** complete objects in `dataLicenses`. The identifications of well-known licenses in `dataLicenseIds`, as
+  `ExpandDataLicenses: ShowIdOnly` writes them, are read, but a version naming them so is refused, as it is not
+  written as the content holds it ("… the content leaves it out", [As written](#properties)); an unknown
+  identification there is an error. A license given twice, also across both, is an error.
 - **Well-known:** `None`, `PDDL`, `ODC-By`, `ODbL`, `dl-de/by-2-0`, `dl-de/zero-2-0`, `GeoLizenz_V1.3`,
   `CC BY 4.0`, `CC BY-SA 4.0`, `CC BY-ND 4.0`, `CC BY-NC 4.0`, `CC BY-NC-SA 4.0`, `CC BY-NC-ND 4.0` (`POIDataLicenses.Known`).
 - **Change set:** `UpdateProperty(rn, "dataLicenses", …, [ … ])` takes complete objects only (no `dataLicenseIds`);

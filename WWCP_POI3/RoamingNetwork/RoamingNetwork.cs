@@ -1017,6 +1017,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                  );
 
+                #region Check written form
+
+                // A version is what it writes again: its ETags are calculated over that text (RoamingNetwork.WrittenForm.cs).
+                if (NotWrittenAsHeld(JSON, RoamingNetwork.ToJSON(IncludeETags: false)) is String notWritten)
+                {
+                    RoamingNetwork  = null;
+                    ErrorResponse   = notWritten;
+                    return false;
+                }
+
+                #endregion
+
                 #region Check ETags          [optional]
 
                 if (JSON[BasePropertyKeys.ETags] is JToken eTagsJSON &&
@@ -1621,6 +1633,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      Operator:                  roamingNetworkOperator,
                                      TreeHashAlgorithms:        treeHashAlgorithms
                                  );
+
+                #region Check written form
+
+                // As JSON, as its entities read their CBOR: the CBOR it writes again (RoamingNetwork.WrittenForm.cs).
+                if (CBORJSON.ToJSON(CBOR) is JObject givenJSON &&
+                    NotWrittenAsHeld(givenJSON, (JObject) CBORJSON.ToJSON(RoamingNetwork.ToCBOR(IncludeETags: false))) is String notWritten)
+                {
+                    RoamingNetwork  = null;
+                    ErrorResponse   = notWritten;
+                    return false;
+                }
+
+                #endregion
 
                 #region Check ETags          [optional]
 

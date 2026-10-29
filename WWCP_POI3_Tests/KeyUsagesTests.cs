@@ -76,7 +76,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var json  = StationProofTests.NewNetwork().ToJSON(IncludeETags: false);
             var gef   = json[RoamingNetwork.PropertyKeys.ChargingStationOperators]!.Children<JObject>().Single(cso => cso["@id"]!.Value<String>() == GEF.ToString());
 
-            gef[POIPartyKeys.SigningKeysProperty] = new JArray(SigningKeys.Select(key => key.ToJSON(Embedded: true)));
+            gef[POIPartyKeys.SigningKeysProperty] = new JArray(SigningKeys.OrderBy(key => key.Id, StringComparer.Ordinal).Select(key => key.ToJSON(Embedded: true)));
 
             return RoamingNetwork.TryParse(json, out var network, out var error)
                        ? network

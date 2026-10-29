@@ -258,9 +258,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var operatorId  = ChargingStationOperator_Id.Parse("DE*GDF");
             var json        = NewNetwork().ToJSON(IncludeETags: false);
 
-            ((JArray) json["chargingStationOperators"]!).Add(new ChargingStationOperator(operatorId,
-                                                                                         Created:     Created,
-                                                                                         EVSEGroups:  [ new EVSEGroup(EVSEGroup_Id.Parse("DE*GDF*EGHIGHWAY"), Created: Created) ]).ToEmbeddedJSON());
+            // DE*GDF before DE*GEF, in the order the content holds them in.
+            json["chargingStationOperators"] = new JArray(((JArray) json["chargingStationOperators"]!).
+                                                              Append (new ChargingStationOperator(operatorId,
+                                                                                                  Created:     Created,
+                                                                                                  EVSEGroups:  [ new EVSEGroup(EVSEGroup_Id.Parse("DE*GDF*EGHIGHWAY"), Created: Created) ]).ToEmbeddedJSON()).
+                                                              OrderBy(chargingStationOperator => chargingStationOperator["@id"]!.Value<String>(), StringComparer.Ordinal));
 
             Assert.That(RoamingNetwork.TryParse(json, out var parsed, out var parseError), Is.True, parseError);
 

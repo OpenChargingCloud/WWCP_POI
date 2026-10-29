@@ -756,9 +756,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(RoamingNetwork.TryParse(licenseIds,  out _, out var error2),  Is.False);
                 Assert.That(error2,                                                       Does.Contain("'own-1.0' is not well-known"));
 
-                // Well-known licenses can be given by their identification alone.
-                Assert.That(RoamingNetwork.Parse(knownOnly.ToJSON(ExpandDataLicenses: InfoStatus.ShowIdOnly)).CalcETags(),
-                            Is.EqualTo(knownOnly.CalcETags()));
+                // Well-known licenses are known by their identification alone, but a version gives them completely, as it
+                // writes them.
+                Assert.That(RoamingNetwork.TryParse(knownOnly.ToJSON(ExpandDataLicenses: InfoStatus.ShowIdOnly), out _, out var error3),  Is.False);
+                Assert.That(error3,                                                       Is.EqualTo("'dataLicenseIds' is not written as the content holds it: the content leaves it out!"));
 
             }
 

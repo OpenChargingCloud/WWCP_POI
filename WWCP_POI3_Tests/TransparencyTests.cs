@@ -885,8 +885,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var (softwareKey, softwarePublic)  = TestParties.Key(new POIPartyId(nameof(TransparencySoftwareManufacturer), "OpenChargingCloud/software"));
 
             var json = NewNetwork().ToJSON();
-            json["transparencySoftwareManufacturers"]![0]!["signingKeys"] = new JArray(POIPublicKey.From(partyKey,    Usages: [ POIKeyUsages.Party    ]).ToJSON(Embedded: true),
-                                                                                         POIPublicKey.From(softwareKey, Usages: [ POIKeyUsages.Software ]).ToJSON(Embedded: true));
+            json["transparencySoftwareManufacturers"]![0]!["signingKeys"] = new JArray(new[] { POIPublicKey.From(partyKey,    Usages: [ POIKeyUsages.Party    ]),
+                                                                                                 POIPublicKey.From(softwareKey, Usages: [ POIKeyUsages.Software ]) }.
+                                                                                           OrderBy(key => key.Id, StringComparer.Ordinal).
+                                                                                           Select (key => key.ToJSON(Embedded: true)));
 
             Assert.That(RoamingNetwork.TryParse(json, out var rn1, out var error),  Is.True, error);
 

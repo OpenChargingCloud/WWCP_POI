@@ -93,11 +93,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                    NotAfter:   T0.AddYears(2),
                                                    Holder:     ExtraIdentityKeyOf));
 
-            operatorJSON[POIPartyKeys.IdentityKeysProperty]  = new JArray(identityKeys.Select(key => key.ToJSON(Embedded: true)));
+            operatorJSON[POIPartyKeys.IdentityKeysProperty]  = new JArray(identityKeys.OrderBy(key => key.Id, StringComparer.Ordinal).Select(key => key.ToJSON(Embedded: true)));
 
             // Its signing keys are those of its certificates: each holder certifies its own with its first identity key.
             operatorJSON.Remove(POIPartyKeys.SigningKeysProperty);
-            operatorJSON[RoamingNetworkSigningKeyCertificate.JSONProperty] = new JArray(signingKeys.Select(key => Certificate(network, key).ToJSON(Embedded: true)));
+            operatorJSON[RoamingNetworkSigningKeyCertificate.JSONProperty] = new JArray(signingKeys.Select (key         => Certificate(network, key)).
+                                                                                                    OrderBy(certificate => certificate.SigningKey.Id, StringComparer.Ordinal).
+                                                                                                    ThenBy (certificate => certificate.KeyId,         StringComparer.Ordinal).
+                                                                                                    Select (certificate => certificate.ToJSON(Embedded: true)));
 
             if (MinConsensus > 1)
                 operatorJSON[POIPartyKeys.MinConsensusProperty] = MinConsensus;

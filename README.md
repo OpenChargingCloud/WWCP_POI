@@ -1075,6 +1075,13 @@ Decisions taken by the maintainer between alternatives the agent laid out:
   Written again, it would be another text than the one hashed, and two
   readers would disagree on whether a version has its eTags. So is the
   `notifiedFor` of a conformity assessment body out of its ordinal order.
+- **2026-10-29 – A reader refuses a version not written as POI writes it**,
+  as WWCP_POI.TS does: read and written again, its canonical JSON is the one
+  given, its `eTags` aside and its `@context` where it names none; a version
+  in another form, e.g. its payment options in another order, a language in
+  upper case, an empty list, `null` or a property its type does not define,
+  is refused, in the words of WWCP_POI.TS ("'…' is not written as the
+  content holds it: …!"). An entity read alone is not held to it.
 
 ### Rejected suggestions
 

@@ -61,12 +61,17 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             // The signing keys of each holder, certified by its identity key.
             operatorJSON.Remove(POIPartyKeys.SigningKeysProperty);
+            // Both in the order the content holds them in: the certificates by their signing keys, the keys by their identifications.
             operatorJSON[RoamingNetworkSigningKeyCertificate.JSONProperty] = new JArray(Holders.Select(holder => RoamingNetworkSigningKeyCertificate.Create(TestParties.QuorumKey(network.Id, holder, POIKeyKind.Identity).Private,
                                                                                                                              COSEAlgorithm.ES512,
                                                                                                                              TestParties.OperatorId(network.Id),
                                                                                                                              TestParties.QuorumKey(network.Id, holder, POIKeyKind.Signing).Public,
-                                                                                                                             DateTimeOffset.Parse("2026-01-01T00:00:00Z")).ToJSON(Embedded: true)));
-            operatorJSON[POIPartyKeys.IdentityKeysProperty]  = new JArray(Holders.Select(holder => TestParties.QuorumKey(network.Id, holder, POIKeyKind.Identity).Public.ToJSON(Embedded: true)));
+                                                                                                                             DateTimeOffset.Parse("2026-01-01T00:00:00Z"))).
+                                                                                        OrderBy(certificate => certificate.SigningKey.Id, StringComparer.Ordinal).
+                                                                                        Select (certificate => certificate.ToJSON(Embedded: true)));
+            operatorJSON[POIPartyKeys.IdentityKeysProperty]  = new JArray(Holders.Select (holder => TestParties.QuorumKey(network.Id, holder, POIKeyKind.Identity).Public).
+                                                                                  OrderBy(key    => key.Id, StringComparer.Ordinal).
+                                                                                  Select (key    => key.ToJSON(Embedded: true)));
             operatorJSON[POIPartyKeys.MinConsensusProperty]  = 2;
 
             return RoamingNetwork.TryParse(json, out var quorumNetwork, out var error)
