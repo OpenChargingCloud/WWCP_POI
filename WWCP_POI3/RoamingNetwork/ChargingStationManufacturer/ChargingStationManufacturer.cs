@@ -159,62 +159,62 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The URL of its logo.
         /// </summary>
-        public URL?                          Logo                     { get; }
+        public URL?                                                          Logo                     { get; }
 
         /// <summary>
         /// The address of the headquarters.
         /// </summary>
-        public Address?                      Address                  { get; }
+        public Address?                                                      Address                  { get; }
 
         /// <summary>
         /// The geographical location of the headquarters.
         /// </summary>
-        public GeoCoordinate?                GeoLocation              { get; }
+        public GeoCoordinate?                                                GeoLocation              { get; }
 
         /// <summary>
         /// The telephone number of its (sales) office.
         /// </summary>
-        public PhoneNumber?                  Telephone                { get; }
+        public PhoneNumber?                                                  Telephone                { get; }
 
         /// <summary>
         /// The e-mail address of its (sales) office, also with a name: "Example Office &lt;info@example.org&gt;".
         /// </summary>
-        public EMailAddress?                 EMailAddress             { get; }
+        public EMailAddress?                                                 EMailAddress             { get; }
 
         /// <summary>
         /// The homepage.
         /// </summary>
-        public URL?                          Homepage                 { get; }
+        public URL?                                                          Homepage                 { get; }
 
         /// <summary>
         /// The hotline phone number.
         /// </summary>
-        public PhoneNumber?                  HotlinePhoneNumber       { get; }
+        public PhoneNumber?                                                  HotlinePhoneNumber       { get; }
 
         /// <summary>
         /// The URL of its terms and conditions.
         /// </summary>
-        public URL?                          TermsAndConditionsURL    { get; }
+        public URL?                                                          TermsAndConditionsURL    { get; }
 
         /// <summary>
         /// The licenses of its data, ordered by their identifications.
         /// </summary>
-        public ImmutableArray<DataLicense>   DataLicenses             { get; }
+        public ImmutableArray<DataLicense>                                   DataLicenses             { get; }
 
         /// <summary>
         /// Its models, ordered by their identifications.
         /// </summary>
-        public POICollection<ChargingStationModel_Id, ChargingStationModel>  Models  { get; }
+        public POICollection<ChargingStationModel_Id, ChargingStationModel>  Models                   { get; }
 
         /// <summary>
         /// Its signing keys: it signs its own properties and its models with them.
         /// </summary>
-        public ImmutableArray<POIPublicKey>  SigningKeys              { get; }
+        public ImmutableArray<POIPublicKey>                                  SigningKeys              { get; }
 
         /// <summary>
         /// Its identity keys, signing changes of its keys.
         /// </summary>
-        public ImmutableArray<POIPublicKey>  IdentityKeys             { get; }
+        public ImmutableArray<POIPublicKey>                                  IdentityKeys             { get; }
 
         #endregion
 
@@ -223,36 +223,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Create a new charging station manufacturer.
         /// </summary>
-        public ChargingStationManufacturer(ChargingStationManufacturer_Id                              Id,
-                                           I18NString?                                                 Name                         = null,
-                                           I18NString?                                                 Description                  = null,
+        public ChargingStationManufacturer(ChargingStationManufacturer_Id                            Id,
+                                           ImmutableI18NString?                                      Name                         = null,
+                                           ImmutableI18NString?                                      Description                  = null,
 
-                                           URL?                                                        Logo                         = null,
-                                           Address?                                                    Address                      = null,
-                                           GeoCoordinate?                                              GeoLocation                  = null,
-                                           PhoneNumber?                                                Telephone                    = null,
-                                           EMailAddress?                                               EMailAddress                 = null,
-                                           URL?                                                        Homepage                     = null,
-                                           PhoneNumber?                                                HotlinePhoneNumber           = null,
-                                           URL?                                                        TermsAndConditionsURL        = null,
-                                           IEnumerable<DataLicense>?                                   DataLicenses                 = null,
+                                           URL?                                                      Logo                         = null,
+                                           Address?                                                  Address                      = null,
+                                           GeoCoordinate?                                            GeoLocation                  = null,
+                                           PhoneNumber?                                              Telephone                    = null,
+                                           EMailAddress?                                             EMailAddress                 = null,
+                                           URL?                                                      Homepage                     = null,
+                                           PhoneNumber?                                              HotlinePhoneNumber           = null,
+                                           URL?                                                      TermsAndConditionsURL        = null,
+                                           IEnumerable<DataLicense>?                                 DataLicenses                 = null,
 
-                                           IEnumerable<ChargingStationModel>?                          Models                       = null,
+                                           IEnumerable<ChargingStationModel>?                        Models                       = null,
 
-                                           IEnumerable<POIPublicKey>?                                  IdentityKeys                 = null,
-                                           IEnumerable<POIPublicKey>?                                  SigningKeys                  = null,
+                                           IEnumerable<POIPublicKey>?                                IdentityKeys                 = null,
+                                           IEnumerable<POIPublicKey>?                                SigningKeys                  = null,
 
-                                           Timestamped<ChargingStationManufacturerAdminStatusType>?    InitialAdminStatus           = null,
-                                           Timestamped<ChargingStationManufacturerStatusType>?         InitialStatus                = null,
-                                           UInt16?                                                     MaxAdminStatusScheduleSize   = null,
-                                           UInt16?                                                     MaxStatusScheduleSize        = null,
+                                           Timestamped<ChargingStationManufacturerAdminStatusType>?  InitialAdminStatus           = null,
+                                           Timestamped<ChargingStationManufacturerStatusType>?       InitialStatus                = null,
+                                           UInt16?                                                   MaxAdminStatusScheduleSize   = null,
+                                           UInt16?                                                   MaxStatusScheduleSize        = null,
 
-                                           String?                                                     DataSource                   = null,
-                                           DateTimeOffset?                                             Created                      = null,
-                                           DateTimeOffset?                                             LastChange                   = null,
+                                           String?                                                   DataSource                   = null,
+                                           DateTimeOffset?                                           Created                      = null,
+                                           DateTimeOffset?                                           LastChange                   = null,
 
-                                           CustomDataNew?                                              CustomData                   = null,
-                                           UserDefinedDictionary?                                      InternalData                 = null)
+                                           CustomDataNew?                                            CustomData                   = null,
+                                           UserDefinedDictionary?                                    InternalData                 = null)
 
             : base(Id,
                    Name ?? I18NString.Create($"Charging Station Manufacturer '{Id}'"),
@@ -284,7 +284,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var dataLicenses = (DataLicenses ?? []).ToArray();
 
-            if (dataLicenses.Any(dataLicense => dataLicense is null))
+            if (dataLicenses.Any   (dataLicense => dataLicense is null))
                 throw new ArgumentException($"The data licenses of the charging station manufacturer '{Id}' must not contain null entries!", nameof(DataLicenses));
 
             if (dataLicenses.Select(dataLicense => dataLicense.Id).Distinct().Count() != dataLicenses.Length)
