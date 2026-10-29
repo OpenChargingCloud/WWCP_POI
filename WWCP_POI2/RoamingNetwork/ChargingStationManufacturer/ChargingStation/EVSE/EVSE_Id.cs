@@ -67,13 +67,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The regular expression for strict parsing an EVSE identification.
         /// </summary>
-        public static readonly Regex  EVSEId_RegEx       = new (@"^([A-Za-z]{2}\*?[A-Za-z0-9]{3})\*?E([A-Za-z0-9][A-Za-z0-9\*]{0,29})$",
+        public static readonly Regex  EVSEId_RegEx       = new (@"^([A-Za-z]{2}\*?[A-Za-z0-9]{3})\*?E([A-Za-z0-9][A-Za-z0-9\*]{0,29})\z",
                                                                 RegexOptions.IgnorePatternWhitespace);
 
         /// <summary>
         /// The regular expression for parsing an ISO EVSE identification suffix.
         /// </summary>
-        public static readonly Regex EVSEIdSuffix_RegEx  = new (@"^([A-Za-z0-9\*]{1,30})$",
+        public static readonly Regex EVSEIdSuffix_RegEx  = new (@"^([A-Za-z0-9\*]{1,30})\z",
                                                                 RegexOptions.IgnorePatternWhitespace);
 
         #endregion

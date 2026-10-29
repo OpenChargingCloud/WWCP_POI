@@ -40,7 +40,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The regular expression for parsing an EVSE group identification.
         /// </summary>
-        public  static readonly Regex  EVSEGroupId_RegEx  = new Regex(@"^([A-Za-z]{2}[\*\-]?[A-Za-z0-9]{3})\*?EG([a-zA-Z0-9_][a-zA-Z0-9_\*\-\.€\$]{0,49})$",
+        public  static readonly Regex  EVSEGroupId_RegEx  = new Regex(@"^([A-Za-z]{2}[\*\-]?[A-Za-z0-9]{3})\*?EG([a-zA-Z0-9_][a-zA-Z0-9_\*\-\.€\$]{0,49})\z",
                                                                       RegexOptions.IgnorePatternWhitespace);
 
         #endregion

@@ -109,6 +109,34 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Ids
 
         #endregion
 
+        #region A_line_feed_ends_no_identification()
+
+        /// <summary>
+        /// An identification ends where its text ends: .NET's "$" also matches before a final line feed, "\z" does not.
+        /// Identifications trimming surrounding whitespace take the line feed away first; groups and templates, which
+        /// trim nothing, refuse it.
+        /// </summary>
+        [Test]
+        public void A_line_feed_ends_no_identification()
+        {
+
+            Assert.That(EVSE_Id.                   TryParse("DE*ABC*E1\n")?.ToString(),  Is.EqualTo("DE*ABC*E1"));
+            Assert.That(ChargingStationOperator_Id.TryParse("DE*ABC\n")?.   ToString(),  Is.EqualTo("DE*ABC"));
+
+            Assert.That(EVSEGroup_Id.              TryParse("DE*ABC*EG1",   out _),     Is.True);
+            Assert.That(EVSEGroup_Id.              TryParse("DE*ABC*EG1\n", out _),     Is.False);
+            Assert.That(ChargingStationGroup_Id.   TryParse("DE*ABC*SG1\n", out _),     Is.False);
+            Assert.That(ChargingPoolGroup_Id.      TryParse("DE*ABC*PG1\n", out _),     Is.False);
+            Assert.That(ChargingTariffGroup_Id.    TryParse("DE*ABC*TG1\n", out _),     Is.False);
+            Assert.That(EVSETemplate_Id.           TryParse("DE*ABC*ET1\n", out _),     Is.False);
+            Assert.That(ChargingStationTemplate_Id.TryParse("DE*ABC*ST1\n", out _),     Is.False);
+            Assert.That(ChargingPoolTemplate_Id.   TryParse("DE*ABC*PT1\n", out _),     Is.False);
+            Assert.That(ChargingTariffTemplate_Id. TryParse("DE*ABC*TT1\n", out _),     Is.False);
+
+        }
+
+        #endregion
+
         #region Group_IDs_put_the_entity_letter_first()
 
         /// <summary>

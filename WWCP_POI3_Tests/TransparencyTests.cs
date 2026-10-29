@@ -307,6 +307,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             var issuer              = Changed(network => Certificate(network)["issuer"] = "PTB");
             var notNotified         = Changed(network => Certificate(network)["legislation"] = "CRA");
             var bodyNumber          = Changed(network => network["conformityAssessmentBodies"]![0]!["notifiedBodyNumber"] = "102");
+            // .NET's "$" also matches before a final line feed: "0102\n" would be another number than "0102".
+            var bodyNumberLineFeed  = Changed(network => network["conformityAssessmentBodies"]![0]!["notifiedBodyNumber"] = "0102\n");
+            var supportUntil        = Changed(network => Releases(network)[0]!["supportUntil"] = Releases(network)[0]!["supportUntil"]!.Value<String>() + "\n");
             var meterRelease        = Changed(network => Releases(network).RemoveAt(1));
             var stationCertificate  = Changed(network => Station(network)["certificateIds"] = new JArray("cert-9"));
             var statusCertificate   = Changed(network => Meter(network)["transparencySoftwareStatus"]![0]!["certificateId"] = "cert-1");
@@ -347,6 +350,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(error12,                                                               Does.Contain("legislation 'CRA', which the conformity assessment body 'PTB' is not notified for"));
                 Assert.That(RoamingNetwork.TryParse(bodyNumber,           out _, out var error13), Is.False);
                 Assert.That(error13,                                                               Does.Contain("must be four digits"));
+                Assert.That(RoamingNetwork.TryParse(bodyNumberLineFeed,   out _, out var error14), Is.False);
+                Assert.That(error14,                                                               Does.Contain("must be four digits"));
+                Assert.That(RoamingNetwork.TryParse(supportUntil,         out _, out var error15), Is.False);
+                Assert.That(error15,                                                               Does.Contain("supportUntil: invalid timestamp"));
             }
 
         }

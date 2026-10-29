@@ -85,7 +85,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The four digits of the number of a notified body, as the NANDO database of the European Commission gives it.
         /// </summary>
-        private static readonly Regex NotifiedBodyNumberPattern = new ("^[0-9]{4}$", RegexOptions.CultureInvariant);
+        private static readonly Regex NotifiedBodyNumberPattern = new (@"^[0-9]{4}\z", RegexOptions.CultureInvariant);
 
         #endregion
 

@@ -157,7 +157,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         }
 
-        [GeneratedRegex(@"(?:Z|[+-][0-9]{2}:[0-9]{2})$")]
+        [GeneratedRegex(@"(?:Z|[+-][0-9]{2}:[0-9]{2})\z")]
         private static partial Regex ExplicitOffset();
 
         #endregion

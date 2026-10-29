@@ -84,7 +84,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The regular expression for parsing a charging pool identification.
         /// </summary>
-        public static readonly Regex ChargingPoolId_RegEx  = new (@"^([a-zA-Z]{2}\*?[a-zA-Z0-9]{3})\*?P([a-zA-Z0-9][a-zA-Z0-9\*]{0,29})$",
+        public static readonly Regex ChargingPoolId_RegEx  = new (@"^([a-zA-Z]{2}\*?[a-zA-Z0-9]{3})\*?P([a-zA-Z0-9][a-zA-Z0-9\*]{0,29})\z",
                                                                   RegexOptions.IgnorePatternWhitespace);
 
         #endregion

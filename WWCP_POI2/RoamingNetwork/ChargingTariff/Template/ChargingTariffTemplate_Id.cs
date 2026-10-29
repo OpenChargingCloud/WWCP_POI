@@ -38,7 +38,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The regular expression for parsing a charging tariff template identification.
         /// </summary>
-        public  static readonly Regex  ChargingTariffTemplateId_RegEx  = new (@"^([A-Za-z]{2}\*?[A-Za-z0-9]{3})\*?TT([a-zA-Z0-9_][a-zA-Z0-9_\*\-\.€\$]{0,49})$",
+        public  static readonly Regex  ChargingTariffTemplateId_RegEx  = new (@"^([A-Za-z]{2}\*?[A-Za-z0-9]{3})\*?TT([a-zA-Z0-9_][a-zA-Z0-9_\*\-\.€\$]{0,49})\z",
                                                                            RegexOptions.IgnorePatternWhitespace);
 
         #endregion

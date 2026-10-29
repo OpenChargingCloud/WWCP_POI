@@ -63,8 +63,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The regular expression for parsing an electric mobility account identification.
         /// </summary>
-        public static readonly Regex eMobilityAccountId_RegEx  = new (@"^([A-Za-z]{2}\-?[A-Za-z0-9]{3})\-?C([A-Za-z0-9]{8})(?:\-?([A-Za-z0-9]))?$|" +         // ISO
-                                                                      @"^([A-Za-z]{2}[\*\-]?[A-Za-z0-9]{3})[\*\-]?([A-Za-z0-9]{6})[\*\-]?([\dX])$",  // DIN
+        public static readonly Regex eMobilityAccountId_RegEx  = new (@"^([A-Za-z]{2}\-?[A-Za-z0-9]{3})\-?C([A-Za-z0-9]{8})(?:\-?([A-Za-z0-9]))?\z|" +         // ISO
+                                                                      @"^([A-Za-z]{2}[\*\-]?[A-Za-z0-9]{3})[\*\-]?([A-Za-z0-9]{6})[\*\-]?([\dX])\z",  // DIN
                                                                       RegexOptions.IgnorePatternWhitespace);
                                                                  //new Regex(@"^([A-Za-z]{2}\*[A-Za-z0-9]{3})\*([A-Za-z0-9]{6})\*([0-9|X])$ |"  +   // OICP DIN STAR:  DE*BMW*0010LY*3
                                                                  //          @"^([A-Za-z]{2}-[A-Za-z0-9]{3})-([A-Za-z0-9]{6})-([0-9|X])$ |"     +   // OICP DIN HYPEN: DE-BMW-0010LY-3

@@ -73,7 +73,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The regular expression for parsing an Alpha-2-CountryCode and an e-mobility service provider identification.
         /// </summary>
-        public static readonly Regex eMobilityProviderId_RegEx = new Regex(@"^([A-Z]{2})([*-]?)([A-Z0-9]{3})$",
+        public static readonly Regex eMobilityProviderId_RegEx = new Regex(@"^([A-Z]{2})([*-]?)([A-Z0-9]{3})\z",
                                                                            RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         #endregion

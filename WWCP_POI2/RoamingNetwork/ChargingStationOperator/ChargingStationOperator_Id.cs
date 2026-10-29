@@ -74,7 +74,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// The regular expression for parsing a charging station operator identification.
         /// </summary>
-        public static readonly Regex  ChargingStationOperatorId_RegEx = new (@"^([A-Z]{2})\*?([A-Z0-9]{3})$");
+        public static readonly Regex  ChargingStationOperatorId_RegEx = new (@"^([A-Z]{2})\*?([A-Z0-9]{3})\z");
 
         #endregion
 

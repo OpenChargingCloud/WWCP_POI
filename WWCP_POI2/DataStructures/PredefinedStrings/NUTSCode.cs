@@ -68,7 +68,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Two letters of the country, and up to three letters or digits of the region.
         /// </summary>
-        private static readonly Regex NUTSCodeRegex = new ("^[A-Z]{2}[A-Z0-9]{0,3}$");
+        private static readonly Regex NUTSCodeRegex = new (@"^[A-Z]{2}[A-Z0-9]{0,3}\z");
 
         #endregion
 
