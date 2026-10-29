@@ -19,6 +19,7 @@
 
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 
 using Newtonsoft.Json.Linq;
 
@@ -315,17 +316,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                // The key as the content holds it (SPECIFICATION.md 2 and 4.1): the deterministic CBOR of its COSE key, not
+                // another CBOR of the same key, which would be written again as another text than the one hashed.
+                if (!coseKey.ToByteArray(CBORWriterOptions.Canonical).AsSpan().SequenceEqual(bytes))
+                {
+                    ErrorResponse = $"Invalid COSE key: Invalid deterministic CBOR: the key of the public key '{id}' is not written as the deterministic CBOR of its COSE key!";
+                    return false;
+                }
+
                 if (coseKey.IsPrivate)
                 {
                     ErrorResponse = "A public key must not contain private parts!";
                     return false;
                 }
 
-                if (JSON.ParseOptional(PropertyKeys.NotBefore, "not before", out DateTimeOffset? notBefore, out ErrorResponse))
-                    if (ErrorResponse is not null) return false;
-
-                if (JSON.ParseOptional(PropertyKeys.NotAfter,  "not after",  out DateTimeOffset? notAfter,  out ErrorResponse))
-                    if (ErrorResponse is not null) return false;
+                if (!TryParseTimestamp(JSON, PropertyKeys.NotBefore, id, out var notBefore, out ErrorResponse) ||
+                    !TryParseTimestamp(JSON, PropertyKeys.NotAfter,  id, out var notAfter,  out ErrorResponse))
+                {
+                    return false;
+                }
 
                 if (!POIJSON.TryParseString(JSON, PropertyKeys.Holder, "holder of a public key", out var holder, out ErrorResponse))
                     return false;
@@ -388,6 +397,57 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ErrorResponse  = "Invalid public key: " + e.Message;
                 return false;
             }
+
+        }
+
+        #endregion
+
+        #region (private static) TryParseTimestamp(JSON, PropertyName, Id, out Timestamp, out ErrorResponse)
+
+        /// <summary>
+        /// Try to parse an optional timestamp of a public key as the content holds it (SPECIFICATION.md 2, Written forms):
+        /// a text, yyyy-MM-ddTHH:mm:ss.fffZ. Another form of the same instant, or null for none, is refused: written
+        /// again, it would be another text than the one hashed.
+        /// </summary>
+        /// <param name="JSON">The JSON representation of the public key.</param>
+        /// <param name="PropertyName">The name of the timestamp.</param>
+        /// <param name="Id">The identification of the public key, for the error.</param>
+        /// <param name="Timestamp">The parsed timestamp, unless none is given.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        private static Boolean TryParseTimestamp(JObject                           JSON,
+                                                 String                            PropertyName,
+                                                 String                            Id,
+                                                 out DateTimeOffset?               Timestamp,
+                                                 [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            Timestamp      = null;
+            ErrorResponse  = null;
+
+            if (JSON[PropertyName] is not JToken value)
+                return true;
+
+            if (value.Type != JTokenType.String)
+            {
+                ErrorResponse = $"The {PropertyName} of the key '{Id}' must be a text!";
+                return false;
+            }
+
+            var text = value.Value<String>()!;
+
+            if (!DateTimeOffset.TryParseExact(text,
+                                              "yyyy-MM-dd'T'HH:mm:ss.fff'Z'",
+                                              CultureInfo.InvariantCulture,
+                                              DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                                              out var timestamp) ||
+                timestamp.ToISO8601() != text)
+            {
+                ErrorResponse = $"The {PropertyName} of the key '{Id}' must be written as yyyy-MM-ddTHH:mm:ss.fffZ, not '{text}'!";
+                return false;
+            }
+
+            Timestamp = timestamp;
+            return true;
 
         }
 

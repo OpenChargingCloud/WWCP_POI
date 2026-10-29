@@ -1066,6 +1066,11 @@ Decisions taken by the maintainer between alternatives the agent laid out:
 - **2026-10-29 – The RNO says what a conformity assessment body is notified
   for** (S32): `notifiedBodyNumber` and `notifiedFor` are the RNO's, which
   vets the body, also once it has keys; a number names one body.
+- **2026-10-29 – A reader refuses a key not written as POI writes it** (D13
+  of WWCPPOIConformanceTests): a timestamp in another form or `null`, a COSE
+  key in CBOR that is not deterministic, as a new value written otherwise.
+  Written again, it would be another text than the one hashed, and two
+  readers would disagree on whether a version has its eTags.
 
 ### Rejected suggestions
 
