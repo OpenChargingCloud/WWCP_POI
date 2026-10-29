@@ -216,8 +216,9 @@ parking product ids compare case-sensitively.
   disclosure policy and its security advisories; a release names the end of its support period, its declaration of
   conformity and its bill of materials), their identifications unique within the network; certificates are embedded in
   the conformity assessment body that issued them (`ConformityAssessmentBody`, a party as well, which signs them with a
-  key that may sign `certificates`, or the RNO in its place while it has no keys; it names its `notifiedBodyNumber` and
-  the legislations it is `notifiedFor`, e.g. `MID` or `CRA`, and a certificate's `legislation` must be one of them).
+  key that may sign `certificates`, or the RNO in its place while it has no keys; the RNO names its
+  `notifiedBodyNumber`, one body's only, and the legislations it is `notifiedFor`, e.g. `MID` or `CRA`, and a
+  certificate's `legislation` must be one of them). A release keeps the version it was added with.
   Releases and certificates have no status and timestamps. A certificate (`ConformityCertificate`) is for a model of
   charging stations or of energy meters, with its manufacturer, in the hardware revisions and firmware versions of the
   model it covers, and names its components: the releases it verifies or finds compatible, and, of a charging station
@@ -1057,6 +1058,13 @@ Decisions taken by the maintainer between alternatives the agent laid out:
   exchanges are the charging station operator's `evTaler`, once for all its
   stations and in every station proof (D2); changing it needs a signing key
   that may sign `payments`, as it redirects money (D3).
+- **2026-10-29 – A release keeps its version** (POI3-ISSUES.md S31): a new
+  version is a new release, so that a certificate naming a release names the
+  version that was assessed; not a certificate pinning the content of a
+  release.
+- **2026-10-29 – The RNO says what a conformity assessment body is notified
+  for** (S32): `notifiedBodyNumber` and `notifiedFor` are the RNO's, which
+  vets the body, also once it has keys; a number names one body.
 
 ### Rejected suggestions
 

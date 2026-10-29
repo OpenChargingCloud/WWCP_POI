@@ -1073,6 +1073,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Change.Kind == RoamingNetworkChangeKind.Remove)
                     Earlier.RemoveParty(party);
 
+                // The number of a conformity assessment body as a notified body and the legislations it is notified for
+                // are the roaming network operator's, which vets it: no body declares itself notified.
+                if (Change.EntityType == nameof(ConformityAssessmentBody) &&
+                    Change.EntityPropertyName is ConformityAssessmentBody.PropertyKeys.NotifiedBodyNumber
+                                              or ConformityAssessmentBody.PropertyKeys.NotifiedFor)
+                {
+                    Owners = [ (roamingNetworkOperator, POIKeyKind.Signing) ];
+                    return true;
+                }
+
                 // Signing keys are rotated by the signing keys they replace, or by an identity key when none of them
                 // can sign any more; identity keys only by an identity key. The roaming network operator recovers both.
                 Owners = !isProperty

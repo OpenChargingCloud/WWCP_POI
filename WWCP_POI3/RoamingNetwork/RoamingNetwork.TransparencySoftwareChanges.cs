@@ -38,11 +38,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Data
 
         /// <summary>
-        /// The properties of a transparency software release a change set can update or remove.
+        /// The properties of a transparency software release a change set can update or remove: not its version, a new
+        /// version is a new release, so that a certificate naming a release names the version that was assessed.
         /// </summary>
         private static readonly ImmutableHashSet<String> ChangeableTransparencySoftwareProperties = [
             POI.TransparencySoftware.PropertyKeys.Name,
-            POI.TransparencySoftware.PropertyKeys.Version,
             POI.TransparencySoftware.PropertyKeys.OpenSourceLicenses,
             POI.TransparencySoftware.PropertyKeys.Logo,
             POI.TransparencySoftware.PropertyKeys.HowToUse,
@@ -173,7 +173,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (!ChangeableTransparencySoftwareProperties.Contains(propertyName))
                     {
-                        ErrorResponse = $"Change {Index}: the property '{propertyName}' of a transparency software release can not be changed!";
+                        ErrorResponse = propertyName == POI.TransparencySoftware.PropertyKeys.Version
+                                            ? $"Change {Index}: the version of the transparency software release '{releaseId}' can not be changed: a new version is a new release!"
+                                            : $"Change {Index}: the property '{propertyName}' of a transparency software release can not be changed!";
                         return false;
                     }
 

@@ -453,9 +453,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.conformityAssessmentBodies = new (ConformityAssessmentBodies, entity => entity.Id, "conformity assessment body");
 
             // Certificates are embedded in the bodies issuing them, and unique within the network: energy meters name them
-            // by their identifications alone.
-            if (DuplicateConformityCertificate(conformityAssessmentBodies) is String duplicateCertificate)
-                throw new ArgumentException(duplicateCertificate, nameof(ConformityAssessmentBodies));
+            // by their identifications alone. A number as a notified body names one body.
+            if ((DuplicateConformityCertificate(conformityAssessmentBodies) ??
+                 DuplicateNotifiedBodyNumber   (conformityAssessmentBodies)) is String duplicateError)
+            {
+                throw new ArgumentException(duplicateError, nameof(ConformityAssessmentBodies));
+            }
 
             this.certificates = CertificatesOf(conformityAssessmentBodies);
 
@@ -2346,6 +2349,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
+        /// The error, when two of the given conformity assessment bodies have the same number as a notified body: a number
+        /// names one body, as the roaming network operator gives it (SPECIFICATION.md 4.1).
+        /// </summary>
+        internal static String? DuplicateNotifiedBodyNumber(IEnumerable<ConformityAssessmentBody> Bodies)
+        {
+
+            var seen = new Dictionary<String, ConformityAssessmentBody_Id>(StringComparer.Ordinal);
+
+            foreach (var body in Bodies)
+                if (body.NotifiedBodyNumber is String number && !seen.TryAdd(number, body.Id))
+                    return $"The notified body number '{number}' of the conformity assessment body '{body.Id}' is the one of the conformity assessment body '{seen[number]}' already!";
+
+            return null;
+
+        }
+
+        /// <summary>
         /// The transparency software manufacturers in this immutable network version, with their releases.
         /// </summary>
         public POICollection<TransparencySoftwareManufacturer_Id, TransparencySoftwareManufacturer>  TransparencySoftwareManufacturers
@@ -2409,6 +2429,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 foreach (var release in manufacturer.TransparencySoftware)
                     if (!seen.TryAdd(release.Id, manufacturer.Id))
                         return $"The transparency software release '{release.Id}' of the manufacturer '{manufacturer.Id}' is one of the manufacturer '{seen[release.Id]}' already!";
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// The error, when a release of the given ones before has another version among the given ones after, also removed
+        /// and added again: a new version is a new release (SPECIFICATION.md 4.1), so that a certificate naming a release
+        /// names the version that was assessed.
+        /// </summary>
+        internal static String? ChangedTransparencySoftwareVersion(IReadOnlyDictionary<TransparencySoftware_Id, TransparencySoftware>  Before,
+                                                                   IReadOnlyDictionary<TransparencySoftware_Id, TransparencySoftware>  After)
+        {
+
+            foreach (var (releaseId, release) in After)
+                if (Before.TryGetValue(releaseId, out var before) && !before.Version.Equals(release.Version))
+                    return $"The version of the transparency software release '{releaseId}' can not be changed from '{before.Version}' to '{release.Version}': a new version is a new release!";
 
             return null;
 

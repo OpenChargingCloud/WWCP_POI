@@ -414,6 +414,54 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_release_keeps_its_version()
+
+        /// <summary>
+        /// A new version is a new release (SPECIFICATION.md 4.1, POI3-ISSUES.md S31): no change set changes the version of
+        /// a release, also not by removing it and adding it again, so that a certificate naming a release names the
+        /// version that was assessed. Its other properties change as before.
+        /// </summary>
+        [Test]
+        public void A_release_keeps_its_version()
+        {
+
+            var rn1           = NewNetwork();
+            var manufacturer  = TestParties.Party(OCC);
+
+            rn1.TryGetTransparencySoftwareById(Chargy11, out var chargy11);
+
+            var renamed       = NewRelease(Chargy11, "1.1").ToJSON(Embedded: true);
+            renamed["name"]   = new JObject(new JProperty("en", "Chargy Desktop"));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(() => SignedBy(rn1, manufacturer, RoamingNetworkChange.UpdateProperty(chargy11!, "version", null, "1.2")),
+                            Throws.ArgumentException.With.Message.Contains("Change 0: the version of the transparency software release 'chargy-1.1' can not be changed: a new version is a new release!"));
+
+                Assert.That(() => SignedBy(rn1, manufacturer, RoamingNetworkChange.RemoveProperty(chargy11!, "version", "1.1")),
+                            Throws.ArgumentException.With.Message.Contains("can not be changed: a new version is a new release!"));
+
+                Assert.That(() => SignedBy(rn1, manufacturer, RoamingNetworkChange.Remove(Chargy11),
+                                                              RoamingNetworkChange.Add   (NewRelease(Chargy11, "1.2"), OCC)),
+                            Throws.ArgumentException.With.Message.Contains("The version of the transparency software release 'chargy-1.1' can not be changed from '1.1' to '1.2': a new version is a new release!"));
+
+                // Removed and added again with its version, it may change otherwise.
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, manufacturer, RoamingNetworkChange.Remove(Chargy11),
+                                                                               RoamingNetworkChange.Add   ("TransparencySoftware", "chargy-1.1", renamed, nameof(TransparencySoftwareManufacturer), OCC.ToString())),
+                                                  out var readded, out var readdError),                                   Is.True, readdError);
+                Assert.That(readded!.TryGetTransparencySoftwareById(Chargy11, out var renamedChargy11),                 Is.True);
+                Assert.That(renamedChargy11!.Name[Languages.en],                                                        Is.EqualTo("Chargy Desktop"));
+
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, manufacturer, RoamingNetworkChange.UpdateProperty(chargy11!, "supportUntil", null, "2027-12-31T23:59:59.000Z")),
+                                                  out _, out var supportError),                                           Is.True, supportError);
+
+            }
+
+        }
+
+        #endregion
+
         #region A_manufacturer_signs_its_releases_itself()
 
         /// <summary>
@@ -533,6 +581,70 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 // A body whose certificate an energy meter names can not be removed.
                 Assert.That(() => Apply(rn1, RoamingNetworkChange.Remove(PTB)),
                             Throws.ArgumentException.With.Message.Contains("certificate 'cert-1' of the charging station 'DE*GEF*S1'"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region The_roaming_network_operator_says_what_a_body_is_notified_for()
+
+        /// <summary>
+        /// The number of a conformity assessment body as a notified body and the legislations it is notified for are the
+        /// roaming network operator's, which vets it (SPECIFICATION.md 4.1, POI3-ISSUES.md S32): no body declares itself
+        /// notified, also not to issue a certificate under a legislation in the same change set; that change set both
+        /// sign. A number names one body. Its other properties a body changes itself.
+        /// </summary>
+        [Test]
+        public void The_roaming_network_operator_says_what_a_body_is_notified_for()
+        {
+
+            var rn1           = NewNetwork();
+            var ptb           = TestParties.Party(PTB);
+            var rno           = TestParties.Party(rn1);
+
+            rn1.TryGetConformityAssessmentBodyById(PTB, out var ptbBody);
+
+            var notifiedForCRA  = RoamingNetworkChange.UpdateProperty(ptbBody!, "notifiedFor",        null, new JArray("CRA", "MID"));
+            var otherNumber     = RoamingNetworkChange.UpdateProperty(ptbBody!, "notifiedBodyNumber", null, "0103");
+            var craCert         = new ConformityCertificate(ConformityCertificate_Id.Parse("cra-1"), ACME, Wallbox22.Id, [ HardwareRevision.Parse("1.0") ], [ FirmwareVersion.Parse("1.0.0") ], [ Chargy11 ], [],
+                                                            Legislation: ConformityAssessmentBody.Legislations.CRA);
+            var bsiWithPTBsNumber = new ConformityAssessmentBody(BSI, I18NString.Create(Languages.en, "BSI"), NotifiedBodyNumber: "0102",
+                                                                 NotifiedFor: [ ConformityAssessmentBody.Legislations.CRA ], Created: Created);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, ptb, notifiedForCRA),  out _, out var error1),          Is.False, "notified for the CRA by itself");
+                Assert.That(error1,                                                                                       Does.Contain("roaming network operator"));
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, ptb, otherNumber),     out _, out var error2),          Is.False, "its number by itself");
+
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, rno, notifiedForCRA),  out var forCRA, out var error3), Is.True,  error3);
+                Assert.That(forCRA!.TryGetConformityAssessmentBodyById(PTB, out var ptbForCRA) ? ptbForCRA.NotifiedFor : [],
+                                                                                                                          Is.EqualTo(new[] { "CRA", "MID" }));
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, rno, otherNumber),     out _, out var error4),          Is.True,  error4);
+
+                // Notified for the CRA and issuing under it in one change set: both sign.
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, ptb, notifiedForCRA, RoamingNetworkChange.Add(craCert, PTB)),
+                                                  out _, out var error5),                                                 Is.False, "the certificate's legislation by the body alone");
+                Assert.That(rn1.TryApplyChangeSet(rn1.CreateChangeSet([ notifiedForCRA, RoamingNetworkChange.Add(craCert, PTB) ], CreatedAt: T0).SignedBy(rno).SignedBy(ptb),
+                                                  out var withCRA, out var error6),                                       Is.True,  error6);
+                Assert.That(withCRA!.TryGetConformityCertificateById(craCert.Id, out _),                                  Is.True);
+
+                // Its other properties, the body's own.
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, ptb, RoamingNetworkChange.UpdateProperty(ptbBody!, "homepage", null, "https://www.ptb.de")),
+                                                  out _, out var error7),                                                 Is.True,  error7);
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, rno, RoamingNetworkChange.UpdateProperty(ptbBody!, "homepage", null, "https://www.ptb.de")),
+                                                  out _, out var error8),                                                 Is.False, "the homepage of a body with keys by the roaming network operator");
+
+                // A number names one body.
+                Assert.That(() => Apply(rn1, RoamingNetworkChange.Add(bsiWithPTBsNumber)),
+                            Throws.ArgumentException.With.Message.Contains("notified body number '0102'"));
+
+                Assert.That(() => new RoamingNetwork(RoamingNetwork_Id.Parse("rn2"), Created: Created,
+                                                     ConformityAssessmentBodies: [ NewBody(PTB, [ ConformityAssessmentBody.Legislations.MID ]), bsiWithPTBsNumber ]),
+                            Throws.ArgumentException.With.Message.Contains("notified body number '0102'"));
 
             }
 

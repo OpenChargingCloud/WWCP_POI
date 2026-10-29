@@ -36,8 +36,9 @@ epoch 2 takes no others. The output is what one run printed.
 `GraphDefined` makes an identity key and two signing keys, one that may sign `software`, its releases, and one that
 may sign `party`, its own properties. It names what the CRA asks of it: its role, `manufacturer`, where vulnerabilities
 are reported, its policy on coordinated vulnerability disclosure and its security advisories. The PTB makes an
-identity key and a key for `certificates`; it names its number as a notified body, `0102`, and that it is notified for
-the `MID`. The BSI, notified for the `CRA` in this example, has no keys.
+identity key and a key for `certificates`. Its number as a notified body, `0102`, and that it is notified for the
+`MID` are the roaming network operator's, which vets it (SPECIFICATION.md 4.1): it adds the body with them. The BSI,
+notified for the `CRA` in this example, has no keys.
 
 ```csharp
 var ptb = new ConformityAssessmentBody(

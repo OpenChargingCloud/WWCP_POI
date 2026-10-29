@@ -79,7 +79,7 @@ names who made it. Read strictly: an unknown property is an error, also the `ven
 |---|---|---|---|
 | `@id` | string | — | `TransparencySoftware_Id`: any text, compared case-insensitively, surrounding whitespace trimmed; unique within the roaming network. |
 | `name` | I18N text | update | Mandatory; a nonempty text in each language. |
-| `version` | string | update | Mandatory `TransparencySoftwareVersion`, e.g. `1.4.0`. |
+| `version` | string | — | Mandatory `TransparencySoftwareVersion`, e.g. `1.4.0`; the one it was added with: a new version is a new release. |
 | `openSourceLicenses` | object[] | update | Mandatory, at least one: `{@id, description?, URLs}` (Hermod `OpenSourceLicense`, embedded without `@context`); an `@id` only once (case-insensitive); in a canonical order (`@id` upper case, description, URLs). |
 | `logo` | URL | update/remove | Absolute. |
 | `howToUse` | URL | update/remove | Absolute; a manual. |
@@ -94,6 +94,8 @@ names who made it. Read strictly: an unknown property is an error, also the `ven
   the manufacturer embedding it; a change naming another parent is refused.
 - A release still named by a certificate or an energy meter can not be removed, nor its manufacturer.
 - Two manufacturers can not have releases of the same identification.
+- Its `version` can not be changed, also not by removing it and adding it again in one change set: a certificate
+  naming a release names the version that was assessed (SPECIFICATION.md 4.1). A new version is a new release.
 
 
 ## Keys

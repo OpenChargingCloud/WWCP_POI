@@ -337,6 +337,7 @@ Every change has exactly one **owner**:
 | charging station and energy meter models | their manufacturer, the parent of every change of them: a model is unique within its manufacturer only |
 | transparency software releases | their transparency software manufacturer (the parent of an `Add`) |
 | certificates (`ConformityCertificate`) | the conformity assessment body that issued them (the parent of an `Add`); the RNO for a body without signing keys |
+| `notifiedBodyNumber` and `notifiedFor` of a conformity assessment body | the RNO, which vets the body: no body declares itself notified |
 | a grid connection point | its maintainer: the party its `maintainedBy` names, else its grid operator; an `Add` also its grid operator |
 | `maintainedBy` of a grid connection point | its grid operator, its maintainer, or an identity key of the RNO |
 
@@ -351,6 +352,13 @@ names no `statedBy`. A change set adding or changing a certificate whose `stated
 signs it, as the version before has the keys of the body, MUST be refused: a body that got its keys
 since changes a certificate the RNO stated only by removing its `statedBy`, stating it itself. So a
 reader of a proof tells the statements of a body from those of the RNO, also once the body has keys.
+
+**What a certificate rests on:** a body issues a certificate under a legislation only while the RNO says it is notified
+for it; a change set in which the body issues one under a legislation the same change set adds to its `notifiedFor`
+needs the signatures of both. A `notifiedBodyNumber` names one body: a version MUST NOT hold two bodies with the same
+number. The `version` of a transparency software release is the one it was added with: a new version is a new release,
+and a change set changing it, also by removing the release and adding it again, MUST be refused, so that a certificate
+naming a release names the version that was assessed.
 
 **Within a change set**, a change is owned as applying it decides, after the changes before it: what an earlier
 change of the change set added is owned by the parent of that `Add`, a grid connection point an earlier change handed

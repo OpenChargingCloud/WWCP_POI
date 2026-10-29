@@ -10,7 +10,9 @@ energy meters name the certificates of their models by their identifications.
 It names its **number as a notified body**, as the NANDO database of the European Commission gives it, and the
 **legislations it is a notified body for** (`notifiedFor`), e.g. `MID` for the Measuring Instruments Directive
 2014/32/EU or `CRA` for the Cyber Resilience Act, Regulation (EU) 2024/2847. A certificate issued under one of them
-names it as its `legislation`; one the body is not notified for is refused.
+names it as its `legislation`; one the body is not notified for is refused. Both are the **RNO's**, which vets the
+body, also once the body has keys: no body declares itself notified (SPECIFICATION.md 4.1). A number names one body in
+the roaming network.
 
 **What a signature says.** A certificate signed by the body is the body's statement, as the CRA properties of a
 [TransparencySoftwareManufacturer](TransparencySoftwareManufacturer.md) are the manufacturer's: POI proves who says
@@ -64,8 +66,8 @@ See [README.md](README.md#common-properties). No `eTags`.
 | `homepage` | `Homepage` | `URL?` | update/remove | Its homepage. |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | The telephone number of its hotline. |
 | `termsAndConditions` | `TermsAndConditionsURL` | `URL?` | update/remove | The URL of its terms and conditions. |
-| `notifiedBodyNumber` | `NotifiedBodyNumber` | `String?` | update/remove | Its number as a notified body: four digits, e.g. `0102`. |
-| `notifiedFor` | `NotifiedFor` | `ImmutableArray<String>` | update/remove | The legislations it is a notified body for, each once, in their ordinal order; omitted when none. `MID` and `CRA` (`ConformityAssessmentBody.Legislations`) are well known, any other nonempty text names another one. |
+| `notifiedBodyNumber` | `NotifiedBodyNumber` | `String?` | update/remove, by the RNO | Its number as a notified body: four digits, e.g. `0102`; no other body of the roaming network has it. |
+| `notifiedFor` | `NotifiedFor` | `ImmutableArray<String>` | update/remove, by the RNO | The legislations it is a notified body for, each once, in their ordinal order; omitted when none. `MID` and `CRA` (`ConformityAssessmentBody.Legislations`) are well known, any other nonempty text names another one. |
 | `certificates` | `Certificates` | [ConformityCertificate](#certificates)[] | add/remove, each on its own | The certificates it issued, ordered by `@id` (ordinal); omitted when none. |
 | `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update | Its signing keys, see [Keys](#keys); none while it does not take part. |
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update | Its identity keys, see [Keys](#keys); none while it does not take part. |
@@ -138,9 +140,12 @@ signs the change set as the proof that the body holds it, and it keeps at least 
 - `RoamingNetworkChange.Remove(bodyId)` — signed by the RNO; its certificates go with it.
 - `UpdateProperty(body, …)` / `RemoveProperty(body, …)` of `name`, `description`, `dataSource`, `dataLicenses`,
   `address`, `logos`, `geoLocation`, `telephone`, `eMailAddress`, `homepage`, `hotline`, `termsAndConditions`,
-  `notifiedBodyNumber`, `notifiedFor`, `customData` — signed by the body, or the RNO in its place; `signingKeys` and
+  `customData` — signed by the body, or the RNO in its place; of `notifiedBodyNumber` and `notifiedFor` — signed by
+  the RNO, with a signing key that may sign `party`, also for a body with keys: a body issuing a certificate under a
+  legislation the same change set adds to its `notifiedFor` signs it together with the RNO; `signingKeys` and
   `identityKeys` as of every party, or by an identity key of the RNO, which gives a body not taking part its keys.
   `certificates` is no property: its certificates are added, changed and removed on their own.
+- Two bodies can not have the same `notifiedBodyNumber`.
 - Admin status, status and internal data go along to the changed version.
 
 
