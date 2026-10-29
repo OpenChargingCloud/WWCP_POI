@@ -1,8 +1,9 @@
 # GNU EV Taler: paying for charging with GNU Taler, step by step
 
 *Concept paper, draft of 2026-10-28. It proposes what WWCP_POI would carry and check when charging is paid with
-[GNU Taler](https://taler.net); none of it is implemented yet. The choices it leaves to the maintainer are listed
-in [section 10](#10-decisions-needed).*
+[GNU Taler](https://taler.net). Phase 1, the content of section 4, is implemented since 2026-10-29, with the
+decisions D1 to D3 taken; the rest is not built yet. The choices still open are listed in
+[section 10](#10-decisions-needed).*
 
 **In short.** A charging station operator that accepts GNU Taler says so in its WWCP_POI data, signed like
 everything else it owns: `EVTaler` among the payment options of its charging pools, and, once for the operator,
@@ -119,10 +120,10 @@ the currency of the EVSE's tariff. It is not a name in `paymentOptions` itself:
 - which exchanges are accepted is decided by the merchant, i.e. the operator: once in `evTaler`, not again at each of
   thousands of pools, which could then disagree.
 
-**Compatibility.** As only the names of the enumeration are read, a server that does not know `EVTaler` refuses
-every version naming it. All servers of a network therefore take the new name before an operator uses it. Making
-`paymentOptions` an open set at the same time, as `facilities` is (the predefined names, others read as given),
-spares the next payment option this (decision D1).
+**Compatibility.** As only the names of the enumeration were read, a server that does not know `EVTaler` refuses
+every version naming it. All servers of a network therefore take the new name before an operator uses it. Since
+2026-10-29 `paymentOptions` is an open set, as `facilities` is (the predefined names, others read as given, compared
+without case), which spares the next payment option this (decision D1).
 
 ### 4.2 The operator's merchant: `evTaler`
 
@@ -134,7 +135,7 @@ change sets as a whole (update/remove):
 | `merchantBaseURL` | URL | The base URL of its instance at the merchant backend, HTTPS, ending in `/`: the `merchant_base_url` of its contract terms. |
 | `merchantPublicKey` | text | The public key of that instance, as Taler writes it: the `merchant_pub` every contract of a step is signed with. |
 | `exchanges` | array | 1..n exchanges it accepts, ordered by `masterPublicKey`, each once, see below. |
-| `offersURL` | URL | Where drivers ask for offers: the POI_API base of the server that makes them for the operator (section 6). |
+| `offersURL` | URL | Where drivers ask for offers: the POI_API base of the server that makes them for the operator (section 6). Not in phase 1: what it means depends on the offers API (D4), and it can be added without breaking anything. |
 
 An exchange:
 
@@ -171,9 +172,11 @@ check it.
 
 The **EV Taler tariff** of an EVSE is its effective charging tariff (`chargingTariffIds`, SPECIFICATION.md, 9.2) of
 the type `AD_HOC_PAYMENT`, or else the one without `tariffType`, with the elements of the current price statement of
-the EVSE where there is one (12.4). A tariff naming `paymentMeans` is one only when they include **`EV_TALER`**, a new
-predefined name (the set is open: others are read as given). An EVSE without an EV Taler tariff offers no EV Taler,
-whatever its pool says. Its steps are paid with the exchanges of the tariff's currency.
+the EVSE where there is one (12.4); that one, when it names no `paymentMeans` or **`EV_TALER`** among them, a new
+predefined name (the set is open: others are read as given). A tariff of another type is never the EV Taler tariff:
+where the ad hoc tariff takes only cards, the EVSE offers no EV Taler. Nor does an EVSE without an EV Taler tariff,
+whatever its pool says. Its steps are paid with the exchanges of the tariff's currency (`TryGetEVTalerTariff`,
+`EVTalerExchangesAt`).
 
 ### 4.4 Signing: the usage `payments`
 
@@ -435,18 +438,20 @@ payment, the signed meter values, the settlement statement and the refunds. From
 
 ## 9. Implementation in WWCP_POI
 
-**Phase 1, content** (WWCP_POI2 and WWCP_POI3):
+**Phase 1, content** (WWCP_POI2 and WWCP_POI3), done 2026-10-29:
 
-- `PaymentOptions.EVTaler`; possibly `paymentOptions` as an open set (D1).
-- `EVTalerMerchant` and `EVTalerExchange`, the operator's property `evTaler`: JSON and CBOR, strict parsing (base
-  URLs, keys, ISO 4217 codes, exchanges ordered and each once), change sets, the check that a pool naming `EVTaler`
-  has an operator with `evTaler`, effective pools as before.
-- The usage `payments`; `EV_TALER` predefined in `paymentMeans`.
-- docs (`ChargingStationOperator.md`, `ChargingPool.md`, `ChargingTariff.md`), the usage in SPECIFICATION.md 4.1 (8.2
-  stays as it is: `evTaler` is no child array), the contexts, tests; example A15: `DE*GEF` accepts EV Taler and a station
-  proof gives it.
-- OCPI and DATEX II publishers leave it out, with tests that they do; the hub's frontend shows "EV Taler (…)" at pools
-  and edits `evTaler` on the operator's card.
+- `PaymentOptions.EVTaler`, and `paymentOptions` an open set of names (D1).
+- `EVTalerMerchant` and `EVTalerExchange`, the operator's property `evTaler`, without `offersURL` for now: JSON and
+  CBOR, strict parsing (HTTPS base URLs ending in `/`, keys in GNU Taler's canonical form, ISO 4217 codes, exchanges
+  ordered and each once, each with a name), change sets, the check that a pool or pool template naming `EVTaler` has an
+  operator with `evTaler`, after the last change of a change set; `TryGetEVTalerTariff`, `EVTalerExchangesAt` and
+  `PaymentOptionName` for "EV Taler (provider)".
+- The usage `payments` (D3); `EV_TALER` predefined in `paymentMeans`.
+- docs (`ChargingStationOperator.md`, `ChargingPool.md`, `ChargingPoolTemplate.md`, `ChargingTariff.md`), the usage in
+  SPECIFICATION.md 4.1 (8.2 stays as it is: `evTaler` is no child array), `EVTalerTests`; example A15: `DE*GEF` accepts
+  EV Taler and a station proof gives it.
+- OCPI and DATEX II publishers leave it out: they publish only the payment options they know, unchanged.
+- Left for later: the hub's frontend showing "EV Taler (…)" at pools and editing `evTaler` on the operator's card.
 
 **Phase 2, steps and evidence**, needing no Taler service:
 
@@ -475,9 +480,9 @@ knowing the driver; e-mobility providers as merchants of their own offers; walle
 
 | | Question | Options | Recommended |
 |---|---|---|---|
-| D1 | How does "EV Taler (provider)" appear in the data? | (a) `EVTaler` in `paymentOptions`, the exchanges with names in the operator's `evTaler`; (b) a name per exchange in `paymentOptions`, e.g. `EVTaler (Example Exchange)` | (a), and `paymentOptions` an open set like `facilities`, so that the next option does not lock out older servers |
-| D2 | Where does the merchant live? | (a) the operator; (b) each pool; (c) each tariff | (a): one merchant per operator, in every station proof |
-| D3 | Which key signs `evTaler`? | (a) a new usage `payments`; (b) `party`, as the operator's other properties | (a): it redirects money |
+| D1, decided 2026-10-29: (a) and an open set | How does "EV Taler (provider)" appear in the data? | (a) `EVTaler` in `paymentOptions`, the exchanges with names in the operator's `evTaler`; (b) a name per exchange in `paymentOptions`, e.g. `EVTaler (Example Exchange)` | (a), and `paymentOptions` an open set like `facilities`, so that the next option does not lock out older servers |
+| D2, decided 2026-10-29: (a) | Where does the merchant live? | (a) the operator; (b) each pool; (c) each tariff | (a): one merchant per operator, in every station proof |
+| D3, decided 2026-10-29: (a) | Which key signs `evTaler`? | (a) a new usage `payments`; (b) `party`, as the operator's other properties | (a): it redirects money |
 | D4 | How do offers reach the app? | (a) HTTP with long polling; (b) a topic of the history's WebSocket | (a) first: it survives a phone losing its connection; (b) later |
 | D5 | Does the operator sign settlement statements? | (a) yes, not in checkpoints; (b) yes, and checkpoints name them, as price statements; (c) no | (a): evidence for the driver, no load on histories |
 | D6 | The name | "GNU EV Taler"; "EV Taler" | "EV Taler" in the data (`EVTaler`, `evTaler`, `EV_TALER`) either way; "GNU" in the name of what is built here only if the GNU Taler maintainers agree, as "GNU" names GNU packages |

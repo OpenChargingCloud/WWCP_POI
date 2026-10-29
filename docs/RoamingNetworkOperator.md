@@ -83,7 +83,7 @@ The public keys of the RNO (`POIPublicKey`, [source](../WWCP_POI3/DataStructures
 | `notBefore` | timestamp | Optional start of validity (UTC, to the millisecond). |
 | `notAfter` | timestamp | Optional end of validity; not before `notBefore`. |
 | `holder` | string | Optional: who holds the private key, e.g. one company of a [quorum](#quorum). No part of `@id`. |
-| `usages` | array of texts | Optional, signing keys only: what it may sign (`infrastructure`, `tariffs`, `priceStatements`, `models`, `software`, `certificates`, `party`); everything without. Commits and attestations of the RNO need `party`. No part of `@id`. |
+| `usages` | array of texts | Optional, signing keys only: what it may sign (`infrastructure`, `tariffs`, `priceStatements`, `models`, `software`, `certificates`, `payments`, `party`); everything without. Commits and attestations of the RNO need `party`. No part of `@id`. |
 
 - **signingKeys** — short keys (e.g. secp256r1) signing change sets of RNO data: its own properties, the network's
   properties, adding and removing parties, and the rotation of the signing keys themselves. A

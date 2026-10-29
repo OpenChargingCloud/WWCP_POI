@@ -66,7 +66,7 @@ All optional; absent values and empty arrays are not written.
 | `images` | `Images` | `ImmutableArray<Image>` | update/remove | See [Images](#images). |
 | `timeZone` | `TimeZone` | `Time_Zone?` | update/remove | Its time zone, e.g. `Europe/Berlin`. |
 | `facilities` | `Facilities` | `ImmutableArray<Facility>` | update/remove | Facilities nearby, e.g. `HOTEL`, `RESTAURANT`, `CAFE`, `MALL`, `SUPERMARKET`, `SPORT`, `RECREATION_AREA`, `NATURE`, `MUSEUM`, `BIKE_SHARING`, `BUS_STOP`, `TAXI_STAND`, `TRAM_STOP`, `METRO_STATION`, `TRAIN_STATION`, `AIRPORT`, `PARKING_LOT`, `CARPOOL_PARKING`, `FUEL_STATION`, `WIFI`; ordinal order, each once. |
-| `paymentOptions` | `PaymentOptions` | `ImmutableArray<PaymentOptions>` | update/remove | How charging can be paid: `Free`, `Contract`, `Direct`, `Cash`, `CreditCard`, `DebitCard`, `PrepaidCard`, `SMS`; ordinal order, each once. |
+| `paymentOptions` | `PaymentOptions` | `ImmutableArray<PaymentOptions>` | update/remove | How charging can be paid: `Free`, `Contract`, `Direct`, `Cash`, `CreditCard`, `DebitCard`, `PrepaidCard`, `SMS`, `EVTaler` (with GNU Taler, step by step, see [EV Taler](#ev-taler)); ordinal order, each once. |
 | `authenticationModes` | `AuthenticationModes` | `ImmutableArray<AuthenticationMode>` | update/remove | How drivers authenticate, see [Authentication modes](#authentication-modes). |
 | `uiFeatures` | `UIFeatures` | `ImmutableArray<UIFeatures>` | update/remove | Features of its user interfaces, e.g. `Screen`, `CreditCard`, `DebitCard`, `Pinpad`, `Sound`, `SpeechRecognition`, `RFID`, `NFC`, `Bluetooth`, `BLEBeacons`, `WLAN`; ordinal order, each once. |
 | `features` | `Features` | `ImmutableArray<ChargingPoolFeature>` | update/remove | Its features, e.g. `StatusInfoAvailable`, `EnergyInfoAvailable`, `GermanCalibrationLaw`, `EuropeanCalibrationLaw`, `Reservable`, `AuthenticationBeforePlugIn`, `ChargingProfilesSupported`, `ChargingPreferencesSupported`, `TokenGroupsSupported`, `CSOUnlockSupported`, `HubjectCompatible`, `START_SESSION_CONNECTOR_REQUIRED`, `Illuminated` (lit at night), `Roofed`, `IlluminatedParkingNearby`, `RoofedParkingNearby` (parking for charging nearby is); ordinal order, each once. |
@@ -85,9 +85,10 @@ All optional; absent values and empty arrays are not written.
 | `nutsCodes` | `NUTSCodes` | `ImmutableArray<NUTSCode>` | update/remove | The NUTS regions of the EU it is in, e.g. `DEG` (NUTS 1, Thüringen) and `DEG03` (NUTS 3, Jena): two letters of the country and up to three letters or digits, the level being their number; read case-insensitively, written in upper case; each once, in their ordinal order. |
 | `templateIds` | `TemplateIds` | `ImmutableArray<ChargingPoolTemplate_Id>` | update/remove, element changes | The [charging pool templates](ChargingPoolTemplate.md) of its operator it takes, each once, in its order, the first deciding; see [templates and effective members](README.md#templates-and-effective-members). |
 
-The values of `parkingType`, `accessibility`, `facilities`, `uiFeatures`, `features` and `parkingRestrictions`
-are open sets of names: the ones listed are predefined, others are read as given. `paymentOptions` and
-`locationLanguages` are enumerations: only their names are read.
+The values of `parkingType`, `accessibility`, `facilities`, `paymentOptions`, `uiFeatures`, `features` and
+`parkingRestrictions` are open sets of names: the ones listed are predefined, others are read as given, so that a
+new name locks out no reader that does not know it yet; names are compared without case. `locationLanguages` is an
+enumeration: only its names are read.
 
 Arrays of names are written in the ordinal order of the names, whatever order they are given in; a change set
 should send them in that order, as it compares old values as JSON.
@@ -97,6 +98,17 @@ should send them in that order, as it compares old values as JSON.
 - `EVSEs`: the EVSEs of all its charging stations.
 - `AllEnergyMeters`: its own energy meters, and those of its charging stations and their EVSEs.
 - `TryGetChargingStation(id, out station)`: a lookup by identification.
+
+
+## EV Taler
+
+`EVTaler` among the `paymentOptions`, the pool's own or of its templates, says that its EVSEs can be paid for with GNU
+Taler, step by step ([concepts/EVTaler.md](../concepts/EVTaler.md)), with the exchanges its operator accepts: a pool
+naming it needs the `evTaler` merchant of its [operator](ChargingStationOperator.md#ev-taler-merchant), and so does a
+[charging pool template](ChargingPoolTemplate.md) naming it, checked after the last change of a change set. Which
+tariff a step is priced by, and with which exchanges it is paid, `chargingStationOperator.TryGetEVTalerTariff(EVSEId,
+out tariff)` and `EVTalerExchangesAt(EVSEId)` tell; their `PaymentOptionName` is what drivers see, e.g.
+`EV Taler (Example Exchange, EUR)`. OCPI and DATEX II know no GNU Taler: their publishers leave it out.
 
 
 ## Charging stations

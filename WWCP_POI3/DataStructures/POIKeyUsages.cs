@@ -64,6 +64,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const String Certificates     = "certificates";
 
         /// <summary>
+        /// The EV Taler merchant of a charging station operator (concepts/EVTaler.md, section 4.4): whoever changes it
+        /// redirects the payments of every station of the operator, so its key may be kept apart, e.g. offline.
+        /// </summary>
+        public const String Payments         = "payments";
+
+        /// <summary>
         /// The party itself: its own properties and, by a signing key, its signing keys; of the roaming network operator
         /// also the roaming network, its registries, who is a member, commits and attestations.
         /// </summary>
@@ -79,16 +85,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                        Models,
                                                                                        Software,
                                                                                        Certificates,
+                                                                                       Payments,
                                                                                        Party);
 
         #region (internal) Of(Change)
 
         /// <summary>
-        /// The usage a signing key needs to sign the given change, by the type of the entity it changes.
+        /// The usage a signing key needs to sign the given change, by the type of the entity it changes; of a charging
+        /// station operator, by the property it changes: its EV Taler merchant needs "payments", its other properties "party".
         /// </summary>
         internal static String Of(RoamingNetworkChange Change)
 
             => Change.EntityType switch {
+
+                   nameof(ChargingStationOperator)
+                       when Change.EntityPropertyName == ChargingStationOperator.PropertyKeys.EVTaler => Payments,
 
                    nameof(ChargingTariff)          or
                    nameof(ChargingTariffTemplate)  or

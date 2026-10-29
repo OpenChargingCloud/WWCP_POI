@@ -223,8 +223,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             }
 
             var cases = new (String Name, JObject JSON, String Error)[] {
-                ("unknown payment option",    Changed(network => Pool(network)["paymentOptions"]     = new JArray("Bitcoin")),                                        "payment option 'Bitcoin'"),
-                ("payment option by number",  Changed(network => Pool(network)["paymentOptions"]     = new JArray("1")),                                              "payment option '1'"),
+                ("payment option twice",      Changed(network => Pool(network)["paymentOptions"]     = new JArray("Cash", "cash")),                                   "must not be given twice"),
+                ("empty payment option",      Changed(network => Pool(network)["paymentOptions"]     = new JArray(" ")),                                              "payment option ' '"),
                 ("unknown language",          Changed(network => Pool(network)["locationLanguages"]  = new JArray("klingon")),                                        "location language 'klingon'"),
                 ("language twice",            Changed(network => Pool(network)["locationLanguages"]  = new JArray("de", "de")),                                       "must not be given twice"),
                 ("authentication type twice", Changed(network => ((JArray) Pool(network)["authenticationModes"]!).Add(new JObject(new JProperty("type", "CreditCard")))), "must not be given twice"),

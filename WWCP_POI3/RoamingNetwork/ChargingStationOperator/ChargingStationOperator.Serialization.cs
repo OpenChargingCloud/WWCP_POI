@@ -307,6 +307,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse EVTaler                  [optional]
+
+                if (!POIJSON.TryParseObject<EVTalerMerchant>(JSON, PropertyKeys.EVTaler, "EV Taler merchant", EVTalerMerchant.TryParse, out var evTaler, out ErrorResponse))
+                    return false;
+
+                #endregion
+
                 #region Parse ChargingPools            [optional]
 
                 if (!POIJSON.TryParseChildren<ChargingPool>(JSON,
@@ -429,7 +436,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               DataSource:  dataSource,
                                               Created:     created,
                                               LastChange:  lastChange,
-                                              CustomData:  customData
+                                              CustomData:  customData,
+                                              EVTaler:     evTaler
                                           );
 
                 if (!TryCheckETagsOf(JSON, ChargingStationOperator, out ErrorResponse))
@@ -586,6 +594,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                TermsAndConditionsURL.HasValue
                                    ? new JProperty(PropertyKeys.TermsAndConditions,       TermsAndConditionsURL.ToString())
+                                   : null,
+
+                               EVTaler is not null
+                                   ? new JProperty(PropertyKeys.EVTaler,                  EVTaler.ToJSON(Embedded: true))
                                    : null,
 
 
@@ -897,6 +909,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (TermsAndConditionsURL.HasValue)
                 cbor.Add(CBORValue.FromText(PropertyKeys.TermsAndConditions),            CBORValue.FromText(TermsAndConditionsURL.ToString()));
+
+            // The EV Taler merchant has no CBOR representation of its own: it is written with the keys and values of its JSON representation.
+            if (EVTaler is not null)
+                cbor.Add(CBORValue.FromText(PropertyKeys.EVTaler),                       CBORJSON.ToCBOR(EVTaler.ToJSON(Embedded: true)));
 
             // Its brands, charging tariffs, charging pools, templates, groups, offers and parking spaces have no CBOR
             // representation of their own: theirs are the keys and values of their JSON representation, as embedded.

@@ -140,14 +140,14 @@ jobs:
         working-directory: WWCP_POI
         run: dotnet test WWCP_POI3_Tests/WWCP_POI3_Tests.csproj --configuration Release --no-build --logger "console;verbosity=normal" --logger "trx;LogFileName=${{ matrix.leg }}-poi3.trx" --results-directory artifacts
 
-      # The examples A1 to A14 the documentation in examples/ walks through,
+      # The examples A1 to A15 the documentation in examples/ walks through,
       # each building on what the one before published, and each checked by
       # reading only what was published, as an operator or an app would. A
       # check that fails ends the program with exit code 1, so a page of the
       # documentation whose code no longer does what it says turns this red.
       # They write their keys and what they publish beside the program, into
       # directories .gitignore keeps out of the repository.
-      - name: Examples A1 to A14
+      - name: Examples A1 to A15
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         timeout-minutes: 15
         working-directory: WWCP_POI/examples/csharp

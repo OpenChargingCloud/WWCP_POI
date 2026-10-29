@@ -276,3 +276,9 @@ DE-26-QS-PTB-0042 for the meter of DE*GEF*E1*1: The energy meter 'DE*GEF*M1*1' i
   not tell.
 - The names, numbers, persons, URLs and measurement results of `EM-LAB`, the PTB and `SAALE` are examples, not those of
   real bodies, documents and people.
+
+
+## Next
+
+- EV Taler: `DE*GEF` names its merchant at a GNU Taler merchant backend and the exchanges it accepts, signed by a key
+  for payments, and the app shows "EV Taler (provider)" from the station proof: [example A15](exampleA15.md).

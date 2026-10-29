@@ -259,6 +259,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static PaymentMeans WEBSITE           { get; }
             = new ("WEBSITE");
 
+        /// <summary>
+        /// GNU Taler, step by step, with the exchanges the charging station operator names in its EV Taler merchant
+        /// (concepts/EVTaler.md)
+        /// </summary>
+        public static PaymentMeans EV_TALER          { get; }
+            = new ("EV_TALER");
+
         #endregion
 
 

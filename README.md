@@ -585,7 +585,7 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   holders (`RoamingNetworkKeyStatement.Create(…)`, `WithSignature(…)`), and each holder certifies its own signing
   keys with one of its identity keys (`RoamingNetworkSigningKeyCertificate.Create(…)`, as `signingKeyCertificates`),
   so that it renews them alone; both are committed as properties of the operator, so that every proof gives them.
-  Signing keys may name `usages` (`infrastructure`, `tariffs`, `priceStatements`, `software`, `certificates`, `party`), e.g. one key of a charging
+  Signing keys may name `usages` (`infrastructure`, `tariffs`, `priceStatements`, `models`, `software`, `certificates`, `payments`, `party`), e.g. one key of a charging
   station operator for its pools and one for its tariffs. An app scans the QR code of the trust anchor (`GET ~/RNs/{id}/trustAnchor`): `WWCP/TA-2:` and the
   Base45 of its CBOR, with the network, its name and description, the thumbprints of the identity
   keys per holder and the `minConsensus` (`RoamingNetworkTrustAnchor.TryParse(text, …)`; the URI
@@ -1050,6 +1050,12 @@ Decisions taken by the maintainer between alternatives the agent laid out:
   German NAP takes the Mobilithek profile 01-00-00 only as JSON.
 - **2026-10-16 – Tariff price limits as net price plus optional gross price,**
   so that OCPI's price limits are taken without rounding.
+- **2026-10-29 – EV Taler, phase 1 of [concepts/EVTaler.md](concepts/EVTaler.md):**
+  `paymentOptions` is an open set of names, so that `EVTaler` and the next
+  option lock out no reader that does not know them (D1); the merchant and its
+  exchanges are the charging station operator's `evTaler`, once for all its
+  stations and in every station proof (D2); changing it needs a signing key
+  that may sign `payments`, as it redirects money (D3).
 
 ### Rejected suggestions
 

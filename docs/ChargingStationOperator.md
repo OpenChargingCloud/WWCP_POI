@@ -54,6 +54,7 @@ The operator writes no `eTags`.
 | `homepage` | `Homepage` | `URL?` | update/remove | See [Contact](#contact). |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | See [Contact](#contact). |
 | `termsAndConditions` | `TermsAndConditionsURL` | `URL?` | update/remove | See [Contact](#contact). |
+| `evTaler` | `EVTaler` | `EVTalerMerchant?` | update/remove | Its merchant at a GNU Taler merchant backend and the exchanges it accepts, see [EV Taler merchant](#ev-taler-merchant); signed by a key that may sign `payments`. |
 | `brands` | `Brands` | `POICollection<Brand_Id, Brand>` | update/remove | The [brands](Brand.md) it is a white-label solution for, its own, embedded completely; not those of its pools, stations or EVSEs. Changed as a whole or [brand by brand](Brand.md#change-sets). |
 | `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update | 1..n keys signing its change sets, see [Keys](#signing-and-identity-keys). |
 | `identityKeys` | `IdentityKeys` | `ImmutableArray<POIPublicKey>` | update | 1..n long-term keys signing changes of its identity keys. |
@@ -230,7 +231,7 @@ Each key:
 | `key` | text | Canonical Base64 of the deterministic CBOR of the public COSE key; private parts are refused. |
 | `notBefore` | timestamp | Optional: valid from. |
 | `notAfter` | timestamp | Optional: valid until; not before `notBefore`. |
-| `usages` | array of texts | Optional, signing keys only: what it may sign, `infrastructure` (pools, stations, EVSEs, templates and groups), `tariffs` (tariffs, their templates and groups, offers), `priceStatements` and `party` (its own properties, rotating its signing keys); everything without. In their ordinal order; unknown ones are refused. |
+| `usages` | array of texts | Optional, signing keys only: what it may sign, `infrastructure` (pools, stations, EVSEs, templates and groups), `tariffs` (tariffs, their templates and groups, offers), `priceStatements`, `payments` (its `evTaler` merchant) and `party` (its other own properties, rotating its signing keys); everything without. In their ordinal order; unknown ones are refused. |
 
 - Both arrays are in the ordinal order of the key identifications, a key at most once, and no key both a signing
   and an identity key. An array is written only when it is not empty.
@@ -253,6 +254,54 @@ Each key:
   an identity key of the RNO changes both. Never removed or emptied: at least one key of each kind stays.
 
 See [SPECIFICATION.md, 4.1](../SPECIFICATION.md#41-keys-and-owners).
+
+
+## EV Taler merchant
+
+`evTaler` (`EVTalerMerchant`, [source](../WWCP_POI3/DataStructures/EVTalerMerchant.cs)): the operator's instance at a
+[GNU Taler](https://taler.net) merchant backend and the exchanges whose coins it accepts, so that its charging pools
+may name the payment option `EVTaler` ([ChargingPool](ChargingPool.md#ev-taler), [concepts/EVTaler.md](../concepts/EVTaler.md)).
+It is one of the operator's own properties, no child array: every proof of a charging station gives it completely,
+and an app holding one knows, checked against the trust anchor it pinned, which merchant may take money for the
+station. Whoever changes it redirects the payments of every station of the operator, so a change of it is signed by
+a signing key that may sign `payments`, which signs nothing else of the operator. Changed as a whole.
+
+| JSON key | Type | Description |
+|---|---|---|
+| `merchantBaseURL` | URL | The base URL of its instance at the merchant backend: HTTPS, without user, query and fragment, ending in `/`; the `merchant_base_url` of its contract terms. |
+| `merchantPublicKey` | text | The public key of that instance as GNU Taler writes it: 52 characters of Crockford's Base32 in upper case, the last 4 bits zero; every contract of a step is signed with it (`merchant_pub`). |
+| `exchanges` | array | 1..n exchanges it accepts, in the ordinal order of their `masterPublicKey`, each once. |
+
+An exchange (`EVTalerExchange`):
+
+| JSON key | Type | Description |
+|---|---|---|
+| `masterPublicKey` | text | Its master public key, as GNU Taler writes it: what identifies it. |
+| `baseURL` | URL | Its base URL, as `merchantBaseURL`. |
+| `currency` | text | The ISO 4217 code of its coins, as the `currency` of a charging tariff; `XXX` is refused. |
+| `name` | I18N text | Its name as drivers see it, mandatory: `PaymentOptionName` makes `EV Taler (<name>, <currency>)` of it, in the languages of the name. |
+
+```json
+"evTaler": {
+  "merchantBaseURL":   "https://taler.gef.example/instances/de-gef/",
+  "merchantPublicKey": "ESMBKNR5CMZPAYH9AD0QNKCPYSJSE0EN5MH4FMPKN683R63HMD3G",
+  "exchanges": [
+    { "masterPublicKey": "F80MFRG8HVH6R9CQ47KRFQSJP3T6DBJ4K1D9B703RJY3Z39TBMJ0",
+      "baseURL": "https://exchange.example.eu/", "currency": "EUR", "name": { "en": "Example Exchange" } }
+  ]
+}
+```
+
+- **Its pools:** a charging pool or charging pool template of the operator naming `EVTaler` needs `evTaler`; checked
+  when the operator is made and after the last change of a change set, so that one change set may add both in either
+  order, and remove `evTaler` only with the last `EVTaler`.
+- **At an EVSE:** `TryGetEVTalerTariff(EVSEId, out tariff)` gives the tariff a step is priced by: of the tariffs that
+  apply to the EVSE, the one of the type `AD_HOC_PAYMENT`, else the one without a type, when it names no `paymentMeans`
+  or `EV_TALER` among them, and its pool, as it is at runtime, names `EVTaler`. `EVTalerExchangesAt(EVSEId)` gives the
+  exchanges in its currency.
+- **Not checked:** whether the exchanges know the operator (their know-your-customer checks), and whether the merchant
+  backend's configuration names the same exchanges: the app checks the contract terms of every offer.
+- OCPI and DATEX II know no GNU Taler: `evTaler` is not published to them.
 
 
 ## Data licenses
@@ -310,6 +359,8 @@ the runtime status and internal data of the operator and of everything it embeds
   `notBefore` not after `notAfter`; added with at least one of each kind, and keeping at least one of each.
 - **Data licenses:** no null entry, none twice; `dataLicenseIds` only of well-known licenses.
 - **Logos:** an array of at most one object with `uri`.
+- **EV Taler merchant:** as described in [EV Taler merchant](#ev-taler-merchant); a pool or pool template naming
+  `EVTaler` only with it.
 - **Children:** given completely: `chargingPoolIds`, `chargingTariffIds`, `EVSEGroupIds`, `chargingStationGroupIds`,
   `chargingPoolGroupIds`, `chargingTariffGroupIds` and `energyMeterGroupIds`, and those of templates and offers, are
   refused. No null entries.

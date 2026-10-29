@@ -297,6 +297,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  TermsAndConditions          = "termsAndConditions";
 
             /// <summary>
+            /// The property of its merchant at a GNU Taler merchant backend (concepts/EVTaler.md).
+            /// </summary>
+            public const String  EVTaler                     = "evTaler";
+
+            /// <summary>
             /// The property of its brands.
             /// </summary>
             public const String  Brands                      = "brands";
@@ -656,6 +661,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         }
+
+        #endregion
+
+        #region EVTaler
+
+        /// <summary>
+        /// Its merchant at a GNU Taler merchant backend and the exchanges it accepts, when its charging pools may name the
+        /// payment option EVTaler (concepts/EVTaler.md, section 4.2). Changed with a signing key that may sign "payments".
+        /// </summary>
+        [Optional]
+        public EVTalerMerchant? EVTaler { get; }
 
         #endregion
 
@@ -1031,6 +1047,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     Created:                   Created,
                     LastChange:                LastChangeDate,
                     CustomData:                CustomData,
+                    EVTaler:                   EVTaler,
                     KeptFrom:                  KeptFrom);
 
         #endregion
@@ -1062,6 +1079,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="HotlinePhoneNumber">An optional hotline phone number.</param>
         /// <param name="TermsAndConditionsURL">An optional URL of the terms and conditions.</param>
         /// <param name="DataLicenses">Optional data licenses.</param>
+        /// <param name="EVTaler">Optionally, its merchant at a GNU Taler merchant backend and the exchanges it accepts.</param>
         public ChargingStationOperator(ChargingStationOperator_Id                            Id,
                                        //RoamingNetwork                                        RoamingNetwork,
                                        ImmutableI18NString?                                  Name                                   = null,
@@ -1106,7 +1124,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        DateTimeOffset?                                       LastChange                             = null,
 
                                        CustomDataNew?                                        CustomData                             = null,
-                                       UserDefinedDictionary?                                InternalData                           = null)
+                                       UserDefinedDictionary?                                InternalData                           = null,
+                                       EVTalerMerchant?                                      EVTaler                                = null)
 
             : this(true,
                    Id,
@@ -1149,7 +1168,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    Created,
                    LastChange,
                    CustomData,
-                   InternalData)
+                   InternalData,
+                   EVTaler)
 
         { }
 
@@ -1207,6 +1227,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                         CustomDataNew?                                        CustomData                             = null,
                                         UserDefinedDictionary?                                InternalData                           = null,
+                                        EVTalerMerchant?                                      EVTaler                                = null,
                                         ChargingStationOperator?                              KeptFrom                               = null)
 
             : base(Id,
@@ -1238,6 +1259,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.homepage               = Homepage;
             this.hotlinePhoneNumber     = HotlinePhoneNumber;
             this.termsAndConditionsURL  = TermsAndConditionsURL;
+            this.EVTaler                = EVTaler;
 
             (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the charging station operator '{Id}'");
 
@@ -1512,6 +1534,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region The payment option EVTaler only with an EV Taler merchant
+
+            if (CheckGroupsAndOffers && InvalidPaymentOption() is String paymentOptionError)
+                throw new ArgumentException(paymentOptionError, nameof(EVTaler));
+
+            #endregion
+
         }
 
         #endregion
@@ -1571,6 +1600,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             return OverlappingOffers();
+
+        }
+
+        #endregion
+
+        #region (internal) InvalidPaymentOption()
+
+        /// <summary>
+        /// The error, when a charging pool or charging pool template of this operator names the payment option EVTaler
+        /// while the operator has no EV Taler merchant (concepts/EVTaler.md, section 4.1); null when there is none. A change
+        /// set checks it after its last change, as InvalidGroupOrOffer(), so that it may add the merchant and the payment
+        /// option in either order. Checking the templates as well covers every effective charging pool, as it takes their
+        /// payment options.
+        /// </summary>
+        internal String? InvalidPaymentOption()
+        {
+
+            if (EVTaler is not null)
+                return null;
+
+            foreach (var chargingPool in ChargingPools)
+                if (chargingPool.PaymentOptions.Contains(PaymentOptions.EVTaler))
+                    return $"The charging pool '{chargingPool.Id}' names the payment option '{PaymentOptions.EVTaler}', but its operator '{Id}' has no EV Taler merchant!";
+
+            foreach (var chargingPoolTemplate in ChargingPoolTemplates)
+                if (chargingPoolTemplate.PaymentOptions.Contains(PaymentOptions.EVTaler))
+                    return $"The charging pool template '{chargingPoolTemplate.Id}' names the payment option '{PaymentOptions.EVTaler}', but its operator '{Id}' has no EV Taler merchant!";
+
+            return null;
 
         }
 

@@ -163,3 +163,15 @@ Console.WriteLine();
 ExampleA14.Run(a11);
 
 ExampleA14.Validate();
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// EV Taler: DE*GEF accepts GNU Taler at Jena Paradies, to be paid step by step. It names its merchant at a GNU Taler
+// merchant backend and the exchanges it accepts, signed by a key for payments alone; the station proof gives them, and
+// the app shows "EV Taler (provider)" for the exchanges in the currency of the EVSE's tariff.
+ExampleA15.Run(a11);
+
+ExampleA15.Validate();

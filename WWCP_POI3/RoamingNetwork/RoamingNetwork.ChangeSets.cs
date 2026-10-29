@@ -1201,10 +1201,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // The groups and charging tariff offers of every operator the change set changed or added, after its last change:
-            // a charging station it moved to another charging pool was no member of its operator in between.
+            // a charging station it moved to another charging pool was no member of its operator in between. So is the payment
+            // option EVTaler, which needs the operator's EV Taler merchant: a change set may add the two in either order.
             foreach (var changedOperator in operators.Values.OrderBy(chargingStationOperator => chargingStationOperator.Id.ToString(), StringComparer.Ordinal))
                 if (!(chargingStationOperators.TryGet(changedOperator.Id, out var previousOperator) && ReferenceEquals(previousOperator, changedOperator)) &&
-                    changedOperator.InvalidGroupOrOffer() is String groupOrOfferError)
+                    (changedOperator.InvalidGroupOrOffer() ?? changedOperator.InvalidPaymentOption()) is String groupOrOfferError)
                 {
                     ErrorResponse = groupOrOfferError;
                     return false;
@@ -1372,6 +1373,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ChargingStationOperator.PropertyKeys.Homepage,
             ChargingStationOperator.PropertyKeys.HotlinePhoneNumber,
             ChargingStationOperator.PropertyKeys.TermsAndConditions,
+            ChargingStationOperator.PropertyKeys.EVTaler,
             ChargingStationOperator.PropertyKeys.Brands,
             ChargingStationOperator.PropertyKeys.SigningKeys,
             ChargingStationOperator.PropertyKeys.IdentityKeys,
