@@ -1,8 +1,8 @@
-# GNU EV Taler: paying for charging with GNU Taler, step by step
+# EV Taler: paying for charging with GNU Taler, step by step
 
 *Concept paper, draft of 2026-10-28. It proposes what WWCP_POI would carry and check when charging is paid with
 [GNU Taler](https://taler.net). Phase 1, the content of section 4, is implemented since 2026-10-29, with the
-decisions D1 to D3 taken; the rest is not built yet. The choices still open are listed in
+decisions D1 to D3 and D6 taken; the rest is not built yet. The choices still open are listed in
 [section 10](#10-decisions-needed).*
 
 **In short.** A charging station operator that accepts GNU Taler says so in its WWCP_POI data, signed like
@@ -490,7 +490,7 @@ knowing the driver; e-mobility providers as merchants of their own offers; walle
 | D3, decided 2026-10-29: (a) | Which key signs `evTaler`? | (a) a new usage `payments`; (b) `party`, as the operator's other properties | (a): it redirects money |
 | D4 | How do offers reach the app? | (a) HTTP with long polling; (b) a topic of the history's WebSocket | (a) first: it survives a phone losing its connection; (b) later |
 | D5 | Does the operator sign settlement statements? | (a) yes, not in checkpoints; (b) yes, and checkpoints name them, as price statements; (c) no | (a): evidence for the driver, no load on histories |
-| D6 | The name | "GNU EV Taler"; "EV Taler" | "EV Taler" in the data (`EVTaler`, `evTaler`, `EV_TALER`) either way; "GNU" in the name of what is built here only if the GNU Taler maintainers agree, as "GNU" names GNU packages |
+| D6, decided 2026-10-29: "EV Taler" | The name | "GNU EV Taler"; "EV Taler" | "EV Taler" in the data (`EVTaler`, `evTaler`, `EV_TALER`) either way; "GNU" in the name of what is built here only if the GNU Taler maintainers agree, as "GNU" names GNU packages |
 
 
 ## 11. Open points

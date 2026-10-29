@@ -1057,7 +1057,8 @@ Decisions taken by the maintainer between alternatives the agent laid out:
   option lock out no reader that does not know them (D1); the merchant and its
   exchanges are the charging station operator's `evTaler`, once for all its
   stations and in every station proof (D2); changing it needs a signing key
-  that may sign `payments`, as it redirects money (D3).
+  that may sign `payments`, as it redirects money (D3). The name is "EV
+  Taler", without "GNU" (D6).
 - **2026-10-29 – A release keeps its version** (POI3-ISSUES.md S31): a new
   version is a new release, so that a certificate naming a release names the
   version that was assessed; not a certificate pinning the content of a
