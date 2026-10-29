@@ -1070,7 +1070,8 @@ Decisions taken by the maintainer between alternatives the agent laid out:
   of WWCPPOIConformanceTests): a timestamp in another form or `null`, a COSE
   key in CBOR that is not deterministic, as a new value written otherwise.
   Written again, it would be another text than the one hashed, and two
-  readers would disagree on whether a version has its eTags.
+  readers would disagree on whether a version has its eTags. So is the
+  `notifiedFor` of a conformity assessment body out of its ordinal order.
 
 ### Rejected suggestions
 

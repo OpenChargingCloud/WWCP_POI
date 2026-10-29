@@ -451,6 +451,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private static) NotifiedForOutOfOrder(Id, NotifiedFor)
+
+        /// <summary>
+        /// The error, when the legislations a body is notified for are not written in their ordinal order, in which the
+        /// content holds them (SPECIFICATION.md 2, Written forms); null otherwise. Written again, they would be another
+        /// text than the one hashed. A legislation given twice the constructor refuses.
+        /// </summary>
+        /// <param name="Id">The identification of the body, for the error.</param>
+        /// <param name="NotifiedFor">The legislations as read.</param>
+        private static String? NotifiedForOutOfOrder(ConformityAssessmentBody_Id  Id,
+                                                     ImmutableArray<String>       NotifiedFor)
+        {
+
+            for (var index = 1; index < NotifiedFor.Length; index++)
+                if (String.CompareOrdinal(NotifiedFor[index - 1], NotifiedFor[index]) > 0)
+                    return $"The legislations the conformity assessment body '{Id}' is notified for are written in their ordinal order!";
+
+            return null;
+
+        }
+
+        #endregion
+
         #region (static) TryParse(JSON, out ConformityAssessmentBody, out ErrorResponse)
 
         /// <summary>
@@ -510,6 +533,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseString (JSON, PropertyKeys.NotifiedBodyNumber,  "notified body number",      out var notifiedBodyNumber,  out ErrorResponse) ||
                     !POIJSON.TryParseStrings(JSON, PropertyKeys.NotifiedFor,         "legislations notified for", out var notifiedFor,         out ErrorResponse))
                 {
+                    return false;
+                }
+
+                if (NotifiedForOutOfOrder(id, notifiedFor) is String notifiedForError)
+                {
+                    ErrorResponse = notifiedForError;
                     return false;
                 }
 
@@ -769,6 +798,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!POIJSON.TryParseString (json, PropertyKeys.NotifiedBodyNumber,  "notified body number",      out var notifiedBodyNumber,  out ErrorResponse) ||
                     !POIJSON.TryParseStrings(json, PropertyKeys.NotifiedFor,         "legislations notified for", out var notifiedFor,         out ErrorResponse))
                 {
+                    return false;
+                }
+
+                if (NotifiedForOutOfOrder(id, notifiedFor) is String notifiedForError)
+                {
+                    ErrorResponse = notifiedForError;
                     return false;
                 }
 

@@ -70,9 +70,9 @@ A version of a roaming network is identified by its **content**: its JSON repres
   revision counter; internal data.
 - **Written forms:** the content holds every value as its entity writes it, read again; what a change set gives is what
   the content holds (section 4, "New values"). A reader MUST refuse a key of a party (section 4.1) written otherwise - a
-  timestamp in another form or `null`, a `key` in CBOR that is not deterministic -, as it refuses a new value written
-  otherwise: written again, it would be another text than the one hashed. An implementation MUST write the values it
-  gives so:
+  timestamp in another form or `null`, a `key` in CBOR that is not deterministic -, and the `notifiedFor` of a
+  conformity assessment body out of its ordinal order, as it refuses a new value written otherwise: written again, it
+  would be another text than the one hashed. An implementation MUST write the values it gives so:
   - **Order:** the order of properties does not matter, as canonical JSON sorts them. Arrays are in the order the
     content holds them in, each element once (an element given twice is refused):
     - in the ordinal order of their identifications, as written: embedded entities, brands, charging connectors, energy

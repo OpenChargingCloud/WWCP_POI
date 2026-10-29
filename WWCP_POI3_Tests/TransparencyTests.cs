@@ -595,6 +595,48 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_body_names_its_legislations_in_their_ordinal_order()
+
+        /// <summary>
+        /// The legislations a body is notified for are read as the content holds them, in their ordinal order
+        /// (SPECIFICATION.md 2, Written forms): written otherwise they would be written again as another text than the one
+        /// hashed (D13 of WWCPPOIConformanceTests, of keys). Ordinal: "MID" before "mid"; one given twice the constructor
+        /// refuses.
+        /// </summary>
+        [Test]
+        public void A_body_names_its_legislations_in_their_ordinal_order()
+        {
+
+            var json = NewBody(PTB, [ ConformityAssessmentBody.Legislations.CRA, ConformityAssessmentBody.Legislations.MID ]).ToJSON();
+
+            JObject With(params String[] NotifiedFor)
+            {
+                var copy = (JObject) json.DeepClone();
+                copy["notifiedFor"] = new JArray(NotifiedFor);
+                return copy;
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(json["notifiedFor"]!.ToObject<String[]>(),                                   Is.EqualTo(new[] { "CRA", "MID" }));
+                Assert.That(ConformityAssessmentBody.TryParse(json,                   out _, out var error), Is.True, error);
+                Assert.That(ConformityAssessmentBody.TryParse(With("MID", "mid"),     out _, out error),     Is.True, error);
+
+                Assert.That(ConformityAssessmentBody.TryParse(With("MID", "CRA"),     out _, out error),     Is.False);
+                Assert.That(error,                                                                       Is.EqualTo($"The legislations the conformity assessment body '{PTB}' is notified for are written in their ordinal order!"));
+                Assert.That(ConformityAssessmentBody.TryParse(With("mid", "MID"),     out _, out error),     Is.False);
+                Assert.That(ConformityAssessmentBody.TryParse(With("MID", ""),        out _, out error),     Is.False);
+                Assert.That(error,                                                                       Does.Contain("ordinal order"));
+                Assert.That(ConformityAssessmentBody.TryParse(With("MID", "MID"),     out _, out error),     Is.False);
+                Assert.That(error,                                                                       Does.Contain("must not be given twice"));
+
+            }
+
+        }
+
+        #endregion
+
         #region The_roaming_network_operator_says_what_a_body_is_notified_for()
 
         /// <summary>
