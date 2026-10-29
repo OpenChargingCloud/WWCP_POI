@@ -87,6 +87,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(history + "/tips");
+
             #endregion
 
             #region GET  ~/RNs/{roamingNetworkId}/history/haveIds
@@ -100,6 +102,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : errorResponse
 
                        ));
+
+            AddReadPreflight(history + "/haveIds");
 
             #endregion
 

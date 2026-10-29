@@ -154,6 +154,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(History + "/epoch");
+
             #endregion
 
             #region GET ~/RNs/{roamingNetworkId}/history/epochs
@@ -168,6 +170,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(History + "/epochs");
+
             #endregion
 
             #region GET ~/RNs/{roamingNetworkId}/history/epochs/{epoch}/checkpoints
@@ -181,6 +185,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                : errorResponse
 
                        ));
+
+            AddReadPreflight(History + "/epochs/{epoch}/checkpoints");
 
             #endregion
 
@@ -203,6 +209,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(History + "/epochs/{epoch}/checkpoints/{checkpointId}");
+
             #endregion
 
             #region GET ~/RNs/{roamingNetworkId}/history/epochs/{epoch}/commits/{commitId}
@@ -224,6 +232,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(History + "/epochs/{epoch}/commits/{commitId}");
+
             #endregion
 
             #region GET ~/RNs/{roamingNetworkId}/history/epochs/{epoch}/commits/{commitId}/proof
@@ -244,6 +254,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            : ErrorResponse(request, HTTPStatusCode.NotFound, proofError)
 
                        ));
+
+            AddReadPreflight(History + "/epochs/{epoch}/commits/{commitId}/proof");
 
             #endregion
 

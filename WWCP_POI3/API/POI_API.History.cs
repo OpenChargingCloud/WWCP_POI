@@ -310,6 +310,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(history + "/head");
+
             #endregion
 
             #region GET ~/RNs/{roamingNetworkId}/history/snapshot
@@ -328,6 +330,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      : SnapshotResponse(request, roamingNetworkHistory, request.QueryString.GetString("runtimeStatus") != "false")
 
                        )));
+
+            AddReadPreflight(history + "/snapshot");
 
             #endregion
 
@@ -348,6 +352,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            : ErrorResponse(request, HTTPStatusCode.NotFound, error)
 
                        )));
+
+            AddReadPreflight(history + "/commitInfos");
 
             #endregion
 
@@ -388,6 +394,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        }));
 
+            AddReadPreflight(history + "/commits", HTTPMethod.POST);
+
             #endregion
 
             #region COMMIT ~/RNs/{roamingNetworkId}/history/changeSets
@@ -424,6 +432,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            : ErrorResponse(request, HTTPStatusCode.NotFound, $"The commit '{commitId}' is unknown here!")
 
                        ));
+
+            AddReadPreflight(history + "/commits/{commitId}");
 
             #endregion
 
@@ -761,7 +771,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private static) JSONResponse (Request, StatusCode, JSON, CBOR = null)
 
         /// <summary>
-        /// An answer in JSON, or in CBOR when the request prefers it, never cached.
+        /// An answer in JSON, or in CBOR when the request prefers it, never cached; the answer to a read readable from
+        /// every origin, as the entities are, the answer to a change not.
         /// The CBOR has the keys and values of the JSON, unless given.
         /// </summary>
         private static HTTPResponse JSONResponse(HTTPRequest        Request,
@@ -772,22 +783,62 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => WantsCBOR(Request)
 
                    ? new HTTPResponse.Builder(Request) {
-                         HTTPStatusCode  = StatusCode,
-                         ContentType     = HTTPContentType.Application.CBOR,
-                         Content         = (CBOR is not null
-                                                ? CBOR()
-                                                : CBORJSON.ToCBOR(JSON)).ToByteArray(CBORWriterOptions.Canonical),
-                         CacheControl    = "no-store",
-                         Vary            = "Accept"
+                         HTTPStatusCode            = StatusCode,
+                         ContentType               = HTTPContentType.Application.CBOR,
+                         Content                   = (CBOR is not null
+                                                          ? CBOR()
+                                                          : CBORJSON.ToCBOR(JSON)).ToByteArray(CBORWriterOptions.Canonical),
+                         CacheControl              = "no-store",
+                         Vary                      = "Accept",
+                         AccessControlAllowOrigin  = IsRead(Request) ? "*" : null
                      }.AsImmutable
 
                    : new HTTPResponse.Builder(Request) {
-                         HTTPStatusCode  = StatusCode,
-                         ContentType     = HTTPContentType.Application.JSON_UTF8,
-                         Content         = Encoding.UTF8.GetBytes(POIJSON.ToText(JSON)),
-                         CacheControl    = "no-store",
-                         Vary            = "Accept"
+                         HTTPStatusCode            = StatusCode,
+                         ContentType               = HTTPContentType.Application.JSON_UTF8,
+                         Content                   = Encoding.UTF8.GetBytes(POIJSON.ToText(JSON)),
+                         CacheControl              = "no-store",
+                         Vary                      = "Accept",
+                         AccessControlAllowOrigin  = IsRead(Request) ? "*" : null
                      }.AsImmutable;
+
+        #endregion
+
+        #region (private static) IsRead       (Request)
+
+        /// <summary>
+        /// Whether the request reads, GET or HEAD, rather than changes something.
+        /// </summary>
+        private static Boolean IsRead(HTTPRequest Request)
+
+            => Request.HTTPMethod == HTTPMethod.GET ||
+               Request.HTTPMethod == HTTPMethod.HEAD;
+
+        #endregion
+
+        #region (private)        AddReadPreflight(Path, params Changes)
+
+        /// <summary>
+        /// Answer OPTIONS of a read of a history with the CORS permissions of every origin, as for the entities: GET and
+        /// HEAD, so that a page of another site may read what is served to everyone. Not the given methods of the same
+        /// path that change something: Allow names them, Access-Control-Allow-Methods does not, and a browser asked by
+        /// such a page sends none of them (POI3-ISSUES.md S23).
+        /// </summary>
+        private void AddReadPreflight(HTTPPath             Path,
+                                      params HTTPMethod[]  Changes)
+
+            => AddHandler(Path,
+                          HTTPMethod:    HTTPMethod.OPTIONS,
+                          HTTPDelegate:  request => Task.FromResult(
+                                             new HTTPResponse.Builder(request) {
+                                                 HTTPStatusCode             = HTTPStatusCode.NoContent,
+                                                 Allow                      = [ .. EntityMethods, .. Changes ],
+                                                 AccessControlAllowOrigin   = "*",
+                                                 AccessControlAllowMethods  = EntityMethods,
+                                                 AccessControlAllowHeaders  = EntityRequestHeaders,
+                                                 AccessControlMaxAge        = 86400
+                                             }.AsImmutable
+                                         ));
 
         #endregion
 

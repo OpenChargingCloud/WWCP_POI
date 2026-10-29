@@ -125,6 +125,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(History + "/priceStatements", HTTPMethod.POST);
+
             #endregion
 
             #region POST ~/RNs/{roamingNetworkId}/history/priceStatements
@@ -154,6 +156,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(History + "/checkpoints/{checkpointId}/priceStatements");
+
             #endregion
 
             #region GET ~/RNs/{roamingNetworkId}/history/checkpoints/{checkpointId}/priceStatements/{digest}/proof
@@ -173,6 +177,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            : ErrorResponse(request, HTTPStatusCode.NotFound, proofError)
 
                        ));
+
+            AddReadPreflight(History + "/checkpoints/{checkpointId}/priceStatements/{digest}/proof");
 
             #endregion
 

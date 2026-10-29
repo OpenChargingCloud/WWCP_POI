@@ -752,15 +752,18 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 Archived commits are served by `GET …/commits/{commitId}` and proved by `GET …/commits/{commitId}/proof` as well.
 The requests that change something - `COMMIT`, `POST` and `DELETE` above - take a body of `application/json` or
 `application/cbor` (a `charset` aside) and answer any other `Content-Type`, or none, with 415: what a page of
-another site may make a browser send without asking first is neither.
+another site may make a browser send without asking first is neither. Every read above, `GET` and `HEAD`, is readable
+from every origin (CORS `*`), as the entities below, an error as well, and `OPTIONS` answers its preflight; a change is
+allowed no origin, and its answer is readable by none.
 
 The reads that cost what they return - the snapshots of the head and of checkpoints, pages of commits and of their
 metadata, segments of the archive, and views without parts not kept (below) - are heavy reads: a client makes at most
 `MaxHeavyReadsPerMinute` (600) of them per minute, all at once as well, over HTTP and the WebSocket together. Beyond,
-HTTP answers 429 Too Many Requests with `Retry-After`, and the WebSocket waits for the next one, `MaxHeavyReadWait`
-(10 s) at most, and answers `GenericError` beyond (`HeavyReadsRefused` counts them). A client is its address, an IPv6
-one by its /64; behind a trusted proxy the one `ClientAddressOf` says. A page of commits costs about what it returns
-(`CommitsLookedAt` counts the commits looked at), also for a server catching up from the root, page by page.
+HTTP answers 429 Too Many Requests with `Retry-After`, exposed to every origin (`Access-Control-Expose-Headers`), and
+the WebSocket waits for the next one, `MaxHeavyReadWait` (10 s) at most, and answers `GenericError` beyond
+(`HeavyReadsRefused` counts them). A client is its address, an IPv6 one by its /64; behind a trusted proxy the one
+`ClientAddressOf` says. A page of commits costs about what it returns (`CommitsLookedAt` counts the commits looked
+at), also for a server catching up from the root, page by page.
 
 It also serves the roaming networks and their entities, readable from every origin (CORS `*`), each in canonical
 JSON or CBOR with the POI ETag of its representation as HTTP `ETag` (e.g. `"json:sha256:hex:…"`); a known

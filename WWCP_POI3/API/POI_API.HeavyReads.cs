@@ -147,7 +147,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Take one of the heavy reads the client of the given request may make: null where there was one,
-        /// otherwise 429 Too Many Requests with the seconds to wait, in Retry-After as well.
+        /// otherwise 429 Too Many Requests with the seconds to wait, in Retry-After as well; readable from every
+        /// origin, as what it refuses is.
         /// </summary>
         private HTTPResponse? TooManyHeavyReads(HTTPRequest Request)
         {
@@ -160,18 +161,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var retryAfter  = Math.Max(1, (Int32) Math.Ceiling(decision.RetryAfter.TotalSeconds));
             var json        = new JObject(new JProperty(PropertyKeys.Description, $"Too many heavy reads: try again in {retryAfter} seconds!"));
 
-            return new HTTPResponse.Builder(Request) {
-                       HTTPStatusCode  = HTTPStatusCode.TooManyRequests,
-                       ContentType     = WantsCBOR(Request)
-                                             ? HTTPContentType.Application.CBOR
-                                             : HTTPContentType.Application.JSON_UTF8,
-                       Content         = WantsCBOR(Request)
-                                             ? CBORJSON.ToCBOR(json).ToByteArray(CBORWriterOptions.Canonical)
-                                             : Encoding.UTF8.GetBytes(POIJSON.ToText(json)),
-                       RetryAfter      = retryAfter.ToString(CultureInfo.InvariantCulture),
-                       CacheControl    = "no-store",
-                       Vary            = "Accept"
-                   }.AsImmutable;
+            var response    = new HTTPResponse.Builder(Request) {
+                                  HTTPStatusCode            = HTTPStatusCode.TooManyRequests,
+                                  ContentType               = WantsCBOR(Request)
+                                                                  ? HTTPContentType.Application.CBOR
+                                                                  : HTTPContentType.Application.JSON_UTF8,
+                                  Content                   = WantsCBOR(Request)
+                                                                  ? CBORJSON.ToCBOR(json).ToByteArray(CBORWriterOptions.Canonical)
+                                                                  : Encoding.UTF8.GetBytes(POIJSON.ToText(json)),
+                                  RetryAfter                = retryAfter.ToString(CultureInfo.InvariantCulture),
+                                  CacheControl              = "no-store",
+                                  Vary                      = "Accept",
+                                  AccessControlAllowOrigin  = "*"
+                              };
+
+            // Not a CORS-safelisted response header: a script of another origin sees it only when exposed.
+            response.Set("Access-Control-Expose-Headers", "Retry-After");
+
+            return response.AsImmutable;
 
         }
 

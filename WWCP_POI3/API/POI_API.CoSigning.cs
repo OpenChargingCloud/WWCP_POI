@@ -81,6 +81,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(pending, HTTPMethod.POST);
+
             #endregion
 
             #region POST   ~/RNs/{roamingNetworkId}/history/changeSets/pending
@@ -105,6 +107,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      : ErrorResponse(request, HTTPStatusCode.NotFound, $"No change set '{changeSetId}' waits for signatures here!")
 
                        ));
+
+            AddReadPreflight(pending + "/{changeSetId}", HTTPMethod.DELETE);
 
             #endregion
 

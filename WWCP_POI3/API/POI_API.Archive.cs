@@ -57,6 +57,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(History + "/archive");
+
             #endregion
 
             #region GET ~/RNs/{roamingNetworkId}/history/archive/{number}
@@ -77,6 +79,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            : ErrorResponse(request, HTTPStatusCode.NotFound, $"The archive has no segment {number} here!")
 
                        )));
+
+            AddReadPreflight(History + "/archive/{number}");
 
             #endregion
 

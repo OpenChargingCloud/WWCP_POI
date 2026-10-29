@@ -137,6 +137,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(History + "/checkpoints", HTTPMethod.POST);
+
             #endregion
 
             #region POST ~/RNs/{roamingNetworkId}/history/checkpoints
@@ -159,6 +161,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(History + "/checkpoints/{checkpointId}");
+
             #endregion
 
             #region GET ~/RNs/{roamingNetworkId}/history/checkpoints/{checkpointId}/snapshot
@@ -175,6 +179,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      : ErrorResponse(request, HTTPStatusCode.NotFound, snapshotError)
 
                        )));
+
+            AddReadPreflight(History + "/checkpoints/{checkpointId}/snapshot");
 
             #endregion
 
@@ -197,6 +203,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                        ));
 
+            AddReadPreflight(History + "/checkpoints/{checkpointId}/commits/{commitId}/proof");
+
             #endregion
 
             #region GET ~/RNs/{roamingNetworkId}/history/commits/{commitId}/proof
@@ -217,6 +225,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            : ErrorResponse(request, HTTPStatusCode.NotFound, proofError)
 
                        ));
+
+            AddReadPreflight(History + "/commits/{commitId}/proof");
 
             #endregion
 
