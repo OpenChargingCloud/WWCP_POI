@@ -220,8 +220,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             IdentityKeys = [];
 
-            return POIJSON.TryParseObjects(JSON, PropertyKeys.SigningKeys,  "signing key",   POIPublicKey.TryParse, out SigningKeys,  out ErrorResponse) &&
-                   POIJSON.TryParseObjects(JSON, PropertyKeys.IdentityKeys, "identity key",  POIPublicKey.TryParse, out IdentityKeys, out ErrorResponse);
+            return POIJSON.TryParseObjects(JSON, PropertyKeys.SigningKeys,  "signing key",   TryParseKey, out SigningKeys,  out ErrorResponse) &&
+                   POIJSON.TryParseObjects(JSON, PropertyKeys.IdentityKeys, "identity key",  TryParseKey, out IdentityKeys, out ErrorResponse);
+
+        }
+
+        #endregion
+
+        #region (private static) TryParseKey(JSON, out Key, out ErrorResponse)
+
+        /// <summary>
+        /// What a key of a party names, as POIPublicKey.TryParse reads it.
+        /// </summary>
+        private static readonly String[] KeyProperties = [ POIPublicKey.PropertyKeys.Id,
+                                                           POIPublicKey.PropertyKeys.Context,
+                                                           POIPublicKey.PropertyKeys.Key,
+                                                           POIPublicKey.PropertyKeys.NotBefore,
+                                                           POIPublicKey.PropertyKeys.NotAfter,
+                                                           POIPublicKey.PropertyKeys.Holder,
+                                                           POIPublicKey.PropertyKeys.Usages ];
+
+        /// <summary>
+        /// Try to parse a key of a party as POIPublicKey.TryParse reads it, naming nothing else: another property the
+        /// content would leave out, written again (SPECIFICATION.md, section 2, Written forms).
+        /// </summary>
+        private static Boolean TryParseKey(JObject                                 JSON,
+                                           [NotNullWhen(true)]  out POIPublicKey?  Key,
+                                           [NotNullWhen(false)] out String?        ErrorResponse)
+        {
+
+            if (!POIPublicKey.TryParse(JSON, out Key, out ErrorResponse))
+                return false;
+
+            if (JSON.Properties().FirstOrDefault(property => !KeyProperties.Contains(property.Name)) is JProperty unread)
+            {
+                ErrorResponse = $"The public key '{Key.Id}' must not name the property '{unread.Name}'!";
+                Key           = null;
+                return false;
+            }
+
+            return true;
 
         }
 

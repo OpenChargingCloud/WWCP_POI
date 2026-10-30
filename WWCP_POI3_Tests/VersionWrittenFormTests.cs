@@ -242,6 +242,25 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_key_of_a_party_names_nothing_else()
+
+        /// <summary>
+        /// A key of a party names nothing else than what a key has: another property is refused where the key is read, in
+        /// the words of WWCP_POI.TS, before the version is compared with what it writes.
+        /// </summary>
+        [Test]
+        public void A_key_of_a_party_names_nothing_else()
+        {
+
+            var keyId = GEF(Version())["signingKeys"]![0]!["@id"]!.Value<String>();
+
+            Assert.That(Refusal(version => GEF(version)["signingKeys"]![0]!["x"] = 1),
+                        Does.Contain($"The public key '{keyId}' must not name the property 'x'!"));
+
+        }
+
+        #endregion
+
     }
 
 }

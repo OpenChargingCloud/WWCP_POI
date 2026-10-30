@@ -191,6 +191,43 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_merchant_as_the_content_holds_it()
+
+        /// <summary>
+        /// A merchant and its exchanges name nothing else than what they have, their base URLs and currencies as they write
+        /// them, their exchanges in the ordinal order of their master public keys: given otherwise, the version is refused,
+        /// as written again it would be another text than the one hashed (SPECIFICATION.md, section 2, Written forms).
+        /// </summary>
+        [Test]
+        public void A_merchant_as_the_content_holds_it()
+        {
+
+            String? Refusal(Action<JObject, JObject> Change)
+            {
+                var json      = NewNetwork(Merchant()).ToJSON(IncludeETags: false);
+                var merchant  = (JObject) OperatorJSON(json)["evTaler"]!;
+                Change(merchant, (JObject) merchant["exchanges"]![0]!);
+                return RoamingNetwork.TryParse(json, out _, out var error) ? null : error;
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(Refusal((_, _) => { }),                                                     Is.Null);
+                Assert.That(Refusal((merchant, _) => merchant["x"] = 1),                                Does.Contain("The EV Taler merchant must not name the property 'x'!"));
+                Assert.That(Refusal((_, exchange) => exchange["x"] = 1),                                Does.Contain($"Invalid exchange of an EV Taler merchant: The exchange '{EURExchangeKey}' must not name the property 'x'!"));
+                Assert.That(Refusal((merchant, _) => merchant["merchantBaseURL"] = "taler.gef.example/instances/de-gef/"),
+                            Does.Contain("The merchant base URL 'taler.gef.example/instances/de-gef/' is written as 'https://taler.gef.example/instances/de-gef/'!"));
+                Assert.That(Refusal((_, exchange) => exchange["currency"] = " EUR"),                    Does.Contain($"The currency ' EUR' of the exchange '{EURExchangeKey}' is written as 'EUR'!"));
+                Assert.That(Refusal((merchant, _) => merchant["exchanges"] = new JArray(((JArray) merchant["exchanges"]!).Reverse())),
+                            Is.EqualTo("'chargingStationOperators[0].evTaler.exchanges' is not written as the content holds it: its elements are in the order the content holds them in!"));
+
+            }
+
+        }
+
+        #endregion
+
         #region An_operator_names_its_EV_Taler_merchant()
 
         /// <summary>

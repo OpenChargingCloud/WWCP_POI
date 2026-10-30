@@ -316,8 +316,50 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            ErrorResponse = null;
+            // What it takes and writes otherwise, after all it refuses: the merchant, then its exchanges as given.
+            ErrorResponse = NotWrittenAsRead(JSON, EVTalerMerchant);
+
+            for (var index = 0; ErrorResponse is null && index < exchanges.Count; index++)
+                if (EVTalerExchange.NotWrittenAsRead((JObject) exchangesJSON[index], exchanges[index]) is String exchangeError)
+                    ErrorResponse = $"Invalid exchange of an EV Taler merchant: {exchangeError}";
+
+            if (ErrorResponse is not null)
+            {
+                EVTalerMerchant = null;
+                return false;
+            }
+
             return true;
+
+        }
+
+        #endregion
+
+        #region (private static) NotWrittenAsRead(JSON, EVTalerMerchant)
+
+        /// <summary>
+        /// What a merchant names, as TryParse reads it.
+        /// </summary>
+        private static readonly String[] ReadProperties = [ PropertyKeys.Context, PropertyKeys.MerchantBaseURL, PropertyKeys.MerchantPublicKey, PropertyKeys.Exchanges ];
+
+        /// <summary>
+        /// The error, when the given merchant, read from the given JSON, is not written as it was given: a property it does
+        /// not read, which it leaves out, or a base URL it writes otherwise, e.g. with its scheme or trimmed. The content
+        /// holds it only as it writes it (SPECIFICATION.md, section 2, Written forms).
+        /// </summary>
+        private static String? NotWrittenAsRead(JObject          JSON,
+                                                EVTalerMerchant  EVTalerMerchant)
+        {
+
+            if (JSON.Properties().FirstOrDefault(property => !ReadProperties.Contains(property.Name)) is JProperty unread)
+                return $"The EV Taler merchant must not name the property '{unread.Name}'!";
+
+            var merchantBaseURL = JSON[PropertyKeys.MerchantBaseURL]!.Value<String>();
+
+            if (merchantBaseURL != EVTalerMerchant.MerchantBaseURL.ToString())
+                return $"The merchant base URL '{merchantBaseURL}' is written as '{EVTalerMerchant.MerchantBaseURL}'!";
+
+            return null;
 
         }
 
@@ -544,6 +586,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             ErrorResponse = null;
             return true;
+
+        }
+
+        #endregion
+
+        #region (internal static) NotWrittenAsRead(JSON, EVTalerExchange)
+
+        /// <summary>
+        /// What an exchange names, as TryParse reads it.
+        /// </summary>
+        private static readonly String[] ReadProperties = [ PropertyKeys.Context, PropertyKeys.MasterPublicKey, PropertyKeys.BaseURL, PropertyKeys.Currency, PropertyKeys.Name ];
+
+        /// <summary>
+        /// The error, when the given exchange, read from the given JSON, is not written as it was given: a property it does
+        /// not read, which it leaves out, a base URL it writes otherwise, e.g. with its scheme, or a currency it writes by
+        /// its code. Its merchant checks it, after all it refuses (SPECIFICATION.md, section 2, Written forms).
+        /// </summary>
+        internal static String? NotWrittenAsRead(JObject          JSON,
+                                                 EVTalerExchange  EVTalerExchange)
+        {
+
+            if (JSON.Properties().FirstOrDefault(property => !ReadProperties.Contains(property.Name)) is JProperty unread)
+                return $"The exchange '{EVTalerExchange.MasterPublicKey}' must not name the property '{unread.Name}'!";
+
+            var baseURL = JSON[PropertyKeys.BaseURL]!.Value<String>();
+
+            if (baseURL != EVTalerExchange.BaseURL.ToString())
+                return $"The base URL '{baseURL}' of the exchange '{EVTalerExchange.MasterPublicKey}' is written as '{EVTalerExchange.BaseURL}'!";
+
+            var currency = JSON[PropertyKeys.Currency]!.Value<String>();
+
+            if (currency != EVTalerExchange.Currency.ISOCode)
+                return $"The currency '{currency}' of the exchange '{EVTalerExchange.MasterPublicKey}' is written as '{EVTalerExchange.Currency.ISOCode}'!";
+
+            return null;
 
         }
 
