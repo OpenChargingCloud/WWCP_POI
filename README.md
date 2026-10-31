@@ -595,6 +595,17 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   (`RoamingNetwork.CreateTrustAnchor(keyStatement, url, mirrorURL)`), and verifies proofs with `proof.Verify(anchor, …)`:
   only the thumbprints, which of them one holder holds, and the `minConsensus` are pinned. The holders are counted as
   the trust anchor names them, never as a key statement names them, and a key keeps its holder.
+- **Trust contexts:** an app that lets its users import a trust anchor before they trust its keys verifies not
+  against that anchor, which trusts every identity key it pins, but against a context it evaluates of the keys it
+  trusts locally, as WWCP_POI.TS 0.1.1 does (`TrustContext`): `RoamingNetworkTrustContext.Evaluate(anchor,
+  keyStatement, trustedKeyIds, operatorIdentityKeys, at)` reports the signatures, the signers, the quorum and the
+  validity of the key statement apart (`CanTrustKeys` lets it import validly signed data without a quorum), and gives
+  the context only where all of them hold; `TryCreate(…)` the same. Of the holders of the trust anchor the context
+  keeps the keys trusted, two of one holder counting once, and binds the roaming network, its operator, the content of
+  the key statement (`GetContentBytes()`) and the time it was evaluated at. `proof.Verify(context, …)`,
+  `proof.Verify(checkpoint, context, …)` and `history.VerifyHead(context, …)` take it in place of a trust anchor;
+  another key statement, even one signed genuinely, or another time needs another context. The app keeps its
+  decisions and evaluates a context of them for every verification: a context is no revocation and is not stored.
 
 ### Price statements
 
@@ -1082,6 +1093,10 @@ Decisions taken by the maintainer between alternatives the agent laid out:
   upper case, an empty list, `null` or a property its type does not define,
   is refused, in the words of WWCP_POI.TS ("'…' is not written as the
   content holds it: …!"). An entity read alone is not held to it.
+- **2026-10-31 – Trust contexts as WWCP_POI.TS 0.1.1 has them:** a verifier
+  takes a context of the identity keys an app trusts locally in place of a
+  trust anchor (`RoamingNetworkTrustContext`), so that importing an anchor
+  authorizes nothing; given a trust anchor, it verifies as before.
 
 ### Rejected suggestions
 

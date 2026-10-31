@@ -53,10 +53,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #region (static) Key(Network, Holder, Kind, Number = 1)
 
-        private static (ECPrivateKeyParameters Private, POIPublicKey Public) Key(RoamingNetwork  Network,
-                                                                                 String          Holder,
-                                                                                 POIKeyKind      Kind,
-                                                                                 Int32           Number   = 1)
+        internal static (ECPrivateKeyParameters Private, POIPublicKey Public) Key(RoamingNetwork  Network,
+                                                                                  String          Holder,
+                                                                                  POIKeyKind      Kind,
+                                                                                  Int32           Number   = 1)
 
             => TestParties.QuorumKey(Network.Id, Holder, Kind, Number);
 
@@ -69,9 +69,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         /// the given minConsensus; optionally one holder with a second signing key, e.g. while it renews its key, and one
         /// with a second identity key, valid from a day before T0 for two years, its first one until 30 days after T0.
         /// </summary>
-        private static RoamingNetwork Network(Byte     MinConsensus         = 2,
-                                              String?  ExtraSigningKeyOf    = null,
-                                              String?  ExtraIdentityKeyOf   = null)
+        internal static RoamingNetwork Network(Byte     MinConsensus         = 2,
+                                               String?  ExtraSigningKeyOf    = null,
+                                               String?  ExtraIdentityKeyOf   = null)
         {
 
             var network       = StationProofTests.NewNetwork();
@@ -183,7 +183,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         /// <summary>
         /// The @ids of the identity keys of the operator of the given network per holder, as a trust anchor names them.
         /// </summary>
-        private static String[][] HoldersOf(RoamingNetwork Network)
+        internal static String[][] HoldersOf(RoamingNetwork Network)
 
             => [ .. Network.Operator!.IdentityKeys.GroupBy(key => key.HolderOrUnnamed, StringComparer.Ordinal).
                                                    Select (holder => holder.Select(key => key.Id).ToArray()) ];

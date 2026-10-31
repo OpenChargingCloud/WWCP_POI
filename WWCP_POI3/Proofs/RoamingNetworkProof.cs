@@ -364,6 +364,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region Verify(TrustContext, out Attestation, out ErrorResponse, At = null)
+
+        /// <summary>
+        /// Verify this proof against the given trust context of its roaming network, which an app evaluated of the identity
+        /// keys of a trust anchor it trusts locally (RoamingNetworkTrustContext): as against a trust anchor pinning only
+        /// those, the key statement of the operator this proof gives the one the context was evaluated of, at the time it was
+        /// evaluated at. Against a trust anchor, Verify(TrustAnchor, …) trusts every identity key it pins.
+        /// </summary>
+        /// <param name="TrustContext">The trust context.</param>
+        /// <param name="Attestation">One of the attestations it was verified against.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="At">When it must be valid: the time the context was evaluated at, which it is by default.</param>
+        public Boolean Verify(RoamingNetworkTrustContext                            TrustContext,
+                              [NotNullWhen(true)]  out RoamingNetworkAttestation?   Attestation,
+                              [NotNullWhen(false)] out String?                      ErrorResponse,
+                              DateTimeOffset?                                       At   = null)
+        {
+
+            Attestation = null;
+
+            if (TrustContext.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
+            {
+                ErrorResponse = $"The trust context is one of the roaming network '{TrustContext.RoamingNetworkId}'!";
+                return false;
+            }
+
+            if (!TrustContext.TryGetEvaluationTime(At, out var at, out ErrorResponse))
+                return false;
+
+            return VerifyRoot(TrustContext.TrustedHolders,
+                              TrustContext.TrustAnchor.MinConsensus,
+                              TrustContext,
+                              out Attestation,
+                              out ErrorResponse,
+                              at);
+
+        }
+
+        #endregion
+
         #region TrustAnchorTextMismatch(TrustAnchor)
 
         /// <summary>
@@ -445,13 +485,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               [NotNullWhen(false)] out String?                      ErrorResponse,
                               DateTimeOffset?                                       At             = null,
                               Byte                                                  MinConsensus   = 1)
+
+            => VerifyRoot(TrustedHolders,
+                          MinConsensus,
+                          null,
+                          out Attestation,
+                          out ErrorResponse,
+                          At ?? Timestamp.Now);
+
+        #endregion
+
+        #region (private) VerifyRoot(TrustedHolders, MinConsensus, TrustContext, out Attestation, out ErrorResponse, At)
+
+        /// <summary>
+        /// Verify this proof as Verify(TrustedHolders, …) does; with a trust context, the key statement of the operator this
+        /// proof gives must be the one it was evaluated of (RoamingNetworkTrustContext.TryVerify(…)).
+        /// </summary>
+        private Boolean VerifyRoot(IEnumerable<IEnumerable<String>>                      TrustedHolders,
+                                   Byte                                                  MinConsensus,
+                                   RoamingNetworkTrustContext?                           TrustContext,
+                                   [NotNullWhen(true)]  out RoamingNetworkAttestation?   Attestation,
+                                   [NotNullWhen(false)] out String?                      ErrorResponse,
+                                   DateTimeOffset                                        At)
         {
 
             Attestation = null;
 
-            var at = At ?? Timestamp.Now;
-
-            if (!TryGetCertifiedSigningKeys(TrustedHolders, MinConsensus, at, out var signingKeyOf, out var required, out ErrorResponse))
+            if (!TryGetCertifiedSigningKeys(TrustedHolders, MinConsensus, TrustContext, At, out var signingKeyOf, out var required, out ErrorResponse))
                 return false;
 
             // The signing key of an attestation, certified by a trusted identity key of its holder, and that holder. Valid
@@ -464,7 +524,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              attestation.VerifySignature(signingKey.Key.ToPublicKey(), signingKey.Id, out _),
                               out Attestation,
                               out ErrorResponse,
-                              at);
+                              At);
 
             #region Attested by as many holders of the signing keys certified, as the verifier knows them
 
@@ -473,7 +533,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             var holders = new HashSet<String>(StringComparer.Ordinal);
 
-            foreach (var attestation in AttestationsOf(eTag, at))
+            foreach (var attestation in AttestationsOf(eTag, At))
             {
                 if (CertifiedSigningKeyOf(attestation) is var (signingKey, holder) &&
                     attestation.VerifySignature(signingKey.Key.ToPublicKey(), signingKey.Id, out _))
@@ -519,6 +579,57 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               RoamingNetworkTrustAnchor         TrustAnchor,
                               [NotNullWhen(false)] out String?  ErrorResponse,
                               DateTimeOffset?                   At   = null)
+
+            => VerifyCheckpoint(Checkpoint,
+                                TrustAnchor,
+                                null,
+                                out ErrorResponse,
+                                At ?? Timestamp.Now);
+
+        #endregion
+
+        #region Verify(Checkpoint, TrustContext, out ErrorResponse, At = null)
+
+        /// <summary>
+        /// Verify the given checkpoint against the given trust context of its roaming network, which an app evaluated of the
+        /// identity keys of a trust anchor it trusts locally (RoamingNetworkTrustContext), with this proof of the version of
+        /// its commit: as Verify(Checkpoint, TrustAnchor, …) against a trust anchor pinning only those, the key statement of
+        /// the operator this proof gives the one the context was evaluated of, at the time it was evaluated at.
+        /// </summary>
+        /// <param name="Checkpoint">The checkpoint.</param>
+        /// <param name="TrustContext">The trust context.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="At">When the keys must be valid: the time the context was evaluated at, which it is by default.</param>
+        public Boolean Verify(RoamingNetworkCheckpoint          Checkpoint,
+                              RoamingNetworkTrustContext        TrustContext,
+                              [NotNullWhen(false)] out String?  ErrorResponse,
+                              DateTimeOffset?                   At   = null)
+        {
+
+            if (!TrustContext.TryGetEvaluationTime(At, out var at, out ErrorResponse))
+                return false;
+
+            return VerifyCheckpoint(Checkpoint,
+                                    TrustContext.AuthorizedTrustAnchor,
+                                    TrustContext,
+                                    out ErrorResponse,
+                                    at);
+
+        }
+
+        #endregion
+
+        #region (private) VerifyCheckpoint(Checkpoint, TrustAnchor, TrustContext, out ErrorResponse, At)
+
+        /// <summary>
+        /// Verify the given checkpoint as Verify(Checkpoint, TrustAnchor, …) does; with a trust context, the key statement of
+        /// the operator this proof gives must be the one it was evaluated of (RoamingNetworkTrustContext.TryVerify(…)).
+        /// </summary>
+        private Boolean VerifyCheckpoint(RoamingNetworkCheckpoint          Checkpoint,
+                                         RoamingNetworkTrustAnchor         TrustAnchor,
+                                         RoamingNetworkTrustContext?       TrustContext,
+                                         [NotNullWhen(false)] out String?  ErrorResponse,
+                                         DateTimeOffset                    At)
         {
 
             if (TrustAnchor.Id.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>() ||
@@ -545,7 +656,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!Verify(eTag, out ErrorResponse))
                 return false;
 
-            if (!TryGetCertifiedSigningKeys(TrustAnchor.Holders, TrustAnchor.MinConsensus, At ?? Timestamp.Now, out var signingKeyOf, out var required, out ErrorResponse))
+            if (!TryGetCertifiedSigningKeys(TrustAnchor.Holders, TrustAnchor.MinConsensus, TrustContext, At, out var signingKeyOf, out var required, out ErrorResponse))
                 return false;
 
             var holders = new HashSet<String>(StringComparer.Ordinal);
@@ -571,7 +682,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TryGetCertifiedSigningKeys(TrustedHolders, MinConsensus, At, out SigningKeyOf, out Required, out ErrorResponse)
+        #region (private) TryGetCertifiedSigningKeys(TrustedHolders, MinConsensus, TrustContext, At, out SigningKeyOf, out Required, out ErrorResponse)
 
         /// <summary>
         /// The signing keys of the roaming network operator this proof gives, as a verifier trusting the given identity keys
@@ -580,10 +691,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// holders as the verifier knows them, and be valid at the given time; its identity keys are trusted then as well.
         /// SigningKeyOf gives the signing key of a signature by its key identification and the time it was signed, certified
         /// by a trusted identity key of its holder, valid at that time and at the given one, and allowed to sign for the
-        /// party, with the holder of that identity key as the verifier knows it; Required how many holders must sign.
+        /// party, with the holder of that identity key as the verifier knows it; Required how many holders must sign. With a
+        /// trust context, the key statement must be the one it was evaluated of, verified against its trusted holders.
         /// </summary>
         private Boolean TryGetCertifiedSigningKeys(IEnumerable<IEnumerable<String>>                                                     TrustedHolders,
                                                    Byte                                                                                 MinConsensus,
+                                                   RoamingNetworkTrustContext?                                                          TrustContext,
                                                    DateTimeOffset                                                                       At,
                                                    [NotNullWhen(true)]  out Func<String, DateTimeOffset, (POIPublicKey SigningKey, String Holder)?>?  SigningKeyOf,
                                                    out Byte                                                                             Required,
@@ -599,9 +712,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            // A key statement trusted names identity keys to trust, e.g. those replacing pinned ones, with their holders.
-            if (!keyStatement.TryVerify(TrustedHolders, operatorIdentityKeys, out var holderOf, out ErrorResponse, MinConsensus, At))
+            // A key statement trusted names identity keys to trust, e.g. those replacing pinned ones, with their holders; of a
+            // trust context only the one it was evaluated of: it follows the keys of the operator to no successor by itself.
+            if (TrustContext is not null
+                    ? !TrustContext.TryVerify(keyStatement, operatorIdentityKeys, out var holderOf, out ErrorResponse, At)
+                    : !keyStatement.TryVerify(TrustedHolders, operatorIdentityKeys, out holderOf, out ErrorResponse, MinConsensus, At))
+            {
                 return false;
+            }
 
             var identityKeys  = keyStatement.IdentityKeys.Concat(operatorIdentityKeys).ToArray();
             var trustedIds    = holderOf.Keys.ToHashSet(StringComparer.Ordinal);

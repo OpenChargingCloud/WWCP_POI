@@ -417,9 +417,59 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   [NotNullWhen(false)] out String?         ErrorResponse,
                                   IEnumerable<RoamingNetworkAttestation>?  Attestations   = null,
                                   DateTimeOffset?                          At             = null)
+
+            => VerifyHead(TrustAnchor,
+                          null,
+                          out ErrorResponse,
+                          Attestations,
+                          At ?? Timestamp.Now);
+
+        #endregion
+
+        #region VerifyHead(TrustContext, out ErrorResponse, Attestations = null, At = null)
+
+        /// <summary>
+        /// Verify the head against the given trust context of its roaming network, which an app evaluated of the identity keys
+        /// of a trust anchor it trusts locally (RoamingNetworkTrustContext): as VerifyHead(TrustAnchor, …) against a trust
+        /// anchor pinning only those, as a proof is verified against it (RoamingNetworkProof.Verify(TrustContext, …)), at the
+        /// time it was evaluated at.
+        /// </summary>
+        /// <param name="TrustContext">The trust context.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="Attestations">The attestations of the head, those of this history otherwise.</param>
+        /// <param name="At">When they must be valid: the time the context was evaluated at, which it is by default.</param>
+        public Boolean VerifyHead(RoamingNetworkTrustContext               TrustContext,
+                                  [NotNullWhen(false)] out String?         ErrorResponse,
+                                  IEnumerable<RoamingNetworkAttestation>?  Attestations   = null,
+                                  DateTimeOffset?                          At             = null)
         {
 
-            var at            = At ?? Timestamp.Now;
+            if (!TrustContext.TryGetEvaluationTime(At, out var at, out ErrorResponse))
+                return false;
+
+            return VerifyHead(null,
+                              TrustContext,
+                              out ErrorResponse,
+                              Attestations,
+                              at);
+
+        }
+
+        #endregion
+
+        #region (private) VerifyHead(TrustAnchor, TrustContext, out ErrorResponse, Attestations, At)
+
+        /// <summary>
+        /// Verify the head as VerifyHead(TrustAnchor, …) or VerifyHead(TrustContext, …) does, whichever is given.
+        /// </summary>
+        private Boolean VerifyHead(RoamingNetworkTrustAnchor?               TrustAnchor,
+                                   RoamingNetworkTrustContext?              TrustContext,
+                                   [NotNullWhen(false)] out String?         ErrorResponse,
+                                   IEnumerable<RoamingNetworkAttestation>?  Attestations,
+                                   DateTimeOffset                           At)
+        {
+
+            var at            = At;
             var head          = Head;
             var attestations  = Attestations?.ToArray() ?? [ .. AttestationsOf(head.Commit.Id, at) ];
 
@@ -432,8 +482,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!TryGetRootProof(out var proof, out ErrorResponse, hashAlgorithm, attestations))
                     return false;
 
-                if (proof.Verify(TrustAnchor, out _, out ErrorResponse, at))
+                if (TrustContext is not null
+                        ? proof.Verify(TrustContext, out _, out ErrorResponse, at)
+                        : proof.Verify(TrustAnchor!, out _, out ErrorResponse, at))
+                {
                     return true;
+                }
 
             }
 

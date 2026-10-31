@@ -759,6 +759,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region GetContentBytes()
+
+        /// <summary>
+        /// What this key statement states, as Styx canonical JSON: its JSON-LD context, its roaming network and operator, the
+        /// identity keys and the minConsensus of the operator, when it was signed and until when it is valid; no signatures.
+        /// The same embedded or not and whoever signed it, so that a verifier binds a decision to it
+        /// (RoamingNetworkTrustContext).
+        /// </summary>
+        public Byte[] GetContentBytes()
+        {
+
+            var json = Content();
+
+            json.AddFirst(new JProperty(PropertyKeys.Context, JSONLDContext));
+
+            return CanonicalJSON.ToUTF8Bytes(json);
+
+        }
+
+        #endregion
+
         #region GetSigningBytes()
 
         /// <summary>
