@@ -203,19 +203,33 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
-        #region An_epoch_change_needs_commits_of_all_ETags()
+        #region The_epoch_change_of_the_vector_opens_the_next_epoch()
 
         /// <summary>
-        /// The epoch change of the vector opens its epoch by a genesis commit naming the effectiveTree ETag only, which
-        /// WWCP_POI.TS takes; a commit names its json, cbor and effectiveTree ETags (SPECIFICATION.md, section 2), so here it
-        /// is refused.
+        /// The epoch change of the vector, of commits naming the json, cbor and effectiveTree ETags of their versions, opens
+        /// the next epoch; its context verifies proofs of that epoch, not those attested before it began, nor attestations of
+        /// signature algorithms the epoch does not take.
         /// </summary>
         [Test]
-        public void An_epoch_change_needs_commits_of_all_ETags()
+        public void The_epoch_change_of_the_vector_opens_the_next_epoch()
         {
 
-            Assert.That(TryVerify(data["epoch"]!, out _, out var error),  Is.False);
-            Assert.That(error,  Does.Contain("json, cbor and effectiveTree"));
+            var result      = Verified("epoch");
+            var epochProof  = TSVectors.ProofOf(data["epochProof"]!);
+
+            var restricted  = new RoamingNetworkEpoch(result.Epoch.Number,
+                                                      new RoamingNetworkEpochProfiles(result.Epoch.Profiles.IdentificationHash, SignatureAlgorithms: [ "ML-DSA-65" ]));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.Epoch.Number,     Is.EqualTo(2));
+                Assert.That(result.EpochStartedAt,   Is.EqualTo(result.FirstCheckpoint!.CreatedAt));
+                Assert.That(VerifiedChargingStation.TryVerify(result.Context, epochProof, out var station, out var error, EVSEId: EVSEId),  Is.True, error);
+                Assert.That(station!.Verification.AttestedBy,  Has.Length.EqualTo(2));
+                Assert.That(VerifiedChargingStation.TryVerify(result.Context, TSVectors.ProofOf(data["baseProof"]!), out _, out _, EVSEId: EVSEId),  Is.False, "a proof of the epoch before");
+                Assert.That(VerifiedChargingStation.TryVerify(RoamingNetworkTrustContext.WithEpoch(result.Context, restricted, result.EpochStartedAt),
+                                                              epochProof, out _, out _, EVSEId: EVSEId),  Is.False, "attestations of algorithms the epoch does not take");
+            }
 
         }
 

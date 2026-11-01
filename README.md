@@ -1118,9 +1118,10 @@ Decisions taken by the maintainer between alternatives the agent laid out:
   `chargeTransparencyRecords`, the freshness of verified proofs, epochs of
   trust contexts, measurement keys, historical meter evidence, CPO document
   keys, session prices and trust transitions, in the C# style (TryX with an
-  error response); the journal of observed versions not, it is the app's. A
-  commit names its json, cbor and effectiveTree ETags also here, so the
-  epoch change of the TS vector, of the effectiveTree ETag only, is refused.
+  error response); the journal of observed versions not, it is the app's.
+  WWCP_POI.TS refuses a commit without its json, cbor and effectiveTree
+  ETags as well now, and both calculate the policy identity of a trust
+  transition of canonical JSON (`TrustTransition.PolicyIdOf`).
 
 ### Rejected suggestions
 

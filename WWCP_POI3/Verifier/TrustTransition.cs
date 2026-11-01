@@ -155,9 +155,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (static) PolicyIdOf(TrustAnchor)
 
         /// <summary>
-        /// The identity of the complete policy of a trust anchor, as Chargy calculates it (WWCP_POI.TS trustPolicyId): the
-        /// SHA-256 of the compact JSON of its network, its holders, its minConsensus and its URLs, each normalized as a URL
-        /// without trailing slashes, in their ordinal order, as lowercase hex.
+        /// The identity of the complete policy of a trust anchor (WWCP_POI.TS trustPolicyId): the SHA-256 of the canonical
+        /// JSON of {network, holders, minConsensus, urls}, its holders in their order, its URLs as absolute URIs (scheme and
+        /// host in lower case, no default port) without trailing slashes, in their ordinal order; as lowercase hex, so that
+        /// one endpoint spelled otherwise is one policy.
         /// </summary>
         /// <param name="TrustAnchor">The trust anchor.</param>
         public static String PolicyIdOf(RoamingNetworkTrustAnchor TrustAnchor)
@@ -169,7 +170,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    new JProperty("urls",          new JArray(TrustAnchor.URLs.Select(url => new Uri(url.ToString()).AbsoluteUri.TrimEnd('/')).
                                                                                               Order(StringComparer.Ordinal))));
 
-            return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(json.ToString(Formatting.None))));
+            return Convert.ToHexStringLower(SHA256.HashData(CanonicalJSON.ToUTF8Bytes(json)));
 
         }
 

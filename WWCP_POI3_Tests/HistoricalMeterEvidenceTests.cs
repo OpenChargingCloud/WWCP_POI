@@ -100,7 +100,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(result.Bindings[0].Evidence.AttestationValidUntil,            Is.LessThan(context.EvaluatedAt));
                 Assert.That(result.Bindings[0].Evidence.VerifiedAt,                       Is.EqualTo(context.EvaluatedAt));
                 Assert.That(result.Bindings[0].Evidence.ValidUntil,                       Is.EqualTo(context.ValidUntil));
-                Assert.That(result.Bindings[0].Evidence.CommitId.ToString(),              Is.EqualTo("68760b654959ebc5f7828b056fcb3d50abab86f2a1e63def4de1d8d4868c8a18"));
+                Assert.That(result.Bindings[0].Evidence.CommitId.ToString(),              Is.EqualTo("be2d88ca3c83eb385ac813293d5c82061ac847cee44b384cbe115e00fb434fcc"));
                 Assert.That(result.Bindings[0].Evidence.TreeRoot.ToString(),              Is.EqualTo("effectiveTree:sha256:hex:b169f5595b6797e21497b0aee261b00eadac6d182bcbade28d39071b01da619c"));
                 Assert.That(result.Bindings[0].Evidence.HistoricalStatementDigest,        Is.EqualTo("fb5d392b09a76f5354c114f7d3376268f041d46682f32ff645a3e041ce4a350d"));
                 Assert.That(result.Bindings[0].Evidence.HistoricalStatementDigest,        Is.Not.EqualTo(context.KeyStatementDigest));
@@ -110,7 +110,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(result.Versions,                                              Has.Length.EqualTo(1));
                 Assert.That(result.Versions[0].Publication,                               Is.EqualTo("rno-checkpoint"));
-                Assert.That(result.Versions[0].CheckpointId.ToString(),                   Is.EqualTo("ed2604cbb362c256a22a1cfcb1b0fde4ad5b6bb6451552d1fcd8697e1fc55845"));
+                Assert.That(result.Versions[0].CheckpointId.ToString(),                   Is.EqualTo("a65327ba6821312a68d1b34bfb8a8ed5d5e6266c73a296fee8ba6e2c15ddfbb9"));
                 Assert.That(result.IndependentTime,                                       Is.EqualTo("not-proven"));
 
             }
