@@ -309,6 +309,7 @@ and an identity key naming any:
 | `infrastructure` | charging pools, stations, EVSEs, their templates and groups, energy meter templates and groups, grid connection points, parking garages, spaces, sensors, products and their templates and groups |
 | `tariffs` | charging tariffs, their templates and groups, charging tariff offers |
 | `priceStatements` | price statements (section 12) |
+| `chargeTransparencyRecords` | the charge transparency records of a charging station operator, e.g. the signed documents of its charging sessions: signed outside the history, a verifier takes the key from a verified proof of the station |
 | `models` | the models of a charging station or energy meter manufacturer |
 | `software` | the transparency software releases of a transparency software manufacturer |
 | `certificates` | the certificates of a conformity assessment body, of charging station and energy meter models |

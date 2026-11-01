@@ -307,6 +307,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (static) GenesisOf(RoamingNetworkId, ETags, Epoch)
+
+        /// <summary>
+        /// The genesis commit of the given epoch after the first one, of the given ETags of the version it starts with, e.g.
+        /// those of the final checkpoint of the epoch before (WWCP_POI.TS Commit.genesisOf): whoever knows them calculates it,
+        /// e.g. a verifier of a trust transition opening the epoch.
+        /// </summary>
+        /// <param name="RoamingNetworkId">The roaming network.</param>
+        /// <param name="ETags">The ETags of the version the epoch starts with.</param>
+        /// <param name="Epoch">The epoch, after the first one.</param>
+        public static RoamingNetworkCommit GenesisOf(RoamingNetwork_Id    RoamingNetworkId,
+                                                     IEnumerable<ETag>    ETags,
+                                                     RoamingNetworkEpoch  Epoch)
+
+            => Epoch.Number > 1
+                   ? new ([],
+                          RoamingNetworkId,
+                          0,
+                          [.. ETags],
+                          null,
+                          Epoch.Number,
+                          Epoch.Profiles.IdentificationHash,
+                          Epoch.Profiles)
+                   : throw new ArgumentException("Only an epoch after the first one starts with the ETags of the one before.", nameof(Epoch));
+
+        #endregion
+
         #region (static) Next   (Parent, ChangeSet, RoamingNetwork)
 
         /// <summary>

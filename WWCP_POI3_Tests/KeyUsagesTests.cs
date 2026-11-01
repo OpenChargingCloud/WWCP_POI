@@ -295,6 +295,52 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_key_of_charge_transparency_records_signs_nothing_of_the_history()
+
+        /// <summary>
+        /// A signing key for charge transparency records is read as WWCP_POI.TS reads it, unknown usages named with it, but
+        /// signs neither a change nor a price statement: what it signs is signed outside the history.
+        /// </summary>
+        [Test]
+        public void A_key_of_charge_transparency_records_signs_nothing_of_the_history()
+        {
+
+            var records  = Key("records", POIKeyUsages.ChargeTransparencyRecords);
+            var json     = records.Public.ToJSON(Embedded: true);
+            var unknown  = (JObject) json.DeepClone();
+            unknown[POIPublicKey.PropertyKeys.Usages] = new JArray("everything");
+
+            var network  = Network(records.Public);
+            var pool     = network.CreateChangeSet([ RoamingNetworkChange.Add(new ChargingPool(ChargingPool_Id.Parse("DE*GEF*P9"), Created: T0)) ], CreatedAt: T0).
+                                   Sign(records.Private, records.Public.Id, COSEAlgorithm.ES256);
+            var prices   = RoamingNetworkPriceStatement.Create(records.Private, records.Public.Id, COSEAlgorithm.ES256, RoamingNetwork_Id.Parse("rn1"),
+                                                               nameof(EVSE), "DE*GEF*E1*1",
+                                                               new ChargingPrices([ new ChargingTariffPrices(ChargingTariff_Id.Parse("DE*GEF*T1"),
+                                                                                                             [ new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.39m, StepSize: 1) ]) ]) ]),
+                                                               0, null, T0, T0, T0.AddMinutes(15));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(json[POIPublicKey.PropertyKeys.Usages]!.ToObject<String[]>(),  Is.EqualTo(new[] { "chargeTransparencyRecords" }));
+                Assert.That(POIPublicKey.TryParse(json, out var read, out var error),       Is.True, error);
+                Assert.That(read!.MaySign(POIKeyUsages.ChargeTransparencyRecords),          Is.True);
+                Assert.That(read. MaySign(POIKeyUsages.PriceStatements),                    Is.False);
+
+                Assert.That(POIPublicKey.TryParse(unknown, out _, out error),               Is.False);
+                Assert.That(error,  Does.EndWith("is unknown: it is one of certificates, chargeTransparencyRecords, infrastructure, models, party, payments, priceStatements, software, tariffs!"));
+
+                Assert.That(network.TryApplyChangeSet(pool, out _, out var error1),         Is.False, "a pool by the key of the records");
+                Assert.That(error1,  Does.Contain("that may sign 'infrastructure'"));
+                Assert.That(prices.TryVerify([ records.Public ], out var error2),           Is.False, "a price statement by the key of the records");
+                Assert.That(error2,  Does.Contain("may not sign 'priceStatements'"));
+
+            }
+
+        }
+
+        #endregion
+
     }
 
 }

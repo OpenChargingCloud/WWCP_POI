@@ -49,6 +49,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const String PriceStatements  = "priceStatements";
 
         /// <summary>
+        /// The charge transparency records of a charging station operator, e.g. the signed documents of its charging sessions:
+        /// signed outside the history, apart from its price statements, with a key a verifier takes from a verified proof of
+        /// the station, as WWCP_POI.TS verifyChargingDocumentKeys does.
+        /// </summary>
+        public const String ChargeTransparencyRecords = "chargeTransparencyRecords";
+
+        /// <summary>
         /// The models of a charging station or energy meter manufacturer.
         /// </summary>
         public const String Models           = "models";
@@ -82,6 +89,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                        Infrastructure,
                                                                                        Tariffs,
                                                                                        PriceStatements,
+                                                                                       ChargeTransparencyRecords,
                                                                                        Models,
                                                                                        Software,
                                                                                        Certificates,

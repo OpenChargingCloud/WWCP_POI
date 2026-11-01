@@ -1,3 +1,5 @@
 # Fixed interoperability artifacts must retain their exact bytes across checkouts.
 old/docs/interoperability/*.json text eol=lf
 old/docs/interoperability/*.cbor binary
+# The vectors of WWCP_POI.TS keep the bytes they have there.
+WWCP_POI3_Tests/Vectors/TS/*.json text eol=lf

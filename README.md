@@ -606,6 +606,23 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   `proof.Verify(checkpoint, context, …)` and `history.VerifyHead(context, …)` take it in place of a trust anchor;
   another key statement, even one signed genuinely, or another time needs another context. The app keeps its
   decisions and evaluates a context of them for every verification: a context is no revocation and is not stored.
+- **Verifier extensions of WWCP_POI.TS 0.1.2-dev.0 (experimental):** `proof.TryVerify(context, out verification, …)`
+  gives the attestations counted, their holders and `ValidUntil`, the earliest end of the key statement, the
+  attestations and the keys certifying them; in an epoch a verified trust transition opened, a proof must name its
+  commit as the epoch identifies it, and only attestations of its algorithms, signed once it began, count.
+  `VerifiedChargingStation` gives what a proof attests of a station, its tariffs and the signing keys of its CPO, and
+  its current prices (`TryGetCurrentPrices`). `VerifiedMeterKeyBinding` binds the one P-256 key of the meter of an EVSE
+  of a given serial number, as SubjectPublicKeyInfo or COSE key with one canonical identity, never searching other
+  meters or keys. `HistoricalMeterEvidence` (`historicalMeterEvidence/v1`) verifies the keys of a meter at the signed
+  times of measurements with the operator of that time, under the current local authorization or a
+  `HistoricalTrustContext` of a saved key statement, its publication in checkpoints (`AuthorizedCheckpoint`) as the
+  verifier's own witnesses and revocations require. `AuthorizedChargingDocumentKeys` gives the keys of a CPO that may
+  sign `chargeTransparencyRecords`. `SessionPriceAgreement` and `SessionPriceEvidence` (`sessionPriceAgreement/v1`,
+  `sessionPriceEvidence/v1`) let a CPO assign a price of its price statements to a session and a verifier check it
+  apart from its publication. `TrustTransition` (`trustTransition/v1`) delegates trust to a next trust anchor and
+  operator, signed by quorums of the holders of both, optionally opening the next epoch; `VerifiedTrustTransition`
+  gives the context of it. Each is made here as WWCP_POI.TS verifies it, of its vectors in `WWCP_POI3_Tests/Vectors/TS`;
+  the local journal of the versions an app observed is the app's and stays in WWCP_POI.TS.
 
 ### Price statements
 
@@ -1097,6 +1114,13 @@ Decisions taken by the maintainer between alternatives the agent laid out:
   takes a context of the identity keys an app trusts locally in place of a
   trust anchor (`RoamingNetworkTrustContext`), so that importing an anchor
   authorizes nothing; given a trust anchor, it verifies as before.
+- **2026-11-01 – WWCP_POI.TS 0.1.2-dev.0 backported:** the usage
+  `chargeTransparencyRecords`, the freshness of verified proofs, epochs of
+  trust contexts, measurement keys, historical meter evidence, CPO document
+  keys, session prices and trust transitions, in the C# style (TryX with an
+  error response); the journal of observed versions not, it is the app's. A
+  commit names its json, cbor and effectiveTree ETags also here, so the
+  epoch change of the TS vector, of the effectiveTree ETag only, is refused.
 
 ### Rejected suggestions
 

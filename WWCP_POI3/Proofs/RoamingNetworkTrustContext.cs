@@ -137,7 +137,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// decisions, not the context, which sees nothing that changes after it was evaluated. A key excluded locally is no
     /// longer trusted from the start, but a key statement signed by the quorum may still name it among its identity keys.
     /// </remarks>
-    public sealed class RoamingNetworkTrustContext
+    public sealed class RoamingNetworkTrustContext : IRoamingNetworkTrustAuthority
     {
 
         #region Properties
@@ -189,6 +189,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public DateTimeOffset                        EvaluatedAt                 { get; }
 
+        /// <summary>
+        /// The epoch a proof verified against this context must belong to (SPECIFICATION.md, section 11): the first one, unless
+        /// a verified trust transition established another (RoamingNetworkVerifiedTrustTransition).
+        /// </summary>
+        public RoamingNetworkEpoch                   Epoch                       { get; }
+
+        /// <summary>
+        /// When the epoch began, as the first checkpoint of it a verified trust transition gives says, and no attestation signed
+        /// earlier counts; none for the first epoch. Known locally, no part of what is signed.
+        /// </summary>
+        public DateTimeOffset?                       EpochStartedAt              { get; }
+
+        /// <summary>
+        /// The epochs verified so far, e.g. the one before the last trust transition, by which checkpoints are checked.
+        /// </summary>
+        public IReadOnlyList<RoamingNetworkEpoch>    Epochs                      { get; }
+
+        /// <summary>
+        /// The key statement it was evaluated of.
+        /// </summary>
+        internal RoamingNetworkKeyStatement          KeyStatement                { get; }
+
         #endregion
 
         #region (private) Constructor(s)
@@ -196,7 +218,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private RoamingNetworkTrustContext(RoamingNetworkTrustAnchor             TrustAnchor,
                                            IReadOnlyList<IReadOnlyList<String>>  TrustedHolders,
                                            RoamingNetworkKeyStatement            KeyStatement,
-                                           DateTimeOffset                        EvaluatedAt)
+                                           DateTimeOffset                        EvaluatedAt,
+                                           RoamingNetworkEpoch?                  Epoch            = null,
+                                           DateTimeOffset?                       EpochStartedAt   = null,
+                                           IEnumerable<RoamingNetworkEpoch>?     Epochs           = null)
         {
 
             this.TrustAnchor               = TrustAnchor;
@@ -217,6 +242,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.RequiredConsensus         = Math.Max(TrustAnchor.MinConsensus, KeyStatement.MinConsensus);
             this.ValidUntil                = KeyStatement.ValidUntil;
             this.EvaluatedAt               = EvaluatedAt;
+            this.Epoch                     = Epoch ?? RoamingNetworkEpoch.First;
+            this.EpochStartedAt            = EpochStartedAt;
+            this.Epochs                    = (Epochs ?? [ this.Epoch ]).ToImmutableArray();
+            this.KeyStatement              = KeyStatement;
 
         }
 
@@ -345,6 +374,51 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (static) WithEpoch(TrustContext, Epoch, EpochStartedAt, Epochs = null)
+
+        /// <summary>
+        /// The given trust context in the given epoch: only of an epoch a verified trust transition established
+        /// (RoamingNetworkVerifiedTrustTransition), as a context evaluated of the decisions of an app starts in the first one.
+        /// </summary>
+        /// <param name="TrustContext">The trust context.</param>
+        /// <param name="Epoch">The epoch.</param>
+        /// <param name="EpochStartedAt">When it began, as its first checkpoint says.</param>
+        /// <param name="Epochs">The epochs verified so far, the given one by default.</param>
+        public static RoamingNetworkTrustContext WithEpoch(RoamingNetworkTrustContext         TrustContext,
+                                                           RoamingNetworkEpoch                Epoch,
+                                                           DateTimeOffset?                    EpochStartedAt,
+                                                           IEnumerable<RoamingNetworkEpoch>?  Epochs   = null)
+
+            => new (TrustContext.TrustAnchor,
+                    TrustContext.TrustedHolders,
+                    TrustContext.KeyStatement,
+                    TrustContext.EvaluatedAt,
+                    Epoch,
+                    EpochStartedAt,
+                    Epochs ?? [ Epoch ]);
+
+        #endregion
+
+
+        #region TryGetAuthorityAt(At, out Authority, out ErrorResponse)
+
+        /// <summary>
+        /// None: a trust context of the current decisions of an app has no timeline of authorities, it is the authority.
+        /// </summary>
+        /// <param name="At">The historical time.</param>
+        /// <param name="Authority">None.</param>
+        /// <param name="ErrorResponse">None.</param>
+        public Boolean TryGetAuthorityAt(DateTimeOffset                    At,
+                                         out RoamingNetworkTrustContext?   Authority,
+                                         [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+            Authority      = null;
+            ErrorResponse  = null;
+            return true;
+        }
+
+        #endregion
 
         #region TryGetEvaluationTime(At, out EvaluationTime, out ErrorResponse)
 

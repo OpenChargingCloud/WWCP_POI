@@ -495,6 +495,81 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region TryVerify(TrustAnchor,  out Verification, out ErrorResponse, At = null)
+
+        /// <summary>
+        /// Verify this proof against the given trust anchor of its roaming network as Verify(TrustAnchor, …) does, and give
+        /// what it attests and by whom (RoamingNetworkProofVerification), e.g. until when the observation holds at most.
+        /// </summary>
+        /// <param name="TrustAnchor">The trust anchor.</param>
+        /// <param name="Verification">What the proof attests, and by whom.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="At">When it must be valid, now by default.</param>
+        public Boolean TryVerify(RoamingNetworkTrustAnchor                                  TrustAnchor,
+                                 [NotNullWhen(true)]  out RoamingNetworkProofVerification?  Verification,
+                                 [NotNullWhen(false)] out String?                           ErrorResponse,
+                                 DateTimeOffset?                                            At   = null)
+        {
+
+            Verification = null;
+
+            if (TrustAnchor.Id.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
+            {
+                ErrorResponse = $"The trust anchor is one of the roaming network '{TrustAnchor.Id}'!";
+                return false;
+            }
+
+            return TryVerifyRoot(TrustAnchor.Holders,
+                                 TrustAnchor.MinConsensus,
+                                 null,
+                                 out Verification,
+                                 out ErrorResponse,
+                                 At ?? Timestamp.Now);
+
+        }
+
+        #endregion
+
+        #region TryVerify(TrustContext, out Verification, out ErrorResponse, At = null)
+
+        /// <summary>
+        /// Verify this proof against the given trust context of its roaming network as Verify(TrustContext, …) does, and give
+        /// what it attests and by whom (RoamingNetworkProofVerification), e.g. until when the observation holds at most. In an
+        /// epoch after the first one a verified trust transition established, the commit is identified as the epoch does, and
+        /// only attestations of its signature algorithms count, signed when it had begun (SPECIFICATION.md, section 11).
+        /// </summary>
+        /// <param name="TrustContext">The trust context.</param>
+        /// <param name="Verification">What the proof attests, and by whom.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="At">When it must be valid: the time the context was evaluated at, which it is by default.</param>
+        public Boolean TryVerify(RoamingNetworkTrustContext                                 TrustContext,
+                                 [NotNullWhen(true)]  out RoamingNetworkProofVerification?  Verification,
+                                 [NotNullWhen(false)] out String?                           ErrorResponse,
+                                 DateTimeOffset?                                            At   = null)
+        {
+
+            Verification = null;
+
+            if (TrustContext.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
+            {
+                ErrorResponse = $"The trust context is one of the roaming network '{TrustContext.RoamingNetworkId}'!";
+                return false;
+            }
+
+            if (!TrustContext.TryGetEvaluationTime(At, out var at, out ErrorResponse))
+                return false;
+
+            return TryVerifyRoot(TrustContext.TrustedHolders,
+                                 TrustContext.TrustAnchor.MinConsensus,
+                                 TrustContext,
+                                 out Verification,
+                                 out ErrorResponse,
+                                 at);
+
+        }
+
+        #endregion
+
         #region (private) VerifyRoot(TrustedHolders, MinConsensus, TrustContext, out Attestation, out ErrorResponse, At)
 
         /// <summary>
@@ -509,53 +584,108 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                    DateTimeOffset                                        At)
         {
 
-            Attestation = null;
+            Attestation = TryVerifyRoot(TrustedHolders, MinConsensus, TrustContext, out var verification, out ErrorResponse, At)
+                              ? verification.Attestations[0]
+                              : null;
 
-            if (!TryGetCertifiedSigningKeys(TrustedHolders, MinConsensus, TrustContext, At, out var signingKeyOf, out var required, out ErrorResponse))
+            return Attestation is not null;
+
+        }
+
+        #endregion
+
+        #region (private) TryVerifyRoot(TrustedHolders, MinConsensus, TrustContext, out Verification, out ErrorResponse, At)
+
+        /// <summary>
+        /// Verify this proof as Verify(TrustedHolders, …) does, and give what it attests: every attestation that counts, the
+        /// holders attesting it, and until when the observation holds at most, the earliest end of the key statement, of the
+        /// attestations counted and of the signing keys and identity keys certifying them. With a trust context in an epoch
+        /// after the first one, the commit must be identified as the epoch does, and only attestations of the signature
+        /// algorithms of the epoch, signed when it had begun, count.
+        /// </summary>
+        private Boolean TryVerifyRoot(IEnumerable<IEnumerable<String>>                           TrustedHolders,
+                                      Byte                                                       MinConsensus,
+                                      RoamingNetworkTrustContext?                                TrustContext,
+                                      [NotNullWhen(true)]  out RoamingNetworkProofVerification?  Verification,
+                                      [NotNullWhen(false)] out String?                           ErrorResponse,
+                                      DateTimeOffset                                             At)
+        {
+
+            Verification = null;
+
+            if (!TryGetCertifiedSigningKeys(TrustedHolders, MinConsensus, TrustContext, At, out var keyStatement, out var signingKeyOf, out var required, out ErrorResponse))
                 return false;
 
-            // The signing key of an attestation, certified by a trusted identity key of its holder, and that holder. Valid
-            // when the attestation was signed and at the time it is verified: its signedAt is the signer's choice.
-            (POIPublicKey SigningKey, String Holder)? CertifiedSigningKeyOf(RoamingNetworkAttestation Attestation)
-                => signingKeyOf(Attestation.KeyId, Attestation.SignedAt);
-
-            if (required == 1)
-                return Verify(attestation => CertifiedSigningKeyOf(attestation) is var (signingKey, _) &&
-                                             attestation.VerifySignature(signingKey.Key.ToPublicKey(), signingKey.Id, out _),
-                              out Attestation,
-                              out ErrorResponse,
-                              At);
-
-            #region Attested by as many holders of the signing keys certified, as the verifier knows them
+            if (TrustContext is not null && TrustContext.Epoch.Number > 1 &&
+                CommitId?.ToString().Length != HexLengthOf(TrustContext.Epoch.Profiles.IdentificationHash))
+            {
+                ErrorResponse = $"The commit '{CommitId}' of the proof is not identified as its verified epoch {TrustContext.Epoch.Number} identifies it!";
+                return false;
+            }
 
             if (!TryCalculateETag(out var eTag, out ErrorResponse))
                 return false;
 
-            var holders = new HashSet<String>(StringComparer.Ordinal);
+            var counted     = new List<RoamingNetworkAttestation>();
+            var holders     = new HashSet<String>(StringComparer.Ordinal);
+            var validUntil  = keyStatement.ValidUntil;
 
+            // The signing key of an attestation, certified by a trusted identity key of its holder, and that holder. Valid
+            // when the attestation was signed and at the time it is verified: its signedAt is the signer's choice.
             foreach (var attestation in AttestationsOf(eTag, At))
             {
-                if (CertifiedSigningKeyOf(attestation) is var (signingKey, holder) &&
+
+                if (TrustContext is not null &&
+                    (!TrustContext.Epoch.Profiles.AllowsSignatureAlgorithm(attestation.Algorithm) ||
+                     attestation.SignedAt < TrustContext.EpochStartedAt))
+                {
+                    continue;
+                }
+
+                if (signingKeyOf(attestation.KeyId, attestation.SignedAt) is var (signingKey, holder, keyValidUntil) &&
                     attestation.VerifySignature(signingKey.Key.ToPublicKey(), signingKey.Id, out _))
                 {
-                    Attestation ??= attestation;
+                    counted.Add(attestation);
                     holders.Add(holder);
+                    validUntil = new[] { validUntil, attestation.ValidUntil, keyValidUntil }.Min();
                 }
+
             }
 
-            if (holders.Count >= required)
+            if (holders.Count < required)
             {
-                ErrorResponse = null;
-                return true;
+                ErrorResponse = required == 1
+                                    ? $"No valid attestation of a trusted key attests the root {eTag} of the proof as its roaming network operator!"
+                                    : $"Valid attestations of trusted keys of {holders.Count} holder{(holders.Count == 1 ? "" : "s")} attest the root {eTag} of the proof, not of {required}!";
+                return false;
             }
 
-            Attestation    = null;
-            ErrorResponse  = $"Valid attestations of trusted keys of {holders.Count} holder{(holders.Count == 1 ? "" : "s")} attest the root {eTag} of the proof, not of {required}!";
-            return false;
-
-            #endregion
+            Verification   = new RoamingNetworkProofVerification(eTag,
+                                                                  RoamingNetwork,
+                                                                  counted,
+                                                                  holders.Order(StringComparer.Ordinal),
+                                                                  keyStatement,
+                                                                  At,
+                                                                  validUntil);
+            ErrorResponse  = null;
+            return true;
 
         }
+
+        #endregion
+
+        #region (private static) HexLengthOf(HashAlgorithm)
+
+        /// <summary>
+        /// How many lowercase hexadecimal digits an identification of the given hash algorithm has.
+        /// </summary>
+        private static Int32 HexLengthOf(ETagHashAlgorithm HashAlgorithm)
+
+            => HashAlgorithm switch {
+                   ETagHashAlgorithm.SHA384  => 96,
+                   ETagHashAlgorithm.SHA512  => 128,
+                   _                         => 64
+               };
 
         #endregion
 
@@ -656,14 +786,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!Verify(eTag, out ErrorResponse))
                 return false;
 
-            if (!TryGetCertifiedSigningKeys(TrustAnchor.Holders, TrustAnchor.MinConsensus, TrustContext, At, out var signingKeyOf, out var required, out ErrorResponse))
+            if (!TryGetCertifiedSigningKeys(TrustAnchor.Holders, TrustAnchor.MinConsensus, TrustContext, At, out _, out var signingKeyOf, out var required, out ErrorResponse))
                 return false;
 
             var holders = new HashSet<String>(StringComparer.Ordinal);
 
             foreach (var signature in Checkpoint.Signatures)
                 if (signature.Role == RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator    &&
-                    signingKeyOf(signature.KeyId, signature.SignedAt) is var (signingKey, holder) &&
+                    signingKeyOf(signature.KeyId, signature.SignedAt) is var (signingKey, holder, _) &&
                     Checkpoint.VerifySignature(signature, signingKey.Key, signingKey.Id, out _))
                 {
                     holders.Add(holder);
@@ -682,7 +812,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TryGetCertifiedSigningKeys(TrustedHolders, MinConsensus, TrustContext, At, out SigningKeyOf, out Required, out ErrorResponse)
+        #region (private) TryGetCertifiedSigningKeys(TrustedHolders, MinConsensus, TrustContext, At, out KeyStatement, out SigningKeyOf, out Required, out ErrorResponse)
 
         /// <summary>
         /// The signing keys of the roaming network operator this proof gives, as a verifier trusting the given identity keys
@@ -691,18 +821,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// holders as the verifier knows them, and be valid at the given time; its identity keys are trusted then as well.
         /// SigningKeyOf gives the signing key of a signature by its key identification and the time it was signed, certified
         /// by a trusted identity key of its holder, valid at that time and at the given one, and allowed to sign for the
-        /// party, with the holder of that identity key as the verifier knows it; Required how many holders must sign. With a
-        /// trust context, the key statement must be the one it was evaluated of, verified against its trusted holders.
+        /// party, with the holder of that identity key as the verifier knows it and until when both keys are valid at most;
+        /// Required how many holders must sign. With a trust context, the key statement must be the one it was evaluated of,
+        /// verified against its trusted holders.
         /// </summary>
         private Boolean TryGetCertifiedSigningKeys(IEnumerable<IEnumerable<String>>                                                     TrustedHolders,
                                                    Byte                                                                                 MinConsensus,
                                                    RoamingNetworkTrustContext?                                                          TrustContext,
                                                    DateTimeOffset                                                                       At,
-                                                   [NotNullWhen(true)]  out Func<String, DateTimeOffset, (POIPublicKey SigningKey, String Holder)?>?  SigningKeyOf,
+                                                   [NotNullWhen(true)]  out RoamingNetworkKeyStatement?                                 KeyStatement,
+                                                   [NotNullWhen(true)]  out Func<String, DateTimeOffset, (POIPublicKey SigningKey, String Holder, DateTimeOffset ValidUntil)?>?  SigningKeyOf,
                                                    out Byte                                                                             Required,
                                                    [NotNullWhen(false)] out String?                                                     ErrorResponse)
         {
 
+            KeyStatement  = null;
             SigningKeyOf  = null;
             Required      = 0;
 
@@ -750,13 +883,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         certificate.SigningKey.MaySign(POIKeyUsages.Party)          &&
                                         certificate.TryVerify(identityKeys, out var identityKey, out _, trustedIds))
                                     {
-                                        return (certificate.SigningKey, holderOf[identityKey.Id]);
+                                        return (certificate.SigningKey,
+                                                holderOf[identityKey.Id],
+                                                new[] { certificate.SigningKey.NotAfter ?? DateTimeOffset.MaxValue,
+                                                        identityKey.           NotAfter ?? DateTimeOffset.MaxValue }.Min());
                                     }
 
                                 return null;
 
                             };
 
+            KeyStatement  = keyStatement;
             Required      = Math.Max(MinConsensus, keyStatement.MinConsensus);
 
             return true;
