@@ -56,6 +56,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const String ChargeTransparencyRecords = "chargeTransparencyRecords";
 
         /// <summary>
+        /// The receipts of an independent witness that it retrieved a price publicly (PricePublicationReceipt), as WWCP_POI.TS
+        /// takes them: its key, named in a witness publication policy of a verifier, signs nothing of the history.
+        /// </summary>
+        public const String WitnessPublications       = "witnessPublications";
+
+        /// <summary>
         /// The models of a charging station or energy meter manufacturer.
         /// </summary>
         public const String Models           = "models";
@@ -90,6 +96,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                        Tariffs,
                                                                                        PriceStatements,
                                                                                        ChargeTransparencyRecords,
+                                                                                       WitnessPublications,
                                                                                        Models,
                                                                                        Software,
                                                                                        Certificates,

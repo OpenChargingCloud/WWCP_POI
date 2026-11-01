@@ -619,7 +619,11 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   verifier's own witnesses and revocations require. `AuthorizedChargingDocumentKeys` gives the keys of a CPO that may
   sign `chargeTransparencyRecords`. `SessionPriceAgreement` and `SessionPriceEvidence` (`sessionPriceAgreement/v1`,
   `sessionPriceEvidence/v1`) let a CPO assign a price of its price statements to a session and a verifier check it
-  apart from its publication. `TrustTransition` (`trustTransition/v1`) delegates trust to a next trust anchor and
+  apart from its publication; `PricePublicationReceipt` (`pricePublicationReceipt/v1`, signed by a key that may sign
+  `witnessPublications`) lets an independent witness state that it retrieved the price publicly, and
+  `PricePublicationVerification` counts the organizations of a `WitnessPublicationPolicy` the verifier accepted
+  (`witnessPublicationPolicy/v1`) whose receipts, their clock error included, are before the signed start, no key or
+  identity of the RNO or the CPO among them. `TrustTransition` (`trustTransition/v1`) delegates trust to a next trust anchor and
   operator, signed by quorums of the holders of both, optionally opening the next epoch; `VerifiedTrustTransition`
   gives the context of it. Each is made here as WWCP_POI.TS verifies it, of its vectors in `WWCP_POI3_Tests/Vectors/TS`;
   the local journal of the versions an app observed is the app's and stays in WWCP_POI.TS.
@@ -1122,6 +1126,10 @@ Decisions taken by the maintainer between alternatives the agent laid out:
   WWCP_POI.TS refuses a commit without its json, cbor and effectiveTree
   ETags as well now, and both calculate the policy identity of a trust
   transition of canonical JSON (`TrustTransition.PolicyIdOf`).
+- **2026-11-02 – Witnessed price publication of WWCP_POI.TS 8b1946b:** the
+  usage `witnessPublications`, the receipts of witnesses and the policy of
+  the witnesses a verifier accepted, and `publicationReceipts` and
+  `witnessCandidates` in session price evidence, as WWCP_POI.TS has them.
 
 ### Rejected suggestions
 

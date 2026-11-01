@@ -310,6 +310,7 @@ and an identity key naming any:
 | `tariffs` | charging tariffs, their templates and groups, charging tariff offers |
 | `priceStatements` | price statements (section 12) |
 | `chargeTransparencyRecords` | the charge transparency records of a charging station operator, e.g. the signed documents of its charging sessions: signed outside the history, a verifier takes the key from a verified proof of the station |
+| `witnessPublications` | the receipts of an independent witness that it retrieved a price publicly, signed outside the history: a verifier takes the key from a witness publication policy it accepted |
 | `models` | the models of a charging station or energy meter manufacturer |
 | `software` | the transparency software releases of a transparency software manufacturer |
 | `certificates` | the certificates of a conformity assessment body, of charging station and energy meter models |

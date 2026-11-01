@@ -57,8 +57,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// <summary>
     /// What a verification of session price evidence established (WWCP_POI.TS SessionPriceVerification), each apart:
     /// the signatures of the price statements, whether a price applies to the session and is bound by an assignment of the
-    /// CPO, and whether it is published in a checkpoint. That it was published before the start, that the customer agreed
-    /// and that it was the only or the latest offer are not proven.
+    /// CPO, whether it is published in a checkpoint, and whether witnesses the verifier accepted retrieved it publicly before
+    /// the signed start (PublicationBeforeStart: "witnessed-before-signed-start", "invalid" or "not-proven"). That the
+    /// customer agreed and that it was the only or the latest offer are not proven.
     /// </summary>
     public sealed record SessionPriceVerification(VerifiedChargingStation        Station,
                                                   String                         Signatures,
@@ -70,13 +71,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   ImmutableArray<String>         CheckpointIds,
                                                   ImmutableArray<String>         WitnessedBy,
                                                   ImmutableArray<String>         Diagnostics,
-                                                  SelectedSessionPrice?          Selected)
+                                                  SelectedSessionPrice?          Selected,
+                                                  String                         PublicationBeforeStart   = "not-proven",
+                                                  PricePublicationVerification?  PublicationWitnesses     = null)
     {
-
-        /// <summary>
-        /// That the price was published before the start: not proven.
-        /// </summary>
-        public String PublicationBeforeStart  { get; } = "not-proven";
 
         /// <summary>
         /// That the customer agreed: not proven.
@@ -143,6 +141,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<HistoricalCheckpointEntry>  Checkpoints             { get; }
 
+        /// <summary>
+        /// The receipts of witnesses that they retrieved the price publicly (PricePublicationReceipt), at most 64.
+        /// </summary>
+        public ImmutableArray<JToken>                     PublicationReceipts     { get; }
+
+        /// <summary>
+        /// Witnesses recommended, e.g. by the CPO, at most 32: recommendations only, which authorize nothing.
+        /// </summary>
+        public ImmutableArray<JToken>                     WitnessCandidates       { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -155,7 +163,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     IEnumerable<JToken>                     PriceStatements,
                                     JToken?                                 Agreement              = null,
                                     IEnumerable<JToken>?                    PriceStatementProofs   = null,
-                                    IEnumerable<HistoricalCheckpointEntry>? Checkpoints            = null)
+                                    IEnumerable<HistoricalCheckpointEntry>? Checkpoints            = null,
+                                    IEnumerable<JToken>?                    PublicationReceipts    = null,
+                                    IEnumerable<JToken>?                    WitnessCandidates      = null)
         {
 
             this.EVSEId                = EVSEId;
@@ -164,6 +174,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Agreement             = Agreement;
             this.PriceStatementProofs  = [.. PriceStatementProofs ?? []];
             this.Checkpoints           = [.. Checkpoints          ?? []];
+            this.PublicationReceipts   = [.. PublicationReceipts  ?? []];
+            this.WitnessCandidates     = [.. WitnessCandidates    ?? []];
 
         }
 
@@ -189,7 +201,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             if (!HistoricalMeterEvidence.Only(json, "Session price evidence", out ErrorResponse,
-                                              "@context", "EVSEId", "chargingStationProof", "priceStatements", "agreement", "priceStatementProofs", "checkpoints"))
+                                              "@context", "EVSEId", "chargingStationProof", "priceStatements", "agreement", "priceStatementProofs", "checkpoints",
+                                              "publicationReceipts", "witnessCandidates"))
             {
                 return false;
             }
@@ -212,6 +225,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
+            if (json["publicationReceipts"] is not null and not JArray ||
+                json["witnessCandidates"]   is not null and not JArray)
+            {
+                ErrorResponse = "The publication receipts and the witness recommendations must be JSON arrays!";
+                return false;
+            }
+
+            if ((json["publicationReceipts"] as JArray)?.Count > 64 || (json["witnessCandidates"] as JArray)?.Count > 32)
+            {
+                ErrorResponse = "Too many publication receipts or recommendations!";
+                return false;
+            }
+
             if (!HistoricalMeterEvidence.TryParseCheckpoints(json["checkpoints"], "Price checkpoints", out var checkpoints, out ErrorResponse))
                 return false;
 
@@ -220,7 +246,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 statements,
                                                 json["agreement"],
                                                 json["priceStatementProofs"] as JArray,
-                                                checkpoints);
+                                                checkpoints,
+                                                json["publicationReceipts"]  as JArray,
+                                                json["witnessCandidates"]    as JArray);
 
             return true;
 
@@ -251,6 +279,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 json.Add("checkpoints", new JArray(Checkpoints.Select(entry => new JObject(new JProperty("checkpoint", entry.Checkpoint),
                                                                                          new JProperty("operator",   entry.Operator)))));
 
+            if (!WitnessCandidates.IsEmpty)
+                json.Add("witnessCandidates", new JArray(WitnessCandidates));
+
+            if (!PublicationReceipts.IsEmpty)
+                json.Add("publicationReceipts", new JArray(PublicationReceipts));
+
             return json;
 
         }
@@ -258,15 +292,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region TryVerify(Current, EVSEId, MeterSerialNumber, ChargingStarted, StartDocumentSHA256, out Verification, out ErrorResponse, Policy = null, RelatedCheckpoints = null)
+        #region TryVerify(Current, EVSEId, MeterSerialNumber, ChargingStarted, StartDocumentSHA256, out Verification, out ErrorResponse, Policy = null, RelatedCheckpoints = null, PublicationPolicy = null)
 
         /// <summary>
         /// Verify this evidence for the given original session under the given local authorization (WWCP_POI.TS
         /// verifySessionPriceEvidence): the station attested at the start, with the operator of that time; the price
         /// statements of its CPO, their validity at the start and their chains; the assignment of the CPO to exactly this
         /// session; the one price selected; and apart from that its publication in checkpoints verified under the local
-        /// authority, with the checkpoints an after link names and those related given, forks among them refused. The
-        /// decimals are kept as written.
+        /// authority, with the checkpoints an after link names and those related given, forks among them refused; and apart
+        /// from all of that the receipts of witnesses of the given publication policy the verifier accepted, the keys and
+        /// identities of the RNO and the CPO excluded (PricePublicationVerification). The decimals are kept as written.
         /// </summary>
         /// <param name="Current">The current local authorization.</param>
         /// <param name="EVSEId">The EVSE of the session.</param>
@@ -277,6 +312,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ErrorResponse">An optional error response.</param>
         /// <param name="Policy">What the verifier requires.</param>
         /// <param name="RelatedCheckpoints">Other checkpoints known, e.g. of the station, to refuse forks.</param>
+        /// <param name="PublicationPolicy">The witness publication policy the verifier accepted, if any.</param>
         public Boolean TryVerify(IRoamingNetworkTrustAuthority                       Current,
                                  String                                              EVSEId,
                                  String                                              MeterSerialNumber,
@@ -285,7 +321,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  [NotNullWhen(true)]  out SessionPriceVerification?  Verification,
                                  [NotNullWhen(false)] out String?                    ErrorResponse,
                                  HistoricalPolicy?                                   Policy               = null,
-                                 IEnumerable<HistoricalCheckpointEntry>?             RelatedCheckpoints   = null)
+                                 IEnumerable<HistoricalCheckpointEntry>?             RelatedCheckpoints   = null,
+                                 WitnessPublicationPolicy?                           PublicationPolicy    = null)
         {
 
             Verification = null;
@@ -326,6 +363,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             var statements = new List<RoamingNetworkPriceStatement>();
+            var originals  = new Dictionary<String, JObject>(StringComparer.Ordinal);
 
             foreach (var statementJSON in PriceStatements)
             {
@@ -352,6 +390,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 statements.Add(statement);
+                originals.TryAdd(statement.Digest, json);
 
             }
 
@@ -439,6 +478,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
             }
 
+            if (!TryVerifyWitnesses(Current, proof, station, originals[selected.Digest], selected.Tariff, ChargingStarted, publication, checkpointIds, PublicationPolicy, out var witnesses, out ErrorResponse))
+                return false;
+
             if (policy.RequirePublication && publication != "valid")
                 diagnostics.Add("Required price publication evidence is incomplete");
 
@@ -457,7 +499,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                  selected.Tariff,
                                                                                  currency,
                                                                                  elements,
-                                                                                 agreement?.PricingProfile == SessionPriceAgreement.SimpleGrossPriceProfile ? rates : null));
+                                                                                 agreement?.PricingProfile == SessionPriceAgreement.SimpleGrossPriceProfile ? rates : null),
+                                                        witnesses.Status,
+                                                        witnesses);
 
             return true;
 
@@ -465,6 +509,79 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (private) TryVerifyWitnesses(…)
+
+        /// <summary>
+        /// Verify the receipts of witnesses of the selected price (PricePublicationVerification): the checkpoints proven to
+        /// name it, where its publication is valid, and the keys and identities of the CPO and of every RNO the evidence gives
+        /// excluded from witnessing.
+        /// </summary>
+        private Boolean TryVerifyWitnesses(IRoamingNetworkTrustAuthority                           Current,
+                                           RoamingNetworkProof                                     Proof,
+                                           VerifiedChargingStation                                 Station,
+                                           JObject                                                 PriceStatement,
+                                           JObject                                                 Tariff,
+                                           DateTimeOffset                                          ChargingStarted,
+                                           String                                                  Publication,
+                                           IReadOnlyCollection<String>                             CheckpointIds,
+                                           WitnessPublicationPolicy?                               PublicationPolicy,
+                                           [NotNullWhen(true)]  out PricePublicationVerification?  Verification,
+                                           [NotNullWhen(false)] out String?                        ErrorResponse)
+        {
+
+            Verification = null;
+
+            var authorities  = new List<JObject> { Proof.RoamingNetwork[RoamingNetwork.PropertyKeys.Operator] as JObject ?? [] };
+            authorities.AddRange(Checkpoints.Select(entry => entry.Operator));
+
+            if (!POIPartyKeys.TryParse(Station.Operator, out _, out var cpoIdentityKeys, out ErrorResponse))
+                return false;
+
+            var partyKeys    = new List<POIPublicKey>([ .. Station.OperatorSigningKeys, .. cpoIdentityKeys ]);
+
+            foreach (var authority in authorities)
+            {
+
+                if (!POIPartyKeys.TryParse(authority, out _, out var identityKeys, out ErrorResponse))
+                    return false;
+
+                partyKeys.AddRange(identityKeys);
+
+                foreach (var certificate in (authority[RoamingNetworkOperator.PropertyKeys.SigningKeyCertificates] as JArray ?? []).OfType<JObject>())
+                    if (certificate["signingKey"] is JObject signingKeyJSON)
+                    {
+                        if (!POIPublicKey.TryParse(signingKeyJSON, out var signingKey, out ErrorResponse))
+                            return false;
+                        partyKeys.Add(signingKey);
+                    }
+
+            }
+
+            var checkpoints  = new List<RoamingNetworkCheckpoint>();
+
+            if (Publication == "valid")
+                foreach (var entry in Checkpoints)
+                    if (RoamingNetworkCheckpoint.TryParse(entry.Checkpoint, out var checkpoint, out _) && CheckpointIds.Contains(checkpoint.Id.ToString()))
+                        checkpoints.Add(checkpoint);
+
+            return PricePublicationVerification.TryVerify(PublicationReceipts,
+                                                          PublicationPolicy,
+                                                          Station.RoamingNetworkId,
+                                                          EVSEId,
+                                                          PriceStatement,
+                                                          Tariff,
+                                                          checkpoints,
+                                                          ChargingStarted,
+                                                          Current.EvaluatedAt,
+                                                          out Verification,
+                                                          out ErrorResponse,
+                                                          partyKeys.Select(key => Convert.ToHexStringLower(key.Key.Thumbprint())),
+                                                          [ VerifiedChargingStation.IdOf(Station.Operator), .. authorities.Select(authority => VerifiedChargingStation.IdOf(authority)) ]);
+
+        }
+
+        #endregion
 
         #region (private) TryVerifyPublication(…)
 

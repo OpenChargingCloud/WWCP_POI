@@ -328,7 +328,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(read. MaySign(POIKeyUsages.PriceStatements),                    Is.False);
 
                 Assert.That(POIPublicKey.TryParse(unknown, out _, out error),               Is.False);
-                Assert.That(error,  Does.EndWith("is unknown: it is one of certificates, chargeTransparencyRecords, infrastructure, models, party, payments, priceStatements, software, tariffs!"));
+                Assert.That(error,  Does.EndWith("is unknown: it is one of certificates, chargeTransparencyRecords, infrastructure, models, party, payments, priceStatements, software, tariffs, witnessPublications!"));
 
                 Assert.That(network.TryApplyChangeSet(pool, out _, out var error1),         Is.False, "a pool by the key of the records");
                 Assert.That(error1,  Does.Contain("that may sign 'infrastructure'"));
