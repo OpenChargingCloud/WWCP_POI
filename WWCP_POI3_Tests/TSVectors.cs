@@ -30,7 +30,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 {
 
     /// <summary>
-    /// The test vectors of WWCP_POI.TS 0.1.2-dev.0 in Vectors/TS, which ChargyWebApp generated with public test keys: the
+    /// The test vectors of WWCP_POI.TS 0.2.0 in Vectors/TS, which ChargyWebApp generated with public test keys: the
     /// identity keys of the seeds 41 and 43, the signing keys of the seeds 42 and 44, all Ed25519.
     /// </summary>
     internal static class TSVectors

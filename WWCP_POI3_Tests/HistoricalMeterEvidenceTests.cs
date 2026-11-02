@@ -27,7 +27,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 {
 
     /// <summary>
-    /// Historical meter evidence under the current local authorization, as WWCP_POI.TS 0.1.2-dev.0 verifies it
+    /// Historical meter evidence under the current local authorization, as WWCP_POI.TS 0.2.0 verifies it
     /// (tests/historicalMeasurements.test.ts), of its vector history-session.json: what it established there, here.
     /// </summary>
     [TestFixture]

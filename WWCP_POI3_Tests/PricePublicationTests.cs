@@ -32,7 +32,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
     /// <summary>
     /// The public retrieval of a price before the signed start of a session, witnessed by organizations a verifier accepted,
-    /// as WWCP_POI.TS 0.1.2-dev.0 verifies it (tests/pricePublication.test.ts), of its vector price-publication.json: the
+    /// as WWCP_POI.TS 0.2.0 verifies it (tests/pricePublication.test.ts), of its vector price-publication.json: the
     /// witness A of the Ed25519 seeds 181 and 184, the witness B of the ML-DSA-65 seed 183, the CPO of the seed 161.
     /// </summary>
     [TestFixture]

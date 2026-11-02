@@ -606,7 +606,7 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   `proof.Verify(checkpoint, context, …)` and `history.VerifyHead(context, …)` take it in place of a trust anchor;
   another key statement, even one signed genuinely, or another time needs another context. The app keeps its
   decisions and evaluates a context of them for every verification: a context is no revocation and is not stored.
-- **Verifier extensions of WWCP_POI.TS 0.1.2-dev.0 (experimental):** `proof.TryVerify(context, out verification, …)`
+- **Verifier extensions of WWCP_POI.TS 0.2.0 (experimental):** `proof.TryVerify(context, out verification, …)`
   gives the attestations counted, their holders and `ValidUntil`, the earliest end of the key statement, the
   attestations and the keys certifying them; in an epoch a verified trust transition opened, a proof must name its
   commit as the epoch identifies it, and only attestations of its algorithms, signed once it began, count.
@@ -1130,6 +1130,8 @@ Decisions taken by the maintainer between alternatives the agent laid out:
   usage `witnessPublications`, the receipts of witnesses and the policy of
   the witnesses a verifier accepted, and `publicationReceipts` and
   `witnessCandidates` in session price evidence, as WWCP_POI.TS has them.
+  WWCP_POI.TS released these extensions, unchanged, as 0.2.0 (before as
+  the development candidate 0.1.2-dev.0); its vectors are those of 0.2.0.
 
 ### Rejected suggestions
 

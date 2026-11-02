@@ -32,7 +32,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 {
 
     /// <summary>
-    /// The assignment of a price to a charging session by its CPO, and its publication apart, as WWCP_POI.TS 0.1.2-dev.0
+    /// The assignment of a price to a charging session by its CPO, and its publication apart, as WWCP_POI.TS 0.2.0
     /// verifies them (tests/sessionPrices.test.ts), of its vectors session-price-ed, -pqc and -decimal.json.
     /// </summary>
     [TestFixture]

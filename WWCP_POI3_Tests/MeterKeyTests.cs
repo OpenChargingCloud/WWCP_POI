@@ -31,7 +31,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 {
 
     /// <summary>
-    /// Measurement keys bound to an EVSE by a proof verified against a trust context, as WWCP_POI.TS 0.1.2-dev.0 binds them
+    /// Measurement keys bound to an EVSE by a proof verified against a trust context, as WWCP_POI.TS 0.2.0 binds them
     /// (tests/measurementKeys.test.ts), of its vector meter-session.json: the same keys, @ids and freshness.
     /// </summary>
     [TestFixture]

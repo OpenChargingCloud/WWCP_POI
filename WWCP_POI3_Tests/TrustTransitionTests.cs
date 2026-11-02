@@ -31,7 +31,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 {
 
     /// <summary>
-    /// The experimental compact trust succession and the charging document keys of a CPO, as WWCP_POI.TS 0.1.2-dev.0
+    /// The experimental compact trust succession and the charging document keys of a CPO, as WWCP_POI.TS 0.2.0
     /// verifies them (tests/trustTransitions.test.ts), of its vector trust-transitions.json; the local journal of observed
     /// versions is the one of an app and stays there.
     /// </summary>
