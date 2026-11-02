@@ -17,6 +17,7 @@
 
 #region Usings
 
+using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
@@ -58,6 +59,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The default maximum time a request over the WebSocket waits for its heavy read.
         /// </summary>
         public static readonly TimeSpan  DefaultMaxHeavyReadWait        = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// The time the heavy reads are counted in: started from the wall clock once, then going on by a monotonic clock,
+        /// which a clock set back or forward does not move, e.g. on a CI runner synchronizing its time.
+        /// </summary>
+        private static readonly DateTimeOffset            heavyReadClockStart     = DateTimeOffset.UtcNow;
+        private static readonly Int64                     heavyReadClockTicks     = Stopwatch.GetTimestamp();
 
         private volatile InMemoryTokenBucketRateLimiter?  heavyReads              = NewHeavyReadLimiter(DefaultMaxHeavyReadsPerMinute);
         private          Int32                            maxHeavyReadsPerMinute  = DefaultMaxHeavyReadsPerMinute;
@@ -107,6 +115,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (private static) HeavyReadNow
+
+        /// <summary>
+        /// Now, in the time the heavy reads are counted in.
+        /// </summary>
+        private static DateTimeOffset HeavyReadNow
+            => heavyReadClockStart + Stopwatch.GetElapsedTime(heavyReadClockTicks);
+
+        #endregion
+
         #region (private static) NewHeavyReadLimiter(MaxPerMinute)
 
         private static InMemoryTokenBucketRateLimiter? NewHeavyReadLimiter(Int32 MaxPerMinute)
@@ -153,7 +171,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private HTTPResponse? TooManyHeavyReads(HTTPRequest Request)
         {
 
-            if (heavyReads?.TryAcquire(ClientKeyOf(Request)) is not { Allowed: false } decision)
+            if (heavyReads?.TryAcquire(ClientKeyOf(Request), HeavyReadNow) is not { Allowed: false } decision)
                 return null;
 
             Interlocked.Increment(ref heavyReadsRefused);
@@ -188,7 +206,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Wait for the next heavy read the client of the given request over the WebSocket may make: null once it may,
-        /// or GenericError where it would wait longer than MaxHeavyReadWait.
+        /// or GenericError where it would wait longer than MaxHeavyReadWait, counted from the time it waited already,
+        /// not from the waits it asked for, which a busy machine may end late.
         /// </summary>
         private async Task<POIWebSocketMessage?> WaitForHeavyRead(POIWebSocketRequest Request)
         {
@@ -197,21 +216,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var client   = Request.Session.UpgradeRequest is HTTPRequest upgradeRequest
                                ? ClientKeyOf(upgradeRequest)
                                : ClientKeyOf(Request.Session.Connection.RemoteSocket.IPAddress.ToString());
-            var waited   = TimeSpan.Zero;
+            var waited   = Stopwatch.StartNew();
 
-            while (limiter?.TryAcquire(client) is { Allowed: false } decision)
+            while (limiter?.TryAcquire(client, HeavyReadNow) is { Allowed: false } decision)
             {
 
-                if (waited + decision.RetryAfter > MaxHeavyReadWait)
+                if (waited.Elapsed + decision.RetryAfter > MaxHeavyReadWait)
                 {
                     Interlocked.Increment(ref heavyReadsRefused);
                     return Request.Error(POIWebSocketErrorCodes.GenericError,
                                          $"Too many heavy reads: try again in {Math.Max(1, (Int32) Math.Ceiling(decision.RetryAfter.TotalSeconds))} seconds!");
                 }
 
-                await Task.Delay(decision.RetryAfter, Request.CancellationToken);
-
-                waited += decision.RetryAfter;
+                // At least a millisecond: Task.Delay waits whole milliseconds, and less would not wait at all.
+                await Task.Delay(decision.RetryAfter < TimeSpan.FromMilliseconds(1)
+                                     ? TimeSpan.FromMilliseconds(1)
+                                     : decision.RetryAfter,
+                                 Request.CancellationToken);
 
             }
 
