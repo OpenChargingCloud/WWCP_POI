@@ -379,9 +379,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var (operatorJSON, poolJSON, stationJSON) = matches[0];
 
             var evses     = EVSEsOf(stationJSON).ToArray();
-            var given     = operatorJSON[ChargingStationOperator.PropertyKeys.ChargingTariffs] is JArray tariffsJSON
-                                ? tariffsJSON.OfType<JObject>().ToArray()
-                                : [];
+            // The tariffs of its EVSEs: of a station proof usually the leaves of a partial array, as it gives the others not.
+            var given     = Proof.GivenBelow(operatorJSON, ChargingStationOperator.PropertyKeys.ChargingTariffs).ToArray();
             var tariffs   = new Dictionary<String, ImmutableArray<JObject>>(StringComparer.Ordinal);
 
             foreach (var evse in evses)
@@ -401,7 +400,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            var energyMeters = (stationJSON[POI.ChargingStation.PropertyKeys.EnergyMeters] as JArray ?? []).OfType<JObject>().
+            var energyMeters = Proof.GivenBelow(stationJSON, POI.ChargingStation.PropertyKeys.EnergyMeters).
                                    Concat(evses.Select(evse => evse[EVSE.PropertyKeys.EnergyMeter]).OfType<JObject>()).
                                    ToArray();
 

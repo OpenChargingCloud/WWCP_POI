@@ -485,6 +485,45 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
         #endregion
 
+        #region A_verified_station_takes_the_tariffs_a_station_proof_gives_partially()
+
+        /// <summary>
+        /// A station proof gives the charging tariffs of its EVSEs as leaves of a partial array, not the third one of the
+        /// operator: the verified station takes them all the same, so that a price statement naming one of them is current.
+        /// </summary>
+        [Test]
+        public void A_verified_station_takes_the_tariffs_a_station_proof_gives_partially()
+        {
+
+            var now        = Timestamp.Now;
+            var history    = Attested(now, out _);
+            var statement  = SetPrice(history, EVSEType, E12, 0.29m, 1);
+
+            Assert.That(history.TryGetChargingStationProof(S1, out var proof, out var proofError),  Is.True, proofError);
+
+            var operatorJSON = proof!.Given(RoamingNetwork.PropertyKeys.ChargingStationOperators).Single();
+
+            Assert.That(operatorJSON[ChargingStationOperator.PropertyKeys.ChargingTariffs],  Is.InstanceOf<JObject>(), "the tariffs given partially");
+
+            Assert.That(VerifiedChargingStation.TryVerify(history.Head.RoamingNetwork.TrustAnchor(), proof, out var station, out var verifyError, ChargingStationId: S1.ToString(), At: now),  Is.True, verifyError);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(station!.Warnings,                                                            Is.Empty);
+                Assert.That(station.Tariffs[E11].Select(entity => entity["@id"]!.Value<String>()),  Is.EqualTo(new[] { "DE*GEF*T2" }), "of its template");
+                Assert.That(station.Tariffs[E12].Select(entity => entity["@id"]!.Value<String>()),  Is.EqualTo(new[] { T1.ToString() }));
+                Assert.That(station.EnergyMeters.Select(entity => entity["@id"]!.Value<String>()),  Is.EqualTo(new[] { "meter-1" }));
+
+                Assert.That(station.TryGetCurrentPrices([ statement ], out var prices, out var pricesError),  Is.True, pricesError);
+                Assert.That(prices!.Keys,                                             Has.One.Contains(E12));
+
+            }
+
+        }
+
+        #endregion
+
         #region Price_statements_of_other_servers_are_checked_and_follow_the_one_before()
 
         [Test]

@@ -480,11 +480,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(rootProof. Verify(checkpoint!, context!, out var error4),      Is.True, error4);
 
                 Assert.That(history.VerifyHead(anchor,  out var error5, At: at),  Is.True, error5);
-                Assert.That(history.VerifyHead(context, out var error6),          Is.True, error6);
+                Assert.That(history.VerifyHead(context!, out var error6),         Is.True, error6);
 
-                Assert.That(proof.Verify(context, out _, out var error7, at.AddSeconds(1)),  Is.False);
+                Assert.That(proof.Verify(context!, out _, out var error7, at.AddSeconds(1)),  Is.False);
                 Assert.That(error7,  Does.Contain("recreate it"));
-                Assert.That(history.VerifyHead(context, out var error8, At: at.AddSeconds(1)),  Is.False);
+                Assert.That(history.VerifyHead(context!, out var error8, At: at.AddSeconds(1)),  Is.False);
                 Assert.That(error8,  Does.Contain("recreate it"));
 
                 Assert.That(proof.     Verify(otherContext!, out _, out var error9),               Is.False);
