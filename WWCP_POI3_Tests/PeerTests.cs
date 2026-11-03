@@ -137,7 +137,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
         #region StartFollower(History = null, Options = null)
 
         private async Task<RoamingNetworkPeer> StartFollower(RoamingNetworkHistory?          History   = null,
-                                                                 RoamingNetworkPeerOptions?  Options   = null)
+                                                                 RoamingNetworkPeerOptions?  Options   = null,
+                                                                 TimeSpan?                   Timeout   = null)
         {
 
             follower = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"),
@@ -148,7 +149,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
                                                                  MaxReconnectDelay  = TimeSpan.FromMilliseconds(200)
                                                              });
 
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var timeout = new CancellationTokenSource(Timeout ?? TimeSpan.FromSeconds(10));
 
             await follower.StartAsync(timeout.Token);
 
@@ -404,13 +405,16 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
             // A server taking far fewer than the default, but as many as an honest peer names.
             poiAPI!.MaxHaveIds = 40;
 
+            // Catching up verifies the 4 signatures of each change set, 1,200 ECDSA signatures, half of them on P-521:
+            // seconds on a busy machine, more than the 10 seconds of the other tests.
             var follower = await StartFollower(own,
                                                new RoamingNetworkPeerOptions {
                                                    TrustAnchor           = TrustAnchor,
                                                    MaxCommitsPerRequest  = 25,
                                                    MinReconnectDelay     = TimeSpan.FromMilliseconds(50),
                                                    MaxReconnectDelay     = TimeSpan.FromMilliseconds(200)
-                                               });
+                                               },
+                                               TimeSpan.FromSeconds(60));
 
             using (Assert.EnterMultipleScope())
             {

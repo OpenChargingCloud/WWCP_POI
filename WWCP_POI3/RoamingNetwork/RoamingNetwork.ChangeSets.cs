@@ -254,7 +254,29 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          [NotNullWhen(false)] out String?          ErrorResponse,
                                          VerifyChangeSetSignatureDelegate?         VerifySignature   = null)
 
-            => TryApplyChangeSet(ChangeSet, true, out RoamingNetwork, out ErrorResponse, VerifySignature);
+            => TryApplyChangeSet(ChangeSet, true, null, out RoamingNetwork, out ErrorResponse, VerifySignature);
+
+        #endregion
+
+        #region (internal) TryApplyChangeSet(ChangeSet, ValidAt, out RoamingNetwork, out ErrorResponse, VerifySignature = null)
+
+        /// <summary>
+        /// Try to apply all changes of the given change set to a new version of this roaming network, as
+        /// TryApplyChangeSet(…) does, the keys of its signatures valid at every given time: a server taking it checks its
+        /// signatures once, also for the time it takes it, not again afterwards.
+        /// </summary>
+        /// <param name="ChangeSet">The change set.</param>
+        /// <param name="ValidAt">When the keys of its signatures must be valid.</param>
+        /// <param name="RoamingNetwork">The new version of this roaming network.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="VerifySignature">A verifier of signatures using trusted keys, required for signed change sets.</param>
+        internal Boolean TryApplyChangeSet(RoamingNetworkChangeSet                   ChangeSet,
+                                           IEnumerable<DateTimeOffset>               ValidAt,
+                                           [NotNullWhen(true)]  out RoamingNetwork?  RoamingNetwork,
+                                           [NotNullWhen(false)] out String?          ErrorResponse,
+                                           VerifyChangeSetSignatureDelegate?         VerifySignature   = null)
+
+            => TryApplyChangeSet(ChangeSet, true, ValidAt, out RoamingNetwork, out ErrorResponse, VerifySignature);
 
         #endregion
 
@@ -272,7 +294,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                 [NotNullWhen(true)]  out RoamingNetwork?  RoamingNetwork,
                                                 [NotNullWhen(false)] out String?          ErrorResponse)
 
-            => TryApplyChangeSet(ChangeSet, false, out RoamingNetwork, out ErrorResponse, null);
+            => TryApplyChangeSet(ChangeSet, false, null, out RoamingNetwork, out ErrorResponse, null);
 
         #endregion
 
@@ -304,10 +326,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private) TryApplyChangeSet(ChangeSet, CheckOwnership, out RoamingNetwork, out ErrorResponse, VerifySignature)
+        #region (private) TryApplyChangeSet(ChangeSet, CheckOwnership, ValidAt, out RoamingNetwork, out ErrorResponse, VerifySignature)
 
         private Boolean TryApplyChangeSet(RoamingNetworkChangeSet                   ChangeSet,
                                           Boolean                                   CheckOwnership,
+                                          IEnumerable<DateTimeOffset>?              ValidAt,
                                           [NotNullWhen(true)]  out RoamingNetwork?  RoamingNetwork,
                                           [NotNullWhen(false)] out String?          ErrorResponse,
                                           VerifyChangeSetSignatureDelegate?         VerifySignature)
@@ -332,7 +355,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #region Signatures: by the owners of everything it changes, and of the optional verifier
 
-                if (CheckOwnership && !TryCheckOwnership(ChangeSet, out var ownershipError))
+                if (CheckOwnership && !TryCheckOwnership(ChangeSet, out var ownershipError, ValidAt))
                 {
                     ErrorResponse = ownershipError;
                     return false;

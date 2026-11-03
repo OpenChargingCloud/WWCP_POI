@@ -888,10 +888,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (ChangeSet.CreatedAt > at + MaxClockSkew)
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: $"The change set was created at {ChangeSet.CreatedAt.ToISO8601()}, later than now, {at.ToISO8601()}!");
 
-                if (!parentVersion.TryCheckOwnership(ChangeSet, out var keyError, [ ChangeSet.CreatedAt, at ]))
-                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: keyError);
-
-                if (!parentVersion.TryApplyChangeSet(ChangeSet, out var roamingNetwork, out var applyError, VerifySignature))
+                // Its signatures verified once, for both times.
+                if (!parentVersion.TryApplyChangeSet(ChangeSet, [ ChangeSet.CreatedAt, at ], out var roamingNetwork, out var applyError, VerifySignature))
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: applyError);
 
                 if (VersionEpochError(roamingNetwork) is String versionError)
