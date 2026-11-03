@@ -1881,7 +1881,16 @@ operator with one of its signing keys (section 4.1) when it sets the price.
 - **priceStatus:** the price status, signed as it is written. A reader keeps it as given, numbers with a
   fraction as decimals, and checks that it is one: every `chargingTariffId` of its prices is the identification of a
   charging tariff, `{operatorId}*T{suffix}` (section 2). A statement naming another text is no price statement and is
-  refused before its signature is looked at.
+  refused before its signature is looked at, and so is one without a price status or with one that is none:
+  - a price status holds its `prices`, an array, and no other property;
+  - the prices of a charging tariff hold its `chargingTariffId` and its `elements`, and no other property;
+  - each charging tariff is named once, compared as `ChargingTariff_Id` compares them, its operator as an operator, its
+    suffix without case and `*`: `DE*GEF*T_dc` names `DE*GEF*T_DC`;
+  - the `elements` are at least one, each a JSON object read as those of a charging tariff, with at least one price
+    component;
+  - a `@context` names its own (1.1): of a price status
+    `https://open.charging.cloud/contexts/wwcp/roamingNetwork/chargingPrices/v1`, of the prices of a charging tariff
+    `https://open.charging.cloud/contexts/wwcp/roamingNetwork/chargingTariffPrices/v1`.
 - **validFrom, validUntil:** when it is valid, written as in section 5.4. `validFrom` is not before
   `signedAt`; without `validUntil`, it is valid until the next statement of its entity. Either way it is valid no
   longer than the key it is signed with: an operator replacing that key states the price status of its entities
