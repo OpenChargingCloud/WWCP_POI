@@ -102,7 +102,10 @@ A version of a roaming network is identified by its **content**: its JSON repres
       certificate chains, and the arrays of custom data.
   - **Identifications** trimmed, as their type writes them: of charging station operators and grid operators in upper
     case with `*` (`DE*GEF`), of charging pools, stations, EVSEs, tariffs, groups and templates with their operator so,
-    of e-mobility providers in upper case with the separator given, every other one as given. Predefined values of
+    of e-mobility providers in upper case with the separator given, every other one as given. A charging tariff is
+    identified as `ChargingTariff_Id`, `{operatorId}*T{suffix}` (`DE*GEF*T_AC`), as its templates and groups are (9.1,
+    9.3), wherever it is named: its `@id`, `chargingTariffIds`, the `chargingTariffId` of a template and of the prices
+    of a price statement (12.1); a reader refuses any other text there. Predefined values of
     signature methods, energy meter roles and legal status in their defined spelling (`OCMF`), NUTS codes in upper
     case, every other one trimmed; enumerations by their exact names.
   - **Texts:** multi-language texts keyed by the lower-case code of a known language; a country by its ISO 3166-1
@@ -1876,7 +1879,9 @@ operator with one of its signing keys (section 4.1) when it sets the price.
   spelling is refused. Its operator is the one of the identification: `signer` names it, `role` is
   `chargingStationOperator`.
 - **priceStatus:** the price status, signed as it is written. A reader keeps it as given, numbers with a
-  fraction as decimals, and checks that it is one.
+  fraction as decimals, and checks that it is one: every `chargingTariffId` of its prices is the identification of a
+  charging tariff, `{operatorId}*T{suffix}` (section 2). A statement naming another text is no price statement and is
+  refused before its signature is looked at.
 - **validFrom, validUntil:** when it is valid, written as in section 5.4. `validFrom` is not before
   `signedAt`; without `validUntil`, it is valid until the next statement of its entity. Either way it is valid no
   longer than the key it is signed with: an operator replacing that key states the price status of its entities
