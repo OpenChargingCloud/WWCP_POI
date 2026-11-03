@@ -449,12 +449,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   Context?         DataSource   = null)
         {
 
-            var callChangeEvents  = false;
-            var oldStatus         = OldStatus ?? currentStatus;
-
+            // The old status, the check and the change events all under the lock: a reader taking the old status
+            // before a concurrent insert, and checking after it, would tell of the change of the insert once more.
             lock (statusSchedule)
             {
 
+                var oldStatus      = OldStatus ?? currentStatus;
                 var now            = Timestamp.Now;
 
                 var historyList    = statusSchedule.
@@ -474,30 +474,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          ? futureList.First()
                                          : null;
 
-                callChangeEvents   = !EqualityComparer<T>.Default.Equals(
-                                          currentStatus.Value,
-                                          oldStatus.Value
-                                      );
+                if (!EqualityComparer<T>.Default.Equals(currentStatus.Value, oldStatus.Value))
+                {
+
+                    OnStatusChanged?.Invoke(
+                        Timestamp.Now,
+                        EventTracking_Id.New,
+                        this,
+                        currentStatus,
+                        oldStatus,
+                        DataSource
+                    );
+
+                    //DebugX.Log($"RuntimeStatusSchedule: Current status changed from '{oldStatus}' to '{currentStatus}'!");
+
+                }
+
+                return currentStatus;
 
             }
-
-            if (callChangeEvents)
-            {
-
-                OnStatusChanged?.Invoke(
-                    Timestamp.Now,
-                    EventTracking_Id.New,
-                    this,
-                    currentStatus,
-                    oldStatus,
-                    DataSource
-                );
-
-                //DebugX.Log($"RuntimeStatusSchedule: Current status changed from '{oldStatus}' to '{currentStatus}'!");
-
-            }
-
-            return currentStatus;
 
         }
 

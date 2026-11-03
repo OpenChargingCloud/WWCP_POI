@@ -276,6 +276,44 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region A_status_read_while_it_is_set_is_told_of_once()
+
+        [Test]
+        public async Task A_status_read_while_it_is_set_is_told_of_once()
+        {
+
+            var history  = NewHistory();
+            var updates  = 0;
+            var results  = new List<POIStatusUpdateResult>();
+
+            history.RuntimeStatus.OnStatusUpdate += statusUpdate => Interlocked.Increment(ref updates);
+
+            // Readers, e.g. the WebSocket asking for the runtime status: one waiting for the lock of the status schedule
+            // while a status is set must not tell of its change once more.
+            using var stop     = new CancellationTokenSource();
+            var       readers  = Enumerable.Range(0, 4).
+                                            Select(_ => Task.Run(() => {
+                                                while (!stop.IsCancellationRequested)
+                                                    history.RuntimeStatus.TryGet(POIRuntimeStatusKind.Status, Operator, "DE*GEF", out var _);
+                                            })).
+                                            ToArray();
+
+            for (var i = 1; i <= 500; i++)
+                results.Add(history.RuntimeStatus.TryUpdate(POIRuntimeStatusKind.Status, Operator, "DE*GEF", i % 2 == 1 ? "offline" : "available", T0.AddSeconds(i), out _, out _));
+
+            stop.Cancel();
+            await Task.WhenAll(readers);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(results,                    Is.All.EqualTo(POIStatusUpdateResult.Updated));
+                Assert.That(Volatile.Read(ref updates), Is.EqualTo(500));
+            }
+
+        }
+
+        #endregion
+
         #region A_planned_status_is_told_of_when_it_is_due()
 
         [Test]
