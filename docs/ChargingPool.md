@@ -64,7 +64,7 @@ All optional; absent values and empty arrays are not written.
 | `openingTimes` | `OpeningTimes` | `ImmutableOpeningTimes?` | update/remove | When it is open, see [Opening times](#opening-times); always, unless given. |
 | `energyMix` | `EnergyMix` | `EnergyMix?` | update/remove | The mix of the energy it delivers, see [Energy mix](#energy-mix). |
 | `images` | `Images` | `ImmutableArray<Image>` | update/remove | See [Images](#images). |
-| `timeZone` | `TimeZone` | `Time_Zone?` | update/remove | Its time zone, e.g. `Europe/Berlin`. |
+| `timeZone` | `TimeZone` | `Time_Zone?` | update/remove | Its time zone: one of a region of the IANA time zone database, as it writes it, e.g. `Europe/Berlin`, which the platform knows; no Windows name, none without a region (`CET`, `UTC`), none in another case (SPECIFICATION.md 9.4). |
 | `facilities` | `Facilities` | `ImmutableArray<Facility>` | update/remove | Facilities nearby, e.g. `HOTEL`, `RESTAURANT`, `CAFE`, `MALL`, `SUPERMARKET`, `SPORT`, `RECREATION_AREA`, `NATURE`, `MUSEUM`, `BIKE_SHARING`, `BUS_STOP`, `TAXI_STAND`, `TRAM_STOP`, `METRO_STATION`, `TRAIN_STATION`, `AIRPORT`, `PARKING_LOT`, `CARPOOL_PARKING`, `FUEL_STATION`, `WIFI`; ordinal order, each once. |
 | `paymentOptions` | `PaymentOptions` | `ImmutableArray<PaymentOptions>` | update/remove | How charging can be paid: `Free`, `Contract`, `Direct`, `Cash`, `CreditCard`, `DebitCard`, `PrepaidCard`, `SMS`, `EVTaler` (with GNU Taler, step by step, see [EV Taler](#ev-taler)); ordinal order, each once. |
 | `authenticationModes` | `AuthenticationModes` | `ImmutableArray<AuthenticationMode>` | update/remove | How drivers authenticate, see [Authentication modes](#authentication-modes). |

@@ -531,6 +531,47 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_time_zone_of_a_charging_pool_is_one_of_a_region_of_the_IANA_time_zone_database()
+
+        /// <summary>
+        /// A charging pool and a charging pool template name a time zone of a region of the IANA time zone database, as
+        /// the database writes it, also an older name it keeps: no Windows name, none without a region, none in another
+        /// case, none the database does not know. Taken as UTC, they would let two readers find different offers
+        /// overlapping (SPECIFICATION.md 9.4).
+        /// </summary>
+        [Test]
+        public void A_time_zone_of_a_charging_pool_is_one_of_a_region_of_the_IANA_time_zone_database()
+        {
+
+            var rn1   = NewNetwork();
+            var gef1  = rn1.GetChargingStationOperatorById(GEF)!;
+
+            gef1.TryGetChargingPool(P1, out var p1);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                foreach (var timeZone in new[] { "Europe/Berlin", "Asia/Calcutta", "Asia/Kolkata", "America/Argentina/Buenos_Aires" })
+                    Assert.That(Apply(rn1, RoamingNetworkChange.UpdateProperty(p1!, "timeZone", null, timeZone)).GetChargingStationOperatorById(GEF)!.TimeZoneOf(E1).Id,
+                                Is.EqualTo(timeZone), timeZone);
+
+                foreach (var timeZone in new[] { "CET", "UTC", "Etc/UTC", "Etc/GMT-1", "US/Eastern", "W. Europe Standard Time", "europe/berlin", "Europe/BERLIN", "Europe/Atlantis", "Mars/Olympus" })
+                    Assert.That(() => Apply(rn1, RoamingNetworkChange.UpdateProperty(p1!, "timeZone", null, timeZone)),
+                                Throws.ArgumentException.With.Message.Contains($"The time zone '{timeZone}' of the charging pool '{P1}' is no time zone of a region of the IANA time zone database this reader knows!"),
+                                timeZone);
+
+                Assert.That(() => new ChargingPoolTemplate(ChargingPoolTemplate_Id.Parse("DE*GEF*PT1"), TimeZone: Time_Zone.Parse("CET")),
+                            Throws.ArgumentException.With.Message.Contains("The time zone 'CET' of the charging pool template 'DE*GEF*PT1' is no time zone of a region of the IANA time zone database this reader knows!"));
+
+                Assert.That(POITimeZones.TryFind(Time_Zone.Parse("Europe/Berlin"), out var berlin) ? berlin.GetUtcOffset(DateTimeOffset.Parse("2026-07-01T12:00:00Z")) : (TimeSpan?) null,
+                            Is.EqualTo(TimeSpan.FromHours(2)));
+
+            }
+
+        }
+
+        #endregion
+
         #region The_applicable_offers_of_an_EVSE()
 
         /// <summary>

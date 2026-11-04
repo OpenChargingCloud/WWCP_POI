@@ -37,7 +37,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The time zone the regular openings of charging tariff offers are local times of at the given EVSE of this
-        /// operator: the one of its charging pool as it is at runtime, UTC when it has none, or one unknown here.
+        /// operator: the one of its charging pool as it is at runtime, UTC when it has none. A charging pool or template
+        /// naming one this platform does not know is refused (POITimeZones), not taken as UTC.
         /// </summary>
         /// <param name="EVSEId">An EVSE of this operator.</param>
         public TimeZoneInfo TimeZoneOf(EVSE_Id EVSEId)
@@ -47,7 +48,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    : TimeZoneInfo.Utc;
 
         /// <summary>
-        /// The time zones of the EVSEs whose charging pool, as it is at runtime, has a known one.
+        /// The time zones of the EVSEs whose charging pool, as it is at runtime, has one.
         /// </summary>
         private ImmutableDictionary<EVSE_Id, TimeZoneInfo> CalculateEVSETimeZones()
         {
@@ -56,7 +57,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             foreach (var chargingPool in ChargingPools)
                 if (EffectiveChargingPool(chargingPool).TimeZone is Time_Zone timeZone &&
-                    TimeZoneInfo.TryFindSystemTimeZoneById(timeZone.ToString(), out var timeZoneInfo))
+                    POITimeZones.TryFind(timeZone, out var timeZoneInfo))
                 {
                     foreach (var evse in chargingPool.ChargingStations.SelectMany(chargingStation => chargingStation.EVSEs))
                         timeZones[evse.Id] = timeZoneInfo;

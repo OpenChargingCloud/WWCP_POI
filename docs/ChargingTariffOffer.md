@@ -72,8 +72,10 @@ session from 17:30 to 19:00 takes an offer opening at 18:00 from 18:00 on. It ap
 ([runtime status](#runtime-status)).
 
 - **Time zone:** the regular openings are local times of the time zone of the charging pool of the EVSE, as it is at
-  runtime (its `timeZone`, also one a [template](ChargingPoolTemplate.md) gives it); UTC where it has none, or one
-  unknown. At EVSEs in two time zones an offer opening at 18:00 opens at two times.
+  runtime (its `timeZone`, also one a [template](ChargingPoolTemplate.md) gives it); UTC where it has none. A pool
+  or template naming one that is no time zone of a region of the IANA time zone database, or one the platform does
+  not know, is refused (`POITimeZones`, SPECIFICATION.md 9.4). At EVSEs in two time zones an offer opening at 18:00
+  opens at two times.
 - **Exceptional periods:** exceptional openings and closings are periods of absolute time. During an exceptional
   closing the offer does not apply, else during an exceptional opening it does, else by its regular openings.
   Opening times without any regular opening are open at any time, but for their exceptional closings.

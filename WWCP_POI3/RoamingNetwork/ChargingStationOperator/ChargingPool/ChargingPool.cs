@@ -569,7 +569,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.EnergyMix             = EnergyMix;
             this.Images = POIJSON.Distinct(Images, image => image.URL.ToString(), $"image of the charging pool '{Id}'");
 
-            this.TimeZone             = TimeZone;
+            this.TimeZone             = POITimeZones.Known(TimeZone, $"the charging pool '{Id}'");
             this.Facilities           = POIJSON.OrderedIds(Facilities,          $"facility of the charging pool '{Id}'");
             this.PaymentOptions       = POIJSON.OrderedIds(PaymentOptions,      $"payment option of the charging pool '{Id}'");
             this.AuthenticationModes  = [.. POIJSON.Distinct(AuthenticationModes, authenticationMode => authenticationMode.Type, $"authentication mode of the charging pool '{Id}'").

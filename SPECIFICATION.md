@@ -1469,7 +1469,7 @@ Its content is `@id`, `name`, `description`, `dataSource`, `created`, `lastChang
 - **When:** `notBefore` and `notAfter`, both inclusive, as of keys (section 4.1); absent, always since
   and for good. `openingTimes`, as a charging pool writes them, e.g. every day from 18:00 to 06:00;
   absent, at any time. Their regular openings are local times of the time zone of the EVSE's charging
-  pool as it is at runtime (`timeZone`), UTC where it has none; their exceptional openings and closings
+  pool as it is at runtime (`timeZone`, below), UTC where it has none; their exceptional openings and closings
   are periods of absolute time: an exceptional closing closes, else an exceptional opening opens, else
   the regular openings apply. An offer applies to the part of a session within these times, as the
   restrictions of a tariff element do: a session from 17:30 to 19:00 takes an offer opening at 18:00
@@ -1499,6 +1499,18 @@ overlap is invalid: they and what they cover are its own data, checked per EVSE.
 provider MUST NOT make two of its offers overlap; where they come to overlap by the changes of others,
 e.g. an operator adding an EVSE to a group both name, the one with the later `notBefore` applies, of the
 same `notBefore` the one with the ordinal lower identification.
+
+**Time zones.** The `timeZone` of a charging pool or of a charging pool template is a time zone of the IANA
+time zone database of one of its regions (`Africa`, `America`, `Antarctica`, `Arctic`, `Asia`, `Atlantic`,
+`Australia`, `Europe`, `Indian`, `Pacific`), as the database writes it: e.g. `Europe/Berlin`, also an older
+name it keeps for one, e.g. `Asia/Calcutta`. No name of another system (`W. Europe Standard Time`), none
+without a region (`CET`, `UTC`, `Etc/GMT-1`, `US/Eastern`), none in another case (`europe/berlin`). A
+reader refuses a version a charging pool or template of which names another, or one its time zone database
+does not know, rather than taking it as UTC: two readers would else find different offers overlapping, or
+price one session differently. The local times of a time zone are those the reader's database gives;
+databases of different age may know different names (`America/Ciudad_Juarez` since 2022) and rules (a
+country leaving daylight saving time), so that readers may read a version naming such a time zone
+differently, until they update their databases (9.5).
 
 **Which offers apply.** At an EVSE at a time, the offers apply that cover it, are `active` then and whose
 opening times are open then: of its operator all of them, which are for different sessions; of a
@@ -1542,6 +1554,9 @@ EVSEs throughout.
 6. **A tree over the stored content** (8.8, point 6): a proof could give the stored member and the
    templates it names in place of the effective member. A change of a template would then hash
    `O(log n)` in place of every member naming it, but a verifier would need the rules of 9.2.
+7. **The age of the time zone database** (9.4): a roaming network could name the version of the IANA
+   time zone database its readers have at least, so that they know the same names and rules; a reader
+   has the one of its platform, e.g. .NET on Windows the one of Windows.
 
 
 ## 10. Checkpoints
