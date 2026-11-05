@@ -2,8 +2,8 @@
 
 *Concept paper, draft of 2026-10-28, revised on 2026-11-05. It proposes what WWCP_POI would carry and check when
 charging is paid with [GNU Taler](https://taler.net). Phase 1, the content of section 4, is implemented since
-2026-10-29, with the decisions D1 to D3 and D6 taken; the rest is not built yet. The choices still open are listed
-in [section 10](#10-decisions-needed).*
+2026-10-29, phase 2, the steps and the evidence of sections 5 and 7, since 2026-11-05; the offers of section 6 are
+not built yet. All decisions of [section 10](#10-decisions-needed) are taken.*
 
 **In short.** A charging station operator that accepts GNU Taler says so in its WWCP_POI data, signed like
 everything else it owns: `EVTaler` among the payment options of its charging pools, and, once for the operator,
@@ -135,7 +135,7 @@ change sets as a whole (update/remove):
 | `merchantBaseURL` | URL | The base URL of its instance at the merchant backend, HTTPS, ending in `/`: the `merchant_base_url` of its contract terms. |
 | `merchantPublicKey` | text | The public key of that instance, as Taler writes it: the `merchant_pub` every contract of a step is signed with. |
 | `exchanges` | array | 1..n exchanges it accepts, ordered by `masterPublicKey`, each once, see below. |
-| `offersURL` | URL | Where drivers ask for offers: the POI_API base of the server that makes them for the operator (section 6). Not in phase 1: what it means depends on the offers API (D4), and it can be added without breaking anything. |
+| `offersURL` | URL | Where drivers ask for offers: the POI_API base of the server that makes them for the operator (section 6). Not in phase 1: it comes with the offers API of phase 3 (D4), without breaking anything. |
 
 An exchange:
 
@@ -256,7 +256,8 @@ The operator's backend makes every step with `POST /private/orders` at its insta
     "chargingTariffId": "DE*GEF*T_DC",
     "priceStatement":   "<digest of the price statement, SPECIFICATION.md 12.1>",
     "covers":           { "from": "10", "to": "15", "unit": "kWh" },
-    "startMeterValue":  "<the signed meter value at the start, as the station sent it, e.g. OCMF>"
+    "startMeterValue":  { "signedMeterData": "<Base64, e.g. of OCMF>", "signingMethod": "ECDSA-secp256r1-SHA256",
+                          "encodingMethod":  "OCMF" }
   }
 }
 ```
@@ -271,7 +272,7 @@ The operator's backend makes every step with `POST /private/orders` at its insta
 | `chargingTariffId` | The EV Taler tariff (4.3). |
 | `priceStatement` | The digest of the price statement whose elements price the session; absent when the tariff's own elements do. |
 | `covers` | What the step pays for, counted from the start of the session: from, to, unit. |
-| `startMeterValue` | From step 2 on: the signed meter value at the start of the session, as the station sent it (5.6). Step 2 is offered only once the station gave it, and with the merchant's signature over the contract terms the operator stands by it in every step paid after it (5.4). |
+| `startMeterValue` | From step 2 on: the signed meter value at the start of the session, as the station sent it with OCPP 2.1 (5.6): `signedMeterData`, `encodingMethod`, and `signingMethod` and `publicKey` where it sends them. Step 2 is offered only once the station gave it, and with the merchant's signature over the contract terms the operator stands by it in every step paid after it (5.4). |
 
 ### 5.3 The flow
 
@@ -332,7 +333,7 @@ as a refund never exceeds what its order took. Then it signs a **settlement stat
   "merchantPublicKey": "<as in evTaler>",
   "chargingTariffId": "DE*GEF*T_DC", "priceStatement": "<digest>",
   "start": "2026-10-28T09:12:04.000Z", "end": "2026-10-28T09:41:37.000Z",
-  "meterValues": [ "<the signed meter value at the start, as the meter gives it>", "<at the end>" ],
+  "meterValues": [ { "signedMeterData": "<Base64>", "encodingMethod": "OCMF", … }, { "<at the end>": "…" } ],
   "energy": "13.412", "currency": "EUR",
   "orders": [ { "orderId": "2026.301-01ABCDEF1", "amount": "3.25" }, … ],
   "price": "8.72", "paid": "9.75", "refunded": "1.03",
@@ -479,6 +480,23 @@ POST ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/stop
 4. From step 2 on, the signed start value: verified with a measurement key the station proof gives for the meter or
    the station, and the one `extra.wwcp` of the offer names (5.4).
 
+**How exactly** (phase 2: `EVTalerContractTerms.TryVerify`, `EVTalerSettlement.TryVerify`):
+
+- **The amount.** Where the session is priced by one element without restrictions, of `ENERGY`, `TIME` and `FLAT`
+  components each at most once, and its tariff has no minimum or maximum price (`EVTalerRates`), a reader
+  recalculates it: what the step covers at the gross price of its dimension, rounded up to the minor unit of the
+  currency (open point 3); step 1 adds the flat fee, and the rest of its amount is the reserve the app shows. Where
+  the session is priced by energy and time, the amount is at least that, an estimate settled at the end (5.1). Other
+  prices are not recalculated, and the app says so.
+- **The meter values.** WWCP_POI reads no OCMF and no other format of a meter: a transparency software verifies a
+  value with a key and tells its meter, time and energy register (`EVTalerMeterValueVerifier`), as in example A10.
+  WWCP_POI chooses the key from the station proof: of the energy meter of the EVSE or of the station, the one the
+  value names by its `publicKey`, else the only one there is; no key is tried after another. The value must name the
+  serial number of that meter or station.
+- **The price of the session**, where the prices are of that kind: the flat fee, the energy from the start value to
+  the end value and the time between them, each billed in its step size, rounded to the nearest minor unit, half away
+  from zero. A settlement statement of another price is refused.
+
 **Afterwards, kept in one file**, as in example A10: the station proof, the price statement and later its proof in a
 checkpoint (12.3), the contract terms of every step with the merchant's signature, the wallet's record of each
 payment, the signed meter values, the settlement statement and the refunds. From it alone a dispute is decided:
@@ -530,12 +548,17 @@ payment, the signed meter values, the settlement statement and the refunds. From
   change set waits for signatures (SPECIFICATION.md, 4.2) only once an owner signed it; the operator changes its merchant
   with its own key for `payments`, from its own software.
 
-**Phase 2, steps and evidence**, needing no Taler service:
+**Phase 2, steps and evidence**, needing no Taler service (WWCP_POI3, `EVTaler/`), done 2026-11-05:
 
-- `EVTalerStep`, the object of `extra.wwcp` with the signed start value from step 2 on, and the checks of section 7
-  on an order, on contract terms and on a `taler://pay` URI, against a station proof and a price statement.
-- `EVTalerSettlement`: signing and checking as of price statements, refused without both signed meter values (5.4).
-- Example A16: the evidence of a session paid in steps, from recorded contract terms.
+- `EVTalerStep` and `EVTalerCovers`, the object of `extra.wwcp`, with the signed start value from step 2 on as OCPP
+  2.1 sends it (`EVTalerSignedMeterValue`); `EVTalerContractTerms`, contract terms of version 0, and
+  `EVTalerPayURI`; the checks of section 7 against a verified charging station and the price statements the app
+  holds, one step after the other (`TryVerify`).
+- `EVTalerSettlement`: signed with a key for `payments` and checked as price statements are, refused without both
+  signed meter values (5.4), its price recalculated where the prices allow it (7).
+- `EVTalerRates` and `EVTalerAmounts`: GNU Taler's amounts, the rates of a session, the rounding of open point 3.
+- `EVTalerEvidenceTests`. Example A16, the evidence of a session paid in steps from recorded contract terms, is to
+  follow.
 
 The merchant's signature over contract terms is checked by the wallet, with Taler's own hashing of contract terms;
 WWCP_POI checks only that the merchant is the operator's. Doing it as well would mean implementing that hashing.
@@ -560,8 +583,8 @@ knowing the driver; e-mobility providers as merchants of their own offers; walle
 | D1, decided 2026-10-29: (a) and an open set | How does "EV Taler (provider)" appear in the data? | (a) `EVTaler` in `paymentOptions`, the exchanges with names in the operator's `evTaler`; (b) a name per exchange in `paymentOptions`, e.g. `EVTaler (Example Exchange)` | (a), and `paymentOptions` an open set like `facilities`, so that the next option does not lock out older servers |
 | D2, decided 2026-10-29: (a) | Where does the merchant live? | (a) the operator; (b) each pool; (c) each tariff | (a): one merchant per operator, in every station proof |
 | D3, decided 2026-10-29: (a) | Which key signs `evTaler`? | (a) a new usage `payments`; (b) `party`, as the operator's other properties | (a): it redirects money |
-| D4 | How do offers reach the app? | (a) HTTP with long polling; (b) a topic of the history's WebSocket | (a) first: it survives a phone losing its connection; (b) later |
-| D5 | Does the operator sign settlement statements? | (a) yes, not in checkpoints; (b) yes, and checkpoints name them, as price statements; (c) no | (a): evidence for the driver, no load on histories |
+| D4, decided 2026-11-05: (a), (b) later | How do offers reach the app? | (a) HTTP with long polling; (b) a topic of the history's WebSocket | (a) first: it survives a phone losing its connection; (b) later |
+| D5, decided 2026-11-05: (a) | Does the operator sign settlement statements? | (a) yes, not in checkpoints; (b) yes, and checkpoints name them, as price statements; (c) no | (a): evidence for the driver, no load on histories |
 | D6, decided 2026-10-29 and 2026-11-05: "EV Taler", without "GNU" | The name | "GNU EV Taler"; "EV Taler" | "EV Taler" in the data (`EVTaler`, `evTaler`, `EV_TALER`) and as the name of what is built here; "GNU" is left out, as it names GNU packages. GNU Taler stays the name of the payment system it uses. |
 
 
@@ -571,7 +594,8 @@ knowing the driver; e-mobility providers as merchants of their own offers; walle
    cap, without asking again. To be discussed with the Taler developers; until then steps are as large as drivers
    want to confirm.
 2. **Fees after the credit:** parking and idle fees beyond the reserve (5.5).
-3. **Rounding:** step amounts to the currency's minor unit and up, the session's price as the tariff rounds it; Taler
+3. **Rounding:** step amounts to the currency's minor unit and up, the session's price to the nearest minor unit,
+   half away from zero, as phase 2 checks them; a tariff rounding otherwise would need rules of its own. Taler
    amounts have more fractional digits than tariffs, coins have smallest denominations.
 4. **Deposit fees** for small steps, and how much of them an operator bears (`max_fee`).
 5. **Long sessions:** an AC session overnight keeps its first orders' refund deadlines and the wire transfers of the

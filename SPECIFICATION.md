@@ -317,7 +317,7 @@ and an identity key naming any:
 | `models` | the models of a charging station or energy meter manufacturer |
 | `software` | the transparency software releases of a transparency software manufacturer |
 | `certificates` | the certificates of a conformity assessment body, of charging station and energy meter models |
-| `payments` | the `evTaler` merchant of a charging station operator: whoever changes it redirects the payments of its stations ([concepts/EVTaler.md](concepts/EVTaler.md)) |
+| `payments` | the `evTaler` merchant of a charging station operator: whoever changes it redirects the payments of its stations; and its settlement statements of EV Taler sessions, which are no content ([concepts/EVTaler.md](concepts/EVTaler.md), 5.4) |
 | `party` | everything else the party owns: its own properties but `evTaler`, its `signingKeys` by a signing key; of the RNO also the roaming network, adding and removing parties, commits and attestations (8.5) |
 
 A change is signed by a signing key of its owner that may sign the usage of the entity it changes, whoever owns

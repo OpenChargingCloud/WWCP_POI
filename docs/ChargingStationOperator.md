@@ -231,7 +231,7 @@ Each key:
 | `key` | text | Canonical Base64 of the deterministic CBOR of the public COSE key; private parts are refused. |
 | `notBefore` | timestamp | Optional: valid from. |
 | `notAfter` | timestamp | Optional: valid until; not before `notBefore`. |
-| `usages` | array of texts | Optional, signing keys only: what it may sign, `infrastructure` (pools, stations, EVSEs, templates and groups), `tariffs` (tariffs, their templates and groups, offers), `priceStatements`, `payments` (its `evTaler` merchant) and `party` (its other own properties, rotating its signing keys); everything without. In their ordinal order; unknown ones are refused. |
+| `usages` | array of texts | Optional, signing keys only: what it may sign, `infrastructure` (pools, stations, EVSEs, templates and groups), `tariffs` (tariffs, their templates and groups, offers), `priceStatements`, `payments` (its `evTaler` merchant and its settlement statements of EV Taler sessions) and `party` (its other own properties, rotating its signing keys); everything without. In their ordinal order; unknown ones are refused. |
 
 - Both arrays are in the ordinal order of the key identifications, a key at most once, and no key both a signing
   and an identity key. An array is written only when it is not empty.
