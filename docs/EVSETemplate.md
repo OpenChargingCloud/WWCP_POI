@@ -33,7 +33,7 @@ See [common properties](README.md#common-properties). An EVSE template does not 
 | `description` | update/remove |
 | `dataSource` | update/remove |
 | `created` | — |
-| `lastChange` | — (set to the change set's `createdAt`) |
+| `lastChange` | — (set to the change set's stamp) |
 | `customData` | update/remove |
 
 

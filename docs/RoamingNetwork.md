@@ -41,7 +41,7 @@ See [README.md](README.md#common-properties).
 | `description` | update/remove | omitted when empty |
 | `dataSource` | update/remove | a nonempty text; omitted when empty |
 | `created` | — | |
-| `lastChange` | — | set to the `createdAt` of the change set |
+| `lastChange` | — | set to the stamp of the change set |
 | `customData` | update/remove | a JSON object |
 | `eTags` | — | written by `ToJSON()`/`ToCBOR()` unless `IncludeETags: false`; when given, `TryParse` refuses the network unless they are its ETags |
 
@@ -232,7 +232,7 @@ A change set must be signed by the owner of each of its changes ([../README.md](
   its contract ended; its data goes with it. The history keeps the versions before.
 - A change of the network itself names `entityType` `RoamingNetwork` and its `@id`, without a parent; a party may
   name the network as its parent, no other one.
-- `Add` sets `created` (unless given) and `lastChange` to the change set's `createdAt` for entities with timestamps;
+- `Add` sets `created` (unless given) and `lastChange` to the change set's stamp for entities with timestamps;
   every change sets the network's `lastChange` to it.
 
 ```csharp

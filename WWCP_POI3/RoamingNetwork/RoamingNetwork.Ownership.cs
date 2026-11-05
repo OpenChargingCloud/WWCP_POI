@@ -473,19 +473,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region TryCheckWithdrawal(Withdrawal, ChangeSet, out ErrorResponse)
+        #region TryCheckWithdrawal(Withdrawal, ChangeSet, out ErrorResponse, TakenAt = null)
 
         /// <summary>
         /// Whether the given withdrawal of the given change set waiting for signatures is signed by a key of an owner of
         /// one of its changes, of the kind that owner signs it with, a key of this version valid when it was withdrawn
-        /// (SPECIFICATION.md, section 4.2).
+        /// and when a server takes it, as the keys of a change set (SPECIFICATION.md, section 4.2): a withdrawal dated
+        /// back lets no key withdraw once it expired (POI3-ISSUES.md S26).
         /// </summary>
         /// <param name="Withdrawal">The withdrawal.</param>
         /// <param name="ChangeSet">The change set it withdraws.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="TakenAt">When a server takes it, by its clock.</param>
         public Boolean TryCheckWithdrawal(RoamingNetworkChangeSetWithdrawal  Withdrawal,
                                           RoamingNetworkChangeSet            ChangeSet,
-                                          [NotNullWhen(false)] out String?   ErrorResponse)
+                                          [NotNullWhen(false)] out String?   ErrorResponse,
+                                          DateTimeOffset?                    TakenAt   = null)
         {
 
             if (Withdrawal.RoamingNetworkId != ChangeSet.RoamingNetworkId || Withdrawal.ChangeSetId != ChangeSet.Id)
@@ -515,11 +518,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         (kind == POIKeyKind.Signing && !MaySign(key, partyId, ChangeSet.Changes[index])))
                         continue;
 
-                    if (!key.IsValidAt(Withdrawal.WithdrawnAt))
-                    {
-                        ErrorResponse = $"The key '{key.Id}' of {partyId} is not valid at {Withdrawal.WithdrawnAt.ToISO8601()}!";
-                        return false;
-                    }
+                    foreach (var at in TakenAt is DateTimeOffset takenAt ? [ Withdrawal.WithdrawnAt, takenAt ] : new[] { Withdrawal.WithdrawnAt })
+                        if (!key.IsValidAt(at))
+                        {
+                            ErrorResponse = $"The key '{key.Id}' of {partyId} is not valid at {at.ToISO8601()}!";
+                            return false;
+                        }
 
                     if (!Withdrawal.Verify(key.Key.ToPublicKey(), out var verificationError))
                     {

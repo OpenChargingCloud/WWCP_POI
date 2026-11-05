@@ -40,7 +40,7 @@ See [common properties](README.md#common-properties). An EVSE does not write `eT
 | `description` | update/remove |
 | `dataSource` | update/remove |
 | `created` | — |
-| `lastChange` | — (set to the change set's `createdAt`) |
+| `lastChange` | — (set to the change set's stamp) |
 | `customData` | update/remove |
 
 
@@ -252,7 +252,7 @@ See [runtime status](README.md#runtime-status) for the mechanism.
   and the references into the network are checked after the last change, so an EVSE moved to another station stays
   in its [EVSEGroups](EVSEGroup.md).
 - `Add(evse, stationId)` needs the station, of the same operator, as its parent; the EVSE must not exist yet. It
-  gets the change set's `createdAt` as `lastChange`, and as `created` unless given. `Remove(evseId)` removes it
+  gets the change set's stamp as `lastChange`, and as `created` unless given. `Remove(evseId)` removes it
   with its connectors and energy meter.
 
 

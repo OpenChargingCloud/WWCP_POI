@@ -35,7 +35,7 @@ See [Common properties](README.md#common-properties).
 | `description` | update/remove | |
 | `dataSource` | update/remove | |
 | `created` | — | |
-| `lastChange` | — | Set to the change set's `createdAt` by every change of the operator's own properties and of everything it embeds: pools, stations, EVSEs, tariffs, templates, groups and offers. |
+| `lastChange` | — | Set to the change set's stamp by every change of the operator's own properties and of everything it embeds: pools, stations, EVSEs, tariffs, templates, groups and offers. |
 | `customData` | update/remove | |
 
 The operator writes no `eTags`.

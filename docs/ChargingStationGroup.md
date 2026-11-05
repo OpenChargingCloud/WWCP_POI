@@ -38,7 +38,7 @@ See [common properties](README.md#common-properties). A charging station group d
 | `description` | update/remove |
 | `dataSource` | update/remove |
 | `created` | — |
-| `lastChange` | — (set to the change set's `createdAt`) |
+| `lastChange` | — (set to the change set's stamp) |
 | `customData` | update/remove |
 
 

@@ -623,6 +623,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
+            // What the change set is stamped with, as lastChange and as the created of what it adds: its createdAt, or the
+            // lastChange of this version, where it was created before it. So no lastChange goes back, whatever time its
+            // signer chose (SPECIFICATION.md, section 4; POI3-ISSUES.md S5); its keys are checked at its createdAt still.
+            var stamp = ChangeSet.CreatedAt > LastChangeDate ? ChangeSet.CreatedAt : LastChangeDate;
+
             var name                  = Name;
             var description           = Description;
             var dataSource            = DataSource;
@@ -747,8 +752,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             else
                                 currentOperatorJSON![propertyName] = applied.NewValue;
 
-                            // The change set's timestamp is the last change, so that its after ETags are deterministic.
-                            currentOperatorJSON![ChargingStationOperator.BasePropertyKeys.LastChange] = ChangeSet.CreatedAt.ToISO8601();
+                            // The change set's stamp is the last change, so that its after ETags are deterministic.
+                            currentOperatorJSON![ChargingStationOperator.BasePropertyKeys.LastChange] = stamp.ToISO8601();
 
                             // The changed operator must still be a valid one.
                             if (!ChargingStationOperator.TryParseWithinChangeSet(currentOperatorJSON, out var readOperator, out var changedOperatorError))
@@ -790,12 +795,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                 return false;
                             }
 
-                            // The change set's timestamp is the last change and, unless given, the creation,
+                            // The change set's stamp is the last change and, unless given, the creation,
                             // so that its after ETags are deterministic.
                             // A copy: the change set keeps its new value as it gives it.
                             var newOperatorJSON = (JObject) applied.NewValue!.DeepClone();
-                            newOperatorJSON[ChargingStationOperator.BasePropertyKeys.Created]    ??= ChangeSet.CreatedAt.ToISO8601();
-                            newOperatorJSON[ChargingStationOperator.BasePropertyKeys.LastChange]   = ChangeSet.CreatedAt.ToISO8601();
+                            newOperatorJSON[ChargingStationOperator.BasePropertyKeys.Created]    ??= stamp.ToISO8601();
+                            newOperatorJSON[ChargingStationOperator.BasePropertyKeys.LastChange]   = stamp.ToISO8601();
 
                             if (!ChargingStationOperator.TryParseWithinChangeSet(newOperatorJSON, out var newOperator, out var newOperatorError))
                             {
@@ -1048,7 +1053,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
-                    if (!TryApplyRegistryChange(RoamingNetworkOperatorRegistry, change, index, ChangeSet.CreatedAt, AsHeld, networkOperators, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(RoamingNetworkOperatorRegistry, change, index, stamp, AsHeld, networkOperators, out currentValue, out heldValue, out ErrorResponse))
                         return false;
 
                 }
@@ -1059,45 +1064,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (change.EntityType == nameof(ChargingStationManufacturer))
                 {
-                    if (!TryApplyRegistryChange(ManufacturerRegistry,      change, index, ChangeSet.CreatedAt, AsHeld, manufacturers, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(ManufacturerRegistry,      change, index, stamp, AsHeld, manufacturers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(ChargingStationModel))
                 {
-                    if (!TryApplyModelChange(ChargingStationModels,        change, index, ChangeSet.CreatedAt, AsHeld, manufacturers, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyModelChange(ChargingStationModels,        change, index, stamp, AsHeld, manufacturers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(EMobilityProvider))
                 {
-                    if (!TryApplyRegistryChange(EMobilityProviderRegistry, change, index, ChangeSet.CreatedAt, AsHeld, providers,     out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(EMobilityProviderRegistry, change, index, stamp, AsHeld, providers,     out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 // Charging tariff offers of charging station operators and e-mobility providers.
                 else if (change.EntityType == nameof(ChargingTariffOffer))
                 {
-                    if (!TryApplyChargingTariffOfferChange(change, index, ChangeSet.CreatedAt, AsHeld, operators, providers, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyChargingTariffOfferChange(change, index, stamp, AsHeld, operators, providers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 // Groups of e-mobility providers; those of charging station operators are part of their infrastructure.
                 else if (IsProviderGroupChange(change, providers.Values))
                 {
-                    if (!TryApplyProviderGroupChange(change, index, ChangeSet.CreatedAt, AsHeld, providers, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyProviderGroupChange(change, index, stamp, AsHeld, providers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(GridOperator))
                 {
-                    if (!TryApplyRegistryChange(GridOperatorRegistry,      change, index, ChangeSet.CreatedAt, AsHeld, gridOps,       out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(GridOperatorRegistry,      change, index, stamp, AsHeld, gridOps,       out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(GridConnectionPoint))
                 {
-                    if (!TryApplyGridConnectionPointChange(change, index, ChangeSet.CreatedAt, AsHeld, gridOps, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyGridConnectionPointChange(change, index, stamp, AsHeld, gridOps, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1107,13 +1112,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (change.EntityType == nameof(ParkingOperator))
                 {
-                    if (!TryApplyRegistryChange(ParkingOperatorRegistry,   change, index, ChangeSet.CreatedAt, AsHeld, parkingOps,    out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(ParkingOperatorRegistry,   change, index, stamp, AsHeld, parkingOps,    out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (IsParking(change.EntityType))
                 {
-                    if (!TryApplyParkingChange(change, index, ChangeSet.CreatedAt, AsHeld, parkingOps, operators, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyParkingChange(change, index, stamp, AsHeld, parkingOps, operators, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1123,13 +1128,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (change.EntityType == nameof(EnergyMeterManufacturer))
                 {
-                    if (!TryApplyRegistryChange(EnergyMeterManufacturerRegistry, change, index, ChangeSet.CreatedAt, AsHeld, meterManufacturers, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(EnergyMeterManufacturerRegistry, change, index, stamp, AsHeld, meterManufacturers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(EnergyMeterModel))
                 {
-                    if (!TryApplyModelChange(EnergyMeterModels,            change, index, ChangeSet.CreatedAt, AsHeld, meterManufacturers, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyModelChange(EnergyMeterModels,            change, index, stamp, AsHeld, meterManufacturers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1139,13 +1144,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (change.EntityType == nameof(EnergyMeterGroup))
                 {
-                    if (!TryApplyEnergyMeterGroupChange(change, index, ChangeSet.CreatedAt, AsHeld, operators, gridOps, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyEnergyMeterGroupChange(change, index, stamp, AsHeld, operators, gridOps, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(EnergyMeterTemplate))
                 {
-                    if (!TryApplyEnergyMeterTemplateChange(change, index, ChangeSet.CreatedAt, AsHeld, operators, gridOps, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyEnergyMeterTemplateChange(change, index, stamp, AsHeld, operators, gridOps, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1155,25 +1160,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (change.EntityType == nameof(TransparencySoftwareManufacturer))
                 {
-                    if (!TryApplyRegistryChange(TransparencySoftwareManufacturerRegistry, change, index, ChangeSet.CreatedAt, AsHeld, softwareManufacturers, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(TransparencySoftwareManufacturerRegistry, change, index, stamp, AsHeld, softwareManufacturers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(TransparencySoftware))
                 {
-                    if (!TryApplyTransparencySoftwareChange(change, index, ChangeSet.CreatedAt, AsHeld, softwareManufacturers, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyTransparencySoftwareChange(change, index, stamp, AsHeld, softwareManufacturers, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(ConformityAssessmentBody))
                 {
-                    if (!TryApplyRegistryChange(ConformityAssessmentBodyRegistry, change, index, ChangeSet.CreatedAt, AsHeld, bodies, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyRegistryChange(ConformityAssessmentBodyRegistry, change, index, stamp, AsHeld, bodies, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
                 else if (change.EntityType == nameof(ConformityCertificate))
                 {
-                    if (!TryApplyConformityCertificateChange(change, index, ChangeSet.CreatedAt, AsHeld, bodies, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyConformityCertificateChange(change, index, stamp, AsHeld, bodies, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1183,7 +1188,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 else if (IsInfrastructure(change.EntityType))
                 {
-                    if (!TryApplyInfrastructureChange(change, index, ChangeSet.CreatedAt, AsHeld, operators, out currentValue, out heldValue, out ErrorResponse))
+                    if (!TryApplyInfrastructureChange(change, index, stamp, AsHeld, operators, out currentValue, out heldValue, out ErrorResponse))
                         return false;
                 }
 
@@ -1333,7 +1338,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  statusSchedule.     MaxStatusHistorySize,
                                  dataSource,
                                  Created,
-                                 ChangeSet.CreatedAt,
+                                 stamp,
                                  customData,
                                  InternalData,
                                  licenses,

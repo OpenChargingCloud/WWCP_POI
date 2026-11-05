@@ -43,7 +43,7 @@ See [common properties](README.md#common-properties). A charging station does no
 | `description` | update/remove |
 | `dataSource` | update/remove |
 | `created` | — |
-| `lastChange` | — (set to the change set's `createdAt` by every change of the station and of its EVSEs) |
+| `lastChange` | — (set to the change set's stamp by every change of the station and of its EVSEs) |
 | `customData` | update/remove |
 
 
@@ -294,7 +294,7 @@ The station's status is set on its own; it is not calculated from the status of 
   after the last change. So a station moved to another pool (`Remove` and `Add`) stays in its groups, and its EVSEs
   in theirs.
 - `Add(station, poolId)` needs the pool, of the same operator, as its parent; the station must not exist yet. It
-  gets the change set's `createdAt` as `lastChange`, and as `created` unless given.
+  gets the change set's stamp as `lastChange`, and as `created` unless given.
 
 
 ## Example

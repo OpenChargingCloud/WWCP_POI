@@ -35,7 +35,7 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `description` | update/remove |
 | `dataSource` | update/remove |
 | `created` | — (set on `Add` unless given) |
-| `lastChange` | — (set to the change set's `createdAt` when its own properties change, and when its garages, spaces, space templates, sensors, space groups or products change) |
+| `lastChange` | — (set to the change set's stamp when its own properties change, and when its garages, spaces, space templates, sensors, space groups or products change) |
 | `customData` | update/remove |
 
 
@@ -81,7 +81,7 @@ All parking data of an operator is changed by change sets
   change set named.
 - A change edits the element within the operator's JSON and reads the operator again, so the operator must be
   valid as a whole afterwards (see [Validation](#validation)). The element's `lastChange` (except for products)
-  becomes the change set's `createdAt`; the operator's own `lastChange` stays.
+  becomes the change set's stamp; the operator's own `lastChange` stays.
 - Runtime status and internal data of the operator and of all its garages, spaces, sensors and groups go along
   to the new version, by identification.
 

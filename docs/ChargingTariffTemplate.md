@@ -32,8 +32,8 @@ See [README.md](README.md#common-properties). No `eTags`.
 | `name` | update/remove | I18N text; omitted when empty |
 | `description` | update/remove | I18N text; omitted when empty |
 | `dataSource` | update/remove | |
-| `created` | — | set to the `createdAt` of the change set when added, unless given |
-| `lastChange` | — | set to the `createdAt` of the change set by every change |
+| `created` | — | set to the stamp of the change set when added, unless given |
+| `lastChange` | — | set to the stamp of the change set by every change |
 | `customData` | update/remove | a JSON object; omitted when empty |
 
 

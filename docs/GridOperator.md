@@ -40,7 +40,7 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `description` | update/remove |
 | `dataSource` | update/remove |
 | `created` | — (set on `Add` unless given) |
-| `lastChange` | — (set to the change set's `createdAt` by every change of the grid operator, of its grid connection points and of its energy meter templates and groups) |
+| `lastChange` | — (set to the change set's stamp by every change of the grid operator, of its grid connection points and of its energy meter templates and groups) |
 | `customData` | update/remove |
 
 

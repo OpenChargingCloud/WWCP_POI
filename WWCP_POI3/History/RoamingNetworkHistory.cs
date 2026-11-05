@@ -877,6 +877,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (FindCommitted(ChangeSet) is RoamingNetworkCommit committed)
                     return new (RoamingNetworkCommitStatus.AlreadyCommitted, Head, committed);
 
+                // Withdrawn while it waited: not taken again with the signatures it had (POI3-ISSUES.md S26).
+                if (WithdrawnError(ChangeSet) is String withdrawnError)
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: withdrawnError);
+
                 // The version it was made for: a tip, the head first, or else the latest commit having it, not too old.
                 if (FindVersionFor(ChangeSet, out var staleError) is not (RoamingNetworkCommit parent, RoamingNetwork parentVersion))
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: staleError ?? "The change set fits no version of this history: prepare it again for the head!");
@@ -1101,9 +1105,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                // Its signatures by the keys of the version it leads to.
+                // Its signatures by the keys of the version it leads to, a required role by a key that may sign in it.
                 if (!Known && !VerifySignatures(Commit, roamingNetwork, VerifyCommitSignature, out ErrorResponse))
                     return false;
+
+                if (!Known && RequiredRolesError(Commit, roamingNetwork, RequiredSignatureRoles) is String roleError)
+                {
+                    ErrorResponse = roleError;
+                    return false;
+                }
 
                 try
                 {
@@ -1323,7 +1333,33 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            return VerifySignatures(Commit, Version, VerifyCommitSignature, out ErrorResponse);
+            if (!VerifySignatures(Commit, Version, VerifyCommitSignature, out ErrorResponse))
+                return false;
+
+            ErrorResponse = RequiredRolesError(Commit, Version, RequiredSignatureRoles);
+            return ErrorResponse is null;
+
+        }
+
+        #endregion
+
+        #region (private static) RequiredRolesError(Commit, Version, RequiredSignatureRoles)
+
+        /// <summary>
+        /// Why the given commit is not signed in a required role by a key the given version, the one it leads to, lets
+        /// sign in it, if it is not: a role is no more than what a signature says, unless its key may sign in it
+        /// (RoamingNetworkCommitSignatureRoles.KeyMaySignIn; POI3-ISSUES.md S24).
+        /// </summary>
+        private static String? RequiredRolesError(RoamingNetworkCommit          Commit,
+                                                  RoamingNetwork                Version,
+                                                  IReadOnlyCollection<String>?  RequiredSignatureRoles)
+        {
+
+            foreach (var role in RequiredSignatureRoles ?? [])
+                if (!Commit.Signatures.Any(signature => signature.Role == role && RoamingNetworkCommitSignatureRoles.KeyMaySignIn(signature, Version)))
+                    return $"The commit '{Commit.Id}' is not signed in the role '{role}' by a key that may sign in it!";
+
+            return null;
 
         }
 

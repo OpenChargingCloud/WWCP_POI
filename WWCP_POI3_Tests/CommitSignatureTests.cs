@@ -323,8 +323,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(follower3.Head.Commit.Id,                    Is.EqualTo(signed!.Id));
                 Assert.That(follower3.Head.Commit.Signatures,            Has.Length.EqualTo(2));
 
-                Assert.That(RoamingNetworkHistory.CheckSignatures(follower3.Head.Commit, follower3.Head.RoamingNetwork, VerifyCommit, [ "leader", "roamingNetworkOperator" ], out var checkError),
+                Assert.That(RoamingNetworkHistory.CheckSignatures(follower3.Head.Commit, follower3.Head.RoamingNetwork, VerifyCommit, [ "leader" ], out var checkError),
                             Is.True, checkError);
+
+                // The key of the roaming network operator of this test is trusted by the verifier, but certified in no
+                // version: its role is no more than what its signature says, and counts for no required role (S24).
+                Assert.That(RoamingNetworkHistory.CheckSignatures(follower3.Head.Commit, follower3.Head.RoamingNetwork, VerifyCommit, [ "roamingNetworkOperator" ], out var roleError),
+                            Is.False);
+                Assert.That(roleError,                                   Does.Contain("not signed in the role 'roamingNetworkOperator' by a key that may sign in it"));
 
             }
 
@@ -386,7 +392,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             // c) The head commit of a snapshot: in the version of the snapshot, the only one it has.
             Assert.That(RoamingNetworkHistory.TryFromSnapshot(leader.ToSnapshotJSON(), out var fromSnapshot, out var snapshotError), Is.True, snapshotError);
 
-            var ofSnapshot  = RoamingNetworkHistory.CheckSignatures(fromSnapshot!.Head.Commit, fromSnapshot.Head.RoamingNetwork, Recording, [ "leader", "roamingNetworkOperator" ], out var snapshotCheckError);
+            var ofSnapshot  = RoamingNetworkHistory.CheckSignatures(fromSnapshot!.Head.Commit, fromSnapshot.Head.RoamingNetwork, Recording, [ "leader" ], out var snapshotCheckError);
             var ofHead      = given.ToArray();
             given.Clear();
 

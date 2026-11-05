@@ -37,7 +37,7 @@ See [Common properties](README.md#common-properties). It writes no `eTags`.
 | `description` | update/remove |
 | `dataSource` | update/remove |
 | `created` | — (set on `Add` unless given) |
-| `lastChange` | — (set to the change set's `createdAt`) |
+| `lastChange` | — (set to the change set's stamp) |
 | `customData` | update/remove |
 
 

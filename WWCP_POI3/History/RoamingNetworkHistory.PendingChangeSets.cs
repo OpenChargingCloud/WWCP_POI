@@ -159,6 +159,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly OrderedDictionary<ChangeSet_Id, RoamingNetworkChangeSet>        pendingChangeSets  = new ();
 
         /// <summary>
+        /// Since when each change set waiting for signatures waits, by the clock of this server: one waiting longer than
+        /// PendingChangeSetExpiry waits no longer (POI3-ISSUES.md S24).
+        /// </summary>
+        private readonly Dictionary<ChangeSet_Id, DateTimeOffset>                        pendingSince       = [];
+
+        /// <summary>
+        /// The change sets withdrawn while they waited, by the commit of the version each one was made for: refused
+        /// again until that version is too old for them anyway, which bounds them (POI3-ISSUES.md S26).
+        /// </summary>
+        private readonly Dictionary<ChangeSet_Id, RoamingNetworkCommit_Id>               withdrawn          = [];
+
+        /// <summary>
         /// The checks of the change sets waiting for signatures, by each one with the signatures it has: one with new
         /// signatures is another one, and one no longer waiting lets go of its check.
         /// </summary>
@@ -179,6 +191,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// How many change sets may wait for signatures at once; 1,000 by default.
         /// </summary>
         public UInt32 MaxPendingChangeSets { get; set; } = 1000;
+
+        /// <summary>
+        /// How many change sets of one party may wait for signatures at once, counted for the party of the first signature
+        /// of each one: so no party takes the places of the others, the roaming network operator's among them; 50 by
+        /// default (POI3-ISSUES.md S24).
+        /// </summary>
+        public UInt32 MaxPendingChangeSetsPerParty { get; set; } = 50;
+
+        /// <summary>
+        /// How long a change set waits for signatures at most, from when it began to wait here; 30 days by default
+        /// (POI3-ISSUES.md S24).
+        /// </summary>
+        public TimeSpan PendingChangeSetExpiry { get; set; } = TimeSpan.FromDays(30);
 
         /// <summary>
         /// The change sets waiting for the signatures of their owners (SPECIFICATION.md, section 4.2), with those they
@@ -293,6 +318,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (FindCommitted(ChangeSet) is RoamingNetworkCommit committed)
                     return new (RoamingNetworkCoSigningStatus.AlreadyCommitted, ChangeSet, Commit: committed);
 
+                if (WithdrawnError(ChangeSet) is String withdrawnError)
+                    return Refused(withdrawnError);
+
+                // Taken now: by the clock of this server, which also lets go of the change sets waiting too long.
+                var at = At ?? Timestamp.Now;
+
+                DropExpiredPendingChangeSets(at);
+
                 #region The signatures of the change set waiting already, and the new ones
 
                 var waiting    = pendingChangeSets.TryGetValue(ChangeSet.Id, out var pending) ? pending : null;
@@ -322,9 +355,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (FindVersionFor(changeSet, out var staleError) is not (_, RoamingNetwork version))
                     return Dropped(waiting, staleError ?? "The change set fits no version of this history: prepare it again for the head!");
 
-                // Taken now: its keys valid also now, by the clock of this server, and created no later than now.
-                var at = At ?? Timestamp.Now;
-
+                // Its keys valid also now, by the clock of this server, and created no later than now.
                 if (changeSet.CreatedAt > at + MaxClockSkew)
                     return Refused($"The change set was created at {changeSet.CreatedAt.ToISO8601()}, later than now, {at.ToISO8601()}!");
 
@@ -372,6 +403,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (pendingChangeSets.Count >= MaxPendingChangeSets)
                         return Refused($"There are {pendingChangeSets.Count} change sets waiting for signatures, as many as may wait!");
 
+                    var party = PartyOfFirstSignature(changeSet, version);
+
+                    if (pendingChangeSets.Values.Count(other => FindVersionFor(other) is (_, RoamingNetwork otherVersion) &&
+                                                                PartyOfFirstSignature(other, otherVersion) == party) >= MaxPendingChangeSetsPerParty)
+                    {
+                        return Refused($"There are {MaxPendingChangeSetsPerParty} change sets of {party} waiting for signatures, as many as one party may have waiting!");
+                    }
+
                     // Whether it will be committed once its owners signed it.
                     if (!version.TryApplyPendingChangeSet(changeSet, out _, out var applyError))
                         return Refused(applyError);
@@ -382,9 +421,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return new (RoamingNetworkCoSigningStatus.Pending, waiting, missing);
 
                 // Kept before it is shown: a store failing keeps it from waiting.
+                var since = pendingSince.TryGetValue(changeSet.Id, out var waitingSince) ? waitingSince : at;
+
                 try
                 {
-                    StoreAppend(RoamingNetworkHistoryLogEntry.ForPendingChangeSet(changeSet));
+                    StoreAppend(RoamingNetworkHistoryLogEntry.ForPendingChangeSet(changeSet, since));
                 }
                 catch (Exception e)
                 {
@@ -393,6 +434,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 pendingChangeSets[changeSet.Id] = changeSet;
+                pendingSince     [changeSet.Id] = since;
                 PublishPendingChangeSets();
 
                 var pendingResult = new RoamingNetworkCoSigningResult(RoamingNetworkCoSigningStatus.Pending, changeSet, missing);
@@ -437,14 +479,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region Withdraw(Withdrawal)
+        #region Withdraw(Withdrawal, At = null)
 
         /// <summary>
         /// Withdraw the change set waiting for signatures that the given withdrawal names: signed by a key of an owner of
-        /// one of its changes, of the version it fits. One fitting no version waits no longer anyway.
+        /// one of its changes, of the version it fits, valid when it was withdrawn and when it is taken. One fitting no
+        /// version waits no longer anyway. Withdrawn, it is refused again until the version it was made for is too old
+        /// for it anyway: submitted again, it needs new signatures (POI3-ISSUES.md S26).
         /// </summary>
         /// <param name="Withdrawal">The withdrawal.</param>
-        public RoamingNetworkCoSigningResult Withdraw(RoamingNetworkChangeSetWithdrawal Withdrawal)
+        /// <param name="At">When it is taken, now by default.</param>
+        public RoamingNetworkCoSigningResult Withdraw(RoamingNetworkChangeSetWithdrawal  Withdrawal,
+                                                      DateTimeOffset?                    At   = null)
         {
 
             lock (historyLock)
@@ -462,15 +508,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (SignatureAlgorithmError(Withdrawal.Algorithm, "the withdrawal") is String algorithmError)
                     return Refused(algorithmError);
 
-                if (FindVersionFor(waiting) is not (_, RoamingNetwork version))
+                if (FindVersionFor(waiting) is not (RoamingNetworkCommit madeFor, RoamingNetwork version))
                     return Dropped(waiting, "The change set fits no version of this history: prepare it again for the head!");
 
-                if (!version.TryCheckWithdrawal(Withdrawal, waiting, out var withdrawalError))
+                if (!version.TryCheckWithdrawal(Withdrawal, waiting, out var withdrawalError, At ?? Timestamp.Now))
                     return Refused(withdrawalError);
 
                 try
                 {
-                    Drop(waiting);
+                    StoreAppend(RoamingNetworkHistoryLogEntry.ForPendingChangeSetWithdrawn(waiting.Id, madeFor.Id));
+                    TakeWithdrawn(waiting.Id, madeFor.Id);
+                    PublishPendingChangeSets();
                 }
                 catch (Exception e)
                 {
@@ -504,6 +552,99 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (FindVersionFor(changeSet) is null)
                     Dropped(changeSet, "The change set fits no version of this history any longer!");
 
+            foreach (var (changeSetId, madeFor) in withdrawn.ToArray())
+                if (!IsStillWithdrawn(madeFor))
+                    withdrawn.Remove(changeSetId);
+
+        }
+
+        #endregion
+
+        #region (private) DropExpiredPendingChangeSets(At)
+
+        /// <summary>
+        /// Let go of the change sets waiting for signatures longer than PendingChangeSetExpiry at the given time, while the
+        /// history is locked (POI3-ISSUES.md S24).
+        /// </summary>
+        private void DropExpiredPendingChangeSets(DateTimeOffset At)
+        {
+
+            foreach (var changeSet in pendingChangeSets.Values.ToArray())
+                if (pendingSince.TryGetValue(changeSet.Id, out var since) && At - since > PendingChangeSetExpiry)
+                    Dropped(changeSet, $"The change set waited for signatures since {since.ToISO8601()}, longer than a change set may wait!");
+
+        }
+
+        #endregion
+
+        #region (private) WithdrawnError(ChangeSet) / IsStillWithdrawn(MadeFor) / TakeWithdrawn(ChangeSetId, MadeFor)
+
+        /// <summary>
+        /// Why the given change set is refused, while it, or one it was rebased from, was withdrawn and the version it was
+        /// made for is not too old for it yet; null otherwise, forgetting a withdrawal of a version too old by now.
+        /// </summary>
+        private String? WithdrawnError(RoamingNetworkChangeSet ChangeSet)
+        {
+
+            foreach (var changeSetId in ChangeSetIds(ChangeSet))
+                if (withdrawn.TryGetValue(changeSetId, out var madeFor))
+                {
+
+                    if (IsStillWithdrawn(madeFor))
+                        return $"The change set '{changeSetId}' was withdrawn: submitted again, it needs new signatures, as a change set of its own!";
+
+                    withdrawn.Remove(changeSetId);
+
+                }
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// Whether a change set made for the version of the given commit and withdrawn could still be committed, and so is
+        /// still refused: the commit is held, and its version not too old for a change set (StaleVersionError).
+        /// </summary>
+        private Boolean IsStillWithdrawn(RoamingNetworkCommit_Id MadeFor)
+
+            => commitIndex.TryGetValue(MadeFor, out var index) &&
+               StaleVersionError(commits[index]) is null;
+
+        /// <summary>
+        /// Let go of the given change set waiting for signatures as withdrawn, remembering the commit of the version it was
+        /// made for.
+        /// </summary>
+        private void TakeWithdrawn(ChangeSet_Id             ChangeSetId,
+                                   RoamingNetworkCommit_Id  MadeFor)
+        {
+            pendingChangeSets.Remove(ChangeSetId);
+            pendingSince.     Remove(ChangeSetId);
+            withdrawn[ChangeSetId] = MadeFor;
+        }
+
+        #endregion
+
+        #region (private) PartyOfFirstSignature(ChangeSet, Version)
+
+        /// <summary>
+        /// The party whose key made the first signature of the given change set in the given version, what its quota of
+        /// change sets waiting counts against; the key itself where no party of the version has it.
+        /// </summary>
+        private static String PartyOfFirstSignature(RoamingNetworkChangeSet  ChangeSet,
+                                                    RoamingNetwork           Version)
+        {
+
+            var keyId = ChangeSet.Signatures.IsDefaultOrEmpty ? "" : ChangeSet.Signatures[0].KeyId;
+
+            foreach (var (partyId, party) in Version.Parties)
+                if (party.SigningKeys. Any(key => key.Id == keyId) ||
+                    party.IdentityKeys.Any(key => key.Id == keyId))
+                {
+                    return partyId.ToString();
+                }
+
+            return $"the key '{keyId}'";
+
         }
 
         #endregion
@@ -515,7 +656,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         private IEnumerable<RoamingNetworkHistoryLogEntry> PendingChangeSetLogEntries()
 
-            => [ .. pendingChangeSets.Values.Select(RoamingNetworkHistoryLogEntry.ForPendingChangeSet) ];
+            => [ .. pendingChangeSets.Values.Select(changeSet => RoamingNetworkHistoryLogEntry.ForPendingChangeSet(changeSet, pendingSince.TryGetValue(changeSet.Id, out var since) ? since : null)),
+                 .. withdrawn.Where (withdrawal => IsStillWithdrawn(withdrawal.Value)).
+                              Select(withdrawal => RoamingNetworkHistoryLogEntry.ForPendingChangeSetWithdrawn(withdrawal.Key, withdrawal.Value)) ];
 
         #endregion
 
@@ -528,10 +671,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (Entry.Type == RoamingNetworkHistoryLogEntryType.PendingChangeSetDropped)
+            {
                 pendingChangeSets.Remove(Entry.ChangeSetId!.Value);
+                pendingSince.     Remove(Entry.ChangeSetId!.Value);
+            }
+
+            else if (Entry.Type == RoamingNetworkHistoryLogEntryType.PendingChangeSetWithdrawn)
+                TakeWithdrawn(Entry.ChangeSetId!.Value, Entry.CommitId!.Value);
 
             else if (Entry.ChangeSet is RoamingNetworkChangeSet changeSet && FindCommitted(changeSet) is null)
+            {
+
                 pendingChangeSets[changeSet.Id] = changeSet;
+
+                // A store written before the time was kept: waiting since it was loaded.
+                if (!pendingSince.ContainsKey(changeSet.Id))
+                    pendingSince[changeSet.Id] = Entry.Since ?? Timestamp.Now;
+
+            }
 
             // Shown once loaded, all of them at once (TryLoad(…)).
 
@@ -551,6 +708,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var changeSetId in ChangeSetIds(ChangeSet))
                 if (pendingChangeSets.Remove(changeSetId, out var waiting))
                 {
+
+                    pendingSince.Remove(changeSetId);
 
                     // Shown with the tips the commit changes, in one view (PublishTips()).
                     pendingChangeSetsChanged = true;
@@ -572,6 +731,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
             StoreAppend(RoamingNetworkHistoryLogEntry.ForPendingChangeSetDropped(ChangeSet.Id));
             pendingChangeSets.Remove(ChangeSet.Id);
+            pendingSince.     Remove(ChangeSet.Id);
             PublishPendingChangeSets();
         }
 

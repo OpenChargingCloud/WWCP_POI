@@ -272,6 +272,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                             case RoamingNetworkHistoryLogEntryType.PendingChangeSet:
                             case RoamingNetworkHistoryLogEntryType.PendingChangeSetDropped:
+                            case RoamingNetworkHistoryLogEntryType.PendingChangeSetWithdrawn:
                                 history.TakeStoredPendingChangeSet(entry);
                                 break;
 

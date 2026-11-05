@@ -383,7 +383,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             leader.OnCheckpointSignatures += (checkpoint, newSignatures) => told.Add(newSignatures.Count);
 
             var added     = leader.TryAddCheckpointSignatures(cp1.Id, [ signature! ], Verify, out var signed, out var newSignatures, out var addedError);
-            var forgedSig = leader.TryAddCheckpointSignatures(cp1.Id, [ cp1.CreateSignature(RNOKey, "witness", COSEAlgorithm.Ed25519, RoamingNetworkCommitSignatureRoles.Witness) ], Verify, out _, out _, out var forgedError);
+            var forgedSig = leader.TryAddCheckpointSignatures(cp1.Id, [ cp1.CreateSignature(RNOKey, "leader", COSEAlgorithm.Ed25519, RoamingNetworkCommitSignatureRoles.Witness) ], Verify, out _, out _, out var forgedError);
 
             using (Assert.EnterMultipleScope())
             {

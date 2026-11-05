@@ -54,6 +54,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public const String Witness                  = "witness";
 
+
+        /// <summary>
+        /// Whether the key of the given signature may sign in its role, as far as the given version tells it: in the role
+        /// of the roaming network operator a signing key certified for it, in the role of a charging station operator a
+        /// signing key of the operator its signer names. Who leads or witnesses no version says: those roles are the
+        /// verifier's to judge by the keys it trusts (POI3-ISSUES.md S24).
+        /// </summary>
+        /// <param name="Signature">A signature of a commit.</param>
+        /// <param name="Version">The version of the roaming network the commit leads to.</param>
+        public static Boolean KeyMaySignIn(RoamingNetworkCommitSignature  Signature,
+                                           RoamingNetwork                 Version)
+
+            => Signature.Role switch {
+
+                   RoamingNetworkOperator   => Version.Operator?.SigningKeyCertificates.Any(certificate => certificate.SigningKey.Id == Signature.KeyId) == true,
+
+                   ChargingStationOperator  => ChargingStationOperator_Id.TryParse(Signature.Signer ?? "", out var operatorId) &&
+                                               Version.TryGetChargingStationOperatorById(operatorId, out var chargingStationOperator) &&
+                                               chargingStationOperator.SigningKeys.Any(key => key.Id == Signature.KeyId),
+
+                   _                        => true
+
+               };
+
     }
 
 
@@ -390,10 +414,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region IsOfTheSameKeyAndRoleAs(Other)
+
+        /// <summary>
+        /// Whether the given signature is one of the same key in the same role: a commit or checkpoint keeps one of them,
+        /// the first, whatever time the others name, so a trusted key adds no signatures without bound
+        /// (POI3-ISSUES.md S24). The twin of an ECDSA signature is one of them as well (SignsTheSameAs).
+        /// </summary>
+        public Boolean IsOfTheSameKeyAndRoleAs(RoamingNetworkCommitSignature Other)
+
+            => KeyId == Other.KeyId &&
+               Role  == Other.Role;
+
+        #endregion
+
         #region (static) NotYetIn(Held, Given)
 
         /// <summary>
-        /// The given signatures that sign nothing one of the held ones signs, each once (SignsTheSameAs).
+        /// The given signatures of a key in a role none of the held ones has, each the first of its key and role
+        /// (IsOfTheSameKeyAndRoleAs).
         /// </summary>
         public static RoamingNetworkCommitSignature[] NotYetIn(IEnumerable<RoamingNetworkCommitSignature>  Held,
                                                                IEnumerable<RoamingNetworkCommitSignature>  Given)
@@ -403,7 +442,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var news = new List<RoamingNetworkCommitSignature>();
 
             foreach (var signature in Given)
-                if (!kept.Any(signature.SignsTheSameAs))
+                if (!kept.Any(signature.IsOfTheSameKeyAndRoleAs))
                 {
                     kept.Add(signature);
                     news.Add(signature);

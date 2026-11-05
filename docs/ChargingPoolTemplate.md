@@ -33,8 +33,8 @@ See [Common properties](README.md#common-properties).
 | `name` | update/remove | Optional, no default. |
 | `description` | update/remove | |
 | `dataSource` | update/remove | |
-| `created` | — | Set to the change set's `createdAt` when added without one. |
-| `lastChange` | — | Set to the change set's `createdAt` when added and by every change of the template. |
+| `created` | — | Set to the change set's stamp when added without one. |
+| `lastChange` | — | Set to the change set's stamp when added and by every change of the template. |
 | `customData` | update/remove | |
 
 The template writes no `eTags` and no `@context`.

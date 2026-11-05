@@ -165,7 +165,8 @@ representations keep them.
 Reading JSON or CBOR, `created` is mandatory and `lastChange` is the creation unless given. Otherwise an entity
 read without its creation would be created *now*, and everyone reading the same representation, e.g. of a change
 set, would get another version with other ETags. The one exception is the entity a change set adds: unless given,
-its creation is the `createdAt` of the change set. Its embedded children, e.g. the EVSEs of an added charging
+its creation is the stamp of the change set: its `createdAt`, or the `lastChange` of the roaming network it is
+applied to where that is later, so that no `lastChange` goes back (SPECIFICATION.md 4). Its embedded children, e.g. the EVSEs of an added charging
 station, need their own. Objects without timestamps (brands, grid connection points, parking products) refuse
 them.
 

@@ -48,8 +48,8 @@ See [README.md](README.md#common-properties). No `eTags`.
 | `name` | update/remove | I18N text; omitted when empty |
 | `description` | update/remove | I18N text; omitted when empty |
 | `dataSource` | update/remove | |
-| `created` | — | set to the `createdAt` of the change set when added, unless given |
-| `lastChange` | — | set to the `createdAt` of the change set by every change of it and of its certificates |
+| `created` | — | set to the stamp of the change set when added, unless given |
+| `lastChange` | — | set to the stamp of the change set by every change of it and of its certificates |
 | `customData` | update/remove | a JSON object; omitted when empty |
 
 
@@ -136,7 +136,7 @@ signs the change set as the proof that the body holds it, and it keeps at least 
 ## Change sets
 
 - `RoamingNetworkChange.Add(body)` — signed by the RNO, with its keys or without any, and without its certificates:
-  they are its own to add. `created` and `lastChange` become the change set's `createdAt` unless `created` is given.
+  they are its own to add. `created` and `lastChange` become the change set's stamp unless `created` is given.
 - `RoamingNetworkChange.Remove(bodyId)` — signed by the RNO; its certificates go with it.
 - `UpdateProperty(body, …)` / `RemoveProperty(body, …)` of `name`, `description`, `dataSource`, `dataLicenses`,
   `address`, `logos`, `geoLocation`, `telephone`, `eMailAddress`, `homepage`, `hotline`, `termsAndConditions`,

@@ -34,7 +34,7 @@ See [common properties](README.md#common-properties). A charging station templat
 | `description` | update/remove |
 | `dataSource` | update/remove |
 | `created` | — |
-| `lastChange` | — (set to the change set's `createdAt`) |
+| `lastChange` | — (set to the change set's stamp) |
 | `customData` | update/remove |
 
 
@@ -121,7 +121,7 @@ A template a station names can not be removed: update the station first, in the 
 - A change set applies each change to the embedded JSON of the operator and reads the operator again, so these
   rules hold after every single change.
 - `Add(chargingStationTemplate)` refuses a parent other than the operator; the template must not exist yet. It gets
-  the change set's `createdAt` as `lastChange`, and as `created` unless given.
+  the change set's stamp as `lastChange`, and as `created` unless given.
 
 
 ## Example

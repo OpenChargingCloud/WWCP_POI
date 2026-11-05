@@ -184,6 +184,40 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region A_commit_keeps_one_signature_per_key_and_role()
+
+        /// <summary>
+        /// A key signing a commit in the same role at another time adds no further signature: a commit keeps one of each
+        /// key in each role, the first (POI3-ISSUES.md S24).
+        /// </summary>
+        [Test]
+        public void A_commit_keeps_one_signature_per_key_and_role()
+        {
+
+            var history  = RoamingNetworkHistory.Start(NewNetwork());
+            var commit   = history.Head.Commit;
+            var first    = Signer.Sign(commit, Timestamp.Now.AddMinutes(-2));
+            var later    = Signer.Sign(commit, Timestamp.Now.AddMinutes(-1));
+
+            VerifyCommitSignatureDelegate verify = (commit, version, signature) => commit.VerifySignature(signature, ECDSAPublicKey, "rno-ecdsa", out _);
+
+            var added    = history.TryAddSignatures(commit.Id, [ first ], verify, out _,          out var firstNew, out var error1);
+            var again    = history.TryAddSignatures(commit.Id, [ later ], verify, out var signed, out var laterNew, out var error2);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(later.SignedAt,                                           Is.Not.EqualTo(first.SignedAt));
+                Assert.That(added,                                                    Is.True, error1);
+                Assert.That(firstNew,                                                 Has.Count.EqualTo(1));
+                Assert.That(again,                                                    Is.True, error2);
+                Assert.That(laterNew,                                                 Is.Empty, "no further signature of the same key in the same role");
+                Assert.That(signed!.Signatures.Select(kept => kept.SignedAt),        Is.EqualTo(new[] { first.SignedAt }));
+            }
+
+        }
+
+        #endregion
+
     }
 
 }

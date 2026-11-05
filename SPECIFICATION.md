@@ -251,7 +251,9 @@ not hold at all, e.g. an empty array it leaves out, MUST be refused as well: it 
 the content holds, and an implementation applying change sets to JSON takes their values as they are; one preparing a
 change set, or a merge (5.3), writes them so before they are signed.
 
-**Timestamps:** a change set sets `lastChange` to its `createdAt`: of the roaming network always; of an entity
+**Timestamps:** a change set sets `lastChange` to its **stamp**: its `createdAt`, or the `lastChange` of the roaming
+network of the version it is applied to, where that is later, so that no `lastChange` goes back, whatever time its
+signer chose; its keys are still checked at its `createdAt` (4.1). It sets it of the roaming network always; of an entity
 when it is added (and `created`, unless given) or when one of its own properties changes; and of every entity
 embedding one it adds, changes or removes, up to the roaming network: the charging station, charging pool and
 charging station operator of an EVSE, the charging pool and operator of a charging station, the operator of a
@@ -484,10 +486,13 @@ place where a change set **waits** for the signatures still missing, `~/history/
   other change set takes its place. Signatures by the same holder count once, as in 4.1.
 - Once its owners signed it, by as many holders as their quorums need, the server commits it as it commits any
   change set, and it waits no longer. Also when it is committed otherwise, e.g. as a peer sends its commit.
-- It waits until then, without a time limit, unless withdrawn, or once it fits no version any longer, e.g. after a
-  compaction, or its commit is refused: then it can never be committed. A server MAY limit how many wait.
+- It waits until then, unless withdrawn, or once it fits no version any longer, e.g. after a compaction, or its
+  commit is refused: then it can never be committed; or once it waited longer than the server lets a change set wait,
+  counted from when it came there (30 days by default). A server MAY limit how many wait, and SHOULD limit how many of
+  one party wait, counted for the party of the first signature of each one (50 by default), so that no party takes
+  the places of the others, those of the RNO among them.
 - A **withdrawal** is signed by a key of an owner of one of its changes, of the kind that owner signs it with,
-  valid when it is withdrawn:
+  valid when it is withdrawn and when the server takes it, as the keys of a change set:
 
   ```json
   { "@context": "https://open.charging.cloud/contexts/wwcp/roamingNetwork/changeSetWithdrawal/v1",
@@ -497,9 +502,14 @@ place where a change set **waits** for the signatures still missing, `~/history/
 
   Its signature signs the canonical JSON of `@context`, `algorithm`, `keyId`, `roamingNetworkId`,
   `changeSetId` and `withdrawnAt`, the timestamp written as here.
-- The server keeps the change sets waiting in its store, `{type: "pendingChangeSet", changeSet}` with the
-  signatures it has and `{type: "pendingChangeSetDropped", changeSetId}`, so that they still wait after a restart.
-  They wait at this server only; a peer learns of them by their commit.
+- Withdrawn, a change set MUST be refused again, waiting or committed at once, also as a change set rebased from it,
+  until the version it was made for is too old for a change set anyway (5.3): submitted again, it needs new signatures,
+  as a change set of its own. So a withdrawal holds, and what a server remembers of it bounds itself.
+- The server keeps the change sets waiting in its store, `{type: "pendingChangeSet", changeSet, since}` with the
+  signatures it has and since when it waits, `{type: "pendingChangeSetDropped", changeSetId}` and
+  `{type: "pendingChangeSetWithdrawn", changeSetId, commitId}` with the commit of the version it was made for, so that
+  they still wait, and stay withdrawn, after a restart. They wait at this server only; a peer learns of them by their
+  commit.
 
 POI_API answers `{status, changeSet?, missing?, commitId?, description?}`, `status` one of `pending`,
 `committed`, `alreadyCommitted`, `withdrawn`, `refused` and `notFound`, `missing` one text per change whose owners
@@ -697,7 +707,12 @@ change set and **the signatures of the change set**: whoever signs a commit conf
 together with who signed it. The verification rules of section 4 apply.
 
 A server MUST verify every signature of a commit before it takes the commit,
-and MAY require signatures in certain roles. A signature is verified by the keys of the version
+and MAY require signatures in certain roles. A commit, and a checkpoint, keeps one signature of each key in each role,
+the first: another one of the same key and role, also at another time, is no new signature. A signature counts for a
+required role only by a key that may sign in it, as far as the version tells: in the role `roamingNetworkOperator` a
+signing key certified for the RNO (8.6), in the role `chargingStationOperator` a signing key of the operator its
+`signer` names; who leads or witnesses, no version says, and the server judges by the keys it trusts. A signature is
+verified by the keys of the version
 the commit leads to: for the head of a snapshot the version of the snapshot, as an attestation is
 verified in the version it attests; a signature added later to a commit, in the version of that
 commit. Signatures added later are sent with

@@ -39,7 +39,7 @@ See [common properties](README.md#common-properties). An EVSE group does not wri
 | `description` | update/remove |
 | `dataSource` | update/remove |
 | `created` | — |
-| `lastChange` | — (set to the change set's `createdAt`) |
+| `lastChange` | — (set to the change set's stamp) |
 | `customData` | update/remove |
 
 
@@ -104,7 +104,7 @@ In a history it is set and read by `history.RuntimeStatus` with the entity type 
   every single change; that a group of an operator names only EVSEs of the operator is checked after the last
   change, so an EVSE moved by a `Remove` and an `Add` stays in its groups.
 - `Add(evseGroup, partyId)` refuses a parent other than a charging station operator or an e-mobility provider whose
-  identification the group's names; the group must not exist yet. It gets the change set's `createdAt` as
+  identification the group's names; the group must not exist yet. It gets the change set's stamp as
   `lastChange`, and as `created` unless given.
 
 

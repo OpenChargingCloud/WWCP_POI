@@ -17,6 +17,7 @@
 
 #region Usings
 
+using System.Globalization;
 using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
@@ -133,7 +134,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The last price statement of an entity in an epoch before, not taken along, as its algorithm is not one of this
         /// epoch: the one the next statement of its entity made here follows (SPECIFICATION.md, section 11.4).
         /// </summary>
-        PreviousEpochPriceStatement
+        PreviousEpochPriceStatement,
+
+        /// <summary>
+        /// A change set withdrawn while it waited, and the commit of the version it was made for: it is refused again
+        /// until that version is too old for it anyway (SPECIFICATION.md, section 4.2; POI3-ISSUES.md S26).
+        /// </summary>
+        PendingChangeSetWithdrawn
 
     }
 
@@ -224,9 +231,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  ChangeSet        = "changeSet";
 
             /// <summary>
-            /// The property of the change set of a pending change set dropped entry.
+            /// The property of the change set of a pending change set dropped or withdrawn entry.
             /// </summary>
             public const String  ChangeSetId      = "changeSetId";
+
+            /// <summary>
+            /// The property of when a change set of a pending change set entry began to wait, by the clock of the server.
+            /// </summary>
+            public const String  Since            = "since";
 
         }
 
@@ -284,9 +296,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public RoamingNetworkChangeSet?                         ChangeSet       { get; }
 
         /// <summary>
-        /// The change set of a PendingChangeSetDropped entry.
+        /// The change set of a PendingChangeSetDropped or PendingChangeSetWithdrawn entry.
         /// </summary>
         public ChangeSet_Id?                                    ChangeSetId     { get; }
+
+        /// <summary>
+        /// When the change set of a PendingChangeSet entry began to wait, by the clock of the server; none in a store
+        /// written before it was kept.
+        /// </summary>
+        public DateTimeOffset?                                  Since           { get; }
 
         #endregion
 
@@ -302,7 +320,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               RoamingNetworkPriceStatement?                 PriceStatement   = null,
                                               IReadOnlyList<RoamingNetworkPriceStatement>?  PriceStatements  = null,
                                               RoamingNetworkChangeSet?                      ChangeSet        = null,
-                                              ChangeSet_Id?                                 ChangeSetId      = null)
+                                              ChangeSet_Id?                                 ChangeSetId      = null,
+                                              DateTimeOffset?                               Since            = null)
         {
             this.Type             = Type;
             this.Commit           = Commit;
@@ -315,6 +334,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.PriceStatements  = PriceStatements ?? [];
             this.ChangeSet        = ChangeSet;
             this.ChangeSetId      = ChangeSetId;
+            this.Since            = Since;
         }
 
         /// <summary>
@@ -369,11 +389,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             => new (RoamingNetworkHistoryLogEntryType.CheckpointPriceStatements, CheckpointId: CheckpointId, PriceStatements: PriceStatements);
 
         /// <summary>
-        /// The entry of the given change set waiting for signatures, with those it has.
+        /// The entry of the given change set waiting for signatures, with those it has, and since when it waits.
         /// </summary>
-        public static RoamingNetworkHistoryLogEntry ForPendingChangeSet(RoamingNetworkChangeSet ChangeSet)
+        public static RoamingNetworkHistoryLogEntry ForPendingChangeSet(RoamingNetworkChangeSet  ChangeSet,
+                                                                        DateTimeOffset?          Since   = null)
 
-            => new (RoamingNetworkHistoryLogEntryType.PendingChangeSet, ChangeSet: ChangeSet);
+            => new (RoamingNetworkHistoryLogEntryType.PendingChangeSet, ChangeSet: ChangeSet, Since: Since);
 
         /// <summary>
         /// The entry of the given change set no longer waiting for signatures.
@@ -381,6 +402,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static RoamingNetworkHistoryLogEntry ForPendingChangeSetDropped(ChangeSet_Id ChangeSetId)
 
             => new (RoamingNetworkHistoryLogEntryType.PendingChangeSetDropped, ChangeSetId: ChangeSetId);
+
+        /// <summary>
+        /// The entry of the given change set withdrawn while it waited, and of the commit of the version it was made for.
+        /// </summary>
+        public static RoamingNetworkHistoryLogEntry ForPendingChangeSetWithdrawn(ChangeSet_Id             ChangeSetId,
+                                                                                 RoamingNetworkCommit_Id  MadeFor)
+
+            => new (RoamingNetworkHistoryLogEntryType.PendingChangeSetWithdrawn, CommitId: MadeFor, ChangeSetId: ChangeSetId);
 
         #endregion
 
@@ -441,9 +470,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                             ),
 
                            RoamingNetworkHistoryLogEntryType.PendingChangeSet
+                                                                         => Since.HasValue
+                                                                                ? new JObject(
+                                                                                      new JProperty(PropertyKeys.Type,             "pendingChangeSet"),
+                                                                                      new JProperty(PropertyKeys.ChangeSet,        ChangeSet!.ToJSON(Embedded: true)),
+                                                                                      new JProperty(PropertyKeys.Since,            Since.Value.ToISO8601())
+                                                                                  )
+                                                                                : new JObject(
+                                                                                      new JProperty(PropertyKeys.Type,             "pendingChangeSet"),
+                                                                                      new JProperty(PropertyKeys.ChangeSet,        ChangeSet!.ToJSON(Embedded: true))
+                                                                                  ),
+
+                           RoamingNetworkHistoryLogEntryType.PendingChangeSetWithdrawn
                                                                          => new JObject(
-                                                                                new JProperty(PropertyKeys.Type,             "pendingChangeSet"),
-                                                                                new JProperty(PropertyKeys.ChangeSet,        ChangeSet!.ToJSON(Embedded: true))
+                                                                                new JProperty(PropertyKeys.Type,             "pendingChangeSetWithdrawn"),
+                                                                                new JProperty(PropertyKeys.ChangeSetId,      ChangeSetId!.Value.ToString()),
+                                                                                new JProperty(PropertyKeys.CommitId,         CommitId!.Value.ToString())
                                                                             ),
 
                            RoamingNetworkHistoryLogEntryType.PendingChangeSetDropped
@@ -622,7 +664,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         return false;
                     }
 
-                    Entry = ForPendingChangeSet(changeSet);
+                    DateTimeOffset? since = null;
+
+                    if (JSON[PropertyKeys.Since] is JToken sinceJSON)
+                    {
+
+                        if (sinceJSON.Type != JTokenType.String ||
+                            !DateTimeOffset.TryParse(sinceJSON.Value<String>(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var sinceValue))
+                        {
+                            ErrorResponse = "Invalid pending change set entry: its 'since' is no timestamp!";
+                            return false;
+                        }
+
+                        since = sinceValue;
+
+                    }
+
+                    Entry = ForPendingChangeSet(changeSet, since);
                     return true;
 
                 case "pendingChangeSetDropped":
@@ -634,6 +692,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     Entry          = ForPendingChangeSetDropped(changeSetId);
+                    ErrorResponse  = null;
+                    return true;
+
+                case "pendingChangeSetWithdrawn":
+
+                    if (!ChangeSet_Id.           TryParse(JSON[PropertyKeys.ChangeSetId]?.Value<String>() ?? "", out var withdrawnId) ||
+                        !RoamingNetworkCommit_Id.TryParse(JSON[PropertyKeys.CommitId]?.   Value<String>() ?? "", out var madeFor))
+                    {
+                        ErrorResponse = "Invalid pending change set withdrawn entry!";
+                        return false;
+                    }
+
+                    Entry          = ForPendingChangeSetWithdrawn(withdrawnId, madeFor);
                     ErrorResponse  = null;
                     return true;
 

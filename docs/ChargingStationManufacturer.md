@@ -33,8 +33,8 @@ See [README.md](README.md#common-properties). No `eTags`.
 | `name` | update/remove | I18N text; omitted when empty |
 | `description` | update/remove | I18N text; omitted when empty |
 | `dataSource` | update/remove | |
-| `created` | — | set to the `createdAt` of the change set when added, unless given |
-| `lastChange` | — | set to the `createdAt` of the change set by every change of it and of its models |
+| `created` | — | set to the stamp of the change set when added, unless given |
+| `lastChange` | — | set to the stamp of the change set by every change of it and of its models |
 | `customData` | update/remove | a JSON object; omitted when empty |
 
 
@@ -140,7 +140,7 @@ lowered below a station naming it.
 ## Change sets
 
 - `RoamingNetworkChange.Add(manufacturer)` — signed by the RNO, with its keys and without its models: they are its own
-  to add. `created` and `lastChange` become the change set's `createdAt` unless `created` is given.
+  to add. `created` and `lastChange` become the change set's stamp unless `created` is given.
 - `RoamingNetworkChange.Remove(manufacturerId)` — signed by the RNO; its models go with it.
 - `UpdateProperty(manufacturer, …)` / `RemoveProperty(manufacturer, …)` of `name`, `description`, `dataSource`,
   `dataLicenses`, `address`, `logos`, `geoLocation`, `telephone`, `eMailAddress`, `homepage`, `hotline`,
