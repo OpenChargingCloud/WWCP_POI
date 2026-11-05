@@ -655,6 +655,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             var (server1, server2) = Servers();
 
+            // A third one, taking the merge together with its parents.
+            Assert.That(RoamingNetworkHistory.TryFromSnapshot(server2.ToSnapshotJSON(), out var server3, out var snapshotError), Is.True, snapshotError);
+
             Change(server1, 1, network => [ RoamingNetworkChange.UpdateProperty(EVSE(network), "maxPower", null, 11000) ]);
             Change(server2, 2, network => [ RoamingNetworkChange.UpdateProperty(network, "dataSource", null, "v2") ]);
 
@@ -681,6 +684,20 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 // The parents the other way round.
                 Assert.That(server1.TryAppend(WithContent(merge, json => json["parentIds"] = new JArray(merge.ParentIds.Reverse().Select(id => id.ToString()))), out var error4),  Is.False);
                 Assert.That(error4,                                          Does.Contain("does not name its parents in their order"));
+
+                // The merge with a signed change set, which no merge has (POI3-ISSUES.md S25), under the same identification,
+                // which leaves the signatures of its change set out: refused by a server taking it with its parents.
+                var signatures = merge.ChangeSet!.SignedBy(TestParties.Party(EXA)).ToJSON(Embedded: true)["signatures"]!;
+                var signed     = WithContent(merge, json => json["changeSet"]!["signatures"] = signatures.DeepClone());
+
+                Assert.That(signed.Id,                                       Is.EqualTo(merge.Id));
+                Assert.That(signed.ChangeSet!.Signatures,                    Is.Not.Empty);
+                Assert.That(server1.TryGetMissingCommits(server3!.HaveIds(), out var toServer3, out var missingError),  Is.True, missingError);
+                Assert.That(toServer3!.Select(commit => commit.Id),           Does.Contain(merge.Id));
+                Assert.That(server3.TryAppend([ .. toServer3!.Select(commit => commit.Id == merge.Id ? signed : commit) ], out _, out var error5),  Is.False);
+                Assert.That(error5,                                          Does.Contain("is signed, which the change set of a merge never is"));
+                Assert.That(server3.TryAppend(toServer3!, out _, out var error6),  Is.True, error6);
+                Assert.That(server3.Head.Commit.ChangeSet!.Signatures,       Is.Empty);
 
             }
 

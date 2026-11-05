@@ -1048,6 +1048,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Commit.IsMerge)
                 {
 
+                    // Compared with the merge below without its signatures, which it has none of (SPECIFICATION.md,
+                    // section 5.3): those would be stored, served and covered by the signatures of later commits.
+                    if (Commit.ChangeSet!.Signatures.Length > 0)
+                    {
+                        ErrorResponse = $"The change set of the merge commit '{Commit.Id}' is signed, which the change set of a merge never is!";
+                        return false;
+                    }
+
                     if (!IsCanonicalOrder(parents[0], parents[1]))
                     {
                         ErrorResponse = $"The merge commit '{Commit.Id}' does not name its parents in their order: the higher revision first, the lower identification among equal ones!";
