@@ -274,7 +274,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (!attestations.Any(taken => taken.Value == Attestation.Value && taken.KeyId == Attestation.KeyId))
+                if (!attestations.Any(Attestation.AttestsTheSameAs))
                     TakeAttestation(Attestation);
 
             }
@@ -575,8 +575,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             attestations.RemoveAll(taken => now > taken.ValidUntil || !commitIndex.ContainsKey(taken.CommitId));
             attestations.Add(Attestation);
 
-            if (attestations.Count > MaxAttestations)
-                attestations.RemoveRange(0, attestations.Count - MaxAttestations);
+            // Beyond the bound, the oldest one of the key holding the most goes: a trusted attester signing many evicts its
+            // own attestations, not those of the others (POI3-ISSUES.md S29).
+            while (attestations.Count > MaxAttestations)
+            {
+                var most = attestations.GroupBy(taken => taken.KeyId).MaxBy(group => group.Count())!.Key;
+                attestations.RemoveAt(attestations.FindIndex(taken => taken.KeyId == most));
+            }
 
             PublishAttestations();
 

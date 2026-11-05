@@ -388,7 +388,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
                 catch (Exception e)
                 {
-                    return Refused("The change set can not be stored: " + e.Message);
+                    RaiseStoreError("The change set can not be stored: " + e.Message, e);
+                    return Refused(StoreRefused("The change set"));
                 }
 
                 pendingChangeSets[changeSet.Id] = changeSet;
@@ -473,7 +474,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
                 catch (Exception e)
                 {
-                    return Refused("The withdrawal can not be stored: " + e.Message);
+                    RaiseStoreError("The withdrawal can not be stored: " + e.Message, e);
+                    return Refused(StoreRefused("The withdrawal"));
                 }
 
                 var result = new RoamingNetworkCoSigningResult(RoamingNetworkCoSigningStatus.Withdrawn, waiting);
@@ -592,7 +594,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
                 catch (Exception e)
                 {
-                    return Refused(ErrorResponse + " Letting it go can not be stored: " + e.Message);
+                    RaiseStoreError("Letting a change set go can not be stored: " + e.Message, e);
+                    return Refused(ErrorResponse + " " + StoreRefused("Letting it go"));
                 }
 
                 Announce(result with { ChangeSet = ChangeSet });

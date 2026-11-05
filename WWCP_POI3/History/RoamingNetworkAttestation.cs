@@ -485,6 +485,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region AttestsTheSameAs(Other)
+
+        /// <summary>
+        /// Whether the given attestation signs what this one signs, by the same key, whatever its value: an ECDSA signature
+        /// has a twin with the other S anybody can make from it, and a randomized signature another value each time
+        /// (POI3-ISSUES.md S11). A history keeps such attestations once.
+        /// </summary>
+        public Boolean AttestsTheSameAs(RoamingNetworkAttestation Other)
+
+            => KeyId     == Other.KeyId     &&
+               Algorithm == Other.Algorithm &&
+               SignedAt  == Other.SignedAt  &&
+               CommitId  == Other.CommitId  &&
+               GetSigningBytes().AsSpan().SequenceEqual(Other.GetSigningBytes());
+
+        #endregion
+
         #region GetSigningBytes()
 
         /// <summary>

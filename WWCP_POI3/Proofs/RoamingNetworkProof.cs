@@ -176,6 +176,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (private) GivenRoamingNetworkId
+
+        /// <summary>
+        /// The identification of the roaming network as this proof gives it, null where it gives none as a text: a proof is
+        /// whatever it was handed, an object as its identification as well, which is no roaming network (POI3-ISSUES.md S29).
+        /// </summary>
+        private String? GivenRoamingNetworkId
+
+            => RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id] is JValue { Type: JTokenType.String } id
+                   ? id.Value<String>()
+                   : null;
+
+        #endregion
+
         #region TryCalculateETag(out ETag, out ErrorResponse)
 
         /// <summary>
@@ -306,7 +320,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private IEnumerable<RoamingNetworkAttestation> AttestationsOfThisVersion(DateTimeOffset At)
         {
 
-            var roamingNetworkId = RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Type == JTokenType.String ? RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]!.Value<String>() : null;
+            var roamingNetworkId = GivenRoamingNetworkId;
 
             return Attestations.Where(attestation => attestation.RoamingNetworkId.ToString() == roamingNetworkId         &&
                                                      (!CommitId.HasValue || attestation.CommitId == CommitId.Value)      &&
@@ -351,7 +365,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               DateTimeOffset?                                       At   = null)
         {
 
-            if (TrustAnchor.Id.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
+            if (TrustAnchor.Id.ToString() != GivenRoamingNetworkId)
             {
                 Attestation    = null;
                 ErrorResponse  = $"The trust anchor is one of the roaming network '{TrustAnchor.Id}'!";
@@ -384,7 +398,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Attestation = null;
 
-            if (TrustContext.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
+            if (TrustContext.RoamingNetworkId.ToString() != GivenRoamingNetworkId)
             {
                 ErrorResponse = $"The trust context is one of the roaming network '{TrustContext.RoamingNetworkId}'!";
                 return false;
@@ -513,7 +527,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Verification = null;
 
-            if (TrustAnchor.Id.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
+            if (TrustAnchor.Id.ToString() != GivenRoamingNetworkId)
             {
                 ErrorResponse = $"The trust anchor is one of the roaming network '{TrustAnchor.Id}'!";
                 return false;
@@ -550,7 +564,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Verification = null;
 
-            if (TrustContext.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
+            if (TrustContext.RoamingNetworkId.ToString() != GivenRoamingNetworkId)
             {
                 ErrorResponse = $"The trust context is one of the roaming network '{TrustContext.RoamingNetworkId}'!";
                 return false;
@@ -762,7 +776,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                          DateTimeOffset                    At)
         {
 
-            if (TrustAnchor.Id.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>() ||
+            if (TrustAnchor.Id.ToString() != GivenRoamingNetworkId ||
                 TrustAnchor.Id            != Checkpoint.RoamingNetworkId)
             {
                 ErrorResponse = $"The trust anchor is one of the roaming network '{TrustAnchor.Id}'!";
@@ -859,9 +873,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // Of the operator the proof gives: a statement or a certificate its holders made for another one, e.g. of another
             // roaming network sharing them, is none of it (csharp-review 19, WWCPPOIConformanceTests D6).
-            var operatorId    = RoamingNetwork[POI.RoamingNetwork.PropertyKeys.Operator]?[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>();
+            var operatorId    = (RoamingNetwork[POI.RoamingNetwork.PropertyKeys.Operator] as JObject)?[POI.RoamingNetwork.BasePropertyKeys.Id] is JValue { Type: JTokenType.String } givenOperatorId
+                                    ? givenOperatorId.Value<String>()
+                                    : null;
 
-            if (keyStatement.RoamingNetworkId.ToString() != RoamingNetwork[POI.RoamingNetwork.BasePropertyKeys.Id]?.Value<String>())
+            if (keyStatement.RoamingNetworkId.ToString() != GivenRoamingNetworkId)
             {
                 ErrorResponse = $"The key statement is one of the roaming network '{keyStatement.RoamingNetworkId}'!";
                 return false;
@@ -1059,6 +1075,45 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return entities;
 
         }
+
+        #endregion
+
+        #region GivesCompletely(Entity, ChildArray)
+
+        /// <summary>
+        /// Whether this proof gives the given child array of the given entity of it completely: as an array, or none, as an
+        /// entity without such children has. Pruned it gives none of them, partial some, as leaves (section 8.4): what Given
+        /// and GivenBelow return of it is then not all the entity has, e.g. not every EVSE of a station, tariff of an EVSE
+        /// or certificate of a model. An app showing them checks this first (POI3-ISSUES.md S29).
+        /// </summary>
+        /// <param name="Entity">An entity this proof gives.</param>
+        /// <param name="ChildArray">The name of one of its child arrays.</param>
+        public static Boolean GivesCompletely(JObject  Entity,
+                                              String   ChildArray)
+
+            => Entity[ChildArray] is null or JArray;
+
+        #endregion
+
+        #region SizeOf(Entity, ChildArray)
+
+        /// <summary>
+        /// How many children the given child array of the given entity of this proof has, also where it gives only some or
+        /// none of them; null where its size is no number.
+        /// </summary>
+        /// <param name="Entity">An entity this proof gives.</param>
+        /// <param name="ChildArray">The name of one of its child arrays.</param>
+        public static UInt64? SizeOf(JObject  Entity,
+                                     String   ChildArray)
+
+            => Entity[ChildArray] switch {
+                   null                                                                         => 0,
+                   JArray  complete                                                             => (UInt64) complete.Count,
+                   JObject { } form when form[POIEffectiveTree.SizeProperty] is JValue size &&
+                                         POIEffectiveTree.IntegerOf(size) is Decimal value &&
+                                         value >= 0                                             => (UInt64) value,
+                   _                                                                            => null
+               };
 
         #endregion
 

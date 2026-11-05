@@ -373,6 +373,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region SignsTheSameAs(Other)
+
+        /// <summary>
+        /// Whether the given signature signs what this one signs, by the same key, whatever its value: an ECDSA signature
+        /// has a twin with the other S anybody can make from it, and a randomized signature another value each time
+        /// (POI3-ISSUES.md S11). A commit or checkpoint keeps such signatures once.
+        /// </summary>
+        public Boolean SignsTheSameAs(RoamingNetworkCommitSignature Other)
+
+            => Role      == Other.Role      &&
+               Signer    == Other.Signer    &&
+               SignedAt  == Other.SignedAt  &&
+               Algorithm == Other.Algorithm &&
+               KeyId     == Other.KeyId;
+
+        #endregion
+
+        #region (static) NotYetIn(Held, Given)
+
+        /// <summary>
+        /// The given signatures that sign nothing one of the held ones signs, each once (SignsTheSameAs).
+        /// </summary>
+        public static RoamingNetworkCommitSignature[] NotYetIn(IEnumerable<RoamingNetworkCommitSignature>  Held,
+                                                               IEnumerable<RoamingNetworkCommitSignature>  Given)
+        {
+
+            var kept = new List<RoamingNetworkCommitSignature>(Held);
+            var news = new List<RoamingNetworkCommitSignature>();
+
+            foreach (var signature in Given)
+                if (!kept.Any(signature.SignsTheSameAs))
+                {
+                    kept.Add(signature);
+                    news.Add(signature);
+                }
+
+            return [ .. news ];
+
+        }
+
+        #endregion
+
         #region (override) ToString()
 
         /// <summary>

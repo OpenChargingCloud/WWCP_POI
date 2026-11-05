@@ -355,14 +355,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             if (leaves[position] is not JObject leaf ||
                                 leaf.Count != 3 ||
                                 leaf[IndexProperty]     is not JValue { Type: JTokenType.Integer } indexJSON ||
+                                IntegerOf(indexJSON)    is not Decimal index ||
                                 leaf[AuditPathProperty] is not JArray auditPathJSON ||
                                 leaf[EntityProperty]    is not JObject child)
                             {
                                 ErrorResponse = $"{leafPath} must be {{ \"{IndexProperty}\": i, \"{AuditPathProperty}\": [ … ], \"{EntityProperty}\": {{ … }} }}!";
                                 return false;
                             }
-
-                            var index = indexJSON.Value<Decimal>();
 
                             // In ascending order, each child once.
                             if (index <= lastIndex || index >= size)
@@ -467,16 +466,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Size = 0;
 
             if (JSON[SizeProperty] is not JValue { Type: JTokenType.Integer } size ||
-                size.Value<Decimal>() < 0 ||
-                size.Value<Decimal>() > Int64.MaxValue)
+                IntegerOf(size) is not Decimal value ||
+                value < 0 ||
+                value > Int64.MaxValue)
             {
                 return false;
             }
 
-            Size = size.Value<UInt64>();
+            Size = (UInt64) value;
             return true;
 
         }
+
+        #endregion
+
+        #region (internal static) IntegerOf(Value)
+
+        /// <summary>
+        /// The given JSON integer, or null for one beyond 64 bits: Newtonsoft reads such a one as a BigInteger, which
+        /// Value&lt;Decimal&gt;() throws on, out of the verification of a proof (POI3-ISSUES.md S29).
+        /// </summary>
+        internal static Decimal? IntegerOf(JValue Value)
+
+            => Value.Value switch {
+                   Int64  integer => integer,
+                   Int32  integer => integer,
+                   UInt64 integer => integer,
+                   UInt32 integer => integer,
+                   _              => null
+               };
 
         #endregion
 

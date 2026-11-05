@@ -548,6 +548,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private static) StoreRefused(What)
+
+        /// <summary>
+        /// What a client is told when the store refused to keep what it sent: no more than that. The reason of the store,
+        /// with its file paths, goes to OnStoreError (POI3-ISSUES.md S29).
+        /// </summary>
+        private static String StoreRefused(String What)
+
+            => $"{What} can not be stored here, for now!";
+
+        #endregion
+
         #region (private) RaiseStoreError(Description, Exception)
 
         private void RaiseStoreError(String      Description,

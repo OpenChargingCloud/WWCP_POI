@@ -71,7 +71,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public RoamingNetworkCommit WithSignatures(IEnumerable<RoamingNetworkCommitSignature> Signatures)
         {
 
-            var newSignatures = Signatures.Where(signature => !this.Signatures.Contains(signature)).Distinct().ToArray();
+            var newSignatures = RoamingNetworkCommitSignature.NotYetIn(this.Signatures, Signatures);
 
             return newSignatures.Length == 0
                        ? this

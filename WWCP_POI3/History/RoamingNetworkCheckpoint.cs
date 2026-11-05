@@ -498,7 +498,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public RoamingNetworkCheckpoint WithSignatures(IEnumerable<RoamingNetworkCommitSignature> Signatures)
         {
 
-            var newSignatures = Signatures.Where(signature => !this.Signatures.Contains(signature)).Distinct().ToArray();
+            var newSignatures = RoamingNetworkCommitSignature.NotYetIn(this.Signatures, Signatures);
 
             return newSignatures.Length == 0
                        ? this
@@ -951,7 +951,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                               id.HashAlgorithm,
                                                               next,
                                                               previousEpoch,
-                                                              [ .. signatures.Distinct() ]);
+                                                              [ .. RoamingNetworkCommitSignature.NotYetIn([], signatures) ]);
 
                 if (checkpoint.Id != id)
                 {

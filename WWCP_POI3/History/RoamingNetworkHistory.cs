@@ -927,7 +927,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
                 catch (Exception e)
                 {
-                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: "The commit can not be stored: " + e.Message);
+                    RaiseStoreError("The commit can not be stored: " + e.Message, e);
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: StoreRefused("The commit"));
                 }
 
                 // Its merge with the head is calculated already.
@@ -1110,7 +1111,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
                 catch (Exception e)
                 {
-                    ErrorResponse = "The commit can not be stored: " + e.Message;
+                    RaiseStoreError("The commit can not be stored: " + e.Message, e);
+                    ErrorResponse = StoreRefused("The commit");
                     return false;
                 }
 
@@ -1225,7 +1227,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 var commit         = commits[index];
-                var newSignatures  = Signatures.Where(signature => !commit.Signatures.Contains(signature)).Distinct().ToArray();
+                var newSignatures  = RoamingNetworkCommitSignature.NotYetIn(commit.Signatures, Signatures);
 
                 if (newSignatures.Length == 0)
                 {
@@ -1261,7 +1263,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
                 catch (Exception e)
                 {
-                    ErrorResponse = "The signatures can not be stored: " + e.Message;
+                    RaiseStoreError("The signatures can not be stored: " + e.Message, e);
+                    ErrorResponse = StoreRefused("The signatures");
                     return false;
                 }
 

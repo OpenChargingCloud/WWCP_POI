@@ -670,7 +670,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  epoch,
                                  id.HashAlgorithm,
                                  profiles,
-                                 [ .. signatures.Distinct() ]
+                                 [ .. RoamingNetworkCommitSignature.NotYetIn([], signatures) ]
                              );
 
                 if (commit.Id != id)

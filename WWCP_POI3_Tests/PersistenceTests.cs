@@ -351,12 +351,18 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
             store.BeforeWrite = type => throw new IOException("Disk full");
 
+            var errors   = new List<String>();
+            history.OnStoreError += (history, description, exception) => errors.Add(description);
+
             var result   = Change(history, 1, "dataSource", "v2");
 
             using (Assert.EnterMultipleScope())
             {
                 Assert.That(result.Status,            Is.EqualTo(RoamingNetworkCommitStatus.Refused));
-                Assert.That(result.ErrorResponse,     Does.Contain("can not be stored").And.Contain("Disk full"));
+                // The client is told no more than that; the reason of the store, with its paths, goes to OnStoreError
+                // (POI3-ISSUES.md S29).
+                Assert.That(result.ErrorResponse,     Does.Contain("can not be stored").And.Not.Contain("Disk full"));
+                Assert.That(errors.Single(),          Does.Contain("The commit can not be stored").And.Contain("Disk full"));
                 Assert.That(history.Head.Commit.Id,   Is.EqualTo(head));
                 Assert.That(history.Count,            Is.EqualTo(1));
             }

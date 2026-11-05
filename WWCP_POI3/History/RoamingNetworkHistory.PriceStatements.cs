@@ -691,7 +691,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             catch (Exception e)
             {
                 RaiseStoreError("A price statement can not be stored: " + e.Message, e);
-                ErrorResponse = "The price statement can not be stored: " + e.Message;
+                ErrorResponse = StoreRefused("The price statement");
                 return POIPriceStatementResult.Refused;
             }
 

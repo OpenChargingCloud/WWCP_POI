@@ -343,7 +343,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 var checkpoint     = checkpoints[index];
-                var newSignatures  = Signatures.Where(signature => !checkpoint.Signatures.Contains(signature)).Distinct().ToArray();
+                var newSignatures  = RoamingNetworkCommitSignature.NotYetIn(checkpoint.Signatures, Signatures);
 
                 if (newSignatures.Length == 0)
                 {
