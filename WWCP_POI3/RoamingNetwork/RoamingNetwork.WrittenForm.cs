@@ -80,22 +80,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) FirstNotWritten(Given, Written, Path, Property)
+        #region (internal static) FirstNotWritten(Given, Written, Path, Property)
 
         /// <summary>
         /// Where the given value is not written as the content holds it, e.g. "chargingStationOperators[0].chargingPools[1].paymentOptions",
-        /// and how the content holds it; null when it is.
+        /// and how the content holds it; null when it is. Also of the elements of the prices of a charging tariff in a
+        /// price statement, written as a charging tariff holds them (SPECIFICATION.md, 12.1).
         /// </summary>
         /// <param name="Given">The value as it was given.</param>
         /// <param name="Written">The value as it is written again.</param>
         /// <param name="Path">The path of the value.</param>
         /// <param name="Property">The name of the property holding the value, if a property holds it.</param>
         /// <param name="Ignored">The properties of the value compared neither given nor written, if it is an object.</param>
-        private static (String Path, String Reason)? FirstNotWritten(JToken                Given,
-                                                                     JToken                Written,
-                                                                     String                Path,
-                                                                     String?               Property,
-                                                                     HashSet<String>?      Ignored   = null)
+        internal static (String Path, String Reason)? FirstNotWritten(JToken                Given,
+                                                                      JToken                Written,
+                                                                      String                Path,
+                                                                      String?               Property,
+                                                                      HashSet<String>?      Ignored   = null)
         {
 
             switch (Given)

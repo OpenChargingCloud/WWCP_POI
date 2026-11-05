@@ -176,6 +176,53 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region The_elements_of_a_price_status_are_written_as_a_charging_tariff_holds_them()
+
+        /// <summary>
+        /// The elements of the prices of a charging tariff are read as those of a charging tariff, and written as a charging
+        /// tariff holds them (SPECIFICATION.md, 12.1): a restriction this reader does not know, e.g., would else not restrict
+        /// the price for it, and two readers would price one session differently.
+        /// </summary>
+        [Test]
+        public void The_elements_of_a_price_status_are_written_as_a_charging_tariff_holds_them()
+        {
+
+            static String? Refused(String Element)
+            {
+                Assert.That(ChargingPrices.TryParse(POIJSON.Read($$"""{"prices":[{"chargingTariffId":"DE*GEF*T1","elements":[{{Element}}]}]}"""), out _, out var error),
+                            Is.False, Element);
+                return error;
+            }
+
+            static String Held(String Path, String Reason)
+                => $"'{Path}' of the prices of the charging tariff 'DE*GEF*T1' is not written as a charging tariff holds it: {Reason}!";
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(ChargingPrices.TryParse(POIJSON.Read("""{"prices":[{"chargingTariffId":"DE*GEF*T1","elements":[{"priceComponents":[{"type":"ENERGY","price":0.390,"stepSize":1}],"restrictions":{"startTime":"08:00","endTime":"18:00","daysOfWeek":["MONDAY","TUESDAY"]}}]}]}"""), out var prices, out var error),
+                            Is.True, error);
+                Assert.That(prices!.Prices[0].Elements[0].Restrictions?.StartTime, Is.EqualTo(new TimeOnly(8, 0)));
+
+                Assert.That(Refused("""{"priceComponents":[{"type":"ENERGY","price":0.1,"stepSize":1}],"restrictions":{"maxStateOfCharge":80}}"""),
+                            Is.EqualTo(Held("elements[0].restrictions.maxStateOfCharge", "the content leaves it out")));
+                Assert.That(Refused("""{"priceComponents":[{"type":"ENERGY","price":0.1,"stepSize":1}],"x":1}"""),
+                            Is.EqualTo(Held("elements[0].x", "the content leaves it out")));
+                Assert.That(Refused("""{"priceComponents":[{"type":"ENERGY","price":0.1,"stepSize":1,"x":1}]}"""),
+                            Is.EqualTo(Held("elements[0].priceComponents[0].x", "the content leaves it out")));
+                Assert.That(Refused("""{"priceComponents":[{"type":"ENERGY","price":0.1,"stepSize":1}],"restrictions":{"minPower":"11"}}"""),
+                            Is.EqualTo(Held("elements[0].restrictions.minPower", "the content holds it as '11'")));
+                Assert.That(Refused("""{"priceComponents":[{"type":"ENERGY","price":0.1,"stepSize":1}],"restrictions":{"daysOfWeek":["TUESDAY","MONDAY"]}}"""),
+                            Is.EqualTo(Held("elements[0].restrictions.daysOfWeek", "its elements are in the order the content holds them in")));
+                Assert.That(Refused($$"""{"@context":"{{ChargingTariffElement.JSONLDContext}}","priceComponents":[{"type":"ENERGY","price":0.1,"stepSize":1}]}"""),
+                            Is.EqualTo(Held("elements[0]", "embedded, an object names no JSON-LD context")));
+
+            }
+
+        }
+
+        #endregion
+
         #region The_price_status_can_be_planned_and_survives_changes()
 
         [Test]

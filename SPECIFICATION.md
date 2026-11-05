@@ -1903,6 +1903,11 @@ operator with one of its signing keys (section 4.1) when it sets the price.
     suffix without case and `*`: `DE*GEF*T_dc` names `DE*GEF*T_DC`;
   - the `elements` are at least one, each a JSON object read as those of a charging tariff, with at least one price
     component;
+  - the `elements` are written as a charging tariff holds them (section 2, "Written forms"), as a version holds the
+    elements of a tariff: an element, a price component or restrictions naming a property their type does not define, a
+    number given as a text, the days of the week out of their order, the JSON-LD context of an embedded object are
+    refused. A reader not knowing a restriction would else apply a price where its signer did not, and two readers
+    would price one session differently;
   - a `@context` names its own (1.1): of a price status
     `https://open.charging.cloud/contexts/wwcp/roamingNetwork/chargingPrices/v1`, of the prices of a charging tariff
     `https://open.charging.cloud/contexts/wwcp/roamingNetwork/chargingTariffPrices/v1`.

@@ -250,7 +250,7 @@ ETags, shared by all versions of the charging pool. There is none until one is r
 
 | JSON key | Type | Description |
 |---|---|---|
-| `prices` | array | Mandatory, possibly empty: `{chargingTariffId, elements}`, each charging tariff of the operator at most once. Its `elements` (as those of a [charging tariff](ChargingTariff.md#elements), at least one) replace those of the tariff; the currency is the tariff's. No prices: the tariffs apply as they are. |
+| `prices` | array | Mandatory, possibly empty: `{chargingTariffId, elements}`, each charging tariff of the operator at most once. Its `elements` (as those of a [charging tariff](ChargingTariff.md#elements), at least one, written as a charging tariff holds them: a property their types do not define, e.g. a restriction, is refused) replace those of the tariff; the currency is the tariff's. No prices: the tariffs apply as they are. |
 
 Other keys are refused ([`ChargingPrices`](../WWCP_POI3/DataStructures/POIPriceStatus.cs)); so is a tariff the
 operator does not have. Its text, e.g. in status updates, is this JSON, compact, the prices in the order of their

@@ -184,6 +184,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
+            // Written as a charging tariff holds them (SPECIFICATION.md, 12.1): an element naming a restriction this reader
+            // does not know, e.g., would else be priced by it where its signer did not price it.
+            if (RoamingNetwork.FirstNotWritten(elementsJSON,
+                                               new JArray(elements.Select(element => element.ToJSON(Embedded: true))),
+                                               PropertyKeys.Elements,
+                                               PropertyKeys.Elements) is (String path, String reason))
+            {
+                ErrorResponse = $"'{path}' of the prices of the charging tariff '{chargingTariffId}' is not written as a charging tariff holds it: {reason}!";
+                return false;
+            }
+
             ChargingTariffPrices  = new ChargingTariffPrices(chargingTariffId, elements);
             ErrorResponse         = null;
             return true;
