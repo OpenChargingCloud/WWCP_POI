@@ -252,6 +252,10 @@ public static class ExampleA3
 
         using var meterKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
 
+        // Kept for example A16 alone, which plays the meter of DE*GEF*E1*1 signing its readings: a meter never gives it out.
+        if (S == 1 && E == 1)
+            File.WriteAllText(ExampleA16.MeterKey, meterKey.ExportPkcs8PrivateKeyPem() + "\n");
+
         return new (EnergyMeter_Id.Parse($"DE*GEF*M{S}*{E}"),
                     SerialNumber:  SerialNumber.Parse($"{Kind}M-2026-{S:D3}-{E}"),
                     PublicKeys:    [ new MeasurementPublicKey(meterKey.ExportSubjectPublicKeyInfo()) ],

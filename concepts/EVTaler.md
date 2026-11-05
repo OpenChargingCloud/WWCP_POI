@@ -557,8 +557,8 @@ payment, the signed meter values, the settlement statement and the refunds. From
 - `EVTalerSettlement`: signed with a key for `payments` and checked as price statements are, refused without both
   signed meter values (5.4), its price recalculated where the prices allow it (7).
 - `EVTalerRates` and `EVTalerAmounts`: GNU Taler's amounts, the rates of a session, the rounding of open point 3.
-- `EVTalerEvidenceTests`. Example A16, the evidence of a session paid in steps from recorded contract terms, is to
-  follow.
+- `EVTalerEvidenceTests`, and [example A16](../examples/exampleA16.md): a session paid in two steps, settled, and
+  its evidence in one file, from contract terms as a merchant backend makes them.
 
 The merchant's signature over contract terms is checked by the wallet, with Taler's own hashing of contract terms;
 WWCP_POI checks only that the merchant is the operator's. Doing it as well would mean implementing that hashing.

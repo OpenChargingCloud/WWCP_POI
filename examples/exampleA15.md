@@ -125,8 +125,9 @@ Another merchant key: Valid attestations of trusted keys of 0 holders attest the
 
 ## Limits
 
-- This is phase 1 of the concept: what the content says. Asking for offers, the steps, their settlement and the
-  evidence of a paid session (concepts/EVTaler.md, sections 5 to 7) are not built yet.
+- This is phase 1 of the concept: what the content says. The steps, their settlement and the evidence of a paid
+  session are phase 2, [example A16](exampleA16.md); asking for offers (concepts/EVTaler.md, section 6) is not built
+  yet.
 - POI proves that `DE*GEF` names this merchant, not that the merchant backend or the exchanges exist, accept `DE*GEF`
   or are configured alike: the app checks the contract terms of every offer.
 - The URLs, the merchant and the exchange in Swiss francs are examples; the master public key of the exchange in euros

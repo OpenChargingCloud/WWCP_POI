@@ -175,3 +175,15 @@ Console.WriteLine();
 ExampleA15.Run(a11);
 
 ExampleA15.Validate();
+
+Console.WriteLine();
+Console.WriteLine();
+
+
+
+// EV Taler, a session paid in two steps: the app checks each order against the station proof and the price statement
+// before the driver pays, the second one naming the start value the meter signed; DE*GEF settles the session with its key
+// for payments, refused without both signed meter values; the app keeps what decides a dispute in one file.
+ExampleA16.Run(a11);
+
+ExampleA16.Validate();
