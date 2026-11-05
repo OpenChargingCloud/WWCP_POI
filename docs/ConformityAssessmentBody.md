@@ -89,7 +89,7 @@ versions.
 
 | JSON key | Type | Change set | Description |
 |---|---|---|---|
-| `@id` | string | — | `ConformityCertificate_Id`: any text, compared case-insensitively, surrounding whitespace trimmed; unique within the roaming network. |
+| `@id` | string | — | `ConformityCertificate_Id`: the `@id` of the body issuing it, a colon and a name without one, e.g. `PTB:2026-0042` (SPECIFICATION.md 4.1), so that no body takes the identification of another one's certificate and two bodies numbering theirs alike both have them; compared case-insensitively, surrounding whitespace trimmed. |
 | `legislation` | string | update/remove | The legislation it is issued under, e.g. `MID`: one its body is `notifiedFor`. |
 | `chargingStationManufacturerId` | string | update | Of a certificate for a charging station model: a [ChargingStationManufacturer](ChargingStationManufacturer.md) of the network, the manufacturer of the model. |
 | `chargingStationModel` | string | update | Of a certificate for a charging station model: a `ChargingStationModel_Id`, one of the [models](ChargingStationManufacturer.md#chargingstationmodels) of the manufacturer, as charging stations name their model by `modelId`, compared case-insensitively. |
@@ -100,7 +100,7 @@ versions.
 | `verifiedTransparencySoftwareIds` | string[] | update/remove | Components: the releases officially checked with this model; always written, ordered (ordinal). |
 | `compatibleTransparencySoftwareIds` | string[] | update/remove | Components: further compatible releases, without a claim of verification; always written, ordered (ordinal). |
 | `energyMeters` | object[] | update/remove | Components of a charging station model: the energy meters it was issued with, each `{ manufacturerId, modelId, hardwareRevisions, firmwareVersions }`, a model of an energy meter manufacturer of the network in at least one of its hardware revisions and firmware versions; each model once, in their given order; omitted when none. A certificate for an energy meter model names none. |
-| `documentNumber` | string | update/remove | The body's number of the document, if it differs from `@id`. |
+| `documentNumber` | string | update/remove | The body's number of the document, e.g. `PTB-2026-0042`. |
 | `documentURL` | URL | update/remove | Absolute; where the body publishes the document. |
 | `notBefore` | timestamp | update/remove | Start of validity, in UTC to the millisecond like every timestamp of the content, e.g. `2026-01-01T00:00:00.000Z`. |
 | `notAfter` | timestamp | update/remove | End of validity; not before `notBefore`. |
@@ -178,23 +178,23 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Conformi
   "notifiedFor": [ "MID" ],
   "certificates": [
     {
-      "@id": "PTB-2026-0017",
+      "@id": "PTB:2026-0017",
       "energyMeterManufacturerId": "ACME",
       "energyMeterModel": "ACME-3000",
       "hardwareRevisions": [ "1.2" ],
       "firmwareVersions": [ "4.7.1" ],
-      "verifiedTransparencySoftwareIds":   [ "chargy-1.5.0" ],
+      "verifiedTransparencySoftwareIds":   [ "OpenChargingCloud:chargy-1.5.0" ],
       "compatibleTransparencySoftwareIds": [],
       "notBefore": "2026-01-01T00:00:00.000Z"
     },
     {
-      "@id": "PTB-2026-0042",
+      "@id": "PTB:2026-0042",
       "legislation": "MID",
       "chargingStationManufacturerId": "ACME",
       "chargingStationModel": "Wallbox 22",
       "hardwareRevisions": [ "2.1" ],
       "firmwareVersions": [ "4.7.1" ],
-      "verifiedTransparencySoftwareIds":   [ "chargy-1.5.0" ],
+      "verifiedTransparencySoftwareIds":   [ "OpenChargingCloud:chargy-1.5.0" ],
       "compatibleTransparencySoftwareIds": [],
       "energyMeters": [
         { "manufacturerId": "ACME", "modelId": "ACME-3000", "hardwareRevisions": [ "1.2" ], "firmwareVersions": [ "4.7.1" ] }

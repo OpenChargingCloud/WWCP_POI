@@ -52,9 +52,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly ChargingStation_Id          S1        = ChargingStation_Id.        Parse("DE*GEF*S1");
         private static readonly EVSE_Id                     E1        = EVSE_Id.                   Parse("DE*GEF*E1*1");
         private static readonly ChargingStationTemplate_Id  ST1       = ChargingStationTemplate_Id.Parse("DE*GEF*ST1");
-        private static readonly TransparencySoftware_Id     Chargy10  = TransparencySoftware_Id.   Parse("chargy-1.0");
-        private static readonly TransparencySoftware_Id     Chargy11  = TransparencySoftware_Id.   Parse("chargy-1.1");
-        private static readonly TransparencySoftware_Id     Chargy9   = TransparencySoftware_Id.   Parse("chargy-9");
+        private static readonly TransparencySoftware_Id     Chargy10  = TransparencySoftware_Id.   Parse("OpenChargingCloud:chargy-1.0");
+        private static readonly TransparencySoftware_Id     Chargy11  = TransparencySoftware_Id.   Parse("OpenChargingCloud:chargy-1.1");
+        private static readonly TransparencySoftware_Id     Chargy9   = TransparencySoftware_Id.   Parse("OpenChargingCloud:chargy-9");
 
         private static readonly URL                         ModelURL  = URL.Parse("https://acme.example/wallbox-22");
         private static readonly String                      SECC      = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----";
@@ -167,7 +167,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(json["modelURL"]?.Value<String>(),                                   Is.EqualTo(ModelURL.ToString()));
                 Assert.That(json["serialNumber"]?.Value<String>(),                               Is.EqualTo("WB22-000815"));
                 Assert.That(json["transparencySoftwareStatus"]!.Select(status => status["transparencySoftwareId"]!.Value<String>()),
-                                                                                                 Is.EqualTo(new[] { "chargy-1.0", "chargy-1.1" }), "ordered by release");
+                                                                                                 Is.EqualTo(new[] { "OpenChargingCloud:chargy-1.0", "OpenChargingCloud:chargy-1.1" }), "ordered by release");
                 Assert.That(json["signatureMethods"]!.Values<String>(),                          Is.EqualTo(new[] { "OCMF", "SAFE" }), "ordered by name");
                 Assert.That(json["publicKeys"]![0]!["@id"]!.Value<String>(),                      Is.EqualTo(key.Id));
                 Assert.That(key.ToJSON()["@context"]!.Value<String>(),                          Is.EqualTo("https://open.charging.cloud/contexts/wwcp/roamingNetwork/measurementPublicKey/v1"));
@@ -246,12 +246,12 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             {
 
                 Assert.That(() => NewNetwork(Station: NewStation([ new TransparencySoftwareAssignment(Chargy9, LegalStatus.ForInformationOnly) ])),
-                            Throws.ArgumentException.With.Message.Contains("The transparency software release 'chargy-9' of the charging station 'DE*GEF*S1' is unknown in the roaming network"));
+                            Throws.ArgumentException.With.Message.Contains("The transparency software release 'OpenChargingCloud:chargy-9' of the charging station 'DE*GEF*S1' is unknown in the roaming network"));
 
                 Assert.That(() => NewNetwork(Template: new ChargingStationTemplate(ST1,
                                                                                   TransparencySoftwareStatus:  [ new TransparencySoftwareAssignment(Chargy9, LegalStatus.ForInformationOnly) ],
                                                                                   Created:                     Created)),
-                            Throws.ArgumentException.With.Message.Contains("The transparency software release 'chargy-9' of the charging station template 'DE*GEF*ST1' is unknown in the roaming network"));
+                            Throws.ArgumentException.With.Message.Contains("The transparency software release 'OpenChargingCloud:chargy-9' of the charging station template 'DE*GEF*ST1' is unknown in the roaming network"));
 
                 Assert.That(() => new ChargingStation(S1, TransparencySoftwareStatus: [ new TransparencySoftwareAssignment(Chargy10, LegalStatus.ForInformationOnly),
                                                                                         new TransparencySoftwareAssignment(Chargy10, LegalStatus.GermanCalibrationLaw) ]),
@@ -304,7 +304,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 // A release unknown in the network is refused by the change set.
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(gef2.ChargingStations.Single(), "transparencySoftwareStatus", null,
                                                                                  new JArray(new TransparencySoftwareAssignment(Chargy9, LegalStatus.ForInformationOnly).ToJSON(Embedded: true)))),
-                            Throws.Exception.With.Message.Contains("chargy-9"));
+                            Throws.Exception.With.Message.Contains("OpenChargingCloud:chargy-9"));
 
             }
 

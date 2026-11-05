@@ -230,9 +230,9 @@ An EVSE's meter, as `energyMeter`:
   "hardwareRevision": "1.2",
   "firmwareVersion": "4.7.1",
   "transparencySoftwareStatus": [
-    { "transparencySoftwareId": "chargy-1.5.0", "legalStatus": "germanCalibrationLaw" }
+    { "transparencySoftwareId": "OpenChargingCloud:chargy-1.5.0", "legalStatus": "germanCalibrationLaw" }
   ],
-  "certificateIds": [ "PTB-2026-0017" ],
+  "certificateIds": [ "PTB:2026-0017" ],
   "signatureMethods": [ "OCMF" ],
   "publicKeys": [
     { "@id": "b19e015397ed17785f274eee8706d2be6474a2ebc50c91d322a6f89cc894a72b",

@@ -443,18 +443,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.transparencySoftwareManufacturers = new (TransparencySoftwareManufacturers, entity => entity.Id, "transparency software manufacturer");
 
-            // Releases are embedded in their manufacturers, and unique within the network: energy meters and certificates
-            // name them by their identifications alone.
-            if (DuplicateTransparencySoftware(transparencySoftwareManufacturers) is String duplicateRelease)
+            // Releases are embedded in their manufacturers, identified under them, and so unique within the network: energy
+            // meters and certificates name them by their identifications alone.
+            if ((ForeignTransparencySoftware  (transparencySoftwareManufacturers) ??
+                 DuplicateTransparencySoftware(transparencySoftwareManufacturers)) is String duplicateRelease)
+            {
                 throw new ArgumentException(duplicateRelease, nameof(TransparencySoftwareManufacturers));
+            }
 
             this.transparencySoftware = TransparencySoftwareOf(transparencySoftwareManufacturers);
 
             this.conformityAssessmentBodies = new (ConformityAssessmentBodies, entity => entity.Id, "conformity assessment body");
 
-            // Certificates are embedded in the bodies issuing them, and unique within the network: energy meters name them
-            // by their identifications alone. A number as a notified body names one body.
-            if ((DuplicateConformityCertificate(conformityAssessmentBodies) ??
+            // Certificates are embedded in the bodies issuing them, identified under them, and so unique within the network:
+            // energy meters name them by their identifications alone. A number as a notified body names one body.
+            if ((ForeignConformityCertificate  (conformityAssessmentBodies) ??
+                 DuplicateConformityCertificate(conformityAssessmentBodies) ??
                  DuplicateNotifiedBodyNumber   (conformityAssessmentBodies)) is String duplicateError)
             {
                 throw new ArgumentException(duplicateError, nameof(ConformityAssessmentBodies));
@@ -2357,6 +2361,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         /// <summary>
+        /// The error, when a certificate of the given conformity assessment bodies is not identified as one of the body
+        /// issuing it: by the identification of the body, a colon and a name of its own without one, e.g. "PTB:2026-0042"
+        /// (SPECIFICATION.md 4.1). So no body takes the identification another one gives its certificate, and two bodies
+        /// numbering their certificates alike both have them; the number of the document is its documentNumber.
+        /// </summary>
+        internal static String? ForeignConformityCertificate(IEnumerable<ConformityAssessmentBody> Bodies)
+        {
+
+            foreach (var body in Bodies)
+                foreach (var certificate in body.Certificates)
+                    if (!IsIdentifiedUnder(certificate.Id.ToString(), body.Id.ToString()))
+                        return $"The certificate '{certificate.Id}' of the conformity assessment body '{body.Id}' is not identified as one of it: by '{body.Id}:' and a name without a colon!";
+
+            return null;
+
+        }
+
+        /// <summary>
+        /// Whether the given identification is the given one of its owner, a colon and a name without one, compared without
+        /// case, as both are.
+        /// </summary>
+        internal static Boolean IsIdentifiedUnder(String  Id,
+                                                  String  OwnerId)
+
+            => Id.Length > OwnerId.Length + 1 &&
+               Id.StartsWith(OwnerId + ":", StringComparison.OrdinalIgnoreCase) &&
+               Id.IndexOf(':', OwnerId.Length + 1) < 0;
+
+        /// <summary>
         /// The error, when two of the given conformity assessment bodies have a certificate of the same identification.
         /// </summary>
         internal static String? DuplicateConformityCertificate(IEnumerable<ConformityAssessmentBody> Bodies)
@@ -2439,6 +2472,24 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     releases.TryAdd(release.Id, release);
 
             return releases;
+
+        }
+
+        /// <summary>
+        /// The error, when a release of the given manufacturers is not identified as one of its manufacturer: by the
+        /// identification of the manufacturer, a colon and a name of its own without one, e.g. "OpenChargingCloud:chargy-2.0"
+        /// (SPECIFICATION.md 4.1). So no manufacturer takes the identification another one gives its release, which energy
+        /// meters, stations and certificates name alone.
+        /// </summary>
+        internal static String? ForeignTransparencySoftware(IEnumerable<TransparencySoftwareManufacturer> Manufacturers)
+        {
+
+            foreach (var manufacturer in Manufacturers)
+                foreach (var release in manufacturer.TransparencySoftware)
+                    if (!IsIdentifiedUnder(release.Id.ToString(), manufacturer.Id.ToString()))
+                        return $"The transparency software release '{release.Id}' of the manufacturer '{manufacturer.Id}' is not identified as one of it: by '{manufacturer.Id}:' and a name without a colon!";
+
+            return null;
 
         }
 

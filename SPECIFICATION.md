@@ -374,6 +374,14 @@ number. The `version` of a transparency software release is the one it was added
 and a change set changing it, also by removing the release and adding it again, MUST be refused, so that a certificate
 naming a release names the version that was assessed.
 
+**How releases and certificates are identified:** the `@id` of a transparency software release is the `@id` of its
+manufacturer, a colon and a name of its own without one, e.g. `OpenChargingCloud:chargy-2.0`; the `@id` of a
+certificate is the `@id` of the body issuing it, a colon and a name without one, e.g. `PTB:2026-0042`, its number as a
+document being its `documentNumber`. The prefix is compared without case, as these identifications are. A version or
+change set holding a release or a certificate identified otherwise MUST be refused. So no manufacturer takes the
+identification of another one's release, which energy meters, stations and certificates name alone, no body that of
+another one's certificate, and two bodies numbering their certificates alike both have them.
+
 **Within a change set**, a change is owned as applying it decides, after the changes before it: what an earlier
 change of the change set added is owned by the parent of that `Add`, a grid connection point an earlier change handed
 on by its new maintainer; what an earlier change removed, alone or with the party embedding it, by nobody, and a change

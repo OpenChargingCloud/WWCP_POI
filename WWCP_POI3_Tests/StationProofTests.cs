@@ -68,9 +68,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
         private static readonly EnergyMeterModel                    M300        = new (EnergyMeterModel_Id.Parse("M-300"));
         private static readonly EnergyMeterManufacturer_Id          Meters      = EnergyMeterManufacturer_Id.        Parse("METERS");
         private static readonly EnergyMeterManufacturer_Id          Others      = EnergyMeterManufacturer_Id.        Parse("OTHERS");
-        private static readonly TransparencySoftware_Id             Chargy10    = TransparencySoftware_Id.           Parse("chargy-1.0");
-        private static readonly TransparencySoftware_Id             Chargy11    = TransparencySoftware_Id.           Parse("chargy-1.1");
-        private static readonly ConformityCertificate_Id  Cert1       = ConformityCertificate_Id.Parse("cert-1");
+        private static readonly TransparencySoftware_Id             Chargy10    = TransparencySoftware_Id.           Parse("OpenChargingCloud:chargy-1.0");
+        private static readonly TransparencySoftware_Id             Chargy11    = TransparencySoftware_Id.           Parse("OpenChargingCloud:chargy-1.1");
+        private static readonly ConformityCertificate_Id  Cert1       = ConformityCertificate_Id.Parse("PTB:cert-1");
         private static readonly GridOperator_Id                     NET         = GridOperator_Id.                   Parse("DE*NET");
         private static readonly GridConnectionPoint_Id              GCP1        = GridConnectionPoint_Id.            Parse("gcp-1");
         private static readonly ParkingOperator_Id                  PAR         = ParkingOperator_Id.                Parse("DE*PAR");
@@ -122,7 +122,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                                                                                                                                                               DocumentNumber:                 "DE-123",
                                                                                                                                                               NotBefore:                      Created,
                                                                                                                                                               Legislation:                    ConformityAssessmentBody.Legislations.MID),
-                                                                                                        new ConformityCertificate(ConformityCertificate_Id.Parse("cert-2"),
+                                                                                                        new ConformityCertificate(ConformityCertificate_Id.Parse("PTB:cert-2"),
                                                                                                                                   Meters,
                                                                                                                                   M500.Id,
                                                                                                                                   [ HardwareRevision.Parse("2.0") ],
@@ -168,7 +168,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                                                                                                                                                                                                           ModelId:                     M500.Id,
                                                                                                                                                                                                           HardwareRevision:            HardwareRevision.Parse("2.0"),
                                                                                                                                                                                                           FirmwareVersion:             FirmwareVersion.Parse("2.0.1"),
-                                                                                                                                                                                                          CertificateIds:              [ ConformityCertificate_Id.Parse("cert-2") ],
+                                                                                                                                                                                                          CertificateIds:              [ ConformityCertificate_Id.Parse("PTB:cert-2") ],
                                                                                                                                                                                                           SerialNumber:                SerialNumber.Parse("M-1"),
                                                                                                                                                                                                           TransparencySoftwareStatus:  [ new TransparencySoftwareAssignment(Chargy10, LegalStatus.GermanCalibrationLaw) ],
                                                                                                                                                                                                           Created:                     Created),
@@ -345,9 +345,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(Ids(proof.Given("energyMeterManufacturers")),                             Is.EqualTo(new[] { "METERS" }));
                 Assert.That(Ids(proof.Given("energyMeterManufacturers", "energyMeterModels")),        Is.EqualTo(new[] { "M-500" }));
                 Assert.That(Ids(proof.Given("transparencySoftwareManufacturers")),                    Is.EqualTo(new[] { "OpenChargingCloud" }));
-                Assert.That(Ids(proof.Given("transparencySoftwareManufacturers", "transparencySoftware")), Is.EqualTo(new[] { "chargy-1.0" }));
+                Assert.That(Ids(proof.Given("transparencySoftwareManufacturers", "transparencySoftware")), Is.EqualTo(new[] { "OpenChargingCloud:chargy-1.0" }));
                 Assert.That(Ids(proof.Given("conformityAssessmentBodies")),                           Is.EqualTo(new[] { "PTB" }));
-                Assert.That(Ids(proof.Given("conformityAssessmentBodies", "certificates")),         Is.EqualTo(new[] { "cert-1", "cert-2" }));
+                Assert.That(Ids(proof.Given("conformityAssessmentBodies", "certificates")),         Is.EqualTo(new[] { "PTB:cert-1", "PTB:cert-2" }));
                 Assert.That(Ids(proof.Given("parkingOperators", "parkingSpaces")),                    Is.EqualTo(new[] { "space-1" }));
                 Assert.That(proof.Given("parkingOperators", "parkingSpaces").Single()["roofed"]?.Value<Boolean>(), Is.True, "the effective parking space");
                 Assert.That(Ids(proof.Given("gridOperators", "gridConnectionPoints")),                Is.EqualTo(new[] { "gcp-1" }));
@@ -384,9 +384,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
             using (Assert.EnterMultipleScope())
             {
-                Assert.That(Ids(proof.Given("transparencySoftwareManufacturers", "transparencySoftware")), Is.EqualTo(new[] { "chargy-1.0", "chargy-1.1" }));
+                Assert.That(Ids(proof.Given("transparencySoftwareManufacturers", "transparencySoftware")), Is.EqualTo(new[] { "OpenChargingCloud:chargy-1.0", "OpenChargingCloud:chargy-1.1" }));
                 Assert.That(proof.Given("chargingStationOperators", "chargingPools", "chargingStations").Single()["transparencySoftwareStatus"]![0]!["transparencySoftwareId"]!.Value<String>(),
-                                                                                                           Is.EqualTo("chargy-1.1"));
+                                                                                                           Is.EqualTo("OpenChargingCloud:chargy-1.1"));
                 Assert.That(proof.Verify(eTag, out error),                                                Is.True, error);
             }
 

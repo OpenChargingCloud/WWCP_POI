@@ -53,7 +53,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         private static readonly ChargingStationModel_Id         DC300      = ChargingStationModel_Id.       Parse("DC-300");
         private static readonly ChargingStationModel_Id         AC22       = ChargingStationModel_Id.       Parse("AC-22");
         private static readonly EnergyMeterModel_Id             M500       = EnergyMeterModel_Id.           Parse("M-500");
-        private static readonly TransparencySoftware_Id         Chargy10   = TransparencySoftware_Id.       Parse("chargy-1.0");
+        private static readonly TransparencySoftware_Id         Chargy10   = TransparencySoftware_Id.       Parse("OCC:chargy-1.0");
 
         #endregion
 
@@ -519,7 +519,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                         String                          HardwareRevision,
                                                         String                          FirmwareVersion   = "4.3")
 
-                => new (ConformityCertificate_Id.Parse("cert-1"), ManufacturerId, ModelId, [ POI.HardwareRevision.Parse(HardwareRevision) ], [ POI.FirmwareVersion.Parse(FirmwareVersion) ], [ Chargy10 ], []);
+                => new (ConformityCertificate_Id.Parse("PTB:cert-1"), ManufacturerId, ModelId, [ POI.HardwareRevision.Parse(HardwareRevision) ], [ POI.FirmwareVersion.Parse(FirmwareVersion) ], [ Chargy10 ], []);
 
             RoamingNetwork With(ConformityCertificate Certificate)
 
@@ -544,17 +544,17 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(() => With(Certificate(ACME, DC300, "1.1")),                       Throws.Nothing);
 
-                Assert.That(() => With(Certificate(ZAP,  DC300, "1.1")),                       Throws.ArgumentException.With.Message.Contains("The manufacturer 'ZAP' of the certificate 'cert-1' is unknown"));
-                Assert.That(() => With(Certificate(ACME, AC22,  "1.1")),                       Throws.ArgumentException.With.Message.Contains("The charging station model 'AC-22' of the certificate 'cert-1' is unknown at its manufacturer 'ACME'"));
-                Assert.That(() => With(Certificate(ACME, DC300, "2.0")),                       Throws.ArgumentException.With.Message.Contains("The hardware revision '2.0' of the certificate 'cert-1' is no hardware revision of the charging station model 'DC-300' of 'ACME'"));
-                Assert.That(() => With(Certificate(ACME, DC300, "1.1", "1.1")),                Throws.ArgumentException.With.Message.Contains("The firmware version '1.1' of the certificate 'cert-1' is no firmware version of the charging station model 'DC-300' of 'ACME'"));
+                Assert.That(() => With(Certificate(ZAP,  DC300, "1.1")),                       Throws.ArgumentException.With.Message.Contains("The manufacturer 'ZAP' of the certificate 'PTB:cert-1' is unknown"));
+                Assert.That(() => With(Certificate(ACME, AC22,  "1.1")),                       Throws.ArgumentException.With.Message.Contains("The charging station model 'AC-22' of the certificate 'PTB:cert-1' is unknown at its manufacturer 'ACME'"));
+                Assert.That(() => With(Certificate(ACME, DC300, "2.0")),                       Throws.ArgumentException.With.Message.Contains("The hardware revision '2.0' of the certificate 'PTB:cert-1' is no hardware revision of the charging station model 'DC-300' of 'ACME'"));
+                Assert.That(() => With(Certificate(ACME, DC300, "1.1", "1.1")),                Throws.ArgumentException.With.Message.Contains("The firmware version '1.1' of the certificate 'PTB:cert-1' is no firmware version of the charging station model 'DC-300' of 'ACME'"));
 
                 Assert.That(json["hardwareRevisions"]!.Select(revision => revision.ToString()),   Is.EqualTo(new[] { "1.1" }));
                 Assert.That(json["firmwareVersions"]!. Select(version  => version. ToString()),   Is.EqualTo(new[] { "4.3" }));
 
                 // At least one of each, and no longer the one version of before.
-                Assert.That(() => new ConformityCertificate(ConformityCertificate_Id.Parse("cert-2"), ACME, DC300, [ HardwareRevision.Parse("1.1") ], [], [ Chargy10 ], []),
-                            Throws.ArgumentException.With.Message.Contains("The certificate 'cert-2' must name at least one firmware version of its model"));
+                Assert.That(() => new ConformityCertificate(ConformityCertificate_Id.Parse("PTB:cert-2"), ACME, DC300, [ HardwareRevision.Parse("1.1") ], [], [ Chargy10 ], []),
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB:cert-2' must name at least one firmware version of its model"));
 
                 var withVersion = Certificate(ACME, DC300, "1.1").ToJSON();
                 withVersion.Add("chargingStationModelVersion", "1.1");
@@ -628,10 +628,10 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void Stations_and_meters_name_the_certificates_of_their_models()
         {
 
-            var stationId    = ConformityCertificate_Id.Parse("PTB-S");
-            var meterId      = ConformityCertificate_Id.Parse("PTB-M");
-            var otherModel   = ConformityCertificate_Id.Parse("PTB-A");
-            var otherFirm    = ConformityCertificate_Id.Parse("PTB-S42");
+            var stationId    = ConformityCertificate_Id.Parse("PTB:S");
+            var meterId      = ConformityCertificate_Id.Parse("PTB:M");
+            var otherModel   = ConformityCertificate_Id.Parse("PTB:A");
+            var otherFirm    = ConformityCertificate_Id.Parse("PTB:S42");
 
             var station      = new ConformityCertificate(stationId, ACME, DC300, [ HardwareRevision.Parse("1.1") ], [ FirmwareVersion.Parse("4.3") ], [ Chargy10 ], [],
                                                          EnergyMeters: [ new CertifiedEnergyMeter(METERS, M500, [ HardwareRevision.Parse("3.0") ], [ FirmwareVersion.Parse("1.7") ]) ]);
@@ -660,27 +660,27 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 // Of the other kind.
                 Assert.That(() => CertifiedNetwork(all, [ meterId ], []),
-                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB-M' of the charging station 'DE*GEF*S1' is for the energy meter model 'M-500' of 'METERS', not for a model of charging stations"));
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB:M' of the charging station 'DE*GEF*S1' is for the energy meter model 'M-500' of 'METERS', not for a model of charging stations"));
                 Assert.That(() => CertifiedNetwork(all, [], [ stationId ]),
-                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB-S' of the energy meter 'meter-1' is for the charging station model 'DC-300' of 'ACME', not for a model of energy meters"));
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB:S' of the energy meter 'meter-1' is for the charging station model 'DC-300' of 'ACME', not for a model of energy meters"));
 
                 // For another model, or not covering the firmware of the station or the meter.
                 Assert.That(() => CertifiedNetwork(all, [ otherModel ], []),
-                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB-A' of the charging station 'DE*GEF*S1' is for the charging station model 'AC-22' of 'ACME', not for the model of the station"));
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB:A' of the charging station 'DE*GEF*S1' is for the charging station model 'AC-22' of 'ACME', not for the model of the station"));
                 Assert.That(() => CertifiedNetwork(all, [ otherFirm ], []),
-                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB-S42' of the charging station 'DE*GEF*S1' does not cover its hardware revision '1.1' and firmware version '4.3'"));
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB:S42' of the charging station 'DE*GEF*S1' does not cover its hardware revision '1.1' and firmware version '4.3'"));
                 Assert.That(() => CertifiedNetwork(all, [], [ meterId ], MeterFirmware: "1.8"),
-                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB-M' of the energy meter 'meter-1' does not cover its hardware revision '3.0' and firmware version '1.8'"));
+                            Throws.ArgumentException.With.Message.Contains("The certificate 'PTB:M' of the energy meter 'meter-1' does not cover its hardware revision '3.0' and firmware version '1.8'"));
 
                 // A meter of the station is one of those the certificate of the station was issued with.
                 Assert.That(() => CertifiedNetwork(all, [ stationId ], [], MeterFirmware: "1.8"),
-                            Throws.ArgumentException.With.Message.Contains("The energy meter 'meter-1' of the charging station 'DE*GEF*S1' is none of the energy meters the certificate 'PTB-S' was issued with"));
+                            Throws.ArgumentException.With.Message.Contains("The energy meter 'meter-1' of the charging station 'DE*GEF*S1' is none of the energy meters the certificate 'PTB:S' was issued with"));
                 Assert.That(() => CertifiedNetwork([ unknownRevision ], [ stationId ], []),
-                            Throws.ArgumentException.With.Message.Contains("The hardware revision '9.9' of the energy meter model 'M-500' the certificate 'PTB-S' was issued with is no hardware revision of the energy meter model 'M-500' of 'METERS'"));
+                            Throws.ArgumentException.With.Message.Contains("The hardware revision '9.9' of the energy meter model 'M-500' the certificate 'PTB:S' was issued with is no hardware revision of the energy meter model 'M-500' of 'METERS'"));
 
                 // A certificate of a meter model names no energy meters, and a certificate is for one model.
                 Assert.That(ConformityCertificate.TryParse(meterJSON, out _, out var meterError),   Is.False);
-                Assert.That(meterError,                                                              Does.Contain("The certificate 'PTB-M' of an energy meter model names no energy meters"));
+                Assert.That(meterError,                                                              Does.Contain("The certificate 'PTB:M' of an energy meter model names no energy meters"));
                 Assert.That(ConformityCertificate.TryParse(bothJSON,  out _, out var bothError),    Is.False);
                 Assert.That(bothError,                                                               Does.Contain("must be for either a charging station model or an energy meter model"));
 

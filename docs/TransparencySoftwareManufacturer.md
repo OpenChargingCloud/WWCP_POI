@@ -77,7 +77,7 @@ names who made it. Read strictly: an unknown property is an error, also the `ven
 
 | JSON key | Type | Change set | Description |
 |---|---|---|---|
-| `@id` | string | — | `TransparencySoftware_Id`: any text, compared case-insensitively, surrounding whitespace trimmed; unique within the roaming network. |
+| `@id` | string | — | `TransparencySoftware_Id`: the `@id` of its manufacturer, a colon and a name without one, e.g. `OpenChargingCloud:chargy-1.5.0` (SPECIFICATION.md 4.1), so that no manufacturer takes the identification of another one's release, which energy meters, stations and certificates name alone; compared case-insensitively, surrounding whitespace trimmed. |
 | `name` | I18N text | update | Mandatory; a nonempty text in each language. |
 | `version` | string | — | Mandatory `TransparencySoftwareVersion`, e.g. `1.4.0`; the one it was added with: a new version is a new release. |
 | `openSourceLicenses` | object[] | update | Mandatory, at least one: `{@id, description?, URLs}` (Hermod `OpenSourceLicense`, embedded without `@context`); an `@id` only once (case-insensitive); in a canonical order (`@id` upper case, description, URLs). |
@@ -152,7 +152,7 @@ See [README.md](README.md#runtime-status). Runtime status entity type: `Transpar
   "securityAdvisories": "https://github.com/OpenChargingCloud/ChargyDesktopApp/security/advisories",
   "transparencySoftware": [
     {
-      "@id": "chargy-1.5.0",
+      "@id": "OpenChargingCloud:chargy-1.5.0",
       "name": { "en": "Chargy" },
       "version": "1.5.0",
       "openSourceLicenses": [ { "@id": "AGPL-3.0", "URLs": [ "https://www.gnu.org/licenses/agpl-3.0.html" ] } ],

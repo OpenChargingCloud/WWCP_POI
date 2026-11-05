@@ -24,9 +24,9 @@ public static class ExampleA13
     internal static readonly TransparencySoftwareManufacturer_Id  softwareMakerId  = TransparencySoftwareManufacturer_Id.Parse("GraphDefined");
     internal static readonly ConformityAssessmentBody_Id          ptbId            = ConformityAssessmentBody_Id.Parse("PTB");
     internal static readonly ConformityAssessmentBody_Id          bsiId            = ConformityAssessmentBody_Id.Parse("BSI");
-    internal static readonly TransparencySoftware_Id              chargyId         = TransparencySoftware_Id.Parse("chargy-1.5.0");
-    internal static readonly ConformityCertificate_Id             certificateId       = ConformityCertificate_Id.Parse("PTB-2026-0042");
-    internal static readonly ConformityCertificate_Id             meterCertificateId  = ConformityCertificate_Id.Parse("PTB-2026-0017");
+    internal static readonly TransparencySoftware_Id              chargyId         = TransparencySoftware_Id.Parse("GraphDefined:chargy-1.5.0");
+    internal static readonly ConformityCertificate_Id             certificateId       = ConformityCertificate_Id.Parse("PTB:2026-0042");
+    internal static readonly ConformityCertificate_Id             meterCertificateId  = ConformityCertificate_Id.Parse("PTB:2026-0017");
     internal static readonly EnergyMeterModel_Id                  kdm500              = EnergyMeterModel_Id.Parse("KDM-500");
 
     /// <summary>
@@ -146,7 +146,7 @@ public static class ExampleA13
                     [ FirmwareVersion. Parse("2.5.0") ],
                     [ chargyId ],
                     [],
-                    DocumentURL:   URL.Parse("https://www.ptb.example/certificates/PTB-2026-0042.pdf"),
+                    DocumentURL:   URL.Parse("https://www.ptb.example/certificates/PTB:2026-0042.pdf"),
                     NotBefore:     now,
                     NotAfter:      now.AddYears(10),
                     Legislation:   Legislation,
@@ -160,7 +160,7 @@ public static class ExampleA13
                                                          [ FirmwareVersion.Parse("3.2") ],
                                                          [ chargyId ],
                                                          [],
-                                                         DocumentURL:  URL.Parse("https://www.ptb.example/certificates/PTB-2026-0017.pdf"),
+                                                         DocumentURL:  URL.Parse("https://www.ptb.example/certificates/PTB:2026-0017.pdf"),
                                                          NotBefore:    now,
                                                          NotAfter:     now.AddYears(10));
 
@@ -177,7 +177,7 @@ public static class ExampleA13
         var addCertificate = history.Head.RoamingNetwork.CreateChangeSet(
                                  [ RoamingNetworkChange.Add(CertificateUnder(ConformityAssessmentBody.Legislations.MID), ptbId),
                                    RoamingNetworkChange.Add(meterCertificate,                                             ptbId) ],
-                                 Description: ImmutableI18NString.Create(Languages.en, "PTB-2026-0042 for the GD-DC300 with the KDM-500, PTB-2026-0017 for the KDM-500, each with Chargy 1.5.0")
+                                 Description: ImmutableI18NString.Create(Languages.en, "PTB:2026-0042 for the GD-DC300 with the KDM-500, PTB:2026-0017 for the KDM-500, each with Chargy 1.5.0")
                              );
 
         Committed(history, addCertificate.Sign(ptbCertificatesKey.Private, POIPublicKey.From(ptbCertificatesKey.Private).Id, ptbCertificatesKey.Algorithm));
@@ -199,7 +199,7 @@ public static class ExampleA13
                                     [ RoamingNetworkChange.UpdateProperty(dcStations, "certificateIds",             null, new JArray(certificateId.ToString())),
                                       RoamingNetworkChange.UpdateProperty(dcMeters,   "certificateIds",             null, new JArray(meterCertificateId.ToString())),
                                       RoamingNetworkChange.UpdateProperty(dcMeters,   "transparencySoftwareStatus", null, new JArray(new TransparencySoftwareAssignment(chargyId, LegalStatus.GermanCalibrationLaw).ToJSON(Embedded: true))) ],
-                                    Description: ImmutableI18NString.Create(Languages.en, "The DC stations: PTB-2026-0042; their energy meters: PTB-2026-0017, Chargy 1.5.0 under the German calibration law")
+                                    Description: ImmutableI18NString.Create(Languages.en, "The DC stations: PTB:2026-0042; their energy meters: PTB:2026-0017, Chargy 1.5.0 under the German calibration law")
                                 );
 
         Committed(history, nameChargy.Sign(infrastructureKey.Private, POIPublicKey.From(infrastructureKey.Private).Id, infrastructureKey.Algorithm));

@@ -1259,8 +1259,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  DuplicateParking    (parkingOps.Values, operators.Values) ??
                  UnknownChargingStation(parkingOps.Values, operators)  ??
                  UnknownParkingSpace(operators.Values, parkingOps.Values) ??
+                 ForeignTransparencySoftware(softwareManufacturers.Values) ??
                  DuplicateTransparencySoftware(softwareManufacturers.Values) ??
                  ChangedTransparencySoftwareVersion(this.transparencySoftware, softwares) ??
+                 ForeignConformityCertificate(bodies.Values) ??
                  DuplicateConformityCertificate(bodies.Values) ??
                  DuplicateNotifiedBodyNumber(bodies.Values) ??
                  UnknownCertificateReference(operators.Values, gridOps.Values, softwares, certificates, manufacturers, meterManufacturers) ??

@@ -16,8 +16,8 @@ the meters; the station proof of the driver's app gives them ([TransparencySoftw
 | 0 to 3 | see [example A11](exampleA11.md) and [example A12](exampleA12.md) | |
 | 4 | the quorum of `OCC`, and the new identity keys of `GraphDefined` and the PTB as proofs | the transparency software manufacturer `GraphDefined`, the conformity assessment bodies PTB, with its keys, and BSI, without |
 | 5 | `GraphDefined`, its key for `software` | Chargy 1.5.0 |
-| 6 | the PTB, its key for `certificates` | `PTB-2026-0042`, under the MID: the `GD-DC300` with the `KDM-500` and Chargy 1.5.0; `PTB-2026-0017`: the `KDM-500` with Chargy 1.5.0 |
-| 7 | `DE*GEF`, its `infrastructure` key | its DC stations: `PTB-2026-0042`; their energy meters: `PTB-2026-0017`, Chargy 1.5.0 under the German calibration law |
+| 6 | the PTB, its key for `certificates` | `PTB:2026-0042`, under the MID: the `GD-DC300` with the `KDM-500` and Chargy 1.5.0; `PTB:2026-0017`: the `KDM-500` with Chargy 1.5.0 |
+| 7 | `DE*GEF`, its `infrastructure` key | its DC stations: `PTB:2026-0042`; their energy meters: `PTB:2026-0017`, Chargy 1.5.0 under the German calibration law |
 
 The code is [exampleA13.cs](csharp/exampleA13.cs), called by [Program.cs](csharp/Program.cs) with what example A11 left:
 
@@ -64,25 +64,27 @@ Committed, revision 4 of epoch 2: GraphDefined, transparency software manufactur
 ## 2. GraphDefined states its release of Chargy
 
 The release names the end of its support period, its EU declaration of conformity and its software bill of materials.
-Signed by the roaming network operator, it is refused: the release is its manufacturer's. Signed by the `software` key of
-`GraphDefined`, it is committed.
+It is identified under its manufacturer, `GraphDefined:chargy-1.5.0`: no other manufacturer can take the identification,
+which energy meters, stations and certificates name alone. Signed by the roaming network operator, it is refused: the
+release is its manufacturer's. Signed by the `software` key of `GraphDefined`, it is committed.
 
 ```csharp
 var addChargy = history.Head.RoamingNetwork.CreateChangeSet([ RoamingNetworkChange.Add(chargy, softwareMakerId) ], …);
 ```
 
 ```
-Signed by the roaming network operator: Change 0: Add of the TransparencySoftware 'chargy-1.5.0' needs a signature by a signing key of the TransparencySoftwareManufacturer 'GraphDefined'!
+Signed by the roaming network operator: Change 0: Add of the TransparencySoftware 'GraphDefined:chargy-1.5.0' needs a signature by a signing key of the TransparencySoftwareManufacturer 'GraphDefined'!
 Committed, revision 5 of epoch 2: Chargy 1.5.0
 ```
 
 
 ## 3. The PTB certifies the DC stations of GraphDefined and their meters, with Chargy
 
-The certificate `PTB-2026-0042` is for the charging station model `GD-DC300` of `GraphDefined`, in its hardware
+The certificates are identified under the PTB, as releases under their manufacturers. The certificate `PTB:2026-0042`
+is for the charging station model `GD-DC300` of `GraphDefined`, in its hardware
 revision 1.0 with the firmware version 2.5.0, under the `MID`, with the URL of its document. It names the components
 it was issued with: Chargy 1.5.0, verified, and the energy meter `KDM-500` of `KERNBERG` the station mounts, in its
-hardware revision 2.1 with the firmware 3.2. The certificate `PTB-2026-0017` is for the energy meter model `KDM-500`
+hardware revision 2.1 with the firmware 3.2. The certificate `PTB:2026-0017` is for the energy meter model `KDM-500`
 itself, in the same revision and firmware, with Chargy 1.5.0 as its component, without a legislation. The network
 checks that the manufacturers stated the models with these revisions and firmware versions, as they did in
 [example A2](exampleA2.md#4-the-manufacturers-state-their-models); a certificate for a model, a revision or a firmware
@@ -100,15 +102,15 @@ var meterCertificate = new ConformityCertificate(meterCertificateId, ExampleA2.d
 ```
 
 ```
-A certificate of the PTB under the CRA: Change 0: The given JSON representation of a conformity assessment body is invalid: The certificate 'PTB-2026-0042' is issued under the legislation 'CRA', which the conformity assessment body 'PTB' is not notified for!
-Committed, revision 6 of epoch 2: PTB-2026-0042 for the GD-DC300 with the KDM-500, PTB-2026-0017 for the KDM-500, each with Chargy 1.5.0
+A certificate of the PTB under the CRA: Change 0: The given JSON representation of a conformity assessment body is invalid: The certificate 'PTB:2026-0042' is issued under the legislation 'CRA', which the conformity assessment body 'PTB' is not notified for!
+Committed, revision 6 of epoch 2: PTB:2026-0042 for the GD-DC300 with the KDM-500, PTB:2026-0017 for the KDM-500, each with Chargy 1.5.0
 ```
 
 
 ## 4. DE*GEF names them for its DC stations and their energy meters
 
-`DE*GEF` changes its charging station template `DE*GEF*ST_DC`: every DC station naming it names `PTB-2026-0042`, and
-its energy meter template `DE*GEF*EMT_DC`: every DC energy meter naming it names `PTB-2026-0017` and is checked by
+`DE*GEF` changes its charging station template `DE*GEF*ST_DC`: every DC station naming it names `PTB:2026-0042`, and
+its energy meter template `DE*GEF*EMT_DC`: every DC energy meter naming it names `PTB:2026-0017` and is checked by
 Chargy 1.5.0 under the German calibration law. The legal status names no certificate: the certificates naming the
 release among their components prove it. The network checks each certificate against what names it, as it is with
 what its templates give it: the model and manufacturer, the hardware revision and the firmware version, and that the
@@ -121,7 +123,7 @@ RoamingNetworkChange.UpdateProperty(dcMeters,   "transparencySoftwareStatus", nu
 ```
 
 ```
-Committed, revision 7 of epoch 2: The DC stations: PTB-2026-0042; their energy meters: PTB-2026-0017, Chargy 1.5.0 under the German calibration law
+Committed, revision 7 of epoch 2: The DC stations: PTB:2026-0042; their energy meters: PTB:2026-0017, Chargy 1.5.0 under the German calibration law
 ```
 
 
@@ -149,14 +151,14 @@ model changes the leaves of the proof: they no longer lead to the root its attes
 ```
 The station proof, revision 7, by its attestations: valid
 The charging station DE*GEF*S1: a GD-DC300 of GraphDefined, GraphDefined DC 300, hardware 1.0, firmware 2.5.0
-  PTB-2026-0042, under the MID, by the PTB, notified body 0102 for MID; stated by itself
+  PTB:2026-0042, under the MID, by the PTB, notified body 0102 for MID; stated by itself
     for the GD-DC300 of GraphDefined, hardware 1.0, firmware 2.5.0: the model, hardware revision and firmware version of the charging station
-    with chargy-1.5.0 verified, the KDM-500 of KERNBERG, hardware 2.1, firmware 3.2
+    with GraphDefined:chargy-1.5.0 verified, the KDM-500 of KERNBERG, hardware 2.1, firmware 3.2
 The energy meter DE*GEF*M1*1: a KDM-500 of KERNBERG, Kernberg DC meter 500 A, hardware 2.1, firmware 3.2
-  PTB-2026-0017, by the PTB, notified body 0102 for MID; stated by itself
+  PTB:2026-0017, by the PTB, notified body 0102 for MID; stated by itself
     for the KDM-500 of KERNBERG, hardware 2.1, firmware 3.2: the model, hardware revision and firmware version of the energy meter
-    with chargy-1.5.0 verified
-DE*GEF*M1*1, the energy meter of DE*GEF*E1*1: Chargy Transparency Software 1.5.0, germanCalibrationLaw, as PTB-2026-0042 and PTB-2026-0017 name it
+    with GraphDefined:chargy-1.5.0 verified
+DE*GEF*M1*1, the energy meter of DE*GEF*E1*1: Chargy Transparency Software 1.5.0, germanCalibrationLaw, as PTB:2026-0042 and PTB:2026-0017 name it
   by GraphDefined GmbH, manufacturer, supported until 2031-10-26T00:44:35.984Z, vulnerabilities to security@graphdefined.example, bill of materials https://www.graphdefined.example/chargy/1.5.0/sbom.cdx.json
 Conformity assessment bodies the proof gives: PTB
 The certificate for another model: roamingNetwork.conformityAssessmentBodies.@leaves[0].@entity.certificates.@leaves[1]: it leads to another root than the leaves before!
@@ -171,7 +173,7 @@ The certificate for another model: roamingNetwork.conformityAssessmentBodies.@le
   and contacts. Which bodies are notified under the CRA is up to the member states.
 - A certificate is one for a model of charging stations or of energy meters; one under the CRA concerns the software
   itself, which no certificate is for. So the BSI issues none here.
-- `PTB-2026-0017` names no legislation: a DC meter is no measuring instrument of the MID, and the legislation it is
+- `PTB:2026-0017` names no legislation: a DC meter is no measuring instrument of the MID, and the legislation it is
   certified under is not one the PTB names in `notifiedFor` in this example.
 - A certificate tells who states it: one the roaming network operator states in place of a body without keys names
   `statedBy`, also once the body has keys; which key signed which commit, the commits tell, not the station proof.

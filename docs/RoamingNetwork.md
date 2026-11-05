@@ -335,7 +335,7 @@ Checked when a change set is applied:
       "craRole": "manufacturer",
       "vulnerabilityContact": "security@graphdefined.com",
       "transparencySoftware": [
-        { "@id": "chargy-desktop-1.4.0",
+        { "@id": "GraphDefined:chargy-desktop-1.4.0",
           "name": { "en": "Chargy Transparency Software Desktop" },
           "version": "1.4.0",
           "openSourceLicenses": [
@@ -355,12 +355,12 @@ Checked when a change set is applied:
       "notifiedBodyNumber": "0102",
       "notifiedFor": [ "MID" ],
       "certificates": [
-        { "@id": "PTB-2026-0042",
+        { "@id": "PTB:2026-0042",
           "chargingStationManufacturerId": "ACME",
           "chargingStationModel": "Wallbox 22",
           "hardwareRevisions": [ "2.1" ],
           "firmwareVersions": [ "4.7.1" ],
-          "verifiedTransparencySoftwareIds":   [ "chargy-desktop-1.4.0" ],
+          "verifiedTransparencySoftwareIds":   [ "GraphDefined:chargy-desktop-1.4.0" ],
           "compatibleTransparencySoftwareIds": [],
           "notBefore": "2026-01-01T00:00:00.000Z" }
       ],
