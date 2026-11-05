@@ -339,19 +339,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Price = 0;
 
             var quantity = Covers.To - Covers.From;
-            var rate     = Covers.Unit switch {
-                               EVTalerCovers.KWh      => EnergyPerKWh,
-                               EVTalerCovers.Minutes  => TimePerHour / 60m,
+
+            // Multiplied before divided: a decimal holds no rate of a minute such as 0.40 / 60 exactly, and rounding up
+            // would take its last digit for a cent.
+            var price    = Covers.Unit switch {
+                               EVTalerCovers.KWh      => quantity * EnergyPerKWh,
+                               EVTalerCovers.Minutes  => quantity * TimePerHour / 60m,
                                _                      => null
                            };
 
-            if (rate is null)
+            if (price is null)
             {
                 ErrorResponse = $"The charging tariff does not price what a step covers, '{Covers.Unit}'!";
                 return false;
             }
 
-            Price          = EVTalerAmounts.RoundUp(quantity * rate.Value, Currency);
+            Price          = EVTalerAmounts.RoundUp(price.Value, Currency);
             ErrorResponse  = null;
             return true;
 

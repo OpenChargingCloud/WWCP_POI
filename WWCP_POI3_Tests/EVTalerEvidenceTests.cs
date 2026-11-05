@@ -413,6 +413,38 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_step_costs_what_it_covers_rounded_up_to_the_cent()
+
+        /// <summary>
+        /// What a step covers at the price of its dimension, rounded up to the cent, and not a cent more: 0.40 €/h is no
+        /// rate of a minute a decimal holds exactly (found by the TS port's probe).
+        /// </summary>
+        [Test]
+        public void A_step_costs_what_it_covers_rounded_up_to_the_cent()
+        {
+
+            var rates = new EVTalerRates("EUR", 0.59m, 1m, 0.40m, 60m, null);
+
+            Decimal PriceOf(Decimal From, Decimal To, String Unit)
+            {
+                Assert.That(rates.TryGetStepPrice(new EVTalerCovers(From, To, Unit), out var price, out var error),  Is.True, error);
+                return price;
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(PriceOf(0,  60, EVTalerCovers.Minutes),  Is.EqualTo(0.40m));
+                Assert.That(PriceOf(0,  30, EVTalerCovers.Minutes),  Is.EqualTo(0.20m));
+                Assert.That(PriceOf(30, 120, EVTalerCovers.Minutes), Is.EqualTo(0.60m));
+                Assert.That(PriceOf(0,  7,  EVTalerCovers.Minutes),  Is.EqualTo(0.05m), "0.0467 €, rounded up");
+                Assert.That(PriceOf(0,  5,  EVTalerCovers.KWh),      Is.EqualTo(2.95m));
+                Assert.That(PriceOf(5,  5.5m, EVTalerCovers.KWh),    Is.EqualTo(0.30m), "0.295 €, rounded up");
+            }
+
+        }
+
+        #endregion
+
         #region A_pay_URI_names_the_merchant_of_the_operator()
 
         [Test]
