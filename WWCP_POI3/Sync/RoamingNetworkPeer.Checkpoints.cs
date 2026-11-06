@@ -364,13 +364,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) CarriesRequiredSignatures(Checkpoint, Verify)
 
         /// <summary>
-        /// Whether every signature of the given checkpoint is valid and it is signed in every role required.
+        /// Whether the given checkpoint is signed in every role required by a signature that verifies here: one that does not
+        /// is passed over, as the history leaves it out (SPECIFICATION.md, section 10.2).
         /// </summary>
         private Boolean CarriesRequiredSignatures(RoamingNetworkCheckpoint           Checkpoint,
                                                   VerifyCheckpointSignatureDelegate  Verify)
 
-            => Checkpoint.Signatures.All(signature => Verify(Checkpoint, signature)) &&
-               (options.RequiredCheckpointSignatureRoles ?? []).All(role => Checkpoint.Signatures.Any(signature => signature.Role == role));
+            => (options.RequiredCheckpointSignatureRoles ?? []).All(role => Checkpoint.Signatures.Any(signature => signature.Role == role &&
+                                                                                                                    Verify(Checkpoint, signature)));
 
         #endregion
 

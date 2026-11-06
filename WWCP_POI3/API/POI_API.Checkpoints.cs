@@ -282,7 +282,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Add the signatures in the body of the request, { signatures: [ … ] }, to a checkpoint.
-        /// 201 Created: at least one added; 200 OK: all known; 400; 403; 404; 422 invalid.
+        /// 201 Created: at least one added, those that do not verify left out; 200 OK: all known; 400; 403; 404;
+        /// 422 none of the new ones verifies, or one is in an algorithm the epoch does not take.
         /// </summary>
         private HTTPResponse SubmitCheckpointSignatures(HTTPRequest Request)
         {
@@ -315,7 +316,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// Add the given signatures of the sender of the given request to a checkpoint of the given history,
-        /// when allowed for the sender and verified with trusted keys.
+        /// when allowed for the sender: those verified with trusted keys, the others left out (TryAddCheckpointSignatures).
         /// </summary>
         /// <param name="Request">The HTTP request, or the WebSocket upgrade request of the sender.</param>
         /// <param name="History">The history.</param>

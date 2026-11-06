@@ -412,6 +412,85 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region A_checkpoint_is_taken_with_the_signatures_that_verify_here()
+
+        /// <summary>
+        /// A checkpoint is taken with the signatures that verify here (SPECIFICATION.md, section 10.2): a forged one before
+        /// the genuine one of the same key and role, and one of a witness not trusted here, are left out and refuse nothing,
+        /// of a checkpoint held already as well. It is refused only when not signed in a required role by one that verifies,
+        /// and adding none that verifies is refused.
+        /// </summary>
+        [Test]
+        public void A_checkpoint_is_taken_with_the_signatures_that_verify_here()
+        {
+
+            var leader         = NewHistory();
+            Commit(leader, "v1");
+            var cp0            = Checkpoint(leader, 10);
+
+            var strangerKey    = new Ed25519PrivateKeyParameters(Convert.FromHexString("606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f"), 0);
+
+            var genuine        = cp0.Signatures[0];
+            var forged         = cp0.CreateSignature(WitnessKey,  "rno",      COSEAlgorithm.Ed25519, RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator, "DE*RNO",               T0.AddMinutes(11));
+            var stranger       = cp0.CreateSignature(strangerKey, "stranger", COSEAlgorithm.Ed25519, RoamingNetworkCommitSignatureRoles.Witness,                "stranger.example.org",  T0.AddMinutes(12));
+            var forgedWitness  = cp0.CreateSignature(RNOKey,      "witness",  COSEAlgorithm.Ed25519, RoamingNetworkCommitSignatureRoles.Witness,                "witness.example.org",   T0.AddMinutes(13));
+            var witness        = cp0.CreateSignature(WitnessKey,  "witness",  COSEAlgorithm.Ed25519, RoamingNetworkCommitSignatureRoles.Witness,                "witness.example.org",   T0.AddMinutes(14));
+
+            RoamingNetworkCheckpoint Read(params RoamingNetworkCommitSignature[] Signatures)
+            {
+                var json = cp0.ToJSON();
+                json["signatures"] = new JArray(Signatures.Select(signature => signature.ToJSON(Embedded: true)));
+                Assert.That(RoamingNetworkCheckpoint.TryParse(json, out var read, out var error), Is.True, error);
+                return read!;
+            }
+
+            static String[] KeysOf(RoamingNetworkCheckpoint Checkpoint)
+                => [ .. Checkpoint.Signatures.Select(signature => signature.KeyId) ];
+
+            String[] rno            = [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator ];
+            String[] rnoAndWitness  = [ RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator, RoamingNetworkCommitSignatureRoles.Witness ];
+
+            // Taken with the genuine signature only: the forged one before it and the stranger are left out.
+            var follower       = Follower(leader);
+            var taken          = follower.TryAddCheckpoint(Read(forged, genuine, stranger), out var takenError, Verify, rno);
+
+            // Held already: it brings the witness; the forged one before it and the stranger refuse nothing.
+            var again          = follower.TryAddCheckpoint(Read(genuine, forgedWitness, stranger, witness), out var againError, Verify, rno);
+
+            // Required in the role of a witness: the stranger is no witness here.
+            var noWitness      = Follower(leader).TryAddCheckpoint(Read(genuine, stranger), out var noWitnessError, Verify, rnoAndWitness);
+
+            // Added to a checkpoint held: those that verify, the others left out; adding none that verifies is refused.
+            var other          = Follower(leader);
+            Assert.That(other.TryAddCheckpoint(cp0, out var otherError, Verify, rno), Is.True, otherError);
+            var added          = other.TryAddCheckpointSignatures(cp0.Id, [ forgedWitness, stranger, witness ], Verify, out var signed, out var newSignatures, out var addedError);
+            var none           = other.TryAddCheckpointSignatures(cp0.Id, [ stranger ], Verify, out _, out _, out var noneError);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(taken,                                                                         Is.True, takenError);
+                Assert.That(again,                                                                         Is.True, againError);
+                Assert.That(KeysOf(follower.LatestCheckpoint!),                                           Is.EqualTo(new[] { "rno", "witness" }));
+                Assert.That(follower.LatestCheckpoint!.Signatures.All(signature => Verify(cp0, signature)),  Is.True);
+                Assert.That(follower.LatestCheckpoint!.Id,                                                 Is.EqualTo(cp0.Id));
+
+                Assert.That(noWitness,                                                                     Is.False);
+                Assert.That(noWitnessError,                                                                Does.Contain("is not signed in the role 'witness' by a signature that verifies here").
+                                                                                                           And.Contain("is invalid, or its key is not trusted"));
+
+                Assert.That(added,                                                                         Is.True, addedError);
+                Assert.That(newSignatures.Select(signature => signature.Value),                            Is.EqualTo(new[] { witness.Value }));
+                Assert.That(KeysOf(signed!),                                                               Is.EqualTo(new[] { "rno", "witness" }));
+                Assert.That(none,                                                                          Is.False);
+                Assert.That(noneError,                                                                     Does.Contain("is invalid, or its key is not trusted"));
+
+            }
+
+        }
+
+        #endregion
+
         #region (private static) Joined(Leader, CheckpointId)
 
         /// <summary>

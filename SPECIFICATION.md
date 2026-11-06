@@ -1676,10 +1676,18 @@ signatures, as `"checkpoint"` in place of `"commit"`:
   - in an epoch after the first one, when it signed the final checkpoint of the epoch before, only where
     the epoch starts from that one (11.3).
 - Signatures may be added later, as to commits: `signCheckpoint` over the WebSocket or
-  `POST …/history/checkpoints/{checkpointId}/signatures`; they do not change the identification.
+  `POST …/history/checkpoints/{checkpointId}/signatures`; they do not change the identification. One that does not
+  verify is not added and keeps no other from being added; adding none that verifies is refused.
 
 A verifier decides which signatures it requires, e.g. the RNO's and two of the witnesses it trusts.
 Witness keys are trusted independently of the network, as attestation keys are (8.5).
+
+A server takes a checkpoint with the signatures that verify there, one of each key and role (5.4), by keys it trusts
+for their roles, as a verifier counts them. A signature that does not verify, invalid or by a key not trusted there, is
+left out and refuses nothing: so nobody blocks a checkpoint by adding a signature, and a witness one server trusts and
+another one does not keeps no checkpoint from the other one. A server MUST refuse a checkpoint not signed in the roles
+it requires by signatures it takes, or with a signature in an algorithm its epoch does not accept (11.3). What it holds
+and passes on carries the signatures it verified only.
 
 ### 10.3 Intervals (informative)
 
@@ -1715,8 +1723,8 @@ version against the checkpoint's `eTags`, and then the commits since, as from a 
 
 - **The snapshot of a checkpoint** is `{commit, roamingNetwork, effectiveLastChanges?, checkpoint}`, also
   `checkpointSnapshot {checkpointId}` over the WebSocket, without runtime status: the version is not the
-  head. A joining server MUST refuse it unless every signature of the checkpoint is valid and of the roles
-  it requires, `commit` is the commit of the checkpoint with its `revision` and `eTags`, and the version
+  head. A joining server MUST refuse it unless the checkpoint is signed in the roles it requires by signatures
+  that verify there, the others left out (10.2), `commit` is the commit of the checkpoint with its `revision` and `eTags`, and the version
   leads to them (section 3).
 - **Which checkpoint:** the latest one, or, when it does not carry the signatures required yet, e.g. of
   witnesses, the latest one before that does. Without one, the server starts from the head.

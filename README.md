@@ -761,7 +761,7 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/commits/{commitId}/proof` | the proof of a commit in it |
 | `GET ~/RNs/{id}/history/commits/{commitId}/proof` | the proof of a commit in the first checkpoint including it |
 | `POST ~/RNs/{id}/history/checkpoints` `{checkpoints: […]}` | 200 taken, 403 (`AuthorizeCheckpointPush`), 422 refused |
-| `POST ~/RNs/{id}/history/checkpoints/{checkpointId}/signatures` `{signatures: […]}` | 201 added, 200 known, 403 (`AuthorizeCheckpointSignature`), 404, 422 invalid |
+| `POST ~/RNs/{id}/history/checkpoints/{checkpointId}/signatures` `{signatures: […]}` | 201 added, those that do not verify left out; 200 known, 403 (`AuthorizeCheckpointSignature`), 404, 422 none verifies |
 | `GET ~/RNs/{id}/history/archive` | the segments of the archive, without their commit ids |
 | `GET ~/RNs/{id}/history/archive/{number}` | one segment: `{info, base, commits}` |
 | `GET ~/RNs/{id}/attestations` | the attestations of the head valid now: `{attestations: […]}` |

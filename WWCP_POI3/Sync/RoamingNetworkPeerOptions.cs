@@ -165,7 +165,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Func<UInt32, IRoamingNetworkHistoryStore?>?  EpochStore     { get; init; }
 
         /// <summary>
-        /// Verifies the signatures of checkpoints with trusted keys; without it, signed checkpoints are not taken.
+        /// Verifies the signatures of checkpoints with trusted keys; without it, signed checkpoints are not taken. A signature
+        /// it does not verify is left out of a checkpoint taken, and refuses nothing.
         /// </summary>
         public VerifyCheckpointSignatureDelegate?  VerifyCheckpointSignature   { get; init; }
 

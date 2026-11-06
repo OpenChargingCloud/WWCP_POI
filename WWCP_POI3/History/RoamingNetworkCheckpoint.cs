@@ -523,6 +523,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region WithSignaturesOnly(Signatures)
+
+        /// <summary>
+        /// Return this checkpoint with only those of its signatures that are given, e.g. the ones verified where it is taken:
+        /// the others are left out. The identification stays the same.
+        /// </summary>
+        /// <param name="Signatures">Signatures of this checkpoint to keep.</param>
+        public RoamingNetworkCheckpoint WithSignaturesOnly(IEnumerable<RoamingNetworkCommitSignature> Signatures)
+        {
+
+            var given  = Signatures.ToHashSet();
+            var kept   = this.Signatures.Where(given.Contains).ToImmutableArray();
+
+            return kept.Length == this.Signatures.Length
+                       ? this
+                       : new RoamingNetworkCheckpoint(RoamingNetworkId,
+                                                      Epoch,
+                                                      Sequence,
+                                                      PreviousId,
+                                                      CommitId,
+                                                      Revision,
+                                                      ETags,
+                                                      CommitsRoot,
+                                                      CommitsSize,
+                                                      CreatedAt,
+                                                      PriceStatementsRoot,
+                                                      PriceStatementsSize,
+                                                      IdentificationHash,
+                                                      Next,
+                                                      PreviousEpoch,
+                                                      kept);
+
+        }
+
+        #endregion
+
         #region CreateSignature(PrivateKey, KeyId, Algorithm, Role, Signer = null, SignedAt = null, Deterministic = true)
 
         /// <summary>

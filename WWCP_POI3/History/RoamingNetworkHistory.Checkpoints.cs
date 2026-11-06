@@ -227,10 +227,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// Take a checkpoint of another server, after checking it against this history (SPECIFICATION.md, section 10.1):
         /// its commit is held, has its revision and ETags, follows the commit of the latest checkpoint, its commits are the ones
-        /// since, it names the latest checkpoint as the one before and every signature is valid. A checkpoint held already only
-        /// brings its signatures in addition. A history without checkpoints takes any one of a commit it holds as its first,
-        /// e.g. after it started from a snapshot, without checking its commits it does not hold: a witness does not sign it.
-        /// The price statements it names are checked when they are given, TryAddCheckpointPriceStatements(…) takes them later.
+        /// since, it names the latest checkpoint as the one before, every signature is in an algorithm of its epoch, and it is
+        /// signed in the required roles by signatures that verify here. It is taken with those only, one of each key and role:
+        /// one that does not verify, invalid or by a key not trusted here, is left out, not refused, so that nobody blocks a
+        /// checkpoint by adding a signature, and a witness trusted elsewhere and not here keeps none from it (section 10.2).
+        /// A checkpoint held already only brings the signatures that verify in addition. A history without checkpoints takes
+        /// any one of a commit it holds as its first, e.g. after it started from a snapshot, without checking its commits it
+        /// does not hold: a witness does not sign it. The price statements it names are checked when they are given,
+        /// TryAddCheckpointPriceStatements(…) takes them later.
         /// </summary>
         /// <param name="Checkpoint">The checkpoint.</param>
         /// <param name="ErrorResponse">Why it was refused.</param>
@@ -256,7 +260,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (checkpointIndex.ContainsKey(Checkpoint.Id))
                 {
 
-                    if (!TryAddCheckpointSignatures(Checkpoint.Id, Checkpoint.Signatures, VerifyCheckpointSignature, out _, out _, out ErrorResponse))
+                    // Held already: its signatures that do not verify here refuse nothing, as of a new one.
+                    if (!TryAddCheckpointSignatures(Checkpoint.Id, Checkpoint.Signatures, VerifyCheckpointSignature, NoneVerifiedRefuses: false, out _, out _, out ErrorResponse))
                         return false;
 
                     return PriceStatements is null || Checkpoint.PriceStatementsSize == 0 ||
@@ -268,37 +273,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
 
                 foreach (var signature in Checkpoint.Signatures)
-                {
-
                     if (CheckpointSignatureAlgorithmError(Checkpoint, signature) is String algorithmError)
                     {
                         ErrorResponse = algorithmError;
                         return false;
                     }
 
-                        if (!CheckCheckpointSignature(Checkpoint, signature, VerifyCheckpointSignature, out ErrorResponse))
-                        return false;
-
-                }
+                if (!TryVerifyCheckpointSignatures(Checkpoint, Checkpoint.Signatures, VerifyCheckpointSignature, out var verified, out var leftOut, out ErrorResponse))
+                    return false;
 
                 foreach (var role in RequiredSignatureRoles ?? [])
-                    if (!Checkpoint.Signatures.Any(signature => signature.Role == role))
+                    if (!verified.Any(signature => signature.Role == role))
                     {
-                        ErrorResponse = $"The checkpoint '{Checkpoint.Id}' is not signed in the role '{role}'!";
+                        ErrorResponse = $"The checkpoint '{Checkpoint.Id}' is not signed in the role '{role}' by a signature that verifies here!" +
+                                        (leftOut is null ? "" : " " + leftOut);
                         return false;
                     }
 
+                // Held, kept and passed on with the signatures verified here only.
+                var checkpoint = Checkpoint.WithSignaturesOnly(verified);
+
                 IReadOnlyList<RoamingNetworkPriceStatement>? priceStatementsOfCheckpoint = null;
 
-                if (PriceStatements is not null && Checkpoint.PriceStatementsSize > 0 &&
-                    !CheckCheckpointPriceStatements(Checkpoint, PriceStatements, out priceStatementsOfCheckpoint, out ErrorResponse))
+                if (PriceStatements is not null && checkpoint.PriceStatementsSize > 0 &&
+                    !CheckCheckpointPriceStatements(checkpoint, PriceStatements, out priceStatementsOfCheckpoint, out ErrorResponse))
                 {
                     return false;
                 }
 
                 lock (priceStatementLock)
                 {
-                    TakeCheckpoint(Checkpoint, priceStatementsOfCheckpoint);
+                    TakeCheckpoint(checkpoint, priceStatementsOfCheckpoint);
                 }
 
                 ErrorResponse = null;
@@ -313,8 +318,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region TryAddCheckpointSignatures(CheckpointId, Signatures, VerifyCheckpointSignature, out Checkpoint, out NewSignatures, out ErrorResponse)
 
         /// <summary>
-        /// Add the given signatures to a checkpoint of this history, e.g. of witnesses. Every new signature must be valid;
-        /// signatures the checkpoint has already are skipped. The identification of the checkpoint stays the same.
+        /// Add the given signatures to a checkpoint of this history, e.g. of witnesses: those that verify here, one of each key
+        /// and role the checkpoint has none of yet. One that does not verify, invalid or by a key not trusted here, is left out
+        /// and keeps no other from being added (SPECIFICATION.md, section 10.2). Refused when none of the new ones verifies,
+        /// or one is in an algorithm its epoch does not take. The identification of the checkpoint stays the same.
         /// </summary>
         /// <param name="CheckpointId">The identification of the checkpoint.</param>
         /// <param name="Signatures">Signatures of the checkpoint.</param>
@@ -328,6 +335,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                   [NotNullWhen(true)]  out RoamingNetworkCheckpoint?      Checkpoint,
                                                   out IReadOnlyList<RoamingNetworkCommitSignature>        NewSignatures,
                                                   [NotNullWhen(false)] out String?                        ErrorResponse)
+
+            => TryAddCheckpointSignatures(CheckpointId,
+                                          Signatures,
+                                          VerifyCheckpointSignature,
+                                          NoneVerifiedRefuses: true,
+                                          out Checkpoint,
+                                          out NewSignatures,
+                                          out ErrorResponse);
+
+        #endregion
+
+        #region (private) TryAddCheckpointSignatures(CheckpointId, Signatures, VerifyCheckpointSignature, NoneVerifiedRefuses, out Checkpoint, out NewSignatures, out ErrorResponse)
+
+        /// <summary>
+        /// Add the given signatures that verify here to a checkpoint of this history (TryAddCheckpointSignatures);
+        /// when none of the new ones verifies, refused or nothing added, as told.
+        /// </summary>
+        private Boolean TryAddCheckpointSignatures(RoamingNetworkCheckpoint_Id                             CheckpointId,
+                                                   IEnumerable<RoamingNetworkCommitSignature>              Signatures,
+                                                   VerifyCheckpointSignatureDelegate?                      VerifyCheckpointSignature,
+                                                   Boolean                                                 NoneVerifiedRefuses,
+                                                   [NotNullWhen(true)]  out RoamingNetworkCheckpoint?      Checkpoint,
+                                                   out IReadOnlyList<RoamingNetworkCommitSignature>        NewSignatures,
+                                                   [NotNullWhen(false)] out String?                        ErrorResponse)
         {
 
             lock (historyLock)
@@ -342,27 +373,43 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                var checkpoint     = checkpoints[index];
-                var newSignatures  = RoamingNetworkCommitSignature.NotYetIn(checkpoint.Signatures, Signatures);
+                var checkpoint  = checkpoints[index];
 
-                if (newSignatures.Length == 0)
+                // Of a key and role the checkpoint has none of yet, each verified: a forged one before a genuine one of the
+                // same key and role keeps it from nothing.
+                var given       = Signatures.Distinct().
+                                             Where(signature => !checkpoint.Signatures.Any(held => held.IsOfTheSameKeyAndRoleAs(signature))).
+                                             ToArray();
+
+                if (given.Length == 0)
                 {
                     Checkpoint     = checkpoint;
                     ErrorResponse  = null;
                     return true;
                 }
 
-                foreach (var signature in newSignatures)
-                {
-
+                foreach (var signature in given)
                     if (CheckpointSignatureAlgorithmError(checkpoint, signature) is String algorithmError)
                     {
                         ErrorResponse = algorithmError;
                         return false;
                     }
 
-                        if (!CheckCheckpointSignature(checkpoint, signature, VerifyCheckpointSignature, out ErrorResponse))
+                if (!TryVerifyCheckpointSignatures(checkpoint, given, VerifyCheckpointSignature, out var newSignatures, out var leftOut, out ErrorResponse))
+                    return false;
+
+                if (newSignatures.Count == 0)
+                {
+
+                    if (NoneVerifiedRefuses)
+                    {
+                        ErrorResponse = leftOut!;
                         return false;
+                    }
+
+                    Checkpoint     = checkpoint;
+                    ErrorResponse  = null;
+                    return true;
 
                 }
 
@@ -901,13 +948,30 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private static) CheckCheckpointSignature(Checkpoint, Signature, VerifyCheckpointSignature, out ErrorResponse)
+        #region (private static) TryVerifyCheckpointSignatures(Checkpoint, Signatures, VerifyCheckpointSignature, out Verified, out LeftOut, out ErrorResponse)
 
-        private static Boolean CheckCheckpointSignature(RoamingNetworkCheckpoint             Checkpoint,
-                                                        RoamingNetworkCommitSignature        Signature,
-                                                        VerifyCheckpointSignatureDelegate?   VerifyCheckpointSignature,
-                                                        [NotNullWhen(false)] out String?     ErrorResponse)
+        /// <summary>
+        /// Those of the given signatures of the given checkpoint that verify with the given verifier, by keys it trusts, the
+        /// first one of each key and role that does: a twin of one, or another one of its key and role, adds nothing. One that
+        /// does not verify, invalid or by a key not trusted here, is left out, not refused (SPECIFICATION.md, section 10.2),
+        /// and why the first one was left out is told. Without a verifier, signatures are not taken unchecked: refused.
+        /// </summary>
+        private static Boolean TryVerifyCheckpointSignatures(RoamingNetworkCheckpoint                            Checkpoint,
+                                                             IReadOnlyCollection<RoamingNetworkCommitSignature>  Signatures,
+                                                             VerifyCheckpointSignatureDelegate?                  VerifyCheckpointSignature,
+                                                             out List<RoamingNetworkCommitSignature>             Verified,
+                                                             out String?                                         LeftOut,
+                                                             [NotNullWhen(false)] out String?                    ErrorResponse)
         {
+
+            Verified  = [];
+            LeftOut   = null;
+
+            if (Signatures.Count == 0)
+            {
+                ErrorResponse = null;
+                return true;
+            }
 
             if (VerifyCheckpointSignature is null)
             {
@@ -915,10 +979,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!VerifyCheckpointSignature(Checkpoint, Signature))
+            foreach (var signature in Signatures)
             {
-                ErrorResponse = $"The signature of the checkpoint '{Checkpoint.Id}' by {Signature} is invalid, or its key is not trusted!";
-                return false;
+
+                if (Verified.Any(verified => verified.IsOfTheSameKeyAndRoleAs(signature)))
+                    continue;
+
+                if (VerifyCheckpointSignature(Checkpoint, signature))
+                    Verified.Add(signature);
+
+                else
+                    LeftOut ??= $"The signature of the checkpoint '{Checkpoint.Id}' by {signature} is invalid, or its key is not trusted!";
+
             }
 
             ErrorResponse = null;

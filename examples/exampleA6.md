@@ -256,7 +256,7 @@ a) The snapshot of checkpoint 2 without the signatures of the witnesses: it is n
 witness signature by a key nobody trusts, here one just made, naming `calibration.example`.
 
 ```
-Checkpoint 2 without its witnesses: The checkpoint of the snapshot can not be taken: The checkpoint '2fe73391…' is not signed in the role 'witness'!
+Checkpoint 2 without its witnesses: The checkpoint of the snapshot can not be taken: The checkpoint '2fe73391…' is not signed in the role 'witness' by a signature that verifies here!
 A signature of calibration.example by another key: refused, not the key trusted for it
 ```
 
