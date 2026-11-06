@@ -221,26 +221,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region TryParse (JSON, out Signature, out ErrorResponse, Embedded = false)
+        #region TryParse (JSON, out Signature, out ErrorResponse, Embedded = false, What = "A commit signature")
 
         /// <summary>
         /// Try to parse the given JSON representation of a commit signature.
         /// Its signedAt must be written as this library writes it, e.g. 2026-10-12T12:00:00.000Z,
         /// as it is part of the signed content. It names its own properties only, as WWCP_POI.TS reads it: whatever else
         /// it names is signed by nobody, its signer is a text, and embedded in a commit or a checkpoint it names no JSON-LD
-        /// context (SPECIFICATION.md, section 5.4).
+        /// context (SPECIFICATION.md, section 5.4). Its role, signedAt, algorithm, keyId and value are trimmed, its signer
+        /// is taken as given, and none of them is empty. It is refused in the words of WWCP_POI.TS (parseRoleSignature),
+        /// in its order: its properties, then each of them a text, the signedAt a point in time, then none of them empty.
         /// </summary>
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="Signature">The parsed signature.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
         /// <param name="Embedded">Whether it is embedded in a commit or a checkpoint, without its JSON-LD context.</param>
+        /// <param name="What">What it is called in an error response, e.g. "A signature of a commit".</param>
         public static Boolean TryParse(JObject                                                  JSON,
                                        [NotNullWhen(true)]  out RoamingNetworkCommitSignature?  Signature,
                                        [NotNullWhen(false)] out String?                         ErrorResponse,
-                                       Boolean                                                  Embedded   = false)
+                                       Boolean                                                  Embedded   = false,
+                                       String                                                   What       = "A commit signature")
         {
 
             Signature = null;
+
+            // "The role of a signature of a commit", as WWCP_POI.TS names it.
+            var of = What.Length > 0
+                         ? Char.ToLowerInvariant(What[0]) + What[1..]
+                         : What;
 
             try
             {
@@ -250,51 +259,66 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                            PropertyKeys.Algorithm or PropertyKeys.KeyId  or PropertyKeys.Value ||
                           property.Name == PropertyKeys.Context && !Embedded))
                     {
-                        ErrorResponse = property.Name == PropertyKeys.Context
-                                            ? "A commit signature embedded in a commit or a checkpoint must not name its JSON-LD context!"
-                                            : $"A commit signature must not name the property '{property.Name}'!";
+                        ErrorResponse = $"{What} must not name the property '{property.Name}'!";
                         return false;
                     }
-
-                if (JSON[PropertyKeys.Signer] is JToken signerJSON && signerJSON.Type != JTokenType.String)
-                {
-                    ErrorResponse = "The signer of a commit signature must be a text!";
-                    return false;
-                }
 
                 if (JSON[PropertyKeys.Context] is JToken context &&
                     !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
                 {
-                    ErrorResponse = $"The JSON-LD context of the commit signature must be '{JSONLDContext}'!";
+                    ErrorResponse = $"The JSON-LD context of {of} must be '{JSONLDContext}'!";
                     return false;
                 }
 
-                if (!JSON.ParseMandatoryText(PropertyKeys.Role,       "signer role",          out var role,       out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.SignedAt,   "signing timestamp",    out var signedAt,   out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.Algorithm,  "signature algorithm",  out var algorithm,  out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.KeyId,      "key identification",   out var keyId,      out ErrorResponse) ||
-                    !JSON.ParseMandatoryText(PropertyKeys.Value,      "signature value",      out var value,      out ErrorResponse))
+                if (!TryParseText(JSON, PropertyKeys.Role, of, out var role, out ErrorResponse))
+                    return false;
+
+                if (JSON[PropertyKeys.Signer] is JToken signerJSON && signerJSON.Type != JTokenType.String)
                 {
+                    ErrorResponse = $"The {PropertyKeys.Signer} of {of} must be a text!";
+                    return false;
+                }
+
+                var signer = JSON[PropertyKeys.Signer]?.Value<String>();
+
+                if (!TryParseText(JSON, PropertyKeys.SignedAt, of, out var signedAt, out ErrorResponse))
+                    return false;
+
+                if (!IsWrittenAsTimestamp(signedAt))
+                {
+                    ErrorResponse = $"The {PropertyKeys.SignedAt} of {of} must be written as yyyy-MM-ddTHH:mm:ss.fffZ, not '{signedAt}'!";
                     return false;
                 }
 
                 if (!DateTimeOffset.TryParse(signedAt, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var signedAtTimestamp) ||
                     signedAtTimestamp.ToISO8601() != signedAt)
                 {
-                    ErrorResponse = $"The signing timestamp '{signedAt}' must be written as yyyy-MM-ddTHH:mm:ss.fffZ!";
+                    ErrorResponse = $"The {PropertyKeys.SignedAt} of {of} '{signedAt}' is no point in time!";
                     return false;
                 }
 
-                String? signer = null;
-
-                if (JSON.ParseOptional(PropertyKeys.Signer, "signer", out String? parsedSigner, out ErrorResponse))
+                if (!TryParseText(JSON, PropertyKeys.Algorithm, of, out var algorithm, out ErrorResponse) ||
+                    !TryParseText(JSON, PropertyKeys.KeyId,     of, out var keyId,     out ErrorResponse) ||
+                    !TryParseText(JSON, PropertyKeys.Value,     of, out var value,     out ErrorResponse))
                 {
+                    return false;
+                }
 
-                    if (ErrorResponse is not null)
+                // None of them empty, nor whitespace alone: a role, a signer, a key or a value of nothing is refused when read,
+                // before anything counts it.
+                foreach (var (property, text) in new (String Property, String? Text)[] {
+                                                     (PropertyKeys.Role,      role),
+                                                     (PropertyKeys.Signer,    signer),
+                                                     (PropertyKeys.Algorithm, algorithm),
+                                                     (PropertyKeys.KeyId,     keyId),
+                                                     (PropertyKeys.Value,     value)
+                                                 })
+                {
+                    if (text is not null && String.IsNullOrWhiteSpace(text))
+                    {
+                        ErrorResponse = $"The {property} of {of} must not be empty!";
                         return false;
-
-                    signer = parsedSigner;
-
+                    }
                 }
 
                 Signature = new RoamingNetworkCommitSignature(
@@ -316,6 +340,57 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 ErrorResponse  = e.Message;
                 return false;
             }
+
+        }
+
+        #endregion
+
+        #region (private static) TryParseText(JSON, Property, Of, out Text, out ErrorResponse)
+
+        /// <summary>
+        /// The given property of a commit signature, a text, trimmed.
+        /// </summary>
+        private static Boolean TryParseText(JObject                           JSON,
+                                            String                            Property,
+                                            String                            Of,
+                                            [NotNullWhen(true)]  out String?  Text,
+                                            [NotNullWhen(false)] out String?  ErrorResponse)
+        {
+
+            if (JSON[Property] is JToken { Type: JTokenType.String } token &&
+                token.Value<String>() is String text)
+            {
+                Text           = text.Trim();
+                ErrorResponse  = null;
+                return true;
+            }
+
+            Text           = null;
+            ErrorResponse  = $"The {Property} of {Of} must be a text!";
+            return false;
+
+        }
+
+        #endregion
+
+        #region (private static) IsWrittenAsTimestamp(Text)
+
+        /// <summary>
+        /// Whether the given text is written as yyyy-MM-ddTHH:mm:ss.fffZ, with ASCII digits.
+        /// </summary>
+        private static Boolean IsWrittenAsTimestamp(String Text)
+        {
+
+            const String form = "dddd-dd-ddTdd:dd:dd.dddZ";
+
+            if (Text.Length != form.Length)
+                return false;
+
+            for (var i = 0; i < form.Length; i++)
+                if (form[i] == 'd' ? !Char.IsAsciiDigit(Text[i]) : Text[i] != form[i])
+                    return false;
+
+            return true;
 
         }
 

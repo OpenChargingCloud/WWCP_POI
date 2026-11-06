@@ -945,9 +945,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (JSON[PropertyKeys.Signatures] is JToken signaturesJSON)
                 {
 
+                    // In the words of WWCP_POI.TS.
                     if (signaturesJSON is not JArray signaturesArray)
                     {
-                        ErrorResponse = "The signatures must be a JSON array!";
+                        ErrorResponse = "The signatures of a checkpoint must be a JSON array!";
                         return false;
                     }
 
@@ -956,15 +957,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         if (signatureJSON is not JObject signatureObject)
                         {
-                            ErrorResponse = $"Invalid signature {signatures.Count}: it must be a JSON object!";
+                            ErrorResponse = "A signature of a checkpoint must be a JSON object!";
                             return false;
                         }
 
-                        if (!RoamingNetworkCommitSignature.TryParse(signatureObject, out var signature, out var signatureError, Embedded: true))
-                        {
-                            ErrorResponse = $"Invalid signature {signatures.Count}: " + signatureError;
+                        if (!RoamingNetworkCommitSignature.TryParse(signatureObject, out var signature, out ErrorResponse, Embedded: true, What: "A signature of a checkpoint"))
                             return false;
-                        }
 
                         signatures.Add(signature);
 

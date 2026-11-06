@@ -412,10 +412,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (Snapshot?[PropertyKeys.Commit] is not JObject commitJSON ||
-                    !RoamingNetworkCommit.TryParse(commitJSON, out var commit, out var commitError, Limits))
+                // In the words of WWCP_POI.TS: why its commit is refused.
+                if (Snapshot?[PropertyKeys.Commit] is not JObject commitJSON)
                 {
-                    ErrorResponse = "Missing or invalid commit of the snapshot!";
+                    ErrorResponse = "Invalid commit of the snapshot: A commit must be a JSON object!";
+                    return false;
+                }
+
+                if (!RoamingNetworkCommit.TryParse(commitJSON, out var commit, out var commitError, Limits))
+                {
+                    ErrorResponse = $"Invalid commit of the snapshot: {commitError}";
                     return false;
                 }
 
@@ -719,11 +725,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
             try
             {
 
-                if (Snapshot.Kind != CBORValueKind.Map ||
-                    !Snapshot.TryGetValue(CBORValue.FromText(PropertyKeys.Commit), out var commitCBOR) ||
-                    !RoamingNetworkCommit.TryParse(commitCBOR, out var commit, out var commitError, Limits))
+                if (Snapshot.Kind != CBORValueKind.Map)
                 {
-                    ErrorResponse = "Missing or invalid commit of the snapshot!";
+                    ErrorResponse = "The CBOR representation of a snapshot must be a map with text keys!";
+                    return false;
+                }
+
+                if (!Snapshot.TryGetValue(CBORValue.FromText(PropertyKeys.Commit), out var commitCBOR))
+                {
+                    ErrorResponse = "Invalid commit of the snapshot: The CBOR representation of a commit must be a map with text keys!";
+                    return false;
+                }
+
+                if (!RoamingNetworkCommit.TryParse(commitCBOR, out var commit, out var commitError, Limits))
+                {
+                    ErrorResponse = $"Invalid commit of the snapshot: {commitError}";
                     return false;
                 }
 
