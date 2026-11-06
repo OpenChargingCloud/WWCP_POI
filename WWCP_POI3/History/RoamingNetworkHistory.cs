@@ -576,6 +576,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
+            // Signed in algorithms of the epoch, as every commit taken later (CommitEpochError, SPECIFICATION.md 11.1),
+            // anchored or not.
+            if (CommitSignatureAlgorithmError(epoch, Commit) is String algorithmError)
+            {
+                ErrorResponse = algorithmError;
+                return false;
+            }
+
             if (PreviousEpoch is not null && PreviousEpoch.Epoch != epoch.Number - 1)
             {
                 ErrorResponse = $"The epoch before the epoch {epoch.Number} is not the epoch {PreviousEpoch.Epoch}!";

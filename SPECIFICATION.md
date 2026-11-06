@@ -691,8 +691,11 @@ it, the charging station operator itself, or others.
 ```
 
 - **role:** `leader`, `roamingNetworkOperator`, `chargingStationOperator` or another one.
-- **signer:** optional, e.g. the identification of an operator.
+- **signer:** optional, e.g. the identification of an operator, a text.
 - **signedAt:** MUST be written as `yyyy-MM-ddTHH:mm:ss.fffZ`, as it is signed as text.
+
+A reader MUST refuse a signature naming another property, whatever else it names being signed by nobody, a `signer`
+that is not a text, and, embedded in a commit or a checkpoint, a signature naming its `@context`.
 
 The signature input is the canonical JSON of
 

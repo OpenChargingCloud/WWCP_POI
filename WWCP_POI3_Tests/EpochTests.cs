@@ -538,6 +538,47 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region The_commit_of_a_snapshot_is_signed_in_algorithms_of_its_epoch()
+
+        /// <summary>
+        /// The commit of a snapshot, anchored or not, is signed in algorithms of its epoch, as every commit taken later:
+        /// a signature of another algorithm refuses the snapshot (SPECIFICATION.md, section 11.1).
+        /// </summary>
+        [Test]
+        public void The_commit_of_a_snapshot_is_signed_in_algorithms_of_its_epoch()
+        {
+
+            var (history, _) = Close(Restricted);
+
+            Assert.That(history.TryStartNextEpoch(out var next, out var startError),  Is.True, startError);
+
+            // Its signatures are not verified in a snapshot that is not anchored; their algorithms are checked still.
+            JObject SnapshotSignedIn(String Algorithm)
+            {
+                var snapshot = next!.ToSnapshotJSON(IncludeRuntimeStatus: false);
+                snapshot["commit"]!["signatures"] = new JArray(new RoamingNetworkCommitSignature(RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator,
+                                                                                                  "DE*RNO",
+                                                                                                  T0.AddMinutes(10),
+                                                                                                  Algorithm,
+                                                                                                  "rno",
+                                                                                                  "AAAA").ToJSON(Embedded: true));
+                return snapshot;
+            }
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(RoamingNetworkHistory.TryFromSnapshot(next!.ToSnapshotJSON(IncludeRuntimeStatus: false), out _, out var unsignedError),  Is.True, unsignedError);
+                Assert.That(RoamingNetworkHistory.TryFromSnapshot(SnapshotSignedIn("Ed25519"), out _, out var ed25519Error),                        Is.True, ed25519Error);
+                Assert.That(RoamingNetworkHistory.TryFromSnapshot(SnapshotSignedIn("ES256"),   out _, out var es256Error),                          Is.False);
+                Assert.That(es256Error,  Is.EqualTo($"The signature algorithm 'ES256' of a signature of the commit '{next!.Head.Commit.Id}' is not one of the epoch 2, Ed25519, ML-DSA-65!"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Commits_and_checkpoints_of_another_epoch_are_refused()
 
         [Test]

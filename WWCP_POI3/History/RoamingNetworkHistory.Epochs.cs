@@ -362,10 +362,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private String? SignatureAlgorithmError(String  Algorithm,
                                                 String  What)
 
-            => epoch.Profiles.AllowsSignatureAlgorithm(Algorithm)
+            => SignatureAlgorithmError(epoch, Algorithm, What);
+
+        #endregion
+
+        #region (private static) SignatureAlgorithmError(Epoch, Algorithm, What)
+
+        /// <summary>
+        /// Why a signature of the given algorithm is not taken in the given epoch, if it is not: the epoch does not accept the algorithm.
+        /// </summary>
+        private static String? SignatureAlgorithmError(RoamingNetworkEpoch  Epoch,
+                                                       String               Algorithm,
+                                                       String               What)
+
+            => Epoch.Profiles.AllowsSignatureAlgorithm(Algorithm)
                    ? null
-                   : $"The signature algorithm '{Algorithm}' of {What} is not one of the epoch {epoch.Number}" +
-                     (epoch.Profiles.SignatureAlgorithms.IsEmpty ? "!" : $", {String.Join(", ", epoch.Profiles.SignatureAlgorithms)}!");
+                   : $"The signature algorithm '{Algorithm}' of {What} is not one of the epoch {Epoch.Number}" +
+                     (Epoch.Profiles.SignatureAlgorithms.IsEmpty ? "!" : $", {String.Join(", ", Epoch.Profiles.SignatureAlgorithms)}!");
+
+        #endregion
+
+        #region (private static) CommitSignatureAlgorithmError(Epoch, Commit)
+
+        /// <summary>
+        /// Why the given commit is not taken in the given epoch for the algorithm of a signature of it, or of its change set,
+        /// if it is not: of a commit appended (CommitEpochError) and of the commit of a snapshot alike.
+        /// </summary>
+        private static String? CommitSignatureAlgorithmError(RoamingNetworkEpoch   Epoch,
+                                                             RoamingNetworkCommit  Commit)
+        {
+
+            foreach (var signature in Commit.Signatures)
+                if (SignatureAlgorithmError(Epoch, signature.Algorithm, $"a signature of the commit '{Commit.Id}'") is String commitSignatureError)
+                    return commitSignatureError;
+
+            foreach (var signature in Commit.ChangeSet?.Signatures ?? [])
+                if (SignatureAlgorithmError(Epoch, signature.Algorithm, $"a signature of the change set of the commit '{Commit.Id}'") is String changeSetSignatureError)
+                    return changeSetSignatureError;
+
+            return null;
+
+        }
 
         #endregion
 
@@ -383,15 +420,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Commit.IdentificationHash != epoch.Profiles.IdentificationHash)
                 return $"The commit '{Commit.Id}' is identified with {Commit.IdentificationHash.ToText()}, but the epoch {epoch.Number} with {epoch.Profiles.IdentificationHash.ToText()}!";
 
-            foreach (var signature in Commit.Signatures)
-                if (SignatureAlgorithmError(signature.Algorithm, $"a signature of the commit '{Commit.Id}'") is String commitSignatureError)
-                    return commitSignatureError;
-
-            foreach (var signature in Commit.ChangeSet?.Signatures ?? [])
-                if (SignatureAlgorithmError(signature.Algorithm, $"a signature of the change set of the commit '{Commit.Id}'") is String changeSetSignatureError)
-                    return changeSetSignatureError;
-
-            return null;
+            return CommitSignatureAlgorithmError(epoch, Commit);
 
         }
 

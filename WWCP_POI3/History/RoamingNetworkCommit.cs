@@ -616,7 +616,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                             return false;
                         }
 
-                        if (!RoamingNetworkCommitSignature.TryParse(signatureObject, out var signature, out var signatureError))
+                        if (!RoamingNetworkCommitSignature.TryParse(signatureObject, out var signature, out var signatureError, Embedded: true))
                         {
                             ErrorResponse = $"Invalid signature {signatures.Count}: " + signatureError;
                             return false;

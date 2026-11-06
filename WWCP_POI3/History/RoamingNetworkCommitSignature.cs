@@ -221,25 +221,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region TryParse (JSON, out Signature, out ErrorResponse)
+        #region TryParse (JSON, out Signature, out ErrorResponse, Embedded = false)
 
         /// <summary>
         /// Try to parse the given JSON representation of a commit signature.
         /// Its signedAt must be written as this library writes it, e.g. 2026-10-12T12:00:00.000Z,
-        /// as it is part of the signed content.
+        /// as it is part of the signed content. It names its own properties only, as WWCP_POI.TS reads it: whatever else
+        /// it names is signed by nobody, its signer is a text, and embedded in a commit or a checkpoint it names no JSON-LD
+        /// context (SPECIFICATION.md, section 5.4).
         /// </summary>
         /// <param name="JSON">The JSON to parse.</param>
         /// <param name="Signature">The parsed signature.</param>
         /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="Embedded">Whether it is embedded in a commit or a checkpoint, without its JSON-LD context.</param>
         public static Boolean TryParse(JObject                                                  JSON,
                                        [NotNullWhen(true)]  out RoamingNetworkCommitSignature?  Signature,
-                                       [NotNullWhen(false)] out String?                         ErrorResponse)
+                                       [NotNullWhen(false)] out String?                         ErrorResponse,
+                                       Boolean                                                  Embedded   = false)
         {
 
             Signature = null;
 
             try
             {
+
+                foreach (var property in JSON.Properties())
+                    if (!(property.Name is PropertyKeys.Role      or PropertyKeys.Signer or PropertyKeys.SignedAt or
+                                           PropertyKeys.Algorithm or PropertyKeys.KeyId  or PropertyKeys.Value ||
+                          property.Name == PropertyKeys.Context && !Embedded))
+                    {
+                        ErrorResponse = property.Name == PropertyKeys.Context
+                                            ? "A commit signature embedded in a commit or a checkpoint must not name its JSON-LD context!"
+                                            : $"A commit signature must not name the property '{property.Name}'!";
+                        return false;
+                    }
+
+                if (JSON[PropertyKeys.Signer] is JToken signerJSON && signerJSON.Type != JTokenType.String)
+                {
+                    ErrorResponse = "The signer of a commit signature must be a text!";
+                    return false;
+                }
 
                 if (JSON[PropertyKeys.Context] is JToken context &&
                     !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
