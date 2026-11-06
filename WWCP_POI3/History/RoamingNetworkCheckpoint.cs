@@ -951,7 +951,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                               id.HashAlgorithm,
                                                               next,
                                                               previousEpoch,
-                                                              [ .. RoamingNetworkCommitSignature.NotYetIn([], signatures) ]);
+                                                              // As given, none dropped unseen: they are checked where it is
+                                                              // verified; only a server adding takes one of each (NotYetIn).
+                                                              [ .. signatures.Distinct() ]);
 
                 if (checkpoint.Id != id)
                 {

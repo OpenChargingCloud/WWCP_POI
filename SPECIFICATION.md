@@ -707,8 +707,11 @@ change set and **the signatures of the change set**: whoever signs a commit conf
 together with who signed it. The verification rules of section 4 apply.
 
 A server MUST verify every signature of a commit before it takes the commit,
-and MAY require signatures in certain roles. A commit, and a checkpoint, keeps one signature of each key in each role,
-the first: another one of the same key and role, also at another time, is no new signature. A signature counts for a
+and MAY require signatures in certain roles. Signatures added to a commit or a checkpoint a server holds are taken one
+of each key in each role, the first: another one of the same key and role, also at another time, is no new signature.
+A commit or checkpoint read keeps the signatures it comes with, all of them, so that none is dropped unseen: they are
+checked where it is verified, a quorum counting each holder once and witnesses each once (10.2), and a twin of a
+signature adds nothing to either. A signature counts for a
 required role only by a key that may sign in it, as far as the version tells: in the role `roamingNetworkOperator` a
 signing key certified for the RNO (8.6), in the role `chargingStationOperator` a signing key of the operator its
 `signer` names; who leads or witnesses, no version says, and the server judges by the keys it trusts. A signature is

@@ -17,6 +17,8 @@
 
 #region Usings
 
+using Newtonsoft.Json.Linq;
+
 using NUnit.Framework;
 
 using Org.BouncyCastle.Crypto.Parameters;
@@ -212,6 +214,78 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
                 Assert.That(again,                                                    Is.True, error2);
                 Assert.That(laterNew,                                                 Is.Empty, "no further signature of the same key in the same role");
                 Assert.That(signed!.Signatures.Select(kept => kept.SignedAt),        Is.EqualTo(new[] { first.SignedAt }));
+            }
+
+        }
+
+        #endregion
+
+        #region A_commit_read_keeps_its_signatures_and_each_is_checked()
+
+        /// <summary>
+        /// A commit read keeps the signatures it comes with, none dropped unseen: a forged signature of a key in a role
+        /// held already refuses it, before or after the genuine one, and the valid twin of a signature stays with it,
+        /// written out again as it came.
+        /// </summary>
+        [Test]
+        public void A_commit_read_keeps_its_signatures_and_each_is_checked()
+        {
+
+            var leader     = RoamingNetworkHistory.Start(NewNetwork());
+
+            RoamingNetworkHistory Follower()
+            {
+                Assert.That(RoamingNetworkHistory.TryFromSnapshot(leader.ToSnapshotJSON(), out var follower, out var error), Is.True, error);
+                return follower!;
+            }
+
+            var follower1  = Follower();
+            var follower2  = Follower();
+            var follower3  = Follower();
+
+            var head       = leader.Head.RoamingNetwork;
+            var committed  = leader.Commit(head.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(head, "dataSource", null, "v1") ], CreatedAt: DateTimeOffset.Parse("2026-01-01T00:01:00Z")));
+
+            Assert.That(committed.Status, Is.EqualTo(RoamingNetworkCommitStatus.Committed), committed.ErrorResponse);
+
+            var commit     = committed.Commit!;
+            var genuine    = Signer.Sign(commit, Timestamp.Now.AddMinutes(-2));
+
+            // The same key in the same role, another time, with the value of the genuine one: invalid.
+            var forgedJSON = Signer.Sign(commit, Timestamp.Now.AddMinutes(-1)).ToJSON();
+            forgedJSON["value"] = genuine.Value;
+
+            Assert.That(RoamingNetworkCommitSignature.TryParse(forgedJSON, out var forged, out var forgedError), Is.True, forgedError);
+
+            var twinJSON   = genuine.ToJSON();
+            twinJSON["value"] = Twin(genuine.Value);
+
+            Assert.That(RoamingNetworkCommitSignature.TryParse(twinJSON, out var twin, out var twinError), Is.True, twinError);
+
+            RoamingNetworkCommit Read(params RoamingNetworkCommitSignature[] Signatures)
+            {
+                var json = commit.ToJSON();
+                json["signatures"] = new JArray(Signatures.Select(signature => signature.ToJSON(Embedded: true)));
+                Assert.That(RoamingNetworkCommit.TryParse(json, out var read, out var error), Is.True, error);
+                return read!;
+            }
+
+            VerifyCommitSignatureDelegate verify = (commit, version, signature) => commit.VerifySignature(signature, ECDSAPublicKey, "rno-ecdsa", out _);
+
+            var after      = Read(genuine, forged!);
+            var before     = Read(forged!,  genuine);
+            var withTwin   = Read(genuine, twin!);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(after.   Signatures,                                          Has.Length.EqualTo(2), "kept as it came");
+                Assert.That(follower1.TryAppend(after,    out var afterError,  VerifyCommitSignature: verify),  Is.False, "a forged signature after the genuine one");
+                Assert.That(afterError,                                                   Does.Contain("is invalid"));
+                Assert.That(follower2.TryAppend(before,   out var beforeError, VerifyCommitSignature: verify),  Is.False, "a forged signature before the genuine one");
+                Assert.That(beforeError,                                                  Does.Contain("is invalid"));
+                Assert.That(follower3.TryAppend(withTwin, out var twinAppendError, VerifyCommitSignature: verify),  Is.True, twinAppendError);
+                Assert.That(follower3.Head.Commit.Signatures.Select(signature => signature.Value),  Is.EqualTo(new[] { genuine.Value, twin!.Value }));
+                Assert.That(follower3.Head.Commit.ToJSON()["signatures"]!.Count(),       Is.EqualTo(2), "written out as it came");
             }
 
         }

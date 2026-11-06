@@ -417,9 +417,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region IsOfTheSameKeyAndRoleAs(Other)
 
         /// <summary>
-        /// Whether the given signature is one of the same key in the same role: a commit or checkpoint keeps one of them,
-        /// the first, whatever time the others name, so a trusted key adds no signatures without bound
-        /// (POI3-ISSUES.md S24). The twin of an ECDSA signature is one of them as well (SignsTheSameAs).
+        /// Whether the given signature is one of the same key in the same role: a server adding signatures to a commit or
+        /// checkpoint it holds takes one of them, the first, whatever time the others name, so a trusted key adds no
+        /// signatures without bound (POI3-ISSUES.md S24). The twin of an ECDSA signature is one of them as well
+        /// (SignsTheSameAs). A commit or checkpoint read keeps the signatures it was given, none dropped unseen: they are
+        /// checked where it is verified, a quorum counting each holder once.
         /// </summary>
         public Boolean IsOfTheSameKeyAndRoleAs(RoamingNetworkCommitSignature Other)
 
@@ -432,7 +434,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The given signatures of a key in a role none of the held ones has, each the first of its key and role
-        /// (IsOfTheSameKeyAndRoleAs).
+        /// (IsOfTheSameKeyAndRoleAs): what a server adds to a commit or checkpoint it holds, not what it reads.
         /// </summary>
         public static RoamingNetworkCommitSignature[] NotYetIn(IEnumerable<RoamingNetworkCommitSignature>  Held,
                                                                IEnumerable<RoamingNetworkCommitSignature>  Given)

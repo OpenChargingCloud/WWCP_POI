@@ -670,7 +670,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  epoch,
                                  id.HashAlgorithm,
                                  profiles,
-                                 [ .. RoamingNetworkCommitSignature.NotYetIn([], signatures) ]
+                                 // As given, none dropped unseen: they are checked where the commit is verified; only a
+                                 // server adding signatures takes one of each key and role (NotYetIn).
+                                 [ .. signatures.Distinct() ]
                              );
 
                 if (commit.Id != id)
