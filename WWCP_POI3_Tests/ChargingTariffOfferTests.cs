@@ -551,7 +551,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             using (Assert.EnterMultipleScope())
             {
 
-                foreach (var timeZone in new[] { "Europe/Berlin", "Asia/Calcutta", "Asia/Kolkata", "America/Argentina/Buenos_Aires" })
+                // No older name, e.g. Asia/Calcutta: Debian 13 keeps those in tzdata-legacy only, which its containers lack.
+                foreach (var timeZone in new[] { "Europe/Berlin", "Asia/Kolkata", "America/Argentina/Buenos_Aires" })
                     Assert.That(Apply(rn1, RoamingNetworkChange.UpdateProperty(p1!, "timeZone", null, timeZone)).GetChargingStationOperatorById(GEF)!.TimeZoneOf(E1).Id,
                                 Is.EqualTo(timeZone), timeZone);
 
