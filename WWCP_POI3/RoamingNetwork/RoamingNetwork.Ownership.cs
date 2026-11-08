@@ -17,6 +17,7 @@
 
 #region Usings
 
+using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
 using Newtonsoft.Json.Linq;
@@ -716,7 +717,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                 ? $"{(owner.Item2 == POIKeyKind.Identity ? "identity" : "signing")} keys of {MinConsensusOf(owner.Item1)} holders of {owner.Item1}"
                                                                                 : $"a{(owner.Item2 == POIKeyKind.Identity ? "n identity" : " signing")} key of {owner.Item1}") +
                                                                            (owner.Item2 == POIKeyKind.Signing && usageNamed
-                                                                                ? $" that may sign {String.Join(" or ", UsagesOf(owner.Item1, change).Select(usage => $"'{usage}'"))}"
+                                                                                ? $" that may sign {String.Join(" or ", UsagesOf(owner.Item1, change).Select(usages => String.Join(" and ", usages.Select(usage => $"'{usage}'"))))}"
                                                                                 : ""))) + "!");
 
                     if (StopAtMissing)
@@ -900,32 +901,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) UsagesOf(Owner, Change) / MaySign(SigningKey, Owner, Change)
 
         /// <summary>
-        /// The usages of which a signing key of the given owner must name one to sign the given change (SPECIFICATION.md,
-        /// section 4.1): the one of what it changes (POIKeyUsages.Of); of the roaming network operator also "party", the
-        /// usage of everything it owns, as well where it signs in place of a party without signing keys (SignerOf), e.g.
-        /// the certificates of a conformity assessment body or the grid connection points of a grid operator not taking part.
+        /// The sets of usages of which a signing key of the given owner must name all of one to sign the given change
+        /// (SPECIFICATION.md, section 4.1): those of what it changes (POIKeyUsages.Of), e.g. "infrastructure" and "payments"
+        /// to add a charging pool with a web payment page; of the roaming network operator also "party" alone, the usage of
+        /// everything it owns, as well where it signs in place of a party without signing keys (SignerOf), e.g. the
+        /// certificates of a conformity assessment body or the grid connection points of a grid operator not taking part.
         /// </summary>
-        private IEnumerable<String> UsagesOf(POIPartyId            Owner,
-                                             RoamingNetworkChange  Change)
+        private IEnumerable<ImmutableArray<String>> UsagesOf(POIPartyId            Owner,
+                                                             RoamingNetworkChange  Change)
         {
 
-            var usage = POIKeyUsages.Of(Change);
+            var usages = POIKeyUsages.Of(Change);
 
-            yield return usage;
+            yield return usages;
 
-            if (Owner == OperatorParty && usage != POIKeyUsages.Party)
-                yield return POIKeyUsages.Party;
+            if (Owner == OperatorParty && !(usages.Length == 1 && usages[0] == POIKeyUsages.Party))
+                yield return [ POIKeyUsages.Party ];
 
         }
 
         /// <summary>
-        /// Whether the given signing key of the given owner may sign the given change: it names one of its usages (UsagesOf).
+        /// Whether the given signing key of the given owner may sign the given change: it names all usages of one of its sets
+        /// (UsagesOf).
         /// </summary>
         private Boolean MaySign(POIPublicKey          SigningKey,
                                 POIPartyId            Owner,
                                 RoamingNetworkChange  Change)
 
-            => UsagesOf(Owner, Change).Any(SigningKey.MaySign);
+            => UsagesOf(Owner, Change).Any(usages => usages.All(SigningKey.MaySign));
 
         #endregion
 

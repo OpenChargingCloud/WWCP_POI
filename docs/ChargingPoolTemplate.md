@@ -48,8 +48,10 @@ The template writes no `eTags` and no `@context`.
 
 The properties of a charging pool it gives its members, each written and read as a
 [charging pool](ChargingPool.md#properties) writes and reads it, and each updated or removed by a change set. Of
-`address`, `geoLocation`, `parkingType`, `accessibility`, `hotline`, `gridConnectionPointId` (a grid connection point
-of the network), `openingTimes`, `energyMix`, `timeZone`, `entranceAddress`, `entranceLocation`, `exitAddress`,
+`address`, `geoLocation`, `parkingType`, `accessibility`, `hotline`, `webPaymentURL` (not the URL in the dynamic QR
+code of a station, see [Web payment page](ChargingStationOperator.md#web-payment-page); signed by a key that may sign
+`payments`), `gridConnectionPointId` (a grid connection point of the network), `openingTimes`, `energyMix`, `timeZone`,
+`entranceAddress`, `entranceLocation`, `exitAddress`,
 `exitLocation`, `arrivalInstructions`, `chargingWhenClosed` and `assistanceServiceDetails` its members take the value
 of the first of their templates giving one, unless they have their own. Of `dataLicenses`, `brands`, `images`,
 `facilities`, `paymentOptions`, `authenticationModes`, `uiFeatures`, `features`, `locationLanguages` (after their

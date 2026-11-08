@@ -294,13 +294,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
-                #region Parse Telephone, EMailAddress, Homepage, Hotline, TermsAndConditions [optional]
+                #region Parse Telephone, EMailAddress, Homepage, Hotline, TermsAndConditions, WebPaymentURL [optional]
 
                 if (!TryParseOptionalText        (JSON, PropertyKeys.Telephone,           "telephone number",          PhoneNumber.TryParse, out PhoneNumber?  telephone,             out ErrorResponse) ||
                     !POIJSON.TryParseEMailAddress(JSON[ PropertyKeys.EMailAddress],       "e-mail address",                                  out var           eMailAddress,          out ErrorResponse) ||
                     !TryParseOptionalText        (JSON, PropertyKeys.Homepage,            "homepage",                  URL.        TryParse, out URL?          homepage,              out ErrorResponse) ||
                     !TryParseOptionalText        (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",      PhoneNumber.TryParse, out PhoneNumber?  hotlinePhoneNumber,    out ErrorResponse) ||
-                    !TryParseOptionalText        (JSON, PropertyKeys.TermsAndConditions,  "terms and conditions URL",  URL.        TryParse, out URL?          termsAndConditionsURL, out ErrorResponse))
+                    !TryParseOptionalText        (JSON, PropertyKeys.TermsAndConditions,  "terms and conditions URL",  URL.        TryParse, out URL?          termsAndConditionsURL, out ErrorResponse) ||
+                    !TryParseOptionalText        (JSON, PropertyKeys.WebPaymentURL,       "web payment URL",           URL.        TryParse, out URL?          webPaymentURL,         out ErrorResponse))
                 {
                     return false;
                 }
@@ -437,7 +438,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                               Created:     created,
                                               LastChange:  lastChange,
                                               CustomData:  customData,
-                                              EVTaler:     evTaler
+                                              EVTaler:     evTaler,
+                                              WebPaymentURL: webPaymentURL
                                           );
 
                 if (!TryCheckETagsOf(JSON, ChargingStationOperator, out ErrorResponse))
@@ -594,6 +596,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                TermsAndConditionsURL.HasValue
                                    ? new JProperty(PropertyKeys.TermsAndConditions,       TermsAndConditionsURL.ToString())
+                                   : null,
+
+                               WebPaymentURL.HasValue
+                                   ? new JProperty(PropertyKeys.WebPaymentURL,            WebPaymentURL.ToString())
                                    : null,
 
                                EVTaler is not null
@@ -909,6 +915,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (TermsAndConditionsURL.HasValue)
                 cbor.Add(CBORValue.FromText(PropertyKeys.TermsAndConditions),            CBORValue.FromText(TermsAndConditionsURL.ToString()));
+
+            if (WebPaymentURL.HasValue)
+                cbor.Add(CBORValue.FromText(PropertyKeys.WebPaymentURL),                 CBORValue.FromText(WebPaymentURL.Value.ToString()));
 
             // The EV Taler merchant has no CBOR representation of its own: it is written with the keys and values of its JSON representation.
             if (EVTaler is not null)

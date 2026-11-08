@@ -19,6 +19,8 @@
 
 using System.Collections.Immutable;
 
+using Newtonsoft.Json.Linq;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -77,8 +79,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const String Certificates     = "certificates";
 
         /// <summary>
-        /// The EV Taler merchant of a charging station operator (concepts/EVTaler.md, section 4.4): whoever changes it
-        /// redirects the payments of every station of the operator, so its key may be kept apart, e.g. offline.
+        /// The EV Taler merchant of a charging station operator (concepts/EVTaler.md, section 4.4) and the web payment page
+        /// of a charging station operator, a charging pool, a charging station and their templates: whoever changes them
+        /// redirects the payments of the stations, so its key may be kept apart, e.g. offline.
         /// </summary>
         public const String Payments         = "payments";
 
@@ -106,15 +109,44 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (internal) Of(Change)
 
         /// <summary>
-        /// The usage a signing key needs to sign the given change, by the type of the entity it changes; of a charging
-        /// station operator, by the property it changes: its EV Taler merchant needs "payments", its other properties "party".
+        /// The usages a signing key needs, all of them, to sign the given change: the one of what it changes (UsageOf) and,
+        /// where it adds a charging pool, a charging station or their templates with a web payment page, its stations'
+        /// included, "payments" as well, as whoever names a web payment page redirects payments.
         /// </summary>
-        internal static String Of(RoamingNetworkChange Change)
+        internal static ImmutableArray<String> Of(RoamingNetworkChange Change)
+        {
+
+            var usage = UsageOf(Change);
+
+            return usage != Payments && AddsWebPaymentURL(Change)
+                       ? [ usage, Payments ]
+                       : [ usage ];
+
+        }
+
+        #endregion
+
+        #region (private) UsageOf(Change)
+
+        /// <summary>
+        /// The usage of what the given change changes, by the type of the entity it changes; by the property it changes,
+        /// "payments" for the EV Taler merchant of a charging station operator and for the web payment page of an operator,
+        /// a charging pool, a charging station or their templates, and "party" for the other properties of an operator.
+        /// </summary>
+        private static String UsageOf(RoamingNetworkChange Change)
 
             => Change.EntityType switch {
 
                    nameof(ChargingStationOperator)
                        when Change.EntityPropertyName == ChargingStationOperator.PropertyKeys.EVTaler => Payments,
+
+                   // "webPaymentURL" of each of them alike.
+                   nameof(ChargingStationOperator) or
+                   nameof(ChargingPool)            or
+                   nameof(ChargingStation)         or
+                   nameof(ChargingPoolTemplate)    or
+                   nameof(ChargingStationTemplate)
+                       when Change.EntityPropertyName == ChargingStationOperator.PropertyKeys.WebPaymentURL => Payments,
 
                    nameof(ChargingTariff)          or
                    nameof(ChargingTariffTemplate)  or
@@ -150,6 +182,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    _                               => Party
 
                };
+
+        #endregion
+
+        #region (private) AddsWebPaymentURL(Change)
+
+        /// <summary>
+        /// Whether the given change adds a charging pool, a charging station or their templates naming a web payment page,
+        /// a pool by one of its stations as well. A charging station operator is added by the roaming network operator, with
+        /// its web payment page as with its EV Taler merchant.
+        /// </summary>
+        private static Boolean AddsWebPaymentURL(RoamingNetworkChange Change)
+        {
+
+            if (Change.Kind != RoamingNetworkChangeKind.Add || Change.NewValue is not JObject entity)
+                return false;
+
+            return Change.EntityType switch {
+
+                       nameof(ChargingPool)            => entity[ChargingPool.PropertyKeys.WebPaymentURL] is not null ||
+                                                          (entity[ChargingPool.PropertyKeys.ChargingStations] is JArray stations &&
+                                                           stations.OfType<JObject>().Any(station => station[ChargingStation.PropertyKeys.WebPaymentURL] is not null)),
+
+                       nameof(ChargingStation)         => entity[ChargingStation.        PropertyKeys.WebPaymentURL] is not null,
+                       nameof(ChargingPoolTemplate)    => entity[ChargingPoolTemplate.   PropertyKeys.WebPaymentURL] is not null,
+                       nameof(ChargingStationTemplate) => entity[ChargingStationTemplate.PropertyKeys.WebPaymentURL] is not null,
+
+                       _                               => false
+
+                   };
+
+        }
 
         #endregion
 

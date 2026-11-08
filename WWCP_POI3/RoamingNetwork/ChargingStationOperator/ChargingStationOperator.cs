@@ -297,6 +297,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  TermsAndConditions          = "termsAndConditions";
 
             /// <summary>
+            /// The property of the URL of its web payment page - not the URL in the dynamic QR code of a charging station,
+            /// see WebPaymentURL.
+            /// </summary>
+            public const String  WebPaymentURL               = "webPaymentURL";
+
+            /// <summary>
             /// The property of its merchant at a GNU Taler merchant backend (concepts/EVTaler.md).
             /// </summary>
             public const String  EVTaler                     = "evTaler";
@@ -661,6 +667,25 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
         }
+
+        #endregion
+
+        #region WebPaymentURL
+
+        /// <summary>
+        /// The optional URL of its web payment page: where an EV driver pays for a charging session ad hoc, without a
+        /// contract with an e-mobility provider, and starts it - found in these static data, e.g. from a map, before
+        /// standing in front of a charging station. Of its charging stations, a charging station's own comes before that
+        /// of its charging pool, and that before this one.
+        /// </summary>
+        /// <remarks>
+        /// Not to be confused with the URL a charging station shows in its dynamic QR code, as OCPP 2.1's WebPaymentsCtrlr
+        /// makes it: that one is of one EVSE, carries a one-time password and changes every few minutes, and so is never
+        /// part of these static data. A page reached by either may lead to the same payment, but only the one reached by
+        /// the QR code proves that the EV driver stands in front of that EVSE.
+        /// </remarks>
+        [Optional]
+        public URL? WebPaymentURL { get; }
 
         #endregion
 
@@ -1076,6 +1101,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     LastChange:                LastChangeDate,
                     CustomData:                CustomData,
                     EVTaler:                   EVTaler,
+                    WebPaymentURL:             WebPaymentURL,
                     KeptFrom:                  KeptFrom);
 
         #endregion
@@ -1108,6 +1134,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="TermsAndConditionsURL">An optional URL of the terms and conditions.</param>
         /// <param name="DataLicenses">Optional data licenses.</param>
         /// <param name="EVTaler">Optionally, its merchant at a GNU Taler merchant backend and the exchanges it accepts.</param>
+        /// <param name="WebPaymentURL">An optional URL of its web payment page, not that in the dynamic QR code of a charging station.</param>
         public ChargingStationOperator(ChargingStationOperator_Id                            Id,
                                        //RoamingNetwork                                        RoamingNetwork,
                                        ImmutableI18NString?                                  Name                                   = null,
@@ -1153,7 +1180,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                                        CustomDataNew?                                        CustomData                             = null,
                                        UserDefinedDictionary?                                InternalData                           = null,
-                                       EVTalerMerchant?                                      EVTaler                                = null)
+                                       EVTalerMerchant?                                      EVTaler                                = null,
+                                       URL?                                                  WebPaymentURL                          = null)
 
             : this(true,
                    Id,
@@ -1197,7 +1225,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    LastChange,
                    CustomData,
                    InternalData,
-                   EVTaler)
+                   EVTaler,
+                   WebPaymentURL)
 
         { }
 
@@ -1256,6 +1285,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                         CustomDataNew?                                        CustomData                             = null,
                                         UserDefinedDictionary?                                InternalData                           = null,
                                         EVTalerMerchant?                                      EVTaler                                = null,
+                                        URL?                                                  WebPaymentURL                          = null,
                                         ChargingStationOperator?                              KeptFrom                               = null)
 
             : base(Id,
@@ -1287,6 +1317,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.homepage               = Homepage;
             this.hotlinePhoneNumber     = HotlinePhoneNumber;
             this.termsAndConditionsURL  = TermsAndConditionsURL;
+            this.WebPaymentURL          = WebPaymentURL;
             this.EVTaler                = EVTaler;
 
             (this.SigningKeys, this.IdentityKeys) = POIPartyKeys.Check(SigningKeys, IdentityKeys, $"the charging station operator '{Id}'");

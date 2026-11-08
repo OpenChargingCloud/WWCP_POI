@@ -124,6 +124,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  HotlinePhoneNumber    = "hotline";
 
             /// <summary>
+            /// The property of the URL of its web payment page - not the URL in its dynamic QR code, see
+            /// ChargingStationOperator.WebPaymentURL.
+            /// </summary>
+            public const String  WebPaymentURL         = "webPaymentURL";
+
+            /// <summary>
             /// The property of the identification of its manufacturer.
             /// </summary>
             public const String  ManufacturerId        = "manufacturerId";
@@ -282,6 +288,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The hotline phone number.
         /// </summary>
         public PhoneNumber?                                    HotlinePhoneNumber            { get; }
+
+        /// <summary>
+        /// The optional URL of the web payment page of its operator for it: where an EV driver pays for a charging session
+        /// ad hoc and starts it, before that of its charging pool and of its operator. Not the URL in its dynamic QR code,
+        /// which is of one EVSE and changes every few minutes, see ChargingStationOperator.WebPaymentURL.
+        /// </summary>
+        public URL?                                            WebPaymentURL                 { get; }
 
         /// <summary>
         /// The manufacturer, one of its roaming network.
@@ -467,7 +480,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                DateTimeOffset?                               LastChange                   = null,
 
                                CustomDataNew?                                CustomData                   = null,
-                               UserDefinedDictionary?                        InternalData                 = null)
+                               UserDefinedDictionary?                        InternalData                 = null,
+
+                               URL?                                          WebPaymentURL                = null)
 
             : base(Id,
                    Name,
@@ -517,6 +532,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.Address                     = Address;
             this.GeoLocation                 = GeoLocation;
             this.HotlinePhoneNumber          = HotlinePhoneNumber;
+            this.WebPaymentURL               = WebPaymentURL;
             this.ManufacturerId              = ManufacturerId;
             this.ModelId                     = ModelId;
             this.ModelURL                    = ModelURL;
@@ -829,6 +845,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (HotlinePhoneNumber.HasValue)
                 json.Add(PropertyKeys.HotlinePhoneNumber,   HotlinePhoneNumber.Value.ToString());
 
+            if (WebPaymentURL.HasValue)
+                json.Add(PropertyKeys.WebPaymentURL,        WebPaymentURL.Value.ToString());
+
             if (ManufacturerId.HasValue)
                 json.Add(PropertyKeys.ManufacturerId,       ManufacturerId.Value.ToString());
 
@@ -955,6 +974,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseAddress    (JSON, PropertyKeys.Address,            "address",                       out var address,            out ErrorResponse) ||
                     !POIJSON.TryParseGeoLocation(JSON, PropertyKeys.GeoLocation,        "geo location",                  out var geoLocation,        out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.HotlinePhoneNumber, "hotline phone number",          PhoneNumber.TryParse,       out PhoneNumber? hotline,  out ErrorResponse) ||
+                    !POIJSON.TryParseText       (JSON, PropertyKeys.WebPaymentURL,      "web payment URL",               URL.        TryParse,       out URL?   webPaymentURL,  out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.ManufacturerId,     "manufacturer identification",   ChargingStationManufacturer_Id.TryParse, out ChargingStationManufacturer_Id? manufacturerId, out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.ModelId,            "model identification",          ChargingStationModel_Id.       TryParse, out ChargingStationModel_Id?        modelId,        out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.ModelURL,           "model URL",                     URL.                           TryParse, out URL?                            modelURL,       out ErrorResponse) ||
@@ -1060,7 +1080,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                       DataSource:  dataSource,
                                                       Created:     created,
                                                       LastChange:  lastChange,
-                                                      CustomData:  customData);
+                                                      CustomData:  customData,
+                                                      WebPaymentURL: webPaymentURL);
 
                 if (!TryCheckETagsOf(JSON, ChargingStation, out ErrorResponse))
                 {

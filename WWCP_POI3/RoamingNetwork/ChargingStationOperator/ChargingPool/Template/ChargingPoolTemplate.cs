@@ -128,6 +128,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  HotlinePhoneNumber        = ChargingPool.PropertyKeys.HotlinePhoneNumber;
 
             /// <summary>
+            /// The property of the URL of the web payment page of its members.
+            /// </summary>
+            public const String  WebPaymentURL             = ChargingPool.PropertyKeys.WebPaymentURL;
+
+            /// <summary>
             /// The property of the identification of the grid connection point of its members.
             /// </summary>
             public const String  GridConnectionPointId     = ChargingPool.PropertyKeys.GridConnectionPointId;
@@ -305,6 +310,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public PhoneNumber?                              HotlinePhoneNumber        { get; }
 
         /// <summary>
+        /// The URL of the web payment page of its members, unless they have their own - not the URL in the dynamic QR code
+        /// of a charging station, see ChargingStationOperator.WebPaymentURL.
+        /// </summary>
+        public URL?                                      WebPaymentURL             { get; }
+
+        /// <summary>
         /// Data licenses of its members, besides their own, ordered.
         /// </summary>
         public ImmutableArray<DataLicense>               DataLicenses              { get; }
@@ -477,7 +488,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  DateTimeOffset?                                  LastChange                   = null,
 
                                  CustomDataNew?                                   CustomData                   = null,
-                                 UserDefinedDictionary?                           InternalData                 = null)
+                                 UserDefinedDictionary?                           InternalData                 = null,
+
+                                 URL?                                             WebPaymentURL                = null)
 
             : base(Id,
                    Name,
@@ -504,6 +517,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.ParkingType               = ParkingType;
             this.Accessibility             = Accessibility;
             this.HotlinePhoneNumber        = HotlinePhoneNumber;
+            this.WebPaymentURL             = WebPaymentURL;
             this.DataLicenses              = [.. dataLicenses.Ordered()];
             this.GridConnectionPointId     = GridConnectionPointId;
             this.Brands                    = new (Brands, brand => brand.Id, "brand", $"the charging pool template '{Id}'");
@@ -593,6 +607,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (HotlinePhoneNumber.HasValue)
                 json.Add(PropertyKeys.HotlinePhoneNumber,                   HotlinePhoneNumber.Value.ToString());
+
+            if (WebPaymentURL.HasValue)
+                json.Add(PropertyKeys.WebPaymentURL,                        WebPaymentURL.Value.ToString());
 
             if (GridConnectionPointId.HasValue)
                 json.Add(PropertyKeys.GridConnectionPointId,     GridConnectionPointId.Value.ToString());
@@ -723,7 +740,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseGeoLocation(JSON, PropertyKeys.GeoLocation,         "geo location",               out var geoLocation,  out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.ParkingType,         "parking type",               POI.ParkingType.      TryParse, out ParkingType?        parkingType,    out ErrorResponse) ||
                     !POIJSON.TryParseText       (JSON, PropertyKeys.Accessibility,       "accessibility",              POI.AccessibilityType.TryParse, out AccessibilityType?  accessibility,  out ErrorResponse) ||
-                    !POIJSON.TryParseText       (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",       PhoneNumber.          TryParse, out PhoneNumber?        hotline,        out ErrorResponse))
+                    !POIJSON.TryParseText       (JSON, PropertyKeys.HotlinePhoneNumber,  "hotline phone number",       PhoneNumber.          TryParse, out PhoneNumber?        hotline,        out ErrorResponse) ||
+                    !POIJSON.TryParseText       (JSON, PropertyKeys.WebPaymentURL,       "web payment URL",            URL.                  TryParse, out URL?                webPaymentURL,  out ErrorResponse))
                 {
                     return false;
                 }
@@ -822,7 +840,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           DataSource:  dataSource,
                                                           Created:     created,
                                                           LastChange:  lastChange,
-                                                          CustomData:  customData);
+                                                          CustomData:  customData,
+                                                          WebPaymentURL: webPaymentURL);
 
                 ErrorResponse = null;
                 return true;

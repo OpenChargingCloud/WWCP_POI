@@ -54,6 +54,7 @@ The operator writes no `eTags`.
 | `homepage` | `Homepage` | `URL?` | update/remove | See [Contact](#contact). |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | See [Contact](#contact). |
 | `termsAndConditions` | `TermsAndConditionsURL` | `URL?` | update/remove | See [Contact](#contact). |
+| `webPaymentURL` | `WebPaymentURL` | `URL?` | update/remove | The URL of its web payment page - not that in the dynamic QR code of a charging station, see [Web payment page](#web-payment-page); signed by a key that may sign `payments`. |
 | `evTaler` | `EVTaler` | `EVTalerMerchant?` | update/remove | Its merchant at a GNU Taler merchant backend and the exchanges it accepts, see [EV Taler merchant](#ev-taler-merchant); signed by a key that may sign `payments`. |
 | `brands` | `Brands` | `POICollection<Brand_Id, Brand>` | update/remove | The [brands](Brand.md) it is a white-label solution for, its own, embedded completely; not those of its pools, stations or EVSEs. Changed as a whole or [brand by brand](Brand.md#change-sets). |
 | `signingKeys` | `SigningKeys` | `ImmutableArray<POIPublicKey>` | update | 1..n keys signing its change sets, see [Keys](#signing-and-identity-keys). |
@@ -231,7 +232,7 @@ Each key:
 | `key` | text | Canonical Base64 of the deterministic CBOR of the public COSE key; private parts are refused. |
 | `notBefore` | timestamp | Optional: valid from. |
 | `notAfter` | timestamp | Optional: valid until; not before `notBefore`. |
-| `usages` | array of texts | Optional, signing keys only: what it may sign, `infrastructure` (pools, stations, EVSEs, templates and groups), `tariffs` (tariffs, their templates and groups, offers), `priceStatements`, `payments` (its `evTaler` merchant and its settlement statements of EV Taler sessions) and `party` (its other own properties, rotating its signing keys); everything without. In their ordinal order; unknown ones are refused. |
+| `usages` | array of texts | Optional, signing keys only: what it may sign, `infrastructure` (pools, stations, EVSEs, templates and groups), `tariffs` (tariffs, their templates and groups, offers), `priceStatements`, `payments` (its `evTaler` merchant, the `webPaymentURL` of it, its pools, stations and their templates, and its settlement statements of EV Taler sessions) and `party` (its other own properties, rotating its signing keys); everything without. In their ordinal order; unknown ones are refused. |
 
 - Both arrays are in the ordinal order of the key identifications, a key at most once, and no key both a signing
   and an identity key. An array is written only when it is not empty.
@@ -333,6 +334,29 @@ set updates `dataLicenses` as a whole, or [element by element](README.md#element
 | `termsAndConditions` | `TermsAndConditionsURL` | `URL?` | The URL of its terms and conditions for charging. |
 
 All are JSON texts; a value that is no text or can not be parsed is refused.
+
+
+## Web payment page
+
+`webPaymentURL` (`WebPaymentURL`, `URL?`): the URL of the operator's web payment page - where an EV driver pays for
+a charging session ad hoc, without a contract with an e-mobility provider, and starts it. It is part of the static
+data, so an app finds it before the driver stands in front of a charging station, e.g. from a map. A
+[charging pool](ChargingPool.md) and a [charging station](ChargingStation.md) may have their own, and their
+[templates](ChargingPoolTemplate.md) may give one: for a charging station, its own comes first, then that of its pool,
+then the operator's. A JSON text; one that is no URL is refused.
+
+**Not to be confused with the URL in the dynamic QR code of a charging station.** That one - as OCPP 2.1's
+`WebPaymentsCtrlr` makes it from a URL template and a shared secret - is of one EVSE, carries a time-based one-time
+password and changes every few minutes: it shows that whoever reads it stands in front of that EVSE, and it is never
+part of these static data. `webPaymentURL` shows nothing of the kind; the page it leads to learns the EVSE some other
+way. Both may lead to the same page.
+
+What the page offers - paying, starting a session, its live link, stopping it, disputing it - is the operator's;
+WWCP_POI says only where it is. Whoever changes it redirects payments, as with the [EV Taler merchant](#ev-taler-merchant):
+a change of it - of the operator, a pool, a station or their templates - is signed by a key that may sign `payments`,
+and adding a pool, a station or a template with one by a key that may sign both `infrastructure` and `payments`, a pool
+with a station that has one as well. A station moved to another template, or whose own is removed, takes the one of
+its template, pool or operator, signed so as well.
 
 
 ## Runtime status

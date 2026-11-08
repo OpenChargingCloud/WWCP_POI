@@ -1405,6 +1405,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             ChargingStationOperator.PropertyKeys.Homepage,
             ChargingStationOperator.PropertyKeys.HotlinePhoneNumber,
             ChargingStationOperator.PropertyKeys.TermsAndConditions,
+            ChargingStationOperator.PropertyKeys.WebPaymentURL,
             ChargingStationOperator.PropertyKeys.EVTaler,
             ChargingStationOperator.PropertyKeys.Brands,
             ChargingStationOperator.PropertyKeys.SigningKeys,

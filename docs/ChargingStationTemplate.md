@@ -53,6 +53,7 @@ The properties of a charging station it gives its members, each written and read
 | `address` | `Address` | unless they have their own |
 | `geoLocation` | `GeoLocation` | unless they have their own |
 | `hotline` | `HotlinePhoneNumber` | unless they have their own |
+| `webPaymentURL` | `WebPaymentURL` | unless they have their own; not the URL in the dynamic QR code, see [Web payment page](ChargingStationOperator.md#web-payment-page); signed by a key that may sign `payments` |
 | `manufacturerId` | `ManufacturerId` | unless they have their own; a manufacturer of the network |
 | `modelId` | `ModelId` | unless they have their own; a model of the manufacturer, named with it |
 | `modelURL` | `ModelURL` | unless they have their own |

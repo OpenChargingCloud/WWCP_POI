@@ -55,6 +55,7 @@ See [common properties](README.md#common-properties). A charging station does no
 | `address` | `Address` | `Address?` | update/remove | The address, only when it differs from the one of its pool. |
 | `geoLocation` | `GeoLocation` | `GeoCoordinate?` | update/remove | `{lat, lng, alt?}`, only when it differs from the one of its pool. |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | The hotline phone number, e.g. `"+49 3641 123456"`. |
+| `webPaymentURL` | `WebPaymentURL` | `URL?` | update/remove | The URL of the operator's web payment page for this station, before that of its pool and the operator's - not the URL in its dynamic QR code, see [Web payment page](ChargingStationOperator.md#web-payment-page); signed by a key that may sign `payments`. |
 | `manufacturerId` | `ManufacturerId` | `ChargingStationManufacturer_Id?` | update/remove | A [ChargingStationManufacturer](ChargingStationManufacturer.md) of the roaming network; see [Manufacturer and model](#manufacturer-and-model). |
 | `modelId` | `ModelId` | `ChargingStationModel_Id?` | update/remove | A model of its manufacturer, e.g. `"Wallbox-22"`; only with its `manufacturerId`, see [Manufacturer and model](#manufacturer-and-model). |
 | `modelURL` | `ModelURL` | `URL?` | update/remove | The homepage of its model, e.g. with its data sheet. |

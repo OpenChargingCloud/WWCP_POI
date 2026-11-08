@@ -120,6 +120,11 @@ parking product ids compare case-sensitively.
   brands whose cards it takes; SMS and PhoneCall need their `number`. Their accessibility, as the OCPI
   Accessibility Extension: `services` (e.g. `ACCESSIBLE_CHARGING`, `ASSISTANCE`) and `standards` (e.g.
   `PAS 1899:2022`), sets of names, and `assistanceServiceDetails`. The NUTS regions it is in: `nutsCodes`, e.g. `DEG`.
+- **Web payment page:** `webPaymentURL` of a charging station operator, a pool and a station (and of their templates):
+  where an EV driver pays ad hoc and starts, the station's own before its pool's before its operator's - not the URL
+  in the dynamic QR code of a station, which is of one EVSE and changes every few minutes; signed by a key that may
+  sign `payments`, as whoever changes it redirects payments
+  ([Web payment page](docs/ChargingStationOperator.md#web-payment-page)).
 - **Charging station:** `address` and `geoLocation` when they differ from its pool's, `accessibility`, `vehicleTypes`,
   `euVehicleCategories` (e.g. `M1`) and `features` (sets of names), `calibrationInfo`/`certificationInfo` (URLs), `maxPower` (W) it delivers at once, at most that of its EVSEs together,
   `manufacturerId`/`modelId`, a model of its manufacturer, its `hardwareRevision` and `firmwareVersion`, one of the

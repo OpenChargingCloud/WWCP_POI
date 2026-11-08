@@ -57,6 +57,7 @@ All optional; absent values and empty arrays are not written.
 | `parkingType` | `ParkingType` | `ParkingType?` | update/remove | The type of parking, e.g. `ALONG_MOTORWAY`, `PARKING_GARAGE`, `PARKING_LOT`, `ON_DRIVEWAY`, `ON_STREET`, `UNDERGROUND_GARAGE`, `OTHER`, `UNKNOWN`. |
 | `accessibility` | `Accessibility` | `AccessibilityType?` | update/remove | Who may use it, e.g. `FreePubliclyAccessible`, `RestrictedAccess`, `PayingPubliclyAccessible`, `TestStation`, `TestPool`, `Unspecified`. |
 | `hotline` | `HotlinePhoneNumber` | `PhoneNumber?` | update/remove | The telephone number of the hotline for this pool. |
+| `webPaymentURL` | `WebPaymentURL` | `URL?` | update/remove | The URL of the operator's web payment page for this pool, before the operator's own - not the URL in the dynamic QR code of one of its stations, see [Web payment page](ChargingStationOperator.md#web-payment-page); signed by a key that may sign `payments`. |
 | `gridConnectionPointId` | `GridConnectionPointId` | `GridConnectionPoint_Id?` | update/remove | Where it is connected to the public grid: a grid connection point of a grid operator of the network, see [Grid connection point](#grid-connection-point). |
 | `energyMeters` | `EnergyMeters` | `ImmutableArray<EnergyMeter>` | update/remove | Its own energy meters, see [Energy meters](#energy-meters). |
 | `chargingStations` | `ChargingStations` | `POICollection<ChargingStation_Id, ChargingStation>` | add/remove | Its [charging stations](#charging-stations). |
