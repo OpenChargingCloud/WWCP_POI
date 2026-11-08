@@ -136,10 +136,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (Price < 0)
-                return $"The price of a {Type} price component must not be negative!";
+                return $"The price of {POIJSON.WithArticle($"{Type} price component", false)} must not be negative!";
 
             if (VAT is < 0 or > 100)
-                return $"The VAT of a {Type} price component must be between 0 and 100 percent!";
+                return $"The VAT of {POIJSON.WithArticle($"{Type} price component", false)} must be between 0 and 100 percent!";
 
             if (Type == ChargingDimensionTypes.FLAT)
                 return StepSize.HasValue
@@ -148,7 +148,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             return StepSize is > 0
                        ? null
-                       : $"A {Type} price component needs a positive step size!";
+                       : $"{POIJSON.WithArticle($"{Type} price component")} needs a positive step size!";
 
         }
 

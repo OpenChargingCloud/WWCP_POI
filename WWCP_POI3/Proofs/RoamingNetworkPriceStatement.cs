@@ -278,7 +278,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("A price statement is one of a ChargingPool, a ChargingStation or an EVSE.", nameof(EntityType));
 
             if (OperatorOf(EntityType, EntityId) is not ChargingStationOperator_Id operatorId)
-                throw new ArgumentException($"Invalid identification of a {EntityType}.", nameof(EntityId));
+                throw new ArgumentException($"Invalid identification of {POIJSON.WithArticle(EntityType, false)}.", nameof(EntityId));
 
             if (operatorId != Signer)
                 throw new ArgumentException($"A price statement of the {EntityType} '{EntityId}' is signed by its operator '{operatorId}'.", nameof(Signer));
@@ -366,7 +366,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("Signing requires a private asymmetric key.", nameof(PrivateKey));
 
             if (OperatorOf(EntityType, EntityId) is not ChargingStationOperator_Id operatorId)
-                throw new ArgumentException($"Invalid identification of a {EntityType}.", nameof(EntityId));
+                throw new ArgumentException($"Invalid identification of {POIJSON.WithArticle(EntityType, false)}.", nameof(EntityId));
 
             var signedAt   = Truncated(SignedAt ?? Timestamp.Now);
 

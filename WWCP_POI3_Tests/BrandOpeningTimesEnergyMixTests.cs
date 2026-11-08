@@ -218,6 +218,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 ("brand twice",       Changed(network => ((JArray) Pool(network)["brands"]!).Add(Pool(network)["brands"]![0]!.DeepClone())),      "The brand 'fast-charge' of the charging pool 'DE*GEF*P1' must not be given twice"),
                 ("24/7 and openings", Changed(network => Pool(network)["openingTimes"]!["24/7"] = true),                                          "opening times"),
                 ("unknown weekday",   Changed(network => Pool(network)["openingTimes"]!["regularOpenings"]![0]!["moonday"] = new JArray()),      "opening times"),
+                ("end before begin",  Changed(network => Pool(network)["openingTimes"]!["regularOpenings"]![0] =
+                                                             new JObject(new JProperty("monday", new JArray(new JObject(new JProperty("begin", "20:00"), new JProperty("end", "08:00")))))),
+                                                                                                                                                  "Invalid opening times: The end period '08:00h' must be after the start period '20:00h'!"),
                 ("no supplier",       Changed(network => ((JObject) Pool(network)["energyMix"]!).Remove("supplierName")),                         "energy mix")
             };
 
@@ -227,6 +230,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 {
                     Assert.That(RoamingNetwork.TryParse(invalid, out _, out var errorResponse),  Is.False, name);
                     Assert.That(errorResponse,                                                   Does.Contain(error), name);
+                    Assert.That(errorResponse,                                                   Does.Not.Contain("Invalid opening times: Invalid opening times"), name);
                 }
             }
 

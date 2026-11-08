@@ -984,7 +984,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             {
 
                 case POIStatusUpdateResult.Refused:
-                    ErrorResponse = $"Invalid {POIStatusUpdate.KindText(Kind)} '{Value}' of a {EntityType}!";
+                    ErrorResponse = $"Invalid {POIStatusUpdate.KindText(Kind)} '{Value}' of {POIJSON.WithArticle(EntityType, false)}!";
                     break;
 
                 case POIStatusUpdateResult.Outdated:

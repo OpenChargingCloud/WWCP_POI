@@ -665,6 +665,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region WithArticle(NounPhrase, Capitalized = true)
+
+        /// <summary>
+        /// The given noun phrase with its indefinite article, as it is spoken before its first letter: "An EVSE group",
+        /// "An e-mobility provider", "An ENERGY price component", "A public key", "A user interface feature". A, E, I and O
+        /// take "an", every other letter "a". WWCP_POI.TS says it alike.
+        /// </summary>
+        /// <param name="NounPhrase">A noun phrase, e.g. "EVSE group of the charging tariff offer 'O1'".</param>
+        /// <param name="Capitalized">Whether it starts a sentence: "An", else "an".</param>
+        internal static String WithArticle(String   NounPhrase,
+                                           Boolean  Capitalized   = true)
+        {
+
+            var an = NounPhrase.Length > 0 && "aeioAEIO".Contains(NounPhrase[0]);
+
+            return (an
+                        ? Capitalized ? "An " : "an "
+                        : Capitalized ? "A "  : "a ") + NounPhrase;
+
+        }
+
+        #endregion
+
+        #region NumberText(Value)
+
+        /// <summary>
+        /// A number, to say it in an error response, as WWCP_POI.TS says it: in no culture of this machine, without
+        /// trailing zeros, e.g. "22000.5", not "22000,5" on a German one, nor "22000.50".
+        /// </summary>
+        internal static String NumberText(Decimal Value)
+        {
+
+            var text = Value.ToString("0.############################", CultureInfo.InvariantCulture);
+
+            return text == "-0" ? "0" : text;
+
+        }
+
+        #endregion
+
         #region ContentText(Value)
 
         /// <summary>
@@ -1275,10 +1315,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var values = (Values ?? []).ToArray();
 
             if (values.Any(value => value is null))
-                throw new ArgumentException($"An {Description} must not be null!");
+                throw new ArgumentException($"{WithArticle(Description)} must not be null!");
 
             if (values.Select(Key).Distinct(StringComparer.Ordinal).Count() != values.Length)
-                throw new ArgumentException($"An {Description} must not be given twice!");
+                throw new ArgumentException($"{WithArticle(Description)} must not be given twice!");
 
             return [.. values];
 
@@ -1398,7 +1438,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var ids = (Ids ?? []).ToArray();
 
             if (ids.Distinct().Count() != ids.Length)
-                throw new ArgumentException($"A {Description} must not be given twice!");
+                throw new ArgumentException($"{WithArticle(Description)} must not be given twice!");
 
             return [.. ids.OrderBy(id => id.ToString(), StringComparer.Ordinal)];
 
@@ -1420,7 +1460,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var ids = (Ids ?? []).ToArray();
 
             if (ids.Distinct().Count() != ids.Length)
-                throw new ArgumentException($"A {Description} must not be given twice!");
+                throw new ArgumentException($"{WithArticle(Description)} must not be given twice!");
 
             return [.. ids];
 

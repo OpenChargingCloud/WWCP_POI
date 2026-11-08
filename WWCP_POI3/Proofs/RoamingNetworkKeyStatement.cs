@@ -226,7 +226,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                           IEnumerable<RoamingNetworkKeyStatementSignature>  Signatures)
         {
 
-            this.IdentityKeys  = POIPublicKey.Ordered(IdentityKeys, "the identity keys of a key statement");
+            this.IdentityKeys  = POIPublicKey.Ordered(IdentityKeys, "identity key of a key statement");
             this.Signatures    = [ .. Signatures ?? [] ];
 
             if (this.IdentityKeys.IsEmpty)

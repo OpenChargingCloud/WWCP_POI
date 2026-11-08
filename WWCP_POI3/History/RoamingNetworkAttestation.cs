@@ -332,7 +332,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 throw new ArgumentException("An attestation is not valid until before it was signed.", nameof(ValidUntil));
 
             if (ValidUntil - SignedAt > MaxValidity)
-                throw new ArgumentException($"An attestation is valid for {MaxValidity.TotalHours} hours at most.", nameof(ValidUntil));
+                throw new ArgumentException($"An attestation is valid for {MaxValidity.TotalHours.ToString(CultureInfo.InvariantCulture)} hours at most.", nameof(ValidUntil));
 
             this.RoamingNetworkId  = RoamingNetworkId;
             this.CommitId          = CommitId;

@@ -854,7 +854,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (Change.ParentEntityType is not null &&
                        (Change.ParentEntityType != nameof(ChargingStationOperator) || StoredId(Operator, Change.ParentEntityType, Change.ParentEntityId) is null))
                     {
-                        ErrorResponse = $"a {Describe(Change.EntityType)} '{Change.EntityId}' belongs to ChargingStationOperator '{Operator.Id}', not to {Change.ParentEntityType} '{Change.ParentEntityId}'!";
+                        ErrorResponse = $"{POIJSON.WithArticle(Describe(Change.EntityType))} '{Change.EntityId}' belongs to ChargingStationOperator '{Operator.Id}', not to {Change.ParentEntityType} '{Change.ParentEntityId}'!";
                         return false;
                     }
 

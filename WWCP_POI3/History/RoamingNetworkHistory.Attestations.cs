@@ -71,7 +71,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             get => attestationValidity;
             set => attestationValidity = value > TimeSpan.Zero && value <= RoamingNetworkAttestation.MaxValidity
                                              ? value
-                                             : throw new ArgumentOutOfRangeException(nameof(AttestationValidity), value, $"An attestation is valid for some time, {RoamingNetworkAttestation.MaxValidity.TotalHours} hours at most.");
+                                             : throw new ArgumentOutOfRangeException(nameof(AttestationValidity), value, $"An attestation is valid for some time, {RoamingNetworkAttestation.MaxValidity.TotalHours.ToString(System.Globalization.CultureInfo.InvariantCulture)} hours at most.");
         }
 
         /// <summary>

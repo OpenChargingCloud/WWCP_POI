@@ -509,7 +509,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 var evsesMaxPower = evses.Sum(evse => evse.MaxPower!.Value.Value);
 
                 if (MaxPower.Value.Value > evsesMaxPower)
-                    throw new ArgumentException($"The maximum power of the charging station '{Id}', {MaxPower.Value.Value} W, must not exceed the {evsesMaxPower} W of all its EVSEs together!", nameof(MaxPower));
+                    throw new ArgumentException($"The maximum power of the charging station '{Id}', {POIJSON.NumberText(MaxPower.Value.Value)} W, must not exceed the {POIJSON.NumberText(evsesMaxPower)} W of all its EVSEs together!", nameof(MaxPower));
 
             }
 

@@ -359,7 +359,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (RoamingNetworkPriceStatement.OperatorOf(EntityType, EntityId) is not ChargingStationOperator_Id operatorId)
             {
-                ErrorResponse = $"Invalid identification of a {EntityType}: only charging pools, charging stations and EVSEs have a price status!";
+                ErrorResponse = $"Invalid identification of {POIJSON.WithArticle(EntityType, false)}: only charging pools, charging stations and EVSEs have a price status!";
                 return false;
             }
 

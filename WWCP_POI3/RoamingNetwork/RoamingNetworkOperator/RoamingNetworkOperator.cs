@@ -715,7 +715,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #region Parse Description        [optional]
 
                 if (JSON.ParseOptionalJSON(BasePropertyKeys.Description,
-                                           "network description",
+                                           "roaming network operator description",
                                            I18NString.TryParse,
                                            out I18NString? description,
                                            out ErrorResponse))

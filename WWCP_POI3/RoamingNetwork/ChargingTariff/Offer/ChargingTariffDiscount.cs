@@ -101,7 +101,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (Percent <= 0 || Percent > 100)
-                throw new ArgumentException($"The percentage of a discount must be above 0 and at most 100, not {Percent}!", nameof(Percent));
+                throw new ArgumentException($"The percentage of a discount must be above 0 and at most 100, not {POIJSON.NumberText(Percent)}!", nameof(Percent));
 
             var dimensions = (Dimensions ?? []).ToArray();
 

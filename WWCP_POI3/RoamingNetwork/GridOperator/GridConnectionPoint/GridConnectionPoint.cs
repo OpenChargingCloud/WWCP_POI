@@ -323,7 +323,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (MaintainedBy.HasValue && !MaintainerTypes.Contains(MaintainedBy.Value.EntityType))
-                throw new ArgumentException($"The grid connection point '{Id}' can only be maintained by its grid operator, a charging station operator or a parking operator, not by {MaintainedBy}!");
+                throw new ArgumentException($"Besides its grid operator, the grid connection point '{Id}' can only be maintained by a charging station operator or a parking operator, not by {MaintainedBy}!");
 
             if (NominalVoltage?.Value <= 0 || NominalFrequency?.Value <= 0)
                 throw new ArgumentException($"The nominal voltage and frequency of the grid connection point '{Id}' must be positive!");

@@ -80,7 +80,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         {
 
             if (From < 0 || To <= From)
-                throw new ArgumentException($"A step covers from {From} to {To}: from not negative and less than to!");
+                throw new ArgumentException($"A step covers from {EVTalerAmounts.WriteDecimal(From)} to {EVTalerAmounts.WriteDecimal(To)}: from not negative and less than to!");
 
             if (Unit is not KWh and not Minutes)
                 throw new ArgumentException($"A step covers kWh or minutes, not '{Unit}'!", nameof(Unit));
