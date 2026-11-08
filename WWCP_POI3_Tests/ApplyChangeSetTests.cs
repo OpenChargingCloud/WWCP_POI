@@ -553,6 +553,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
                 Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray(OwnLicense.ToPOIJSON(), OwnLicense.ToPOIJSON())) ]),
                             Throws.ArgumentException.With.Message.Contains("'own-1.0' must not be given twice"));
 
+                // Data license identifications compare without case, and so are found twice (Hermod's DataLicense_Id).
+                var ownLicenseUpper = new DataLicense(DataLicense_Id.Parse("OWN-1.0"), I18NString.Create(Languages.en, "Our own license"), URL.Parse("https://example.org/a"));
+
+                Assert.That(() => rn1.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(rn1, "dataLicenses", null, new JArray(OwnLicense.ToPOIJSON(), ownLicenseUpper.ToPOIJSON())) ]),
+                            Throws.ArgumentException.With.Message.Contains("'OWN-1.0' must not be given twice"));
+
+                Assert.That(() => new ChargingStationOperator(ChargingStationOperator_Id.Parse("DE*GEF"), I18NString.Create(Languages.en, "GEF"), DataLicenses: [ OwnLicense, ownLicenseUpper ]),
+                            Throws.ArgumentException.With.Message.Contains("A data license must not be given twice!"));
+
                 Assert.That(() => rn0.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(rn0, "dataLicenses") ]),
                             Throws.ArgumentException.With.Message.Contains("'dataLicenses' does not exist"));
 

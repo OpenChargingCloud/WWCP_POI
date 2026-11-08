@@ -695,6 +695,34 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private readonly System.Collections.Immutable.ImmutableDictionary<EnergyMeter_Id,     EnergyMeter>      energyMeterIndex;
 
         /// <summary>
+        /// The given values by their identifications, none given twice. Not ImmutableDictionary.CreateRange: it takes a key
+        /// given twice when both values are equal, and charging stations, EVSEs and energy meters are equal by their
+        /// identifications alone.
+        /// </summary>
+        private static System.Collections.Immutable.ImmutableDictionary<TId, TValue> UniqueIndex<TId, TValue>(IEnumerable<TValue>         Values,
+                                                                                                          Func<TValue, TId>           IdOf,
+                                                                                                          String                      Description,
+                                                                                                          ChargingStationOperator_Id  OperatorId)
+            where TId : notnull
+        {
+
+            var index = System.Collections.Immutable.ImmutableDictionary.CreateBuilder<TId, TValue>();
+
+            foreach (var value in Values)
+            {
+
+                var id = IdOf(value);
+
+                if (!index.TryAdd(id, value))
+                    throw new ArgumentException($"The {Description} '{id}' of the operator '{OperatorId}' must not be given twice!", nameof(ChargingPools));
+
+            }
+
+            return index.ToImmutable();
+
+        }
+
+        /// <summary>
         /// The EVSE templates, embedded completely, in the order of their identifications.
         /// </summary>
         public POICollection<EVSETemplate_Id, EVSETemplate>                        EVSETemplates             { get; } = POICollection<EVSETemplate_Id, EVSETemplate>.Empty;
@@ -1266,10 +1294,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var dataLicenses = (DataLicenses ?? []).ToArray();
 
             if (dataLicenses.Any(dataLicense => dataLicense is null))
-                throw new ArgumentException("Data licenses must not contain null entries.", nameof(DataLicenses));
+                throw new ArgumentException("Data licenses must not contain null entries!", nameof(DataLicenses));
 
             if (dataLicenses.Select(dataLicense => dataLicense.Id).Distinct().Count() != dataLicenses.Length)
-                throw new ArgumentException("A data license must not be given twice.", nameof(DataLicenses));
+                throw new ArgumentException("A data license must not be given twice!", nameof(DataLicenses));
 
             this.immutableDataLicenses  = [.. dataLicenses.Ordered()];
 
@@ -1286,24 +1314,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.ChargingPools = new (chargingPools, chargingPool => chargingPool.Id, "charging pool", $"the operator '{Id}'");
 
-            try
-            {
-                this.chargingStationIndex  = System.Collections.Immutable.ImmutableDictionary.CreateRange(this.ChargingStations.Select(chargingStation => new KeyValuePair<ChargingStation_Id, ChargingStation>(chargingStation.Id, chargingStation)));
-                this.evseIndex             = System.Collections.Immutable.ImmutableDictionary.CreateRange(this.EVSEs.           Select(evse            => new KeyValuePair<EVSE_Id,            EVSE>           (evse.Id,            evse)));
-            }
-            catch (ArgumentException)
-            {
-                throw new ArgumentException($"A charging station or EVSE of the operator '{Id}' must not be given twice!", nameof(ChargingPools));
-            }
-
-            try
-            {
-                this.energyMeterIndex      = System.Collections.Immutable.ImmutableDictionary.CreateRange(this.EnergyMeters.    Select(energyMeter     => new KeyValuePair<EnergyMeter_Id,     EnergyMeter>    (energyMeter.Id,     energyMeter)));
-            }
-            catch (ArgumentException)
-            {
-                throw new ArgumentException($"An energy meter of the operator '{Id}' must not be given twice!", nameof(ChargingPools));
-            }
+            // A charging station in two of its charging pools, or an EVSE in two of its charging stations, is refused:
+            // proofs, price statements and evidence name them by their identifications alone.
+            this.chargingStationIndex  = UniqueIndex(this.ChargingStations, chargingStation => chargingStation.Id, "charging station", Id);
+            this.evseIndex             = UniqueIndex(this.EVSEs,            evse            => evse.Id,            "EVSE",             Id);
+            this.energyMeterIndex      = UniqueIndex(this.EnergyMeters,     energyMeter     => energyMeter.Id,     "energy meter",     Id);
 
             #endregion
 

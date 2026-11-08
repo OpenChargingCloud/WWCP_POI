@@ -419,6 +419,74 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_station_an_EVSE_or_a_meter_is_given_once_per_operator()
+
+        /// <summary>
+        /// Proofs, price statements and evidence name a charging station, an EVSE or an energy meter by its identification
+        /// alone: one given twice within its operator, in two of its charging pools, charging stations or EVSEs, is refused,
+        /// though both are equal by their identifications.
+        /// </summary>
+        [Test]
+        public void A_station_an_EVSE_or_a_meter_is_given_once_per_operator()
+        {
+
+            static ChargingStation Station(String Id, params EVSE[] EVSEs)
+                => new (ChargingStation_Id.Parse(Id), EVSEs: EVSEs, Created: Created);
+
+            static ChargingPool Pool(String Id, params ChargingStation[] Stations)
+                => new (ChargingPool_Id.Parse(Id), I18NString.Create(Languages.en, Id), ChargingStations: Stations, Created: Created);
+
+            static ChargingStationOperator Operator(params ChargingPool[] Pools)
+                => new (GEF, I18NString.Create(Languages.en, "GraphDefined"), Created: Created, ChargingPools: Pools);
+
+            static EVSE Metered(String Id, String MeterId)
+                => new (EVSE_Id.Parse(Id), EnergyMeter: new EnergyMeter(EnergyMeter_Id.Parse(MeterId), Created: Created), Created: Created);
+
+            // The network of NewNetwork(), its station DE*GEF*S1 also in a second charging pool, or a second station with
+            // its EVSE DE*GEF*E1*1.
+            var json      = NewNetwork().ToJSON();
+            var pool      = (JObject) json["chargingStationOperators"]![0]!["chargingPools"]![0]!;
+            var station   = (JObject) pool["chargingStations"]![0]!;
+
+            var pool2     = (JObject) pool.DeepClone();
+            pool2["@id"]  = "DE*GEF*P2";
+            var twoPools  = (JObject) json.DeepClone();
+            ((JArray) twoPools["chargingStationOperators"]![0]!["chargingPools"]!).Add(pool2);
+
+            var station3  = (JObject) station.DeepClone();
+            station3["@id"]    = "DE*GEF*S3";
+            station3["EVSEs"]  = new JArray(station["EVSEs"]![0]!.DeepClone());
+            var twoStations    = (JObject) json.DeepClone();
+            ((JArray) twoStations["chargingStationOperators"]![0]!["chargingPools"]![0]!["chargingStations"]!).Add(station3);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(() => Operator(Pool("DE*GEF*P1", Station("DE*GEF*S1", NewEVSE(E1))),
+                                           Pool("DE*GEF*P2", Station("DE*GEF*S1", NewEVSE(E1)))),
+                            Throws.ArgumentException.With.Message.Contains("The charging station 'DE*GEF*S1' of the operator 'DE*GEF' must not be given twice!"));
+
+                Assert.That(() => Operator(Pool("DE*GEF*P1", Station("DE*GEF*S1", NewEVSE(E1)),
+                                                             Station("DE*GEF*S3", NewEVSE(E1)))),
+                            Throws.ArgumentException.With.Message.Contains("The EVSE 'DE*GEF*E1*1' of the operator 'DE*GEF' must not be given twice!"));
+
+                Assert.That(() => Operator(Pool("DE*GEF*P1", Station("DE*GEF*S1", Metered("DE*GEF*E1*1", "M1")),
+                                                             Station("DE*GEF*S3", Metered("DE*GEF*E3*1", "M1")))),
+                            Throws.ArgumentException.With.Message.Contains("The energy meter 'M1' of the operator 'DE*GEF' must not be given twice!"));
+
+                // Read, as written by someone else.
+                Assert.That(RoamingNetwork.TryParse(json,        out _, out var error0),  Is.True, error0);
+                Assert.That(RoamingNetwork.TryParse(twoPools,    out _, out var error1),  Is.False);
+                Assert.That(error1,  Does.Contain("The charging station 'DE*GEF*S1' of the operator 'DE*GEF' must not be given twice!"));
+                Assert.That(RoamingNetwork.TryParse(twoStations, out _, out var error2),  Is.False);
+                Assert.That(error2,  Does.Contain("The EVSE 'DE*GEF*E1*1' of the operator 'DE*GEF' must not be given twice!"));
+
+            }
+
+        }
+
+        #endregion
+
         #region Entities_are_found_in_every_spelling_of_their_identification()
 
         /// <summary>
