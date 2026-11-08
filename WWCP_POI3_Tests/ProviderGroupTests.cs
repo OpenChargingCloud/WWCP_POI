@@ -223,7 +223,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 // A group gives nothing.
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(gdf2.EVSEGroups.Single(), "maxPower", null, 22000)),
-                            Throws.ArgumentException.With.Message.Contains("the property 'maxPower' of a EVSE group can not be changed"));
+                            Throws.ArgumentException.With.Message.Contains("the property 'maxPower' of an EVSE group can not be changed"));
 
                 // Only the provider signs a change of its groups, not the operator of its members.
                 var change = rn2.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(gdf2.EVSEGroups.Single(), "EVSEIds", null, new JArray(E1.ToString())) ], CreatedAt: T0.AddMinutes(1));

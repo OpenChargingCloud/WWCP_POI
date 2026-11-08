@@ -217,7 +217,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 // A group gives its members nothing: a change set can not give it a property of them.
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.UpdateProperty(changedEG1, "maxPower", null, 22000)),
-                            Throws.ArgumentException.With.Message.Contains("the property 'maxPower' of a EVSE group can not be changed"));
+                            Throws.ArgumentException.With.Message.Contains("the property 'maxPower' of an EVSE group can not be changed"));
+
+                // A group belongs to its operator, and is refused in the words of its siblings, after "Change 1: ".
+                Assert.That(() => Apply(rn2, RoamingNetworkChange.Add(nameof(EVSEGroup), "DE*GEF*EG9", new JObject(new JProperty("@id", "DE*GEF*EG9")), nameof(ChargingPool), P1.ToString())),
+                            Throws.ArgumentException.With.Message.Contains(": an EVSE group 'DE*GEF*EG9' belongs to ChargingStationOperator 'DE*GEF', not to ChargingPool 'DE*GEF*P1'!"));
 
                 // A member of a group can not be removed, nor a tariff of a tariff group.
                 Assert.That(() => Apply(rn2, RoamingNetworkChange.Remove(E1)),

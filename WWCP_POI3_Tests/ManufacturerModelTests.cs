@@ -277,7 +277,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(error2,                                                                                       Does.Contain("needs a signature by a signing key of the ChargingStationManufacturer 'ACME'"));
 
                 Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, meters, addModel),  out _, out var error3),              Is.False, "a model of another manufacturer");
-                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, meters, addMeter),  out _, out var error4),              Is.True,  error4);
+                Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, meters, addMeter),  out var withMeter, out var error4),  Is.True,  error4);
+                Assert.That(ErrorOf(withMeter!, meters, RoamingNetworkChange.UpdateProperty(new EnergyMeterModel(EnergyMeterModel_Id.Parse("M-300")), METERS, "manufacturerId", null, "ACME")),
+                                                                                                                          Does.Contain("the property 'manufacturerId' of an energy meter model can not be changed!"));
 
                 // Its own properties it changes itself; the roaming network operator adds and removes it.
                 Assert.That(rn1.TryApplyChangeSet(SignedBy(rn1, acme,   RoamingNetworkChange.UpdateProperty(rn1.ChargingStationManufacturers.Single(), "homepage", null, "https://acme.example")),

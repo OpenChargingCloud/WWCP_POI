@@ -213,7 +213,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (!ChangeableGroupProperties[Change.EntityType].Contains(propertyName))
                     {
-                        ErrorResponse = $"Change {Index}: the property '{propertyName}' of a {description} can not be changed!";
+                        ErrorResponse = $"Change {Index}: the property '{propertyName}' of {POIJSON.WithArticle(description, false)} can not be changed!";
                         return false;
                     }
 
@@ -281,7 +281,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #endregion
 
                 default:
-                    ErrorResponse = $"Change {Index}: {Change.Kind} of a {description} is not supported yet!";
+                    ErrorResponse = $"Change {Index}: {Change.Kind} of {POIJSON.WithArticle(description, false)} is not supported yet!";
                     return false;
 
             }

@@ -1403,7 +1403,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             TransparencySoftwareManufacturer  softwareManufacturer  => ListenTo(softwareManufacturer),
                                             ConformityAssessmentBody     conformityAssessmentBody  => ListenTo(conformityAssessmentBody),
                                             ChargingStationOperator      chargingStationOperator  => ListenTo(chargingStationOperator),
-                                            _                                                     => throw new InvalidOperationException($"No status events of a {entity.GetType().Name}!")
+                                            _                                                     => throw new InvalidOperationException($"No status events of {POIJSON.WithArticle(entity.GetType().Name, false)}!")
                                         };
 
                     newEntities.Add(entity);
