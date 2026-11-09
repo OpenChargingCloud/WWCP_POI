@@ -87,16 +87,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      String?  ElementId   = null)
         {
 
-            if (String.IsNullOrWhiteSpace(PropertyName))
-                throw new ArgumentException("A schema property name is required.", nameof(PropertyName));
-
-            if (ElementId is not null && String.IsNullOrWhiteSpace(ElementId))
-                throw new ArgumentException("An element identifier must not be empty.", nameof(ElementId));
+            if (Refusal(PropertyName, ElementId) is String refusal)
+                throw new ArgumentException(refusal);
 
             this.PropertyName  = PropertyName;
             this.ElementId     = ElementId;
 
         }
+
+        #endregion
+
+
+        #region (private static) Refusal(PropertyName, ElementId)
+
+        /// <summary>
+        /// Why the given parts make no element path segment, or null: the constructor throws it, TryParse returns it.
+        /// </summary>
+        private static String? Refusal(String?  PropertyName,
+                                       String?  ElementId)
+
+            => String.IsNullOrWhiteSpace(PropertyName)                         ? "a schema property name is required!"
+             : ElementId is not null && String.IsNullOrWhiteSpace(ElementId)   ? "an element identifier must not be empty!"
+             : null;
 
         #endregion
 
@@ -122,38 +134,40 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (JSON[PropertyKeys.Context] is JToken context &&
                     !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
                 {
-                    ErrorResponse = $"The JSON-LD context of the element path segment must be '{JSONLDContext}'!";
+                    ErrorResponse = $"the JSON-LD context of the element path segment must be '{JSONLDContext}'!";
                     return false;
                 }
 
                 #region Parse PropertyName    [mandatory]
 
-                if (!JSON.ParseMandatoryText(PropertyKeys.PropertyName,
-                                             "property name",
-                                             out var propertyName,
-                                             out ErrorResponse))
-                {
-                    return false;
-                }
+                // Trimmed, as ParseMandatoryText reads it; missing or anything but a text as empty.
+                var propertyName = JSON[PropertyKeys.PropertyName] is JToken { Type: JTokenType.String } propertyNameJSON
+                                       ? propertyNameJSON.Value<String>()!.Trim()
+                                       : null;
 
                 #endregion
 
                 #region Parse ElementId       [optional]
 
-                if (JSON.ParseOptional(PropertyKeys.ElementId,
-                                       "element identification",
-                                       out String? elementId,
-                                       out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
+                // As given; anything but a text, also JSON null, as empty.
+                String? elementId = null;
+
+                if (JSON.TryGetValue(PropertyKeys.ElementId, out var elementIdJSON))
+                    elementId = elementIdJSON.Type == JTokenType.String
+                                    ? elementIdJSON.Value<String>()
+                                    : "";
 
                 #endregion
 
 
+                if (Refusal(propertyName, elementId) is String refusal)
+                {
+                    ErrorResponse = refusal;
+                    return false;
+                }
+
                 POIElementPathSegment = new POIElementPathSegment(
-                                            propertyName,
+                                            propertyName!,
                                             elementId
                                         );
 

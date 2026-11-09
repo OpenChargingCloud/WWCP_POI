@@ -211,70 +211,111 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!Enum.IsDefined(Kind))
                 throw new ArgumentOutOfRangeException(nameof(Kind));
 
-            this.EntityType  = Required(EntityType, nameof(EntityType));
-            this.EntityId    = Required(EntityId,   nameof(EntityId));
+            if (Refusal(Kind, EntityType, EntityId, PropertyName, OldValue, NewValue, ParentEntityType, ParentEntityId, ElementPath) is String refusal)
+                throw new ArgumentException(refusal);
 
-            if ((ParentEntityType is null) != (ParentEntityId is null))
-                throw new ArgumentException("Parent type and parent identifier must be supplied together.");
-
-            this.ParentEntityType  = ParentEntityType is null ? null : Required(ParentEntityType, nameof(ParentEntityType));
-            this.ParentEntityId    = ParentEntityId   is null ? null : Required(ParentEntityId,   nameof(ParentEntityId));
-
-            if (OldValue?.Type is JTokenType.Undefined ||
-                NewValue?.Type is JTokenType.Null or JTokenType.Undefined)
-            {
-                throw new ArgumentException("A new JSON value must not be null or undefined; a property is cleared by RemoveProperty.");
-            }
-
-            var elementOperation = Kind is RoamingNetworkChangeKind.AddElement            or
-                                           RoamingNetworkChangeKind.RemoveElement         or
-                                           RoamingNetworkChangeKind.ReplaceElement        or
-                                           RoamingNetworkChangeKind.UpdateElementProperty or
-                                           RoamingNetworkChangeKind.RemoveElementProperty;
-
-            if (elementOperation && (ElementPath.IsDefaultOrEmpty || ElementPath.Any(segment => segment is null)))
-                throw new ArgumentException("Element operations require a nonempty path without null segments.", nameof(ElementPath));
-
-            if (!elementOperation && !ElementPath.IsDefaultOrEmpty)
-                throw new ArgumentException("Only element operations may contain an element path.", nameof(ElementPath));
-
-            switch (Kind)
-            {
-
-                case RoamingNetworkChangeKind.Add when NewValue is not JObject || OldValue is not null || PropertyName is not null:
-                    throw new ArgumentException("Add requires an entity object and no old value or property name.");
-
-                case RoamingNetworkChangeKind.Remove when NewValue is not null || PropertyName is not null:
-                    throw new ArgumentException("Remove must not contain a new value or property name.");
-
-                case RoamingNetworkChangeKind.UpdateProperty when NewValue is null || String.IsNullOrWhiteSpace(PropertyName):
-                    throw new ArgumentException("UpdateProperty requires a property name and a new JSON value.");
-
-                case RoamingNetworkChangeKind.AddElement when NewValue is null || OldValue is not null || PropertyName is not null:
-                    throw new ArgumentException("AddElement requires a new value and no old value or property name.");
-
-                case RoamingNetworkChangeKind.RemoveElement when NewValue is not null || PropertyName is not null:
-                    throw new ArgumentException("RemoveElement must not contain a new value or property name.");
-
-                case RoamingNetworkChangeKind.ReplaceElement when NewValue is null || PropertyName is not null:
-                    throw new ArgumentException("ReplaceElement requires a new value and no property name.");
-
-                case RoamingNetworkChangeKind.UpdateElementProperty when NewValue is null || String.IsNullOrWhiteSpace(PropertyName):
-                    throw new ArgumentException("UpdateElementProperty requires a property name and a new value.");
-
-                case RoamingNetworkChangeKind.RemoveProperty or RoamingNetworkChangeKind.RemoveElementProperty
-                    when NewValue is not null || String.IsNullOrWhiteSpace(PropertyName):
-                    throw new ArgumentException("Property removal requires a property name and no new value.");
-
-            }
-
-            this.Kind          = Kind;
-            this.PropertyName  = PropertyName;
-            this.oldValue      = OldValue?.DeepClone();
-            this.newValue      = NewValue?.DeepClone();
-            this.ElementPath   = elementOperation ? ElementPath : [];
+            this.Kind              = Kind;
+            this.EntityType        = EntityType;
+            this.EntityId          = EntityId;
+            this.PropertyName      = PropertyName;
+            this.oldValue          = OldValue?.DeepClone();
+            this.newValue          = NewValue?.DeepClone();
+            this.ParentEntityType  = ParentEntityType;
+            this.ParentEntityId    = ParentEntityId;
+            this.ElementPath       = IsElementOperation(Kind) ? ElementPath : [];
 
         }
+
+        #endregion
+
+
+        #region (private static) Refusal(Kind, EntityType, EntityId, PropertyName, OldValue, NewValue, ParentEntityType, ParentEntityId, ElementPath)
+
+        /// <summary>
+        /// Why the given parts make no change, or null: the constructor throws it, TryParse returns it, so that a change
+        /// read is refused in the words a change set says after "Change N: ", not in those of an ArgumentException.
+        /// </summary>
+        private static String? Refusal(RoamingNetworkChangeKind               Kind,
+                                       String?                                EntityType,
+                                       String?                                EntityId,
+                                       String?                                PropertyName,
+                                       JToken?                                OldValue,
+                                       JToken?                                NewValue,
+                                       String?                                ParentEntityType,
+                                       String?                                ParentEntityId,
+                                       ImmutableArray<POIElementPathSegment>  ElementPath)
+        {
+
+            if (String.IsNullOrWhiteSpace(EntityType) || String.IsNullOrWhiteSpace(EntityId))
+                return "its entity type and identification must not be empty!";
+
+            if ((ParentEntityType is null) != (ParentEntityId is null))
+                return "parent type and parent identifier must be supplied together!";
+
+            if (ParentEntityType is not null && (String.IsNullOrWhiteSpace(ParentEntityType) || String.IsNullOrWhiteSpace(ParentEntityId)))
+                return "its parent entity type and identification must not be empty!";
+
+            if (OldValue?.Type is JTokenType.Undefined)
+                return "an old JSON value must not be undefined!";
+
+            if (NewValue?.Type is JTokenType.Null or JTokenType.Undefined)
+                return "a new JSON value must not be null; a property is cleared by RemoveProperty!";
+
+            var elementOperation = IsElementOperation(Kind);
+
+            if (elementOperation && ElementPath.IsDefaultOrEmpty)
+                return $"{Kind} requires a nonempty element path!";
+
+            if (elementOperation && ElementPath.Any(segment => segment is null))
+                return $"{Kind} requires an element path without null segments!";
+
+            if (!elementOperation && !ElementPath.IsDefaultOrEmpty)
+                return "only element changes may contain an element path!";
+
+            return Kind switch {
+
+                RoamingNetworkChangeKind.Add                    when NewValue is not JObject || OldValue is not null || PropertyName is not null
+                    => "Add requires an entity object and no old value or property name!",
+
+                RoamingNetworkChangeKind.Remove                 when NewValue is not null || PropertyName is not null
+                    => "Remove must not contain a new value or property name!",
+
+                RoamingNetworkChangeKind.UpdateProperty         when NewValue is null || String.IsNullOrWhiteSpace(PropertyName)
+                    => "UpdateProperty requires a property name and a new JSON value!",
+
+                RoamingNetworkChangeKind.AddElement             when NewValue is null || OldValue is not null || PropertyName is not null
+                    => "AddElement requires a new value and no old value or property name!",
+
+                RoamingNetworkChangeKind.RemoveElement          when NewValue is not null || PropertyName is not null
+                    => "RemoveElement must not contain a new value or property name!",
+
+                RoamingNetworkChangeKind.ReplaceElement         when NewValue is null || PropertyName is not null
+                    => "ReplaceElement requires a new value and no property name!",
+
+                RoamingNetworkChangeKind.UpdateElementProperty  when NewValue is null || String.IsNullOrWhiteSpace(PropertyName)
+                    => "UpdateElementProperty requires a property name and a new value!",
+
+                RoamingNetworkChangeKind.RemoveProperty or
+                RoamingNetworkChangeKind.RemoveElementProperty  when NewValue is not null || String.IsNullOrWhiteSpace(PropertyName)
+                    => "property removal requires a property name and no new value!",
+
+                _   => null
+
+            };
+
+        }
+
+        #endregion
+
+        #region (private static) IsElementOperation(Kind)
+
+        private static Boolean IsElementOperation(RoamingNetworkChangeKind Kind)
+
+            => Kind is RoamingNetworkChangeKind.AddElement            or
+                       RoamingNetworkChangeKind.RemoveElement         or
+                       RoamingNetworkChangeKind.ReplaceElement        or
+                       RoamingNetworkChangeKind.UpdateElementProperty or
+                       RoamingNetworkChangeKind.RemoveElementProperty;
 
         #endregion
 
@@ -2358,89 +2399,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (JSON[PropertyKeys.Context] is JToken context &&
                     !(context.Type == JTokenType.String && context.Value<String>() == JSONLDContext))
                 {
-                    ErrorResponse = $"The JSON-LD context of the roaming network change must be '{JSONLDContext}'!";
+                    ErrorResponse = $"the JSON-LD context of the roaming network change must be '{JSONLDContext}'!";
                     return false;
                 }
 
                 #region Parse Kind                [mandatory]
 
-                if (!JSON.ParseMandatoryText(PropertyKeys.Kind,
-                                             "change kind",
-                                             out var kindText,
-                                             out ErrorResponse))
-                {
+                if (!TryParseText(JSON, PropertyKeys.Kind,             "kind",                         Mandatory: true,  out var kindText,         out ErrorResponse))
                     return false;
-                }
 
                 if (!Enum.TryParse<RoamingNetworkChangeKind>(kindText, ignoreCase: false, out var kind) ||
                     !Enum.IsDefined(kind)                                                              ||
                     kind.ToString() != kindText)
                 {
-                    ErrorResponse = $"Unknown change kind '{kindText}'!";
+                    ErrorResponse = $"unknown kind '{kindText}'!";
                     return false;
                 }
 
                 #endregion
 
-                #region Parse EntityType          [mandatory]
+                #region Parse EntityType, EntityId [mandatory]
 
-                if (!JSON.ParseMandatoryText(PropertyKeys.EntityType,
-                                             "entity type",
-                                             out var entityType,
-                                             out ErrorResponse))
-                {
-                    return false;
-                }
-
-                #endregion
-
-                #region Parse EntityId            [mandatory]
-
-                if (!JSON.ParseMandatoryText(PropertyKeys.EntityId,
-                                             "entity identification",
-                                             out var entityId,
-                                             out ErrorResponse))
+                if (!TryParseText(JSON, PropertyKeys.EntityType,       "entity type",                  Mandatory: true,  out var entityType,       out ErrorResponse) ||
+                    !TryParseText(JSON, PropertyKeys.EntityId,         "entity identification",        Mandatory: true,  out var entityId,         out ErrorResponse))
                 {
                     return false;
                 }
 
                 #endregion
 
-                #region Parse PropertyName        [optional]
+                #region Parse PropertyName, ParentEntityType, ParentEntityId [optional]
 
-                if (JSON.ParseOptional(PropertyKeys.PropertyName,
-                                       "property name",
-                                       out String? propertyName,
-                                       out ErrorResponse))
+                if (!TryParseText(JSON, PropertyKeys.PropertyName,     "property name",                Mandatory: false, out var propertyName,     out ErrorResponse) ||
+                    !TryParseText(JSON, PropertyKeys.ParentEntityType, "parent entity type",           Mandatory: false, out var parentEntityType, out ErrorResponse) ||
+                    !TryParseText(JSON, PropertyKeys.ParentEntityId,   "parent entity identification", Mandatory: false, out var parentEntityId,   out ErrorResponse))
                 {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
-
-                #endregion
-
-                #region Parse ParentEntityType    [optional]
-
-                if (JSON.ParseOptional(PropertyKeys.ParentEntityType,
-                                       "parent entity type",
-                                       out String? parentEntityType,
-                                       out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
-                }
-
-                #endregion
-
-                #region Parse ParentEntityId      [optional]
-
-                if (JSON.ParseOptional(PropertyKeys.ParentEntityId,
-                                       "parent entity identification",
-                                       out String? parentEntityId,
-                                       out ErrorResponse))
-                {
-                    if (ErrorResponse is not null)
-                        return false;
+                    return false;
                 }
 
                 #endregion
@@ -2454,7 +2448,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (elementPathJSON is not JArray elementPathArray)
                     {
-                        ErrorResponse = "The element path must be a JSON array!";
+                        ErrorResponse = "the element path must be a JSON array!";
                         return false;
                     }
 
@@ -2463,13 +2457,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         if (segmentJSON is not JObject segmentObject)
                         {
-                            ErrorResponse = "An element path segment must be a JSON object!";
+                            ErrorResponse = "an element path segment must be a JSON object!";
                             return false;
                         }
 
                         if (!POIElementPathSegment.TryParse(segmentObject, out var segment, out var segmentError))
                         {
-                            ErrorResponse = "Invalid element path segment: " + segmentError;
+                            ErrorResponse = "invalid element path segment: " + segmentError;
                             return false;
                         }
 
@@ -2489,10 +2483,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 #endregion
 
 
+                // What the constructor would refuse, in the same words, not in those of its ArgumentException.
+                if (Refusal(kind, entityType, entityId, propertyName, oldValue, newValue, parentEntityType, parentEntityId, elementPath) is String refusal)
+                {
+                    ErrorResponse = refusal;
+                    return false;
+                }
+
                 RoamingNetworkChange = new RoamingNetworkChange(
                                            kind,
-                                           entityType,
-                                           entityId,
+                                           entityType!,
+                                           entityId!,
                                            propertyName,
                                            oldValue,
                                            newValue,
@@ -2665,14 +2666,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
-        #region (private static) Required(Value, ParameterName)
+        #region (private static) TryParseText(JSON, PropertyName, Description, Mandatory, out Text, out ErrorResponse)
 
-        private static String Required(String  Value,
-                                       String  ParameterName)
+        /// <summary>
+        /// Read a text of a change: a mandatory one trimmed, as ParseMandatoryText reads it, an optional one as given;
+        /// anything but a text refused, also JSON null.
+        /// </summary>
+        private static Boolean TryParseText(JObject      JSON,
+                                            String       PropertyName,
+                                            String       Description,
+                                            Boolean      Mandatory,
+                                            out String?  Text,
+                                            [NotNullWhen(false)] out String?  ErrorResponse)
+        {
 
-            => !String.IsNullOrWhiteSpace(Value)
-                   ? Value
-                   : throw new ArgumentException("Value must not be empty.", ParameterName);
+            Text           = null;
+            ErrorResponse  = null;
+
+            if (!JSON.TryGetValue(PropertyName, out var token))
+            {
+
+                if (!Mandatory)
+                    return true;
+
+                ErrorResponse = $"the {Description} must be a text!";
+                return false;
+
+            }
+
+            if (token.Type != JTokenType.String)
+            {
+                ErrorResponse = $"the {Description} must be a text!";
+                return false;
+            }
+
+            Text = Mandatory
+                       ? token.Value<String>()!.Trim()
+                       : token.Value<String>();
+
+            return true;
+
+        }
 
         #endregion
 

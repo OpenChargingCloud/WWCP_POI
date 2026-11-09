@@ -798,7 +798,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     if (!RoamingNetworkChange.TryParse(changeObject, out var change, out var changeError))
                     {
-                        ErrorResponse = $"Invalid change {changes.Count}: {changeError}";
+                        ErrorResponse = $"Change {changes.Count}: {changeError}";
                         return false;
                     }
 

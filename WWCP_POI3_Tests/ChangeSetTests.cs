@@ -154,6 +154,74 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
 
         #endregion
 
+        #region A_change_is_refused_in_the_words_of_its_refusal(JSON, Refusal)
+
+        [TestCase("""{ "kind": 42, "entityType": "RoamingNetwork", "entityId": "rn1" }""",
+                  "the kind must be a text!",                                                         Description = "A kind not given as a text")]
+        [TestCase("""{ "kind": "UpdateProperty", "entityType": "RoamingNetwork", "propertyName": "dataSource", "newValue": "x" }""",
+                  "the entity identification must be a text!",                                        Description = "No entity identification")]
+        [TestCase("""{ "kind": "UpdateProperty", "entityType": "RoamingNetwork", "entityId": "  ", "propertyName": "dataSource", "newValue": "x" }""",
+                  "its entity type and identification must not be empty!",                            Description = "A blank entity identification")]
+        [TestCase("""{ "kind": "UpdateProperty", "entityType": "RoamingNetwork", "entityId": "rn1", "propertyName": 1, "newValue": "x" }""",
+                  "the property name must be a text!",                                                Description = "A property name not given as a text")]
+        [TestCase("""{ "kind": "Add", "entityType": "ChargingPool", "entityId": "DE*GEF*P1", "parentEntityType": "ChargingStationOperator", "newValue": {} }""",
+                  "parent type and parent identifier must be supplied together!",                     Description = "A parent type without its identification")]
+        [TestCase("""{ "kind": "Add", "entityType": "ChargingPool", "entityId": "DE*GEF*P1", "parentEntityType": "ChargingStationOperator", "parentEntityId": " ", "newValue": {} }""",
+                  "its parent entity type and identification must not be empty!",                     Description = "A blank parent identification")]
+        [TestCase("""{ "kind": "UpdateProperty", "entityType": "RoamingNetwork", "entityId": "rn1", "propertyName": "dataSource", "newValue": null }""",
+                  "a new JSON value must not be null; a property is cleared by RemoveProperty!",      Description = "A new value of JSON null")]
+        [TestCase("""{ "kind": "AddElement", "entityType": "ChargingStationOperator", "entityId": "DE*GEF", "newValue": {} }""",
+                  "AddElement requires a nonempty element path!",                                     Description = "An element change without an element path")]
+        [TestCase("""{ "kind": "UpdateProperty", "entityType": "RoamingNetwork", "entityId": "rn1", "propertyName": "dataSource", "newValue": "x", "elementPath": [ { "propertyName": "brands" } ] }""",
+                  "only element changes may contain an element path!",                                Description = "A property change with an element path")]
+        [TestCase("""{ "kind": "Remove", "entityType": "ChargingPool", "entityId": "DE*GEF*P1", "propertyName": "name" }""",
+                  "Remove must not contain a new value or property name!",                            Description = "A removal naming a property")]
+        [TestCase("""{ "kind": "RemoveElement", "entityType": "ChargingStationOperator", "entityId": "DE*GEF", "elementPath": [ { "propertyName": " " } ] }""",
+                  "invalid element path segment: a schema property name is required!",                Description = "A segment of a blank property name")]
+        [TestCase("""{ "kind": "RemoveElement", "entityType": "ChargingStationOperator", "entityId": "DE*GEF", "elementPath": [ { "propertyName": "brands", "elementId": " " } ] }""",
+                  "invalid element path segment: an element identifier must not be empty!",           Description = "A segment of a blank element identification")]
+        public void A_change_is_refused_in_the_words_of_its_refusal(String JSON,
+                                                                    String Refusal)
+        {
+
+            Assert.That(RoamingNetworkChange.TryParse(JObject.Parse(JSON), out _, out var error), Is.False);
+            Assert.That(error,                                                                     Is.EqualTo(Refusal));
+
+        }
+
+        #endregion
+
+        #region A_change_is_created_and_read_with_the_same_refusal()
+
+        [Test]
+        public void A_change_is_created_and_read_with_the_same_refusal()
+        {
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(() => new RoamingNetworkChange(RoamingNetworkChangeKind.UpdateProperty, "RoamingNetwork", " ", "dataSource", null, "x"),
+                            Throws.ArgumentException.With.Message.EqualTo("its entity type and identification must not be empty!"));
+
+                Assert.That(() => new RoamingNetworkChange(RoamingNetworkChangeKind.Add, "ChargingPool", "DE*GEF*P1", null, null, new JObject(), "ChargingStationOperator"),
+                            Throws.ArgumentException.With.Message.EqualTo("parent type and parent identifier must be supplied together!"));
+
+                Assert.That(() => new POIElementPathSegment("brands", " "),
+                            Throws.ArgumentException.With.Message.EqualTo("an element identifier must not be empty!"));
+
+                // Read within a change set: "Change N: " and the same words.
+                var json = NewChangeSet().ToJSON();
+                ((JArray) json["changes"]!)[1]["entityId"] = " ";
+
+                Assert.That(RoamingNetworkChangeSet.TryParse(json, out _, out var error), Is.False);
+                Assert.That(error,                                                         Is.EqualTo("Change 1: its entity type and identification must not be empty!"));
+
+            }
+
+        }
+
+        #endregion
+
         #region The_values_of_a_change_are_its_own()
 
         [Test]
@@ -210,7 +278,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.ChangeSets
             ((JArray) json["changes"]!)[1]["kind"] = "Rename";
 
             Assert.That(RoamingNetworkChangeSet.TryParse(json, out _, out var error), Is.False);
-            Assert.That(error,                                                        Does.Contain("Invalid change 1"));
+            Assert.That(error,                                                        Is.EqualTo("Change 1: unknown kind 'Rename'!"));
 
         }
 
