@@ -774,7 +774,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The gross rates of the simple profile: one element, without restrictions, of energy, flat or time components
-        /// each once, with a price not negative and a step size of at least one; none otherwise.
+        /// each once, with a price not negative, energy and time with a step size of at least one, a flat fee without any,
+        /// as a FLAT price component has none; none otherwise.
         /// </summary>
         private static GrossRates? GrossRatesOf(String                    Currency,
                                                 IReadOnlyList<JObject>    Elements)
@@ -811,12 +812,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return null;
                 }
 
-                if (component["stepSize"] is not JValue { Type: JTokenType.Integer } stepSize || stepSize.Value<Int64>() < 1)
+                var type = component["type"]?.Type == JTokenType.String ? component["type"]!.Value<String>() : null;
+
+                // A flat fee has no step size, as a FLAT price component has none; energy and time one of at least one.
+                if (type == "FLAT"
+                        ? component.ContainsKey("stepSize")
+                        : component["stepSize"] is not JValue { Type: JTokenType.Integer } stepSize || stepSize.Value<Int64>() < 1)
+                {
                     return null;
+                }
 
                 var text = Convert.ToString(price.Value, CultureInfo.InvariantCulture);
 
-                switch (component["type"]?.Type == JTokenType.String ? component["type"]!.Value<String>() : null)
+                switch (type)
                 {
                     case "ENERGY" when energy is null:  energy = text; break;
                     case "FLAT"   when flat   is null:  flat   = text; break;

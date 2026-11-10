@@ -136,6 +136,14 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
         /// A history signing the price statements of DE*GEF, whose operator states its signing key, attesting its head now.
         /// </summary>
         private static RoamingNetworkHistory Attested(DateTimeOffset Now, out String IdentityKeyId)
+
+            => Attested(Now, out IdentityKeyId, out _);
+
+        /// <summary>
+        /// A history signing the price statements of DE*GEF, whose operator states its signing key, attesting its head now,
+        /// and the key statement of its operator, which a verifier keeps.
+        /// </summary>
+        internal static RoamingNetworkHistory Attested(DateTimeOffset Now, out String IdentityKeyId, out RoamingNetworkKeyStatement KeyStatement)
         {
 
             var history   = NewHistory();
@@ -172,6 +180,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             Assert.That(history.TryAttest(out _, out var attestError, Now), Is.True, attestError);
 
             IdentityKeyId = identity.Public.Id;
+            KeyStatement  = keyStatement;
 
             return history;
 

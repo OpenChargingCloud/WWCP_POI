@@ -17,6 +17,7 @@
 
 #region Usings
 
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -256,6 +257,63 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(made.JSON.ToString(),                                        Is.EqualTo(given.ToString()));
                 Assert.That(JToken.DeepEquals(evidence!.ToJSON(), example.Evidence),     Is.True);
                 Assert.That(Verify(example).Selected!.Digest,                            Is.EqualTo(agreement.PriceStatementDigest));
+            }
+
+        }
+
+        #endregion
+
+        #region A_flat_fee_without_a_step_size_is_a_gross_rate()
+
+        /// <summary>
+        /// A flat fee has no step size, as a FLAT price component may have none: the simple profile takes it as a gross rate
+        /// all the same, and an assignment of a flat fee and an energy price binds both.
+        /// </summary>
+        [Test]
+        public void A_flat_fee_without_a_step_size_is_a_gross_rate()
+        {
+
+            var now      = DateTimeOffset.FromUnixTimeSeconds(Timestamp.Now.ToUnixTimeSeconds());
+            var history  = Proofs.PriceStatementTests.Attested(now.AddMinutes(-1), out var identityKeyId, out var keyStatement);
+            var gef      = ChargingStationOperator_Id.Parse("DE*GEF");
+            var evse     = "DE*GEF*E1*1";
+            var tariff   = ChargingTariff_Id.Parse("DE*GEF*T2");
+            var prices   = new ChargingPrices([ new ChargingTariffPrices(tariff, [ new ChargingTariffElement([ new ChargingPriceComponent(ChargingDimensionTypes.FLAT,   1.00m),
+                                                                                                                new ChargingPriceComponent(ChargingDimensionTypes.ENERGY, 0.65m, StepSize: 1) ]) ]) ]);
+
+            var statement = Proofs.PriceStatementTests.Signer(gef).StatePrices(history.Head.RoamingNetwork.Id, nameof(EVSE), evse, prices, 0, null, SignedAt: now.AddSeconds(-45));
+
+            Assert.That(history.TryGetChargingStationProof(ChargingStation_Id.Parse("DE*GEF*S1"), out var proof, out var error),                                         Is.True, error);
+            Assert.That(HistoricalTrustContext.TryCreate(history.Head.RoamingNetwork.TrustAnchor(), keyStatement, [ identityKeyId ], out var context, out error, Now: now),  Is.True, error);
+
+            var started  = now.AddSeconds(-30);
+            var start    = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes("OCMF|{\"RD\":[{\"TX\":\"B\"}]}|{}")));
+            var key      = TestParties.Key(TestParties.Party(gef));
+            var assigned = SessionPriceAgreement.Create(key.Private,
+                                                        key.Public.Id,
+                                                        COSEAlgorithm.ES256,
+                                                        history.Head.RoamingNetwork.Id,
+                                                        evse,
+                                                        "M-1",
+                                                        started,
+                                                        start,
+                                                        tariff.ToString(),
+                                                        statement.Digest,
+                                                        gef,
+                                                        SignedAt: now.AddSeconds(-10));
+
+            var evidence = new SessionPriceEvidence(evse, proof!.ToJSON(), [ statement.ToJSON() ], assigned.JSON);
+
+            Assert.That(evidence.TryVerify(context!, evse, "M-1", started, start, out var result, out error),  Is.True, error);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result!.Signatures,                                                                Is.EqualTo("valid"), String.Join("; ", result.Diagnostics));
+                Assert.That(result.Agreement,                                                                  Is.EqualTo("valid"), String.Join("; ", result.Diagnostics));
+                Assert.That(result.Applicability,                                                              Is.EqualTo("bound"), String.Join("; ", result.Diagnostics));
+                Assert.That(Decimal.Parse(result.Selected!.Rates!.FlatFee!,      CultureInfo.InvariantCulture),  Is.EqualTo(1.00m));
+                Assert.That(Decimal.Parse(result.Selected.Rates.EnergyPerKWh!,   CultureInfo.InvariantCulture),  Is.EqualTo(0.65m));
+                Assert.That(result.Selected.Rates.TimePerHour,                                                 Is.Null);
             }
 
         }
