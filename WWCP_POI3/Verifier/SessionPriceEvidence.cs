@@ -455,10 +455,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var rates          = GrossRatesOf(currency, elements);
             var applicability  = agreement is null ? "unbound" : "bound";
 
+            // A session paid ad hoc of the simple profile, one through an e-mobility provider of the profile of contracts.
             if (agreement is not null &&
-                (agreement.ChargingMode   != "adhoc"          ||
+                (agreement.PricingProfile != SessionPriceAgreement.GrossPriceProfileOf(agreement.ChargingMode) ||
                  agreement.PriceBinding   != "fixed-at-start" ||
-                 agreement.PricingProfile != SessionPriceAgreement.SimpleGrossPriceProfile ||
                  rates is null))
             {
                 applicability = "unsupported";
@@ -499,7 +499,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                                  selected.Tariff,
                                                                                  currency,
                                                                                  elements,
-                                                                                 agreement?.PricingProfile == SessionPriceAgreement.SimpleGrossPriceProfile ? rates : null),
+                                                                                 agreement?.PricingProfile is SessionPriceAgreement.SimpleGrossPriceProfile or SessionPriceAgreement.ContractGrossPriceProfile ? rates : null),
                                                         witnesses.Status,
                                                         witnesses);
 

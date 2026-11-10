@@ -33,10 +33,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// The assignment of a price to a charging session by its charging station operator (WWCP_POI.TS SessionPriceAgreement,
-    /// experimental): the exact start document of the session, its meter and EVSE, the time it started, the charging tariff
-    /// and the price statement selected, how the price is bound and its profile, signed by the CPO with a signing key that
-    /// may sign price statements. An assertion of the CPO, not the consent of the customer; an unknown one authorizes
-    /// nothing.
+    /// experimental): the exact start document of the session, its meter and EVSE, the time it started, whether it is paid
+    /// ad hoc or through an e-mobility provider, the charging tariff and the price statement selected, how the price is
+    /// bound and its profile, signed by the CPO with a signing key that may sign price statements. An assertion of the CPO,
+    /// not the consent of the customer; an unknown one authorizes nothing.
     /// </summary>
     public sealed partial class SessionPriceAgreement
     {
@@ -49,9 +49,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const String JSONLDContext          = "https://open.charging.cloud/contexts/wwcp/sessionPriceAgreement/v1";
 
         /// <summary>
-        /// The experimental profile of unconditional gross rates fixed at the start of a session.
+        /// The experimental profile of unconditional gross rates fixed at the start of a session paid ad hoc (AdHoc).
         /// </summary>
-        public const String SimpleGrossPriceProfile = "chargy-gross-rates/v1";
+        public const String SimpleGrossPriceProfile    = "chargy-gross-rates/v1";
+
+        /// <summary>
+        /// The experimental profile of the same unconditional gross rates fixed at the start of a session started through
+        /// an e-mobility provider (Contract): the rates the CPO charges the provider for the session - not those the
+        /// provider charges its customer, which are no part of it.
+        /// </summary>
+        public const String ContractGrossPriceProfile  = "chargy-contract-gross-rates/v1";
+
+        /// <summary>
+        /// The charging mode of a session paid at the station, without a contract: the price is the one its customer pays
+        /// the CPO.
+        /// </summary>
+        public const String AdHoc                      = "adhoc";
+
+        /// <summary>
+        /// The charging mode of a session started through an e-mobility provider, of a contract with it: the price is the
+        /// one the CPO charges the provider for the session.
+        /// </summary>
+        public const String Contract                   = "contract";
 
         private static readonly String[] Properties = [ "@context", "roamingNetworkId", "EVSEId", "meterSerialNumber", "chargingStarted", "startDocumentSHA256",
                                                         "chargingMode", "chargingTariffId", "priceStatementDigest", "priceBinding", "pricingProfile",
@@ -98,7 +117,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public String          StartDocumentSHA256    => Text("startDocumentSHA256");
 
         /// <summary>
-        /// The charging mode, e.g. "adhoc".
+        /// The charging mode: AdHoc or Contract.
         /// </summary>
         public String          ChargingMode           => Text("chargingMode");
 
@@ -165,6 +184,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #endregion
 
 
+        #region (static) GrossPriceProfileOf(ChargingMode)
+
+        /// <summary>
+        /// The profile of gross rates of a charging mode: the simple one of a session paid ad hoc, that of contracts of one
+        /// started through an e-mobility provider - none of another.
+        /// </summary>
+        /// <param name="ChargingMode">The charging mode.</param>
+        public static String? GrossPriceProfileOf(String ChargingMode)
+
+            => ChargingMode switch {
+                   AdHoc     => SimpleGrossPriceProfile,
+                   Contract  => ContractGrossPriceProfile,
+                   _         => null
+               };
+
+        #endregion
+
         #region (static) Create(PrivateKey, KeyId, Algorithm, RoamingNetworkId, EVSEId, MeterSerialNumber, ChargingStarted, StartDocumentSHA256, ChargingTariffId, PriceStatementDigest, Signer, …)
 
         /// <summary>
@@ -182,9 +218,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="ChargingTariffId">The charging tariff selected.</param>
         /// <param name="PriceStatementDigest">The digest of the price statement selected.</param>
         /// <param name="Signer">The charging station operator.</param>
-        /// <param name="ChargingMode">The charging mode, "adhoc" by default.</param>
+        /// <param name="ChargingMode">The charging mode: AdHoc by default, Contract for a session through an e-mobility provider.</param>
         /// <param name="PriceBinding">How the price is bound, "fixed-at-start" by default.</param>
-        /// <param name="PricingProfile">The pricing profile, the simple gross rates by default.</param>
+        /// <param name="PricingProfile">The pricing profile, the simple gross rates by default - those of contracts (ContractGrossPriceProfile) for a session through an e-mobility provider.</param>
         /// <param name="SignedAt">When it is signed, now by default.</param>
         /// <param name="Deterministic">Whether to sign deterministically.</param>
         public static SessionPriceAgreement Create(AsymmetricKeyParameter      PrivateKey,
@@ -198,7 +234,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                    String                      ChargingTariffId,
                                                    String                      PriceStatementDigest,
                                                    ChargingStationOperator_Id  Signer,
-                                                   String                      ChargingMode     = "adhoc",
+                                                   String                      ChargingMode     = AdHoc,
                                                    String                      PriceBinding     = "fixed-at-start",
                                                    String                      PricingProfile   = SimpleGrossPriceProfile,
                                                    DateTimeOffset?             SignedAt         = null,

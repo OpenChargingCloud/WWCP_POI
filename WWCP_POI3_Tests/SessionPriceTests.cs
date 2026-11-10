@@ -273,6 +273,61 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         public void A_flat_fee_without_a_step_size_is_a_gross_rate()
         {
 
+            var result = Assigned(SessionPriceAgreement.AdHoc, SessionPriceAgreement.SimpleGrossPriceProfile);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.Signatures,                                                                 Is.EqualTo("valid"), String.Join("; ", result.Diagnostics));
+                Assert.That(result.Agreement,                                                                  Is.EqualTo("valid"), String.Join("; ", result.Diagnostics));
+                Assert.That(result.Applicability,                                                              Is.EqualTo("bound"), String.Join("; ", result.Diagnostics));
+                Assert.That(Decimal.Parse(result.Selected!.Rates!.FlatFee!,      CultureInfo.InvariantCulture),  Is.EqualTo(1.00m));
+                Assert.That(Decimal.Parse(result.Selected.Rates.EnergyPerKWh!,   CultureInfo.InvariantCulture),  Is.EqualTo(0.65m));
+                Assert.That(result.Selected.Rates.TimePerHour,                                                 Is.Null);
+            }
+
+        }
+
+        #endregion
+
+        #region A_session_through_an_e_mobility_provider_is_bound_of_the_profile_of_contracts(ChargingMode, PricingProfile, Applicability)
+
+        /// <summary>
+        /// A session started through an e-mobility provider, of a contract with it, is bound to the price its CPO assigns it
+        /// of the profile of contracts: the price the CPO charges the provider. Of the simple profile it is not, as the
+        /// conformance vector sessionPrice-contract-mode has it ("Contract mode requires an additional profile"); nor is a
+        /// session paid ad hoc of the profile of contracts, nor one of a charging mode neither profile knows.
+        /// </summary>
+        [TestCase(SessionPriceAgreement.Contract,  SessionPriceAgreement.ContractGrossPriceProfile,  "bound")]
+        [TestCase(SessionPriceAgreement.AdHoc,     SessionPriceAgreement.SimpleGrossPriceProfile,    "bound")]
+        [TestCase(SessionPriceAgreement.Contract,  SessionPriceAgreement.SimpleGrossPriceProfile,    "unsupported")]
+        [TestCase(SessionPriceAgreement.AdHoc,     SessionPriceAgreement.ContractGrossPriceProfile,  "unsupported")]
+        [TestCase("subscription",                  SessionPriceAgreement.ContractGrossPriceProfile,  "unsupported")]
+        public void A_session_through_an_e_mobility_provider_is_bound_of_the_profile_of_contracts(String ChargingMode, String PricingProfile, String Applicability)
+        {
+
+            var result = Assigned(ChargingMode, PricingProfile);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(result.Agreement,                                                                  Is.EqualTo("valid"),       String.Join("; ", result.Diagnostics));
+                Assert.That(result.Applicability,                                                              Is.EqualTo(Applicability), String.Join("; ", result.Diagnostics));
+                Assert.That(Decimal.Parse(result.Selected!.Rates!.EnergyPerKWh!, CultureInfo.InvariantCulture),  Is.EqualTo(0.65m));
+            }
+
+        }
+
+        #endregion
+
+
+        #region (private static) Assigned(ChargingMode, PricingProfile)
+
+        /// <summary>
+        /// The price of a session at DE*GEF*E1*1 - a flat fee of 1.00 and 0.65 a kWh - verified with the assignment of its
+        /// CPO in the given charging mode, of the given pricing profile.
+        /// </summary>
+        private static SessionPriceVerification Assigned(String ChargingMode, String PricingProfile)
+        {
+
             var now      = DateTimeOffset.FromUnixTimeSeconds(Timestamp.Now.ToUnixTimeSeconds());
             var history  = Proofs.PriceStatementTests.Attested(now.AddMinutes(-1), out var identityKeyId, out var keyStatement);
             var gef      = ChargingStationOperator_Id.Parse("DE*GEF");
@@ -300,21 +355,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                         tariff.ToString(),
                                                         statement.Digest,
                                                         gef,
-                                                        SignedAt: now.AddSeconds(-10));
+                                                        ChargingMode,
+                                                        PricingProfile:  PricingProfile,
+                                                        SignedAt:        now.AddSeconds(-10));
 
             var evidence = new SessionPriceEvidence(evse, proof!.ToJSON(), [ statement.ToJSON() ], assigned.JSON);
 
             Assert.That(evidence.TryVerify(context!, evse, "M-1", started, start, out var result, out error),  Is.True, error);
 
-            using (Assert.EnterMultipleScope())
-            {
-                Assert.That(result!.Signatures,                                                                Is.EqualTo("valid"), String.Join("; ", result.Diagnostics));
-                Assert.That(result.Agreement,                                                                  Is.EqualTo("valid"), String.Join("; ", result.Diagnostics));
-                Assert.That(result.Applicability,                                                              Is.EqualTo("bound"), String.Join("; ", result.Diagnostics));
-                Assert.That(Decimal.Parse(result.Selected!.Rates!.FlatFee!,      CultureInfo.InvariantCulture),  Is.EqualTo(1.00m));
-                Assert.That(Decimal.Parse(result.Selected.Rates.EnergyPerKWh!,   CultureInfo.InvariantCulture),  Is.EqualTo(0.65m));
-                Assert.That(result.Selected.Rates.TimePerHour,                                                 Is.Null);
-            }
+            return result!;
 
         }
 

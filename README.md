@@ -624,7 +624,10 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   verifier's own witnesses and revocations require. `AuthorizedChargingDocumentKeys` gives the keys of a CPO that may
   sign `chargeTransparencyRecords`. `SessionPriceAgreement` and `SessionPriceEvidence` (`sessionPriceAgreement/v1`,
   `sessionPriceEvidence/v1`) let a CPO assign a price of its price statements to a session and a verifier check it
-  apart from its publication - of the simple profile of gross rates (`chargy-gross-rates/v1`), one element without
+  apart from its publication - of the simple profile of gross rates (`chargy-gross-rates/v1`) a session paid ad hoc
+  (`adhoc`), of the profile of contracts (`chargy-contract-gross-rates/v1`) of the same rates one started through an
+  e-mobility provider (`contract`), the price the CPO charges the provider, not the one the provider charges its
+  customer: one element without
   restrictions of an energy, a flat and a time component, each once at most, energy and time in a step size and a flat
   fee in none, as a FLAT price component has none; `PricePublicationReceipt` (`pricePublicationReceipt/v1`, signed by a key that may sign
   `witnessPublications`) lets an independent witness state that it retrieved the price publicly, and
