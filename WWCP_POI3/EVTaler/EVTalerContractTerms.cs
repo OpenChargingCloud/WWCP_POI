@@ -671,6 +671,72 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (static) TryGetSessionPrices(Station, EVSEId, PriceStatements, At, out Tariff, out PriceStatement, out Elements, out ErrorResponse)
+
+        /// <summary>
+        /// What prices a session at the given EVSE that begins at the given time, as the backend of an operator makes its
+        /// steps and TryVerify checks them (concepts/EVTaler.md, 4.3): the EV Taler tariff of the EVSE, the price statement
+        /// current then that prices it, the one of the EVSE before the one of its station before the one of its pool, if
+        /// there is one, and the elements, of that statement or else of the tariff itself.
+        /// </summary>
+        /// <param name="Station">The verified charging station of the EVSE.</param>
+        /// <param name="EVSEId">The EVSE.</param>
+        /// <param name="PriceStatements">The price statements of the station, its pool and its EVSEs.</param>
+        /// <param name="At">When the session begins.</param>
+        /// <param name="Tariff">The EV Taler tariff, as the proof gives it.</param>
+        /// <param name="PriceStatement">The price statement that prices the session, if any.</param>
+        /// <param name="Elements">The elements that price the session.</param>
+        /// <param name="ErrorResponse">Why there are none.</param>
+        public static Boolean TryGetSessionPrices(VerifiedChargingStation                    Station,
+                                                  String                                     EVSEId,
+                                                  IEnumerable<RoamingNetworkPriceStatement>  PriceStatements,
+                                                  DateTimeOffset                             At,
+                                                  [NotNullWhen(true)]  out JObject?          Tariff,
+                                                  out VerifiedPrice?                         PriceStatement,
+                                                  out ImmutableArray<JObject>                Elements,
+                                                  [NotNullWhen(false)] out String?           ErrorResponse)
+        {
+
+            PriceStatement  = null;
+            Elements        = [];
+
+            if (!TryGetEVTalerTariff(Station, EVSEId, out Tariff, out ErrorResponse))
+                return false;
+
+            if (!Station.TryGetCurrentPrices(PriceStatements, out var current, out ErrorResponse, At))
+            {
+                Tariff = null;
+                return false;
+            }
+
+            var tariffId  = VerifiedChargingStation.IdOf(Tariff);
+
+            static Int32 Specificity(String EntityType)
+                => EntityType switch {
+                       "EVSE"             => 0,
+                       "ChargingStation"  => 1,
+                       _                  => 2
+                   };
+
+            PriceStatement  = current.Values.
+                                  Where  (candidate => candidate.Statement.PriceStatus.Prices.Any(prices => prices.ChargingTariffId.ToString() == tariffId)).
+                                  OrderBy(candidate => Specificity(candidate.Statement.EntityType)).
+                                  FirstOrDefault();
+
+            Elements        = PriceStatement is not null
+                                  ? [.. ((PriceStatement.Statement.PriceStatusJSON["prices"] as JArray ?? []).
+                                            OfType<JObject>().
+                                            First(prices => prices["chargingTariffId"]?.Value<String>() == tariffId)["elements"] as JArray ?? []).
+                                            OfType<JObject>()]
+                                  : [.. (Tariff[ChargingTariff.PropertyKeys.Elements] as JArray ?? []).OfType<JObject>()];
+
+            ErrorResponse   = null;
+            return true;
+
+        }
+
+        #endregion
+
         #region (private static) TryTime(JSON, Name, out Time, out ErrorResponse)
 
         private static Boolean TryTime(JObject                           JSON,

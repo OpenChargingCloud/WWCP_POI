@@ -783,6 +783,8 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/CSs/{CS_Id}/priceStatements`, `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/priceStatements` | the price statements of the pool, the station and its EVSEs, or the EVSE; also below the full path of the station |
 | `GET ~/RNs/{id}/history/priceStatements` | the current price statement of every entity |
 | `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/evTaler`, `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/evTaler` | how charging there is paid with EV Taler ([concepts/EVTaler.md](concepts/EVTaler.md)): the EV Taler tariff of the EVSE, the merchant of its operator and the exchanges in the tariff's currency, each with its `paymentOptionName`; of a pool its EVSEs with an EV Taler tariff and the exchanges of all of them; 404 where none. The EVSE also below the full path of its station |
+| `POST ~/RNs/{id}/EVSEs/{EVSE_Id}/evTaler/sessions` `{exchange, step, cap?}` | where an operator's charging station management system serves its EV Taler offers (`EVTalerOffersAPI` of `WWCP_POI3_EVTaler`, [concepts/EVTaler.md](concepts/EVTaler.md#6-asking-for-offers-over-poi_api)): 201 `{sessionId, secret, events, offer}`; 404 elsewhere |
+| `GET ~/RNs/{id}/evTaler/sessions/{sessionId}/events?after=&timeout_ms=`, `POST ~/RNs/{id}/evTaler/sessions/{sessionId}/stop` | with `Authorization: Bearer <secret>`: the events of the session, waiting for the next one, and stopping it |
 | `POST ~/RNs/{id}/history/priceStatements` `{priceStatements: […]}` | 200 `{taken, known, outdated, refused, refusals}`, 422 when one was refused |
 | `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/priceStatements` | the price statements a checkpoint names, in the order of its tree |
 | `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/priceStatements/{digest}/proof` | the proof of one of them |
@@ -1142,6 +1144,14 @@ Decisions taken by the maintainer between alternatives the agent laid out:
   `witnessCandidates` in session price evidence, as WWCP_POI.TS has them.
   WWCP_POI.TS released these extensions, unchanged, as 0.2.0 (before as
   the development candidate 0.1.2-dev.0); its vectors are those of 0.2.0.
+- **2026-11-10 – EV Taler, phase 3 of [concepts/EVTaler.md](concepts/EVTaler.md):**
+  the backend of an operator runs at its charging station management system,
+  which serves the offers itself, at the `offersURL` of its `evTaler` (D7):
+  the access token of its merchant instance and the key for payments that
+  signs its settlement statements stay with the operator, and OCPP 2.1 is
+  there. A RoamingHub publishes `offersURL` and makes no offers. The offers
+  are in an assembly of their own, `WWCP_POI3_EVTaler`, so that WWCP_POI3
+  does not depend on GNU Taler.
 
 ### Rejected suggestions
 

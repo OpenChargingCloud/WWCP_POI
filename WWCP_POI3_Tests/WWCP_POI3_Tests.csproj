@@ -32,6 +32,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WWCP_POI3\WWCP_POI3.csproj" />
+    <ProjectReference Include="..\WWCP_POI3_EVTaler\WWCP_POI3_EVTaler.csproj" />
   </ItemGroup>
 
 </Project>

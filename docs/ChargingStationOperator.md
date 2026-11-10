@@ -272,6 +272,7 @@ a signing key that may sign `payments`, which signs nothing else of the operator
 | `merchantBaseURL` | URL | The base URL of its instance at the merchant backend: HTTPS, without user, query and fragment, ending in `/`; the `merchant_base_url` of its contract terms. |
 | `merchantPublicKey` | text | The public key of that instance as GNU Taler writes it: 52 characters of Crockford's Base32 in upper case, the last 4 bits zero; every contract of a step is signed with it (`merchant_pub`). |
 | `exchanges` | array | 1..n exchanges it accepts, in the ordinal order of their `masterPublicKey`, each once. |
+| `offersURL` | URL | Optional: where drivers ask for offers, the POI_API base of the roaming network at the server that makes them for the operator, e.g. `https://poi.gef.example/RNs/QA/`; HTTPS, as `merchantBaseURL`. Left out when not given, so that a merchant without it is written as before. |
 
 An exchange (`EVTalerExchange`):
 
@@ -302,6 +303,10 @@ An exchange (`EVTalerExchange`):
   exchanges in its currency.
 - **Not checked:** whether the exchanges know the operator (their know-your-customer checks), and whether the merchant
   backend's configuration names the same exchanges: the app checks the contract terms of every offer.
+- **Offers:** an app asks the server at `offersURL` for a session at an EVSE, `POST {offersURL}EVSEs/{EVSE_Id}/evTaler/sessions`,
+  and gets the steps of it as offers ([concepts/EVTaler.md](../concepts/EVTaler.md#6-asking-for-offers-over-poi_api)). The
+  server is the operator's, with the backend that makes the orders at its merchant instance and starts charging at its
+  charging station management system (`WWCP_POI3_EVTaler`).
 - OCPI and DATEX II know no GNU Taler: `evTaler` is not published to them.
 
 

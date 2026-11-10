@@ -1,9 +1,11 @@
 # EV Taler: paying for charging with GNU Taler, step by step
 
-*Concept paper, draft of 2026-10-28, revised on 2026-11-05. It proposes what WWCP_POI would carry and check when
-charging is paid with [GNU Taler](https://taler.net). Phase 1, the content of section 4, is implemented since
-2026-10-29, phase 2, the steps and the evidence of sections 5 and 7, since 2026-11-05; the offers of section 6 are
-not built yet. All decisions of [section 10](#10-decisions-needed) are taken.*
+*Concept paper, draft of 2026-10-28, revised on 2026-11-05 and 2026-11-10. It proposes what WWCP_POI would carry and
+check when charging is paid with [GNU Taler](https://taler.net). Phase 1, the content of section 4, is implemented
+since 2026-10-29, phase 2, the steps and the evidence of sections 5 and 7, since 2026-11-05, phase 3, the offers of
+section 6 and the backend of an operator, since 2026-11-10 (`WWCP_POI3_EVTaler`); what runs at the charging station
+management system with OCPP 2.1 (5.6) is not built yet. All decisions of [section 10](#10-decisions-needed) are
+taken.*
 
 **In short.** A charging station operator that accepts GNU Taler says so in its WWCP_POI data, signed like
 everything else it owns: `EVTaler` among the payment options of its charging pools, and, once for the operator,
@@ -135,7 +137,7 @@ change sets as a whole (update/remove):
 | `merchantBaseURL` | URL | The base URL of its instance at the merchant backend, HTTPS, ending in `/`: the `merchant_base_url` of its contract terms. |
 | `merchantPublicKey` | text | The public key of that instance, as Taler writes it: the `merchant_pub` every contract of a step is signed with. |
 | `exchanges` | array | 1..n exchanges it accepts, ordered by `masterPublicKey`, each once, see below. |
-| `offersURL` | URL | Where drivers ask for offers: the POI_API base of the server that makes them for the operator (section 6). Not in phase 1: it comes with the offers API of phase 3 (D4), without breaking anything. |
+| `offersURL` | URL | Optional: where drivers ask for offers, the POI_API base of the roaming network at the server that makes them for the operator (section 6); HTTPS, ending in `/`. Since phase 3; left out when not given, so that a merchant without it is written as before. |
 
 An exchange:
 
@@ -421,8 +423,12 @@ WWCP_POI. OCPP 2.1 has what a session in steps needs:
 
 A POI server makes offers for the operators it has an **EV Taler backend** for: an interface the application hosting
 it provides, as it provides `AuthorizeStatusUpdate`, which talks to the operator's instance and to its charging
-station management system. The RoamingHub can be that server for the operators it hosts. Elsewhere the endpoints
-answer 404, and the app goes to the `offersURL` of the operator.
+station management system. That application is the operator's charging station management system (decision D7): it
+serves the offers itself, at the `offersURL` of its `evTaler`, follows the history of its roaming network as every
+POI server does, and holds the access token of its merchant instance and the key for payments its settlement
+statements are signed with, which no other server should hold. A RoamingHub publishes the `offersURL` with the rest
+of `evTaler` and makes no offers. Elsewhere the endpoints answer 404, and the app goes to the `offersURL` of the
+operator.
 
 ```
 POST ~/RNs/{RN_Id}/EVSEs/{EVSE_Id}/evTaler/sessions
@@ -443,10 +449,11 @@ POST ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/stop
 |---|---|
 | `offer` | `step`, `orderId`, `talerPayURI` (as the merchant backend gave it), `amount`, `covers`, `payDeadline`, and the order as the backend posted it |
 | `paid` | `step`, `orderId`: the credit is raised |
+| `refused` | `step`, `description`: an offer of the backend failed a check of the server and was not relayed; the session ends |
 | `unpaid` | `step`: its deadline passed; charging ends when the credit is used |
 | `meterValue` | a signed meter value as the meter gives it, at least the one at the start, before step 2 is offered, and the one at the end, before the settlement (5.4) |
-| `stopped` | `reason`: by the driver, the vehicle, the cap, an unpaid step, the operator |
-| `settlement` | the settlement statement (5.4) and the refunds, each `orderId`, `amount` and `talerRefundURI` |
+| `stopped` | `reason`: `driver`, `vehicle`, `cap`, `unpaid` (a step was not paid, and the credit is used), `limit` (the credit is used), `operator`; and a `description` where there is one |
+| `settlement` | `statement`, the settlement statement (5.4), and `refunds`, each `orderId`, `amount` and `talerRefundURI`; without both signed meter values no statement, and every step refunded in full |
 
 - **Events stay** until the settlement and the `auto_refund` time after it, numbered per session, and are read again
   from any number: a phone loses its connection while its driver is having a coffee. Long polling, as Taler's own API
@@ -462,7 +469,17 @@ POST ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/stop
 - **Limits:** sessions only where the backend accepts one (409 otherwise), one at an EVSE at a time, and per client
   as many as for the reads that cost the most.
 - **The backend's access** to the operator's instance is a token with only the permissions offers need
-  (`orders-write`, reading orders, `orders-refund`), kept owner-only as the server keeps its keys.
+  (`orders-write`, reading orders, `orders-refund`, GNU Taler's scope `order-mgmt`), kept owner-only as the server
+  keeps its keys.
+- **The station is proven as an app proves it:** the server pins the trust anchor of its roaming network, makes the
+  proof of the EVSE's station from the head it holds when a session is asked for, verifies it, and checks every offer
+  against that station and the price statements current then, with phase 2's `EVTalerContractTerms.TryVerify`. From
+  step 2 on that verifies the signed start value too, with a transparency software the server is given.
+- **The answers:** 201, or 404 where the EVSE offers no EV Taler or no sessions are made here for its operator, 409 when
+  the EVSE takes no session now or has one, 415 for a body that is no `application/json`, 422 for a step, an exchange or
+  a cap not accepted, with `acceptedSteps` where the step is not, 429 for a client with too many sessions open, 502 when
+  the merchant backend failed or the offer of step 1 was refused. Reading the events or stopping with another secret, or
+  of an unknown session, is answered alike, 401.
 
 
 ## 7. Evidence: what the app checks and keeps
@@ -563,13 +580,29 @@ payment, the signed meter values, the settlement statement and the refunds. From
 The merchant's signature over contract terms is checked by the wallet, with Taler's own hashing of contract terms;
 WWCP_POI checks only that the merchant is the operator's. Doing it as well would mean implementing that hashing.
 
-**Phase 3, offers**, in an assembly of its own (e.g. `WWCP_POI3_EVTaler`), so that WWCP_POI3 does not depend on Taler:
+**Phase 3, offers**, in an assembly of its own, `WWCP_POI3_EVTaler`, so that WWCP_POI3 does not depend on Taler, done
+2026-11-10:
 
-- The endpoints and events of section 6, the interface of an EV Taler backend, the checks before relaying.
-- A small client of the merchant API: orders, long polling, refunds, webhooks.
-- In the RoamingHub: a backend for the operators it hosts, their access tokens kept owner-only, the limits.
-- Outside WWCP_POI: starting, limiting and stopping charging at the operator's charging station management system,
-  with OCPP 2.1's transaction limits and signed meter values at the start and the end (5.6).
+- `EVTalerOffersAPI`: the endpoints and events of section 6 on a `POI_API`, the sessions with their secrets kept as
+  hashes, long polling, the limits, and the checks of every offer before it is relayed (`EVTalerOfferSession`);
+  `IEVTalerBackend`, the interface of an EV Taler backend.
+- `TalerMerchantClient`: a small client of the merchant API, making orders, waiting for their payment by long polling
+  and granting refunds. No webhooks: the backend asks for the payment of each step it offered until its deadline.
+- `EVTalerStepBackend`: the backend of an operator, at its charging station management system (D7). It makes the steps
+  as orders, starts charging when step 1 is paid, limited to the credit, raises the limit with every step paid, offers
+  the next step once the share `NextStepAt` of the last one is delivered and the station gave its signed start value,
+  and settles: the price by the tariff from both signed meter values, refunds from the last step back, the settlement
+  statement signed with its key for payments; without both values every step refunded in full. It takes sessions
+  priced by the simple profile of `EVTalerRates` only. Charging is behind `IEVTalerChargingControl`, which the charging
+  station management system implements with OCPP 2.1 (5.6).
+- `offersURL` in `evTaler`, optional; `EVTalerContractTerms.TryGetSessionPrices`, the prices of a session as the backend
+  makes its steps and an app checks them.
+- `EVTalerOffersTests`: sessions over HTTP against a merchant backend and a charging station management system the test
+  plays, paid in steps, charged and settled, the app checking every step and the statement as phase 2 does; refusals;
+  offers failing a check; an unpaid step; the cap; a session without the end value.
+- Not yet: `IEVTalerChargingControl` at the charging station management system of CSMSCLI, with OCPP 2.1's
+  RequestStartTransaction and its transactionLimit, the limit raised in the answer to the next TransactionEvent, and
+  the signed meter values of Transaction.Begin and Transaction.End (5.6).
 
 **Phase 4, later:** wallets paying the steps of an accepted session alone; Taler's token families (contract terms of
 version 1, e.g. discount tokens) for charging tariff offers (9.4), so that `maxSessionsPerContract` applies without
@@ -586,6 +619,7 @@ knowing the driver; e-mobility providers as merchants of their own offers; walle
 | D4, decided 2026-11-05: (a), (b) later | How do offers reach the app? | (a) HTTP with long polling; (b) a topic of the history's WebSocket | (a) first: it survives a phone losing its connection; (b) later |
 | D5, decided 2026-11-05: (a) | Does the operator sign settlement statements? | (a) yes, not in checkpoints; (b) yes, and checkpoints name them, as price statements; (c) no | (a): evidence for the driver, no load on histories |
 | D6, decided 2026-10-29 and 2026-11-05: "EV Taler", without "GNU" | The name | "GNU EV Taler"; "EV Taler" | "EV Taler" in the data (`EVTaler`, `evTaler`, `EV_TALER`) and as the name of what is built here; "GNU" is left out, as it names GNU packages. GNU Taler stays the name of the payment system it uses. |
+| D7, decided 2026-11-10: (a) | Where does the EV Taler backend of an operator run? | (a) at its charging station management system, which serves the offers itself; (b) in the RoamingHub, for the operators it hosts; (c) the hub serving the offers, the charging station management system the backend, joined by an SSH subsystem of WWCP_Node | (a): the access token of the merchant instance and the key for payments stay with the operator, and OCPP 2.1 is there |
 
 
 ## 11. Open points
@@ -607,6 +641,10 @@ knowing the driver; e-mobility providers as merchants of their own offers; walle
    A station or meter that gives no signed value at the start or the end leaves the session without a price: every
    step is refunded (5.4).
 9. **AFIR:** whether EV Taler counts as a means of ad hoc payment the regulation requires (section 2).
+10. **Restarts:** the offers server and the backend keep their sessions in memory. A restart ends them: a driver no
+    longer reads the events, and orders paid and not yet settled are settled by hand, before their refund deadline.
+    Keeping sessions in a store of their own, and the backend asking the merchant instance for its orders again, would
+    let them go on.
 
 
 ## References

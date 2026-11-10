@@ -84,6 +84,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             public const String  Exchanges           = "exchanges";
 
+            /// <summary>
+            /// The property of where drivers ask for offers.
+            /// </summary>
+            public const String  OffersURL           = "offersURL";
+
         }
 
         #endregion
@@ -103,6 +108,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public ImmutableArray<EVTalerExchange>   Exchanges            { get; }
 
+        /// <summary>
+        /// Where drivers ask for offers, if the operator makes them (concepts/EVTaler.md, section 6): the POI_API base of the
+        /// roaming network at the server that makes them for the operator, e.g. "https://poi.gef.example/RNs/QA/"; HTTPS,
+        /// ending in '/'. An app posts to its "EVSEs/{EVSE_Id}/evTaler/sessions".
+        /// </summary>
+        public URL?                              OffersURL            { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -113,14 +125,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="MerchantBaseURL">The base URL of its instance at the merchant backend: HTTPS, ending in '/'.</param>
         /// <param name="MerchantPublicKey">The public key of its instance, as GNU Taler writes it.</param>
         /// <param name="Exchanges">The exchanges it accepts, at least one, each once; in any order.</param>
+        /// <param name="OffersURL">Where drivers ask for offers, if the operator makes them: HTTPS, ending in '/'.</param>
         /// <exception cref="ArgumentException">A value is not one of a merchant.</exception>
         public EVTalerMerchant(URL                           MerchantBaseURL,
                                String                        MerchantPublicKey,
-                               IEnumerable<EVTalerExchange>  Exchanges)
+                               IEnumerable<EVTalerExchange>  Exchanges,
+                               URL?                          OffersURL   = null)
         {
 
             if (InvalidBaseURL(MerchantBaseURL, "merchant base URL") is String baseURLError)
                 throw new ArgumentException(baseURLError, nameof(MerchantBaseURL));
+
+            if (OffersURL.HasValue && InvalidBaseURL(OffersURL.Value, "offers URL") is String offersURLError)
+                throw new ArgumentException(offersURLError, nameof(OffersURL));
 
             if (!IsTalerPublicKey(MerchantPublicKey))
                 throw new ArgumentException($"The merchant public key '{MerchantPublicKey}' is no public key as GNU Taler writes it!", nameof(MerchantPublicKey));
@@ -139,6 +156,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.MerchantBaseURL    = MerchantBaseURL;
             this.MerchantPublicKey  = MerchantPublicKey;
             this.Exchanges          = [.. exchanges.OrderBy(exchange => exchange.MasterPublicKey, StringComparer.Ordinal)];
+            this.OffersURL          = OffersURL;
 
         }
 
@@ -230,6 +248,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             json.Add(PropertyKeys.Exchanges,              new JArray(Exchanges.Select(exchange => exchange.ToJSON(Embedded: true,
                                                                                                                   CustomEVTalerExchangeSerializer))));
 
+            if (OffersURL.HasValue)
+                json.Add(PropertyKeys.OffersURL,          OffersURL.Value.ToString());
+
             return CustomEVTalerMerchantSerializer is not null
                        ? CustomEVTalerMerchantSerializer(this, json)
                        : json;
@@ -304,11 +325,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
+            if (!POIJSON.TryParseText(JSON, PropertyKeys.OffersURL, "offers URL of an EV Taler merchant", URL.TryParse, out URL? offersURL, out ErrorResponse))
+                return false;
+
             try
             {
                 EVTalerMerchant = new EVTalerMerchant(merchantBaseURL.Value,
                                                       merchantPublicKeyJSON.Value<String>()!,
-                                                      exchanges);
+                                                      exchanges,
+                                                      offersURL);
             }
             catch (ArgumentException e)
             {
@@ -340,7 +365,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// What a merchant names, as TryParse reads it.
         /// </summary>
-        private static readonly String[] ReadProperties = [ PropertyKeys.Context, PropertyKeys.MerchantBaseURL, PropertyKeys.MerchantPublicKey, PropertyKeys.Exchanges ];
+        private static readonly String[] ReadProperties = [ PropertyKeys.Context, PropertyKeys.MerchantBaseURL, PropertyKeys.MerchantPublicKey, PropertyKeys.Exchanges, PropertyKeys.OffersURL ];
 
         /// <summary>
         /// The error, when the given merchant, read from the given JSON, is not written as it was given: a property it does
@@ -358,6 +383,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (merchantBaseURL != EVTalerMerchant.MerchantBaseURL.ToString())
                 return $"The merchant base URL '{merchantBaseURL}' is written as '{EVTalerMerchant.MerchantBaseURL}'!";
+
+            var offersURL = JSON[PropertyKeys.OffersURL]?.Value<String>();
+
+            if (EVTalerMerchant.OffersURL.HasValue && offersURL != EVTalerMerchant.OffersURL.Value.ToString())
+                return $"The offers URL '{offersURL}' is written as '{EVTalerMerchant.OffersURL}'!";
 
             return null;
 

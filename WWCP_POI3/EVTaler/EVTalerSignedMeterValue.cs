@@ -250,7 +250,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (internal static) TryVerify(Station, EVSEId, Value, Verifier, out Verified, out ErrorResponse)
+        #region (static) TryVerify(Station, EVSEId, Value, Verifier, out Verified, out ErrorResponse)
 
         /// <summary>
         /// Verify the given signed meter value of the given EVSE with a measurement public key the station proof gives for
@@ -258,12 +258,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// only one there is; no key is tried after another. The reading must name the serial number of the meter or the
         /// station whose key it is.
         /// </summary>
-        internal static Boolean TryVerify(VerifiedChargingStation                              Station,
-                                          String                                               EVSEId,
-                                          EVTalerSignedMeterValue                              Value,
-                                          EVTalerMeterValueVerifier                            Verifier,
-                                          [NotNullWhen(true)]  out EVTalerVerifiedMeterValue?  Verified,
-                                          [NotNullWhen(false)] out String?                     ErrorResponse)
+        public static Boolean TryVerify(VerifiedChargingStation                              Station,
+                                        String                                               EVSEId,
+                                        EVTalerSignedMeterValue                              Value,
+                                        EVTalerMeterValueVerifier                            Verifier,
+                                        [NotNullWhen(true)]  out EVTalerVerifiedMeterValue?  Verified,
+                                        [NotNullWhen(false)] out String?                     ErrorResponse)
         {
 
             Verified = null;

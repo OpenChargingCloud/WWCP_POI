@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    EV Taler, phase 3 (concepts/EVTaler.md, sections 6 and 9): the offers of a POI server and the backend of an operator
+    that makes them at its GNU Taler merchant instance. An assembly of its own, so that WWCP_POI3 does not depend on
+    GNU Taler.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WWCP_POI3\WWCP_POI3.csproj" />
+  </ItemGroup>
+
+</Project>
