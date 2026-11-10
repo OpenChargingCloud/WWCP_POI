@@ -90,7 +90,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      conformityAssessmentBodies,
                                      energyMeterManufacturers,
                                      Operator,
-                                     GivenTreeHashAlgorithms
+                                     GivenTreeHashAlgorithms,
+                                     // The version it copies was checked: the copy is not checked again.
+                                     new CheckedEntities(
+                                         [ .. energyMeters.Values ],
+                                         [ .. energyMeterGroups.Values ],
+                                         [ .. energyMeterTemplates.Values ]
+                                     )
                                  ) {
                                      Revision = Revision
                                  };
@@ -1255,6 +1261,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var softwares               = TransparencySoftwareOf (softwareManufacturers.Values);
             var certificates            = CertificatesOf(bodies.Values);
 
+            // The energy meters with what their templates give them, once the checks get to them: collected once.
+            EnergyMeter[]? effectiveEnergyMeters = null;
+            EnergyMeter[]  EffectiveEnergyMeters() => effectiveEnergyMeters ??= [ .. AllEffectiveEnergyMeters(operators.Values, gridOps.Values) ];
+
             if ((networkOperators.Values.SingleOrDefault()?.KeyStatementError(Id) ??
                  UnknownManufacturer (operators.Values, manufacturers) ??
                  DuplicateGridConnectionPoint(gridOps.Values)          ??
@@ -1277,7 +1287,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                  NewProviderOfferOverlap(operators, providers) ??
                  DuplicateEnergyMeterTemplate(allEnergyMeterTemplates) ??
                  UnknownEnergyMeterTemplateReference(allEnergyMeterTemplates, meterManufacturers, softwares, certificates) ??
-                 UnknownEnergyMeterManufacturer(AllEffectiveEnergyMeters(operators.Values, gridOps.Values), meterManufacturers)) is String referenceError)
+                 UnknownEnergyMeterManufacturer(EffectiveEnergyMeters(), meterManufacturers)) is String referenceError)
             {
 
                 // What the change set withdrew while another party still names it, a party, a model, a hardware revision or
@@ -1317,12 +1327,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    UnknownParkingSpace                (operators.Values, ParkingOperators.Values) ??
                    UnknownCertificateReference        (operators.Values, gridOps.Values, Softwares, Certificates, Manufacturers, MeterManufacturers) ??
                    UnknownEnergyMeterTemplateReference(allEnergyMeterTemplates, MeterManufacturers, Softwares, Certificates) ??
-                   UnknownEnergyMeterManufacturer     (AllEffectiveEnergyMeters(operators.Values, gridOps.Values), MeterManufacturers);
+                   UnknownEnergyMeterManufacturer     (EffectiveEnergyMeters(), MeterManufacturers);
 
             // No charging station and no energy meter contradicts the model it names (SPECIFICATION.md 4.1, "What a model
             // rates"): after a change of either, of a template giving them their values, or of the model.
             if ((ContradictedChargingStationModel(operators.Values, manufacturers) ??
-                 ContradictedEnergyMeterModel    (AllEffectiveEnergyMeters(operators.Values, gridOps.Values), meterManufacturers)) is String contradiction)
+                 ContradictedEnergyMeterModel    (EffectiveEnergyMeters(), meterManufacturers)) is String contradiction)
             {
                 ErrorResponse = contradiction;
                 return false;
@@ -1351,7 +1361,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  bodies.Values,
                                  meterManufacturers.Values,
                                  networkOperators.Values.SingleOrDefault(),
-                                 treeHashAlgorithms
+                                 treeHashAlgorithms,
+                                 // Checked above: it is not checked again.
+                                 new CheckedEntities(
+                                     allEnergyMeters,
+                                     allEnergyMeterGroups,
+                                     allEnergyMeterTemplates
+                                 )
                              ) {
                                  Revision = Revision + 1
                              };

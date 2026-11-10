@@ -339,6 +339,78 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               RoamingNetworkOperator?                        Operator                           = null,
                               IEnumerable<ETagHashAlgorithm>?                TreeHashAlgorithms                 = null)
 
+            : this(Id,
+                   Name,
+                   Description,
+                   InitialAdminStatus,
+                   InitialStatus,
+                   MaxAdminStatusScheduleSize,
+                   MaxStatusScheduleSize,
+                   DataSource,
+                   Created,
+                   LastChange,
+                   CustomData,
+                   InternalData,
+                   DataLicenses,
+                   ChargingStationOperators,
+                   ChargingStationManufacturers,
+                   EMobilityProviders,
+                   GridOperators,
+                   ParkingOperators,
+                   TransparencySoftwareManufacturers,
+                   ConformityAssessmentBodies,
+                   EnergyMeterManufacturers,
+                   Operator,
+                   TreeHashAlgorithms,
+                   Checked: null)
+
+        { }
+
+
+        /// <summary>
+        /// What a new version was checked for already, by TryApplyChanges or as the version it copies: then its constructor
+        /// takes its energy meters, energy meter groups and energy meter templates, of all its charging station operators and
+        /// grid operators, as they were collected for these checks, and does not check again what was checked.
+        /// </summary>
+        /// <param name="EnergyMeters">The energy meters of all its charging station operators and grid operators.</param>
+        /// <param name="EnergyMeterGroups">The energy meter groups of all its charging station operators and grid operators.</param>
+        /// <param name="EnergyMeterTemplates">The energy meter templates of all its charging station operators and grid operators.</param>
+        private sealed record CheckedEntities(IReadOnlyCollection<EnergyMeter>          EnergyMeters,
+                                              IReadOnlyCollection<EnergyMeterGroup>     EnergyMeterGroups,
+                                              IReadOnlyCollection<EnergyMeterTemplate>  EnergyMeterTemplates);
+
+        /// <summary>
+        /// Create a new roaming network, checking what was not checked already (see CheckedEntities).
+        /// </summary>
+        /// <param name="Checked">What was checked already, or null when the roaming network has to be checked as a whole.</param>
+        private RoamingNetwork(RoamingNetwork_Id                              Id,
+                               ImmutableI18NString?                           Name,
+                               ImmutableI18NString?                           Description,
+                               RoamingNetworkAdminStatusType?                 InitialAdminStatus,
+                               RoamingNetworkStatusType?                      InitialStatus,
+                               UInt16?                                        MaxAdminStatusScheduleSize,
+                               UInt16?                                        MaxStatusScheduleSize,
+
+                               String?                                        DataSource,
+                               DateTimeOffset?                                Created,
+                               DateTimeOffset?                                LastChange,
+
+                               CustomDataNew?                                 CustomData,
+                               UserDefinedDictionary?                         InternalData,
+
+                               IEnumerable<DataLicense>?                      DataLicenses,
+                               IEnumerable<ChargingStationOperator>?          ChargingStationOperators,
+                               IEnumerable<ChargingStationManufacturer>?      ChargingStationManufacturers,
+                               IEnumerable<EMobilityProvider>?                EMobilityProviders,
+                               IEnumerable<GridOperator>?                     GridOperators,
+                               IEnumerable<ParkingOperator>?                  ParkingOperators,
+                               IEnumerable<TransparencySoftwareManufacturer>? TransparencySoftwareManufacturers,
+                               IEnumerable<ConformityAssessmentBody>?         ConformityAssessmentBodies,
+                               IEnumerable<EnergyMeterManufacturer>?          EnergyMeterManufacturers,
+                               RoamingNetworkOperator?                        Operator,
+                               IEnumerable<ETagHashAlgorithm>?                TreeHashAlgorithms,
+                               CheckedEntities?                               Checked)
+
             : base(Id,
                    Name,
                    Description,
@@ -357,8 +429,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.Operator = Operator;
 
+            // What TryApplyChanges checks, a new version needs not be checked for again: only where it was not checked.
+            var check = Checked is null;
+
             // A key statement of its operator states this network and the operator's own keys, signed by one of them.
-            if (Operator?.KeyStatementError(Id) is String keyStatementError)
+            if (check && Operator?.KeyStatementError(Id) is String keyStatementError)
                 throw new ArgumentException(keyStatementError, nameof(Operator));
 
             if (TreeHashAlgorithms is not null)
@@ -390,11 +465,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.chargingStationManufacturers = new (ChargingStationManufacturers, entity => entity.Id, "charging station manufacturer");
 
             // Every manufacturer a charging station names is one of this network, with the model it names.
-            if (UnknownManufacturer(chargingStationOperators, chargingStationManufacturers.Index) is String unknownManufacturer)
+            if (check && UnknownManufacturer(chargingStationOperators, chargingStationManufacturers.Index) is String unknownManufacturer)
                 throw new ArgumentException(unknownManufacturer, nameof(ChargingStationManufacturers));
 
             // And no charging station contradicts its model.
-            if (ContradictedChargingStationModel(chargingStationOperators, chargingStationManufacturers.Index) is String contradictedModel)
+            if (check && ContradictedChargingStationModel(chargingStationOperators, chargingStationManufacturers.Index) is String contradictedModel)
                 throw new ArgumentException(contradictedModel, nameof(ChargingStationOperators));
 
             this.eMobilityProviders = new (EMobilityProviders, entity => entity.Id, "e-mobility provider");
@@ -402,17 +477,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
             this.gridOperators = new (GridOperators, entity => entity.Id, "grid operator");
 
             // Grid connection points are unique within the network, and every one a charging pool names is one of this network.
-            if ((DuplicateGridConnectionPoint(gridOperators) ??
+            if (check &&
+                (DuplicateGridConnectionPoint(gridOperators) ??
                  UnknownGridConnectionPoint  (chargingStationOperators, gridOperators)) is String gridError)
             {
                 throw new ArgumentException(gridError, nameof(GridOperators));
             }
 
+            var allEnergyMeters = Checked?.EnergyMeters ?? AllEnergyMeters(chargingStationOperators, gridOperators).ToArray();
+
             // Energy meters are unique within the network, not only within their operator.
-            if (DuplicateEnergyMeter(AllEnergyMeters(chargingStationOperators, gridOperators)) is String duplicateEnergyMeter)
+            if (check && DuplicateEnergyMeter(allEnergyMeters) is String duplicateEnergyMeter)
                 throw new ArgumentException(duplicateEnergyMeter, nameof(ChargingStationOperators));
 
-            foreach (var energyMeter in AllEnergyMeters(chargingStationOperators, gridOperators))
+            foreach (var energyMeter in allEnergyMeters)
                 energyMeters.TryAdd(energyMeter.Id, energyMeter);
 
             this.energyMeterManufacturers = new (EnergyMeterManufacturers, entity => entity.Id, "energy meter manufacturer");
@@ -422,7 +500,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             // Parking garages, spaces, sensors, space groups and products are unique within the network, the parking spaces
             // of charging station operators as well; the charging stations they name are ones of this network, and so are
             // the parking spaces charging stations name.
-            if ((DuplicateParking      (parkingOperators, chargingStationOperators) ??
+            if (check &&
+                (DuplicateParking      (parkingOperators, chargingStationOperators) ??
                  UnknownChargingStation(parkingOperators, chargingStationOperators.Index) ??
                  UnknownParkingSpace   (chargingStationOperators, parkingOperators)) is String parkingError)
             {
@@ -430,12 +509,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // The maintainers of grid connection points are charging station operators and parking operators of this network.
-            if (UnknownMaintainer(gridOperators, chargingStationOperators.Index, parkingOperators.Index) is String maintainerError)
+            if (check && UnknownMaintainer(gridOperators, chargingStationOperators.Index, parkingOperators.Index) is String maintainerError)
                 throw new ArgumentException(maintainerError, nameof(GridOperators));
 
             // Groups of e-mobility providers and charging station operators are unique within the network, and so are their
             // charging tariff offers.
-            if ((DuplicateProviderGroup      (chargingStationOperators, eMobilityProviders) ??
+            if (check &&
+                (DuplicateProviderGroup      (chargingStationOperators, eMobilityProviders) ??
                  DuplicateChargingTariffOffer(chargingStationOperators, eMobilityProviders)) is String providerGroupError)
             {
                 throw new ArgumentException(providerGroupError, nameof(EMobilityProviders));
@@ -445,7 +525,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // Releases are embedded in their manufacturers, identified under them, and so unique within the network: energy
             // meters and certificates name them by their identifications alone.
-            if ((ForeignTransparencySoftware  (transparencySoftwareManufacturers) ??
+            if (check &&
+                (ForeignTransparencySoftware  (transparencySoftwareManufacturers) ??
                  DuplicateTransparencySoftware(transparencySoftwareManufacturers)) is String duplicateRelease)
             {
                 throw new ArgumentException(duplicateRelease, nameof(TransparencySoftwareManufacturers));
@@ -457,7 +538,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // Certificates are embedded in the bodies issuing them, identified under them, and so unique within the network:
             // energy meters name them by their identifications alone. A number as a notified body names one body.
-            if ((ForeignConformityCertificate  (conformityAssessmentBodies) ??
+            if (check &&
+                (ForeignConformityCertificate  (conformityAssessmentBodies) ??
                  DuplicateConformityCertificate(conformityAssessmentBodies) ??
                  DuplicateNotifiedBodyNumber   (conformityAssessmentBodies)) is String duplicateError)
             {
@@ -468,31 +550,42 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             // Certificates name releases and models of this network, energy meters releases; stations and meters name the
             // certificates of their models, covering their hardware revision and firmware version.
-            if (UnknownCertificateReference(chargingStationOperators, gridOperators, transparencySoftware, certificates, chargingStationManufacturers.Index, energyMeterManufacturers.Index) is String transparencyError)
+            if (check && UnknownCertificateReference(chargingStationOperators, gridOperators, transparencySoftware, certificates, chargingStationManufacturers.Index, energyMeterManufacturers.Index) is String transparencyError)
                 throw new ArgumentException(transparencyError, nameof(TransparencySoftwareManufacturers));
+
+            var allEnergyMeterGroups    = Checked?.EnergyMeterGroups    ?? AllEnergyMeterGroups   (chargingStationOperators, gridOperators).ToArray();
+            var allEnergyMeterTemplates = Checked?.EnergyMeterTemplates ?? AllEnergyMeterTemplates(chargingStationOperators, gridOperators).ToArray();
 
             // Energy meter templates and groups are unique within the network; templates name manufacturers, models,
             // releases and certificates of it.
-            if ((DuplicateEnergyMeterGroup          (AllEnergyMeterGroups   (chargingStationOperators, gridOperators)) ??
-                 DuplicateEnergyMeterTemplate       (AllEnergyMeterTemplates(chargingStationOperators, gridOperators)) ??
-                 UnknownEnergyMeterTemplateReference(AllEnergyMeterTemplates(chargingStationOperators, gridOperators), energyMeterManufacturers.Index, transparencySoftware, certificates)) is String energyMeterGroupError)
+            if (check &&
+                (DuplicateEnergyMeterGroup          (allEnergyMeterGroups) ??
+                 DuplicateEnergyMeterTemplate       (allEnergyMeterTemplates) ??
+                 UnknownEnergyMeterTemplateReference(allEnergyMeterTemplates, energyMeterManufacturers.Index, transparencySoftware, certificates)) is String energyMeterGroupError)
             {
                 throw new ArgumentException(energyMeterGroupError, nameof(ChargingStationOperators));
             }
 
-            // Every manufacturer an energy meter names is one of this network, with the model it names, as the meter is
-            // with what its templates give it.
-            if (UnknownEnergyMeterManufacturer(AllEffectiveEnergyMeters(chargingStationOperators, gridOperators), energyMeterManufacturers.Index) is String unknownEnergyMeterManufacturer)
-                throw new ArgumentException(unknownEnergyMeterManufacturer, nameof(EnergyMeterManufacturers));
+            if (check)
+            {
 
-            // And no energy meter contradicts its model.
-            if (ContradictedEnergyMeterModel(AllEffectiveEnergyMeters(chargingStationOperators, gridOperators), energyMeterManufacturers.Index) is String contradictedMeterModel)
-                throw new ArgumentException(contradictedMeterModel, nameof(EnergyMeterManufacturers));
+                EnergyMeter[] allEffectiveEnergyMeters = [ .. AllEffectiveEnergyMeters(chargingStationOperators, gridOperators) ];
 
-            foreach (var energyMeterGroup in AllEnergyMeterGroups(chargingStationOperators, gridOperators))
+                // Every manufacturer an energy meter names is one of this network, with the model it names, as the meter is
+                // with what its templates give it.
+                if (UnknownEnergyMeterManufacturer(allEffectiveEnergyMeters, energyMeterManufacturers.Index) is String unknownEnergyMeterManufacturer)
+                    throw new ArgumentException(unknownEnergyMeterManufacturer, nameof(EnergyMeterManufacturers));
+
+                // And no energy meter contradicts its model.
+                if (ContradictedEnergyMeterModel(allEffectiveEnergyMeters, energyMeterManufacturers.Index) is String contradictedMeterModel)
+                    throw new ArgumentException(contradictedMeterModel, nameof(EnergyMeterManufacturers));
+
+            }
+
+            foreach (var energyMeterGroup in allEnergyMeterGroups)
                 energyMeterGroups.TryAdd(energyMeterGroup.Id, energyMeterGroup);
 
-            foreach (var energyMeterTemplate in AllEnergyMeterTemplates(chargingStationOperators, gridOperators))
+            foreach (var energyMeterTemplate in allEnergyMeterTemplates)
                 energyMeterTemplates.TryAdd(energyMeterTemplate.Id, energyMeterTemplate);
 
             foreach (var parkingOperator in parkingOperators)
@@ -2584,7 +2677,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (!TransparencySoftware.ContainsKey(assignment.TransparencySoftwareId))
                         return $"The transparency software release '{assignment.TransparencySoftwareId}' of the charging station template '{chargingStationTemplate.Id}' is unknown in the roaming network!";
 
-            foreach (var chargingStation in chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EffectiveChargingStations))
+            // The charging stations with what their templates give them, collected once for both checks of them.
+            var effectiveChargingStations = chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EffectiveChargingStations).ToArray();
+
+            foreach (var chargingStation in effectiveChargingStations)
                 foreach (var assignment in chargingStation.TransparencySoftwareStatus)
                     if (!TransparencySoftware.ContainsKey(assignment.TransparencySoftwareId))
                         return $"The transparency software release '{assignment.TransparencySoftwareId}' of the charging station '{chargingStation.Id}' is unknown in the roaming network!";
@@ -2594,7 +2690,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (CertificateOf($"the charging station template '{chargingStationTemplate.Id}'", certificateId, true, Certificates, out _) is String templateError)
                         return templateError;
 
-            foreach (var chargingStation in chargingStationOperators.SelectMany(chargingStationOperator => chargingStationOperator.EffectiveChargingStations))
+            foreach (var chargingStation in effectiveChargingStations)
                 foreach (var certificateId in chargingStation.CertificateIds)
                 {
 
