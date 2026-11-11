@@ -471,10 +471,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (Text is null || !SessionIdText().IsMatch(Text))
                 return false;
 
-            var bytes = Convert.FromBase64String(Text.Replace('-', '+').Replace('_', '/') + "==");
+            // .NET 11 refuses a last character with bits left over, which .NET 10 decoded
+            // and the comparison below refused.
+            var bytes = new Byte[18];
 
-            return bytes.Length == 16 &&
-                   Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_') == Text;
+            return Convert.TryFromBase64String(Text.Replace('-', '+').Replace('_', '/') + "==", bytes, out var written) &&
+                   written == 16 &&
+                   Convert.ToBase64String(bytes, 0, 16).TrimEnd('=').Replace('+', '-').Replace('/', '_') == Text;
 
         }
 
