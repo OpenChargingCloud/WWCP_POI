@@ -1,11 +1,11 @@
 # EV Taler: paying for charging with GNU Taler, step by step
 
-*Concept paper, draft of 2026-10-28, revised on 2026-11-05 and 2026-11-10. It proposes what WWCP_POI would carry and
+*Concept paper, draft of 2026-10-28, revised on 2026-11-05, 2026-11-10 and 2026-11-11. It proposes what WWCP_POI would carry and
 check when charging is paid with [GNU Taler](https://taler.net). Phase 1, the content of section 4, is implemented
 since 2026-10-29, phase 2, the steps and the evidence of sections 5 and 7, since 2026-11-05, phase 3, the offers of
 section 6 and the backend of an operator, since 2026-11-10 (`WWCP_POI3_EVTaler`); what runs at the charging station
 management system with OCPP 2.1 (5.6) is not built yet. All decisions of [section 10](#10-decisions-needed) are
-taken.*
+taken; open point 11, an EVSE held without paying, waits for one.*
 
 **In short.** A charging station operator that accepts GNU Taler says so in its WWCP_POI data, signed like
 everything else it owns: `EVTaler` among the payment options of its charging pools, and, once for the operator,
@@ -457,7 +457,9 @@ POST ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/stop
 
 - **Events stay** until the settlement and the `auto_refund` time after it, numbered per session, and are read again
   from any number: a phone loses its connection while its driver is having a coffee. Long polling, as Taler's own API
-  uses it, comes first; a WebSocket topic can follow (decision D4).
+  uses it, comes first; a WebSocket topic can follow (decision D4). A session settled without any step paid has no
+  refund to pick up: it is kept ten minutes, for its app to read how it ended. At most 100,000 sessions are held;
+  beyond, the settled ones are forgotten, those settled first first, never an open one.
 - **The secret** is 256 random bits, given once, kept by the server only as its hash (as API keys are). It names no
   driver; nothing else does either.
 - **The server checks before it relays** what the backend gives it, against the version it holds: the merchant base
@@ -466,8 +468,15 @@ POST ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/stop
   EV Taler tariff and the price statement the session began with, and from step 2 on the signed start value the
   station sent, and the amount is the quantity at that price (plus flat fee and reserve in step 1). An offer failing a
   check is not relayed, and the session ends.
-- **Limits:** sessions only where the backend accepts one (409 otherwise), one at an EVSE at a time, and per client
-  as many as for the reads that cost the most.
+- **Limits:** sessions only where the backend accepts one (409 otherwise), one at an EVSE at a time, and a few open
+  per client, four by default. The client is counted as the server counts its heavy reads: by its address, an IPv6
+  one by its /64, behind a trusted proxy the one the proxy names. These limits are checked before the station is
+  proven, and proving it takes one of the heavy reads the client may make: a start the limits refuse costs the
+  server no signature check.
+- **A payment not known:** a step is unpaid when the merchant backend says so after its payment deadline. Where it
+  does not say, failing or not reached, it is asked again, ten minutes after the deadline at most; then the step is
+  taken as unpaid, and the operator is told. A step paid while the backend did not reach the merchant backend counts
+  once it is reached again, and the session and its EVSE are never held without an end.
 - **The backend's access** to the operator's instance is a token with only the permissions offers need
   (`orders-write`, reading orders, `orders-refund`, GNU Taler's scope `order-mgmt`), kept owner-only as the server
   keeps its keys.
@@ -477,9 +486,12 @@ POST ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/stop
   step 2 on that verifies the signed start value too, with a transparency software the server is given.
 - **The answers:** 201, or 404 where the EVSE offers no EV Taler or no sessions are made here for its operator, 409 when
   the EVSE takes no session now or has one, 415 for a body that is no `application/json`, 422 for a step, an exchange or
-  a cap not accepted, with `acceptedSteps` where the step is not, 429 for a client with too many sessions open, 502 when
-  the merchant backend failed or the offer of step 1 was refused. Reading the events or stopping with another secret, or
-  of an unknown session, is answered alike, 401.
+  a cap not accepted, with `acceptedSteps` where the step is not, 429 for a client with too many sessions open or with
+  all its heavy reads made, 502 when the offer of step 1 was refused, in the words of the server's check, or when the
+  systems of the operator failed. What failed there, a merchant backend not reached or a charging station management
+  system answering with an error, is told to the operator (`OnError`), not to the client; so is a failure to start
+  charging once step 1 is paid, which the driver sees as `stopped` by the operator. Reading the events or stopping
+  with another secret, or of an unknown session, is answered alike, 401.
 
 
 ## 7. Evidence: what the app checks and keeps
@@ -537,10 +549,13 @@ payment, the signed meter values, the settlement statement and the refunds. From
   is plugged in and not charging, and step 1 must be paid within minutes.
 - **Spam:** see the limits of section 6; an order costs the merchant backend little, and an unpaid one expires at its
   payment deadline.
+- **An EVSE held without paying:** a session holds its EVSE from the start, before step 1 is paid, for the payment
+  deadline of step 1. Asking again and again keeps a driver from it; open point 11.
 - **Refunds** follow the settlement only and never exceed what was paid.
 - **Privacy:** contracts, events and statements name the EVSE and the session, never the driver; vehicle identifiers
   (e.g. those of ISO 15118) go into none of them. The operator learns amounts, times and the EVSE, as with cash.
-  The offers server sees the client's address and keeps it no longer than its limits need.
+  The offers server sees the client's address and keeps it no longer than its limits need: while the session is open.
+  A settled session keeps neither it nor the station proof and the price statements, only its events.
 
 
 ## 9. Implementation in WWCP_POI
@@ -600,6 +615,12 @@ WWCP_POI checks only that the merchant is the operator's. Doing it as well would
 - `EVTalerOffersTests`: sessions over HTTP against a merchant backend and a charging station management system the test
   plays, paid in steps, charged and settled, the app checking every step and the statement as phase 2 does; refusals;
   offers failing a check; an unpaid step; the cap; a session without the end value.
+- After the security review of 2026-11-11 (E2 to E5): the limits count a client as the heavy reads of `POI_API` do
+  (`ClientKeyOf`), before the station is proven, which takes a heavy read (`TooManyHeavyReads`); sessions without a
+  step paid are kept ten minutes, at most `MaxSessions` held, and a settled one keeps neither its client nor the proof;
+  what failed at the operator goes to `OnError`, the client is told only that it failed; the watch of a payment always
+  ends its step, unpaid only once the merchant backend says so or `UnknownPaymentWait` passed. E1, an EVSE held
+  without paying, is open point 11.
 - Not yet: `IEVTalerChargingControl` at the charging station management system of CSMSCLI, with OCPP 2.1's
   RequestStartTransaction and its transactionLimit, the limit raised in the answer to the next TransactionEvent, and
   the signed meter values of Transaction.Begin and Transaction.End (5.6).
@@ -645,6 +666,13 @@ knowing the driver; e-mobility providers as merchants of their own offers; walle
     longer reads the events, and orders paid and not yet settled are settled by hand, before their refund deadline.
     Keeping sessions in a store of their own, and the backend asking the merchant instance for its orders again, would
     let them go on.
+11. **An EVSE held without paying** (security review 2026-11-11, E1): a session holds its EVSE from its start, before
+    step 1 is paid, for the payment deadline of step 1 (two minutes by default). Whoever asks for the next one as soon
+    as it ends keeps a driver from the EVSE; 409 tells the moment a vehicle is plugged in, and with `*` for CORS any
+    web page can ask from the browsers of its visitors, each with an address of its own. Ways out: offers of step 1 to
+    several sessions at an EVSE, the EVSE held only by the session whose step 1 is paid first, the others expiring or
+    refunded in full ("who pays first charges"); or a code shown at the station that proves the driver is there. To be
+    decided by the maintainer.
 
 
 ## References

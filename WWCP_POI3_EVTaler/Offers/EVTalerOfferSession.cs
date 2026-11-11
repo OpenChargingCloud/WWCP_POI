@@ -63,19 +63,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public EVTalerSessionRequest                        Request            { get; }
 
         /// <summary>
-        /// The charging station of the EVSE, as the server's version proved it when the session was asked for.
+        /// The charging station of the EVSE, as the server's version proved it when the session was asked for; null once
+        /// the session is settled, as no offer is checked against it after.
         /// </summary>
-        public VerifiedChargingStation                      Station            { get; }
+        public VerifiedChargingStation?                     Station            { get; private set; }
 
         /// <summary>
-        /// The current price statements of the EVSE, its station and its pool, when the session was asked for.
+        /// The current price statements of the EVSE, its station and its pool, when the session was asked for; null once
+        /// the session is settled.
         /// </summary>
-        public IReadOnlyList<RoamingNetworkPriceStatement>  PriceStatements    { get; }
+        public IReadOnlyList<RoamingNetworkPriceStatement>? PriceStatements    { get; private set; }
 
         /// <summary>
-        /// The client that asked for it, by its address, for the limits.
+        /// The client that asked for it, as the limits count it, while it counts against it: null once the session is
+        /// settled, or was not started.
         /// </summary>
-        public String                                       Client             { get; }
+        public String?                                      Client             { get; private set; }
+
+        /// <summary>
+        /// Whether a step of it was paid: a session settled without kept no longer than its app needs to read how it
+        /// ended.
+        /// </summary>
+        public Boolean                                      AnyStepPaid        { get; private set; }
 
         /// <summary>
         /// When it was asked for.
@@ -133,6 +142,23 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (internal) Close()
+
+        /// <summary>
+        /// The session no longer counts against its client: the client, the first time, and the session forgets it.
+        /// </summary>
+        internal String? Close()
+        {
+            lock (sessionLock)
+            {
+                var client = Client;
+                Client = null;
+                return client;
+            }
+        }
+
+        #endregion
 
         #region IsSecret(Secret)
 
@@ -259,6 +285,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          String  OrderId)
         {
 
+            AnyStepPaid = true;
+
             Add("paid",
                 new JProperty("step",     Step),
                 new JProperty("orderId",  OrderId));
@@ -336,8 +364,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                IEnumerable<EVTalerRefund>  Refunds)
         {
 
-            StoppedAt ??= offersAPI.TimeProvider.GetUtcNow();
-            SettledAt ??= offersAPI.TimeProvider.GetUtcNow();
+            lock (sessionLock)
+            {
+
+                StoppedAt       ??= offersAPI.TimeProvider.GetUtcNow();
+                SettledAt       ??= offersAPI.TimeProvider.GetUtcNow();
+
+                // No offer is checked after the settlement: the proof and the price statements are not kept with its events.
+                Station           = null;
+                PriceStatements   = null;
+
+            }
 
             var properties = new List<JProperty>();
 
@@ -348,7 +385,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Add("settlement", [.. properties]);
 
-            offersAPI.Release(this);
+            offersAPI.Settled(this);
 
             return Task.CompletedTask;
 
@@ -367,7 +404,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Verified = null;
 
-            if (StoppedAt.HasValue)
+            if (StoppedAt.HasValue || Station is not VerifiedChargingStation station || PriceStatements is not IReadOnlyList<RoamingNetworkPriceStatement> priceStatements)
                 return "The session has ended: no step is offered after it!";
 
             var expected = (lastStep?.Step.Step ?? 0) + 1;
@@ -407,8 +444,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            if (!terms.TryVerify(Station,
-                                 PriceStatements,
+            if (!terms.TryVerify(station,
+                                 priceStatements,
                                  lastStep,
                                  offersAPI.MeterValueVerifier,
                                  out Verified,

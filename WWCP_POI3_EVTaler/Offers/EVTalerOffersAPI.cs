@@ -45,7 +45,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///      → 404 where the EVSE offers no EV Taler, or no sessions are made here for its operator
     ///      → 409 when the EVSE takes no session now (no vehicle plugged in, one charging already)
     ///      → 422 when the step or the exchange is not accepted, with the step sizes that are
-    ///      → 429 when the client has too many sessions open
+    ///      → 429 when the client has too many sessions open, or has made all the heavy reads it may for now: proving the
+    ///            station takes one, after the limits above
+    ///      → 502 when an offer of step 1 failed a check of this server, or the systems of the operator failed: what
+    ///            failed there is reported with OnError, not told to the client
     ///
     /// GET  ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/events?after={seq}&amp;timeout_ms={ms}
     ///      Authorization: Bearer &lt;secret&gt;
@@ -75,14 +78,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static readonly TimeSpan  DefaultKeepSettledSessions     = TimeSpan.FromDays(7);
 
         /// <summary>
+        /// How long the events of a session settled without any step paid are kept, by default: long enough for its app to
+        /// read how it ended, as there is no refund to pick up.
+        /// </summary>
+        public static readonly TimeSpan  DefaultKeepUnpaidSessions      = TimeSpan.FromMinutes(10);
+
+        /// <summary>
         /// How many sessions a client may have open at a time, by default.
         /// </summary>
         public const           Int32     DefaultMaxOpenSessionsPerClient  = 4;
 
+        /// <summary>
+        /// How many sessions are held at most, by default: beyond, the settled ones are forgotten, those settled first
+        /// first.
+        /// </summary>
+        public const           Int32     DefaultMaxSessions             = 100_000;
+
+        /// <summary>
+        /// How often the sessions no longer kept are forgotten, by default.
+        /// </summary>
+        public static readonly TimeSpan  DefaultPurgeInterval           = TimeSpan.FromSeconds(10);
+
+        /// <summary>
+        /// What a client is told where the systems of the operator failed to start a session: what failed is reported with
+        /// OnError only.
+        /// </summary>
+        public const           String    NotStarted                     = "The session is not started: the systems of the operator failed. Try again later!";
+
         private readonly Dictionary<RoamingNetwork_Id, RoamingNetworkTrustAnchor>  trustAnchors;
         private readonly ConcurrentDictionary<String,  EVTalerOfferSession>  sessions        = new (StringComparer.Ordinal);
         private readonly ConcurrentDictionary<EVSE_Id, EVTalerOfferSession>  sessionAtEVSE   = new ();
+        private readonly Dictionary<String, Int32>                           openPerClient   = new (StringComparer.Ordinal);
         private readonly Lock                                                startLock       = new ();
+        private          Int64                                               nextPurge;
 
         #endregion
 
@@ -122,20 +150,47 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public TimeSpan                    MaxEventWait                { get; set; } = DefaultMaxEventWait;
 
         /// <summary>
-        /// How long the events of a settled session are kept.
+        /// How long the events of a settled session are kept, when a step of it was paid.
         /// </summary>
         public TimeSpan                    KeepSettledSessions         { get; set; } = DefaultKeepSettledSessions;
 
         /// <summary>
-        /// How many sessions a client, by its address, may have open at a time: not settled yet.
+        /// How long the events of a session settled without any step paid are kept.
+        /// </summary>
+        public TimeSpan                    KeepUnpaidSessions          { get; set; } = DefaultKeepUnpaidSessions;
+
+        /// <summary>
+        /// How many sessions a client may have open at a time, not settled yet: the client as the POI API counts its heavy
+        /// reads, by its address, an IPv6 one by its /64, behind a trusted proxy the one its ClientAddressOf says.
         /// </summary>
         public Int32                       MaxOpenSessionsPerClient    { get; set; } = DefaultMaxOpenSessionsPerClient;
+
+        /// <summary>
+        /// How many sessions are held at most: beyond, the settled ones are forgotten, those settled first first. Open
+        /// sessions are never forgotten; there are no more of them than EVSEs.
+        /// </summary>
+        public Int32                       MaxSessions                 { get; set; } = DefaultMaxSessions;
+
+        /// <summary>
+        /// How often the sessions no longer kept are forgotten.
+        /// </summary>
+        public TimeSpan                    PurgeInterval               { get; set; } = DefaultPurgeInterval;
 
         /// <summary>
         /// The sessions it holds.
         /// </summary>
         public IEnumerable<EVTalerOfferSession> Sessions
             => sessions.Values;
+
+        #endregion
+
+        #region Events
+
+        /// <summary>
+        /// A session was not started because the backend, the merchant backend or the charging station management system
+        /// failed: the session, and what failed, which the client is not told.
+        /// </summary>
+        public event Action<String, String>?   OnError;
 
         #endregion
 
@@ -273,12 +328,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region The proof of the station and the current price statements
-
-            var now = TimeProvider.GetUtcNow();
+            #region The limits, before the proof: a few sessions per client, one at an EVSE
 
             if (!trustAnchors.TryGetValue(roamingNetworkId, out var trustAnchor))
                 return Error(Request, HTTPStatusCode.ServiceUnavailable, $"No trust anchor of the roaming network '{roamingNetworkId}' is pinned here: its stations are not proven!");
+
+            var client = POIAPI.ClientKeyOf(Request);
+
+            lock (startLock)
+            {
+                if (RefusedByLimits(Request, client, evseId) is HTTPResponse refused)
+                    return refused;
+            }
+
+            // Proving the station checks its signatures: the start takes one of the heavy reads its client may make.
+            if (POIAPI.TooManyHeavyReads(Request) is HTTPResponse tooManyHeavyReads)
+                return tooManyHeavyReads;
+
+            #endregion
+
+            #region The proof of the station and the current price statements
+
+            var now = TimeProvider.GetUtcNow();
 
             if (!history.TryGetChargingStationProof(evseId, out var proof, out var proofError, null, now) ||
                 !VerifiedChargingStation.TryVerify(trustAnchor, proof, out var station, out proofError, EVSEId: evseId.ToString(), At: now))
@@ -288,9 +359,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region The limits: one session at an EVSE, a few per client
+            #region The session, held where the limits still let it be
 
-            var client  = Request.RemoteSocket.IPAddress.ToString();
             var session = new EVTalerOfferSession(this,
                                                   NewRandom(16),
                                                   NewRandom(32, out var secret),
@@ -303,13 +373,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
             lock (startLock)
             {
 
-                if (sessions.Values.Count(open => open.Client == client && !open.SettledAt.HasValue) >= MaxOpenSessionsPerClient)
-                    return Error(Request, HTTPStatusCode.TooManyRequests, "Too many EV Taler sessions of this client are open!");
+                if (RefusedByLimits(Request, client, evseId) is HTTPResponse refused)
+                    return refused;
 
                 if (!sessionAtEVSE.TryAdd(evseId, session))
                     return Error(Request, HTTPStatusCode.Conflict, $"The EVSE '{evseId}' has an EV Taler session already!");
 
-                sessions[session.SessionId] = session;
+                sessions[session.SessionId]  = session;
+                openPerClient[client]        = openPerClient.GetValueOrDefault(client) + 1;
 
             }
 
@@ -340,23 +411,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (!result.Started || offer is null)
             {
 
-                sessions.TryRemove(session.SessionId, out _);
-                sessionAtEVSE.TryRemove(new KeyValuePair<EVSE_Id, EVTalerOfferSession>(evseId, session));
+                Forget(session);
 
                 if (result.Started)
                     await Backend.StopSession(session.SessionId, CancellationToken.None);
 
-                var statusCode = result.Started
-                                     ? HTTPStatusCode.BadGateway
-                                     : result.StatusCode switch {
-                                           409 => HTTPStatusCode.Conflict,
-                                           422 => HTTPStatusCode.UnprocessableEntity,
-                                           _   => HTTPStatusCode.BadGateway
-                                       };
+                // The client is told what its driver may act on: a step or an exchange not accepted (422), the EVSE taking
+                // no session now (409), and an offer of step 1 failing a check of this server, in this server's words. What
+                // failed in the systems of the operator is reported with OnError, not told to the client.
+                var refusal     = events.FirstOrDefault(json => json["type"]?.Value<String>() == "refused");
 
-                var description = result.Started
-                                      ? "The backend started the session without offering step 1!"
-                                      : result.Description ?? "The session is not started!";
+                var statusCode  = result.Started
+                                      ? HTTPStatusCode.BadGateway
+                                      : result.StatusCode switch {
+                                            409 => HTTPStatusCode.Conflict,
+                                            422 => HTTPStatusCode.UnprocessableEntity,
+                                            _   => HTTPStatusCode.BadGateway
+                                        };
+
+                var description = statusCode != HTTPStatusCode.BadGateway
+                                      ? result.Description ?? "The session is not started!"
+                                      : refusal is not null
+                                            ? $"The offer of step 1 was refused: {refusal["description"]?.Value<String>()}"
+                                            : NotStarted;
+
+                if (statusCode == HTTPStatusCode.BadGateway)
+                    Report(session.SessionId,
+                           result.Started
+                               ? "The backend started the session without offering step 1!"
+                               : result.Description ?? "The session is not started!");
 
                 return result.AcceptedSteps.Count > 0
                            ? Error(Request, statusCode, description, new JProperty("acceptedSteps", new JArray(result.AcceptedSteps.Select(step => step.ToJSON()))))
@@ -457,20 +540,132 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (internal) Settled(Session)
+
+        /// <summary>
+        /// The session was settled: its EVSE takes another session, and it no longer counts against its client.
+        /// </summary>
+        internal void Settled(EVTalerOfferSession Session)
+        {
+            Release(Session);
+            Close(Session);
+        }
+
+        #endregion
+
+        #region (private) Forget(Session)
+
+        /// <summary>
+        /// The session was not started: it is not held, its EVSE takes another session, and it does not count against its
+        /// client.
+        /// </summary>
+        private void Forget(EVTalerOfferSession Session)
+        {
+            sessions.TryRemove(new KeyValuePair<String, EVTalerOfferSession>(Session.SessionId, Session));
+            Release(Session);
+            Close(Session);
+        }
+
+        #endregion
+
+        #region (private) Close(Session)
+
+        /// <summary>
+        /// The session no longer counts against its client, once; it forgets the client.
+        /// </summary>
+        private void Close(EVTalerOfferSession Session)
+        {
+
+            if (Session.Close() is not String client)
+                return;
+
+            lock (startLock)
+            {
+                if (openPerClient.TryGetValue(client, out var open))
+                {
+                    if (open > 1)
+                        openPerClient[client] = open - 1;
+                    else
+                        openPerClient.Remove(client);
+                }
+            }
+
+        }
+
+        #endregion
+
+        #region (private) RefusedByLimits(Request, Client, EVSEId)
+
+        /// <summary>
+        /// Whether the limits refuse a new session of the given client at the given EVSE: 429 when the client has as many
+        /// sessions open as it may, 409 when the EVSE has one. Called under the start lock.
+        /// </summary>
+        private HTTPResponse? RefusedByLimits(HTTPRequest  Request,
+                                              String       Client,
+                                              EVSE_Id      EVSEId)
+        {
+
+            if (openPerClient.GetValueOrDefault(Client) >= MaxOpenSessionsPerClient)
+                return Error(Request, HTTPStatusCode.TooManyRequests, "Too many EV Taler sessions of this client are open!");
+
+            if (sessionAtEVSE.ContainsKey(EVSEId))
+                return Error(Request, HTTPStatusCode.Conflict, $"The EVSE '{EVSEId}' has an EV Taler session already!");
+
+            return null;
+
+        }
+
+        #endregion
+
         #region (private) Purge()
 
         /// <summary>
-        /// Forget the sessions settled longer ago than they are kept.
+        /// Forget the sessions no longer kept, every PurgeInterval at most: those settled longer ago than KeepSettledSessions,
+        /// or than KeepUnpaidSessions without any step paid; and beyond MaxSessions the settled ones, those settled first
+        /// first.
         /// </summary>
         private void Purge()
         {
 
-            var before = TimeProvider.GetUtcNow() - KeepSettledSessions;
+            var now   = TimeProvider.GetUtcNow();
+            var next  = Interlocked.Read(ref nextPurge);
+
+            if (now.UtcTicks < next ||
+                Interlocked.CompareExchange(ref nextPurge, (now + PurgeInterval).UtcTicks, next) != next)
+                return;
+
+            var settledBefore  = now - KeepSettledSessions;
+            var unpaidBefore   = now - KeepUnpaidSessions;
 
             foreach (var session in sessions.Values)
-                if (session.SettledAt < before)
+                if (session.SettledAt is DateTimeOffset settledAt &&
+                    settledAt < (session.AnyStepPaid ? settledBefore : unpaidBefore))
                     sessions.TryRemove(new KeyValuePair<String, EVTalerOfferSession>(session.SessionId, session));
 
+            var beyond = sessions.Count - MaxSessions;
+
+            if (beyond > 0)
+                foreach (var session in sessions.Values.Where  (session => session.SettledAt.HasValue).
+                                                       OrderBy(session => session.SettledAt).
+                                                       Take   (beyond).
+                                                       ToArray())
+                    sessions.TryRemove(new KeyValuePair<String, EVTalerOfferSession>(session.SessionId, session));
+
+        }
+
+        #endregion
+
+        #region (private) Report(SessionId, Description)
+
+        private void Report(String  SessionId,
+                            String  Description)
+        {
+            try
+            {
+                OnError?.Invoke(SessionId, Description);
+            }
+            catch
+            { }
         }
 
         #endregion

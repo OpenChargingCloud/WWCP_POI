@@ -262,6 +262,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             public Boolean                              Down           { get; set; }
 
             /// <summary>
+            /// Throws on every read of an order, as a client failing beyond what it catches would.
+            /// </summary>
+            public Boolean                              ThrowOnRead    { get; set; }
+
+            /// <summary>
             /// Changes the contract terms of the orders it makes from now on, as a merchant backend configured otherwise
             /// than the operator's evTaler, or a relay changing them, would.
             /// </summary>
@@ -280,6 +285,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 if (Down)
                     return Answer(HttpStatusCode.BadGateway, new JObject(new JProperty("code", 1), new JProperty("hint", "down")));
+
+                if (ThrowOnRead && Request.Method == HttpMethod.Get)
+                    throw new InvalidOperationException("The read broke at 10.0.0.9:9966.");
 
                 if (Request.Headers.Authorization?.ToString() != "Bearer " + AccessToken)
                     return Answer(HttpStatusCode.Unauthorized, new JObject(new JProperty("code", 2), new JProperty("hint", "token")));
@@ -413,15 +421,21 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         {
 
             public String?                                    Busy        { get; set; }
+            public String?                                    FailAsked   { get; set; }
+            public String?                                    FailStart   { get; set; }
             public ConcurrentQueue<String>                    Calls       { get; } = new ();
             public ConcurrentDictionary<String, IEVTalerChargingEvents> Events { get; } = new ();
             public EVTalerSignedMeterValue?                   EndValue    { get; set; }
 
             public Task<String?> WhyNotStart(EVSE_Id EVSEId, CancellationToken CancellationToken)
-                => Task.FromResult(Busy);
+                => FailAsked is not null
+                       ? throw new InvalidOperationException(FailAsked)
+                       : Task.FromResult(Busy);
 
             public Task<String?> Start(EVSE_Id EVSEId, String SessionId, EVTalerChargingLimit Limit, IEVTalerChargingEvents Events, CancellationToken CancellationToken)
             {
+                if (FailStart is not null)
+                    throw new InvalidOperationException(FailStart);
                 Calls.Enqueue($"start {EVSEId} {Limit}");
                 this.Events[SessionId] = Events;
                 return Task.FromResult<String?>(null);
@@ -487,6 +501,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                       [ History.Head.RoamingNetwork.TrustAnchor() ],
                                                       VerifyMeterValue);
 
+                this.Offers.OnError += (session, description) => Errors.Enqueue(description);
+
                 this.Client    = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{Server.TCPPort}/RNs/rn1/") };
 
             }
@@ -506,13 +522,21 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             }
 
-            public async Task<(HttpStatusCode Status, JObject JSON)> Ask(EVSE_Id EVSEId, String Body, String ContentType = "application/json")
+            /// <summary>
+            /// Ask for a session; as the client a trusted proxy names in X-Client, if given.
+            /// </summary>
+            public async Task<(HttpStatusCode Status, JObject JSON)> Ask(EVSE_Id EVSEId, String Body, String ContentType = "application/json", String? Client = null)
             {
-                using var response = await Client.PostAsync($"EVSEs/{EVSEId}/evTaler/sessions", new StringContent(Body, Encoding.UTF8, ContentType));
+                using var request = new HttpRequestMessage(HttpMethod.Post, $"EVSEs/{EVSEId}/evTaler/sessions") {
+                                        Content = new StringContent(Body, Encoding.UTF8, ContentType)
+                                    };
+                if (Client is not null)
+                    request.Headers.Add("X-Client", Client);
+                using var response = await this.Client.SendAsync(request);
                 return (response.StatusCode, (JObject) POIJSON.Read(await response.Content.ReadAsStringAsync()));
             }
 
-            public Task<(HttpStatusCode Status, JObject JSON)> Ask(EVSE_Id EVSEId, Decimal Quantity = 5, String Unit = "kWh", String Exchange = EURExchangeKey, String? Cap = null)
+            public Task<(HttpStatusCode Status, JObject JSON)> Ask(EVSE_Id EVSEId, Decimal Quantity = 5, String Unit = "kWh", String Exchange = EURExchangeKey, String? Cap = null, String? Client = null)
             {
 
                 var json = new JObject(new JProperty("exchange", Exchange),
@@ -522,7 +546,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 if (Cap is not null)
                     json.Add("cap", Cap);
 
-                return Ask(EVSEId, json.ToString());
+                return Ask(EVSEId, json.ToString(), Client: Client);
 
             }
 
@@ -1006,6 +1030,330 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(seen[5]["statement"]!["price"]!.Value<String>(),       Is.EqualTo("3.75"));
                 Assert.That((JArray) seen[5]["refunds"]!,                          Is.Empty);
                 Assert.That(hub.Merchant.Orders,                                   Has.Count.EqualTo(1));
+            }
+
+        }
+
+        #endregion
+
+        #region The_limits_count_a_client_as_the_heavy_reads_do()
+
+        /// <summary>
+        /// The open sessions of a client are counted as the POI API counts its heavy reads (E2): by the address a trusted
+        /// proxy names, not the proxy's, an IPv6 one by its /64; and a session settled counts no more.
+        /// </summary>
+        [Test]
+        public async Task The_limits_count_a_client_as_the_heavy_reads_do()
+        {
+
+            await using var hub = await Hub.Start();
+
+            hub.POIAPI.ClientAddressOf           = request => request.GetHeaderField("X-Client") is String client ? System.Net.IPAddress.Parse(client) : null;
+            hub.Offers.MaxOpenSessionsPerClient  = 1;
+            hub.Backend.FirstPayDeadline         = TimeSpan.FromSeconds(2);
+
+            var (status, first) = await hub.Ask(E1, Client: "2001:db8:1:1::1");
+
+            Assert.That(status, Is.EqualTo(HttpStatusCode.Created), first.ToString());
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That((await hub.Ask(E2, Client: "2001:db8:1:1::2")).Status,  Is.EqualTo(HttpStatusCode.TooManyRequests));
+                Assert.That((await hub.Ask(E2, Client: "2001:db8:1:2::1")).Status,  Is.EqualTo(HttpStatusCode.Created));
+                Assert.That(hub.Offers.Sessions.Select(session => session.Client),   Is.EquivalentTo(new[] { "2001:db8:1:1::/64", "2001:db8:1:2::/64" }));
+            }
+
+            // Step 1 of the first not paid: settled, it counts no more, and its EVSE takes the next session.
+            await hub.Until(first["sessionId"]!.Value<String>()!, first["secret"]!.Value<String>()!, "settlement", []);
+
+            Assert.That((await hub.Ask(E1, Client: "2001:db8:1:1::2")).Status,      Is.EqualTo(HttpStatusCode.Created));
+
+        }
+
+        #endregion
+
+        #region Starting_a_session_takes_a_heavy_read_after_the_limits()
+
+        /// <summary>
+        /// Proving the station of a session asked for takes one of the heavy reads its client may make; a start the limits
+        /// refuse before takes none (E2).
+        /// </summary>
+        [Test]
+        public async Task Starting_a_session_takes_a_heavy_read_after_the_limits()
+        {
+
+            await using var hub = await Hub.Start();
+
+            hub.POIAPI.MaxHeavyReadsPerMinute = 1;
+
+            var (status, json) = await hub.Ask(E1);
+
+            Assert.That(status, Is.EqualTo(HttpStatusCode.Created), json.ToString());
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That((await hub.Ask(E1)).Status,                 Is.EqualTo(HttpStatusCode.Conflict));
+                Assert.That((await hub.Ask(E1)).Status,                 Is.EqualTo(HttpStatusCode.Conflict));
+
+                (status, json) = await hub.Ask(E2);
+
+                Assert.That(status,                                     Is.EqualTo(HttpStatusCode.TooManyRequests), json.ToString());
+                Assert.That(json["description"]!.Value<String>(),       Does.Contain("heavy reads"));
+                Assert.That(hub.POIAPI.HeavyReadsRefused,               Is.EqualTo(1));
+                Assert.That(hub.Merchant.Orders,                        Has.Count.EqualTo(1));
+
+            }
+
+        }
+
+        #endregion
+
+        #region What_fails_at_the_operator_is_reported_not_told_to_the_driver()
+
+        /// <summary>
+        /// What fails at the merchant backend or the charging station management system is reported with OnError, and the
+        /// driver is told that the systems of the operator failed, not what (E4): not started, or stopped by the operator
+        /// once step 1 is paid, refunded in full.
+        /// </summary>
+        [Test]
+        public async Task What_fails_at_the_operator_is_reported_not_told_to_the_driver()
+        {
+
+            await using var hub = await Hub.Start();
+
+            hub.Merchant.Down = true;
+            var (merchantDown, merchantJSON) = await hub.Ask(E1);
+            hub.Merchant.Down = false;
+
+            hub.Control.FailAsked = "The database at 10.0.0.5:5432 refused.";
+            var (controlFailed, controlJSON) = await hub.Ask(E1);
+            hub.Control.FailAsked = null;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(merchantDown,                                    Is.EqualTo(HttpStatusCode.BadGateway));
+                Assert.That(merchantJSON["description"]!.Value<String>(),   Is.EqualTo(EVTalerOffersAPI.NotStarted));
+                Assert.That(controlFailed,                                   Is.EqualTo(HttpStatusCode.BadGateway));
+                Assert.That(controlJSON["description"]!.Value<String>(),    Is.EqualTo(EVTalerOffersAPI.NotStarted));
+                Assert.That(hub.Errors,                                      Has.Some.Contains("down"));
+                Assert.That(hub.Errors,                                      Has.Some.Contains("10.0.0.5:5432"));
+                Assert.That(hub.Offers.Sessions,                             Is.Empty);
+            }
+
+            hub.Control.FailStart = "The relay K3 at 10.0.0.6 is stuck.";
+
+            var (status, started) = await hub.Ask(E1);
+
+            Assert.That(status, Is.EqualTo(HttpStatusCode.Created), started.ToString());
+
+            var sessionId = started["sessionId"]!.Value<String>()!;
+            var secret    = started["secret"]!.Value<String>()!;
+
+            hub.Merchant.Pay(started["offer"]!["orderId"]!.Value<String>()!);
+
+            var seen = await hub.Until(sessionId, secret, "settlement", []);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(seen.Select(json => json["type"]!.Value<String>()),  Is.EqualTo(new[] { "offer", "paid", "stopped", "settlement" }));
+                Assert.That(seen[2]["reason"]!.Value<String>(),                   Is.EqualTo(EVTalerStopReasons.Operator));
+                Assert.That(seen[2]["description"]!.Value<String>(),              Does.Not.Contain("10.0.0.6"));
+                Assert.That(seen[3]["refunds"]![0]!["amount"]!.Value<String>(),   Is.EqualTo("EUR:3.75"));
+                Assert.That(hub.Errors,                                           Has.Some.Contains("10.0.0.6"));
+            }
+
+        }
+
+        #endregion
+
+        #region Sessions_without_a_payment_are_forgotten_soon()
+
+        /// <summary>
+        /// A session settled without any step paid is kept KeepUnpaidSessions, one with a step paid KeepSettledSessions;
+        /// beyond MaxSessions the settled ones are forgotten, never the open ones; once settled a session keeps neither its
+        /// client nor the proof and the price statements, and counts against its client no more (E3).
+        /// </summary>
+        [Test]
+        public async Task Sessions_without_a_payment_are_forgotten_soon()
+        {
+
+            await using var hub = await Hub.Start();
+
+            hub.Backend.FirstPayDeadline         = TimeSpan.FromSeconds(2);
+            hub.Offers.PurgeInterval             = TimeSpan.Zero;
+            hub.Offers.MaxOpenSessionsPerClient  = 1;
+
+            #region A session whose step 1 is not paid, kept as long as KeepUnpaidSessions
+
+            var (status, first) = await hub.Ask(E1);
+
+            Assert.That(status, Is.EqualTo(HttpStatusCode.Created), first.ToString());
+
+            var firstId      = first["sessionId"]!.Value<String>()!;
+            var firstSecret  = first["secret"]!.Value<String>()!;
+
+            await hub.Until(firstId, firstSecret, "settlement", []);
+
+            var settled = hub.Offers.Sessions.Single();
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(settled.SettledAt,                                 Is.Not.Null);
+                Assert.That(settled.AnyStepPaid,                               Is.False);
+                Assert.That(settled.Client,                                    Is.Null);
+                Assert.That(settled.Station,                                   Is.Null);
+                Assert.That(settled.PriceStatements,                           Is.Null);
+                Assert.That((await hub.Events(firstId, firstSecret)).Status,  Is.EqualTo(HttpStatusCode.OK));
+            }
+
+            #endregion
+
+            #region A second session of the client; beyond MaxSessions the settled one is forgotten, not the open one
+
+            var (status2, second) = await hub.Ask(E2);
+
+            Assert.That(status2, Is.EqualTo(HttpStatusCode.Created), second.ToString());
+
+            var secondId      = second["sessionId"]!.Value<String>()!;
+            var secondSecret  = second["secret"]!.Value<String>()!;
+
+            hub.Offers.MaxSessions = 1;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That((await hub.Events(firstId,  firstSecret)). Status,  Is.EqualTo(HttpStatusCode.Unauthorized));
+                Assert.That((await hub.Events(secondId, secondSecret)).Status,  Is.EqualTo(HttpStatusCode.OK));
+            }
+
+            hub.Offers.MaxSessions = EVTalerOffersAPI.DefaultMaxSessions;
+
+            #endregion
+
+            #region The second paid and stopped: kept, though sessions without a payment are not
+
+            hub.Merchant.Pay(second["offer"]!["orderId"]!.Value<String>()!);
+
+            var seen = await hub.Until(secondId, secondSecret, "paid", []);
+            await WaitFor(() => hub.Control.Events.ContainsKey(secondId));
+            await hub.Stop(secondId, secondSecret);
+            await hub.Until(secondId, secondSecret, "settlement", seen);
+
+            hub.Offers.KeepUnpaidSessions = TimeSpan.Zero;
+            await Task.Delay(50);
+
+            Assert.That((await hub.Events(secondId, secondSecret)).Status,  Is.EqualTo(HttpStatusCode.OK));
+
+            #endregion
+
+            #region A third whose step 1 is not paid: forgotten once KeepUnpaidSessions passed
+
+            hub.Offers.KeepUnpaidSessions = EVTalerOffersAPI.DefaultKeepUnpaidSessions;
+
+            var (status3, third) = await hub.Ask(E1);
+
+            Assert.That(status3, Is.EqualTo(HttpStatusCode.Created), third.ToString());
+
+            var thirdId      = third["sessionId"]!.Value<String>()!;
+            var thirdSecret  = third["secret"]!.Value<String>()!;
+
+            await hub.Until(thirdId, thirdSecret, "settlement", []);
+
+            hub.Offers.KeepUnpaidSessions = TimeSpan.Zero;
+            await Task.Delay(50);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That((await hub.Events(thirdId,  thirdSecret)). Status,  Is.EqualTo(HttpStatusCode.Unauthorized));
+                Assert.That((await hub.Events(secondId, secondSecret)).Status,  Is.EqualTo(HttpStatusCode.OK));
+            }
+
+            #endregion
+
+        }
+
+        #endregion
+
+        #region A_payment_watch_that_fails_still_ends_the_step()
+
+        /// <summary>
+        /// The client of the merchant backend throwing while the payment of step 1 is waited for: the step still ends,
+        /// taken as unpaid once nothing is known of it UnknownPaymentWait after its deadline, and reported; the session is
+        /// settled, and the EVSE takes the next one (E5).
+        /// </summary>
+        [Test]
+        public async Task A_payment_watch_that_fails_still_ends_the_step()
+        {
+
+            await using var hub = await Hub.Start();
+
+            hub.Backend.FirstPayDeadline    = TimeSpan.FromSeconds(2);
+            hub.Backend.UnknownPaymentWait  = TimeSpan.FromSeconds(2);
+
+            var (status, started) = await hub.Ask(E1);
+
+            Assert.That(status, Is.EqualTo(HttpStatusCode.Created), started.ToString());
+
+            // The poll under way ends by the deadline; every read after it throws.
+            hub.Merchant.ThrowOnRead = true;
+
+            var seen = await hub.Until(started["sessionId"]!.Value<String>()!, started["secret"]!.Value<String>()!, "settlement", []);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(seen.Select(json => json["type"]!.Value<String>()),  Is.EqualTo(new[] { "offer", "unpaid", "stopped", "settlement" }));
+                Assert.That(seen[2]["reason"]!.Value<String>(),                   Is.EqualTo(EVTalerStopReasons.Unpaid));
+                Assert.That(hub.Errors,                                           Has.Some.Contains("Waiting for the payment of step 1 failed"));
+                Assert.That(hub.Errors,                                           Has.Some.Contains("taken as unpaid"));
+            }
+
+            hub.Merchant.ThrowOnRead = false;
+
+            Assert.That((await hub.Ask(E1)).Status,                               Is.EqualTo(HttpStatusCode.Created));
+
+        }
+
+        #endregion
+
+        #region A_step_paid_while_the_merchant_backend_was_not_reached_counts()
+
+        /// <summary>
+        /// Step 1 paid while the backend did not reach the merchant backend: past its deadline the step is not taken as
+        /// unpaid while the merchant backend does not say so, and once reached again its payment counts (E5).
+        /// </summary>
+        [Test]
+        public async Task A_step_paid_while_the_merchant_backend_was_not_reached_counts()
+        {
+
+            await using var hub = await Hub.Start();
+
+            hub.Backend.FirstPayDeadline    = TimeSpan.FromSeconds(2);
+            hub.Backend.UnknownPaymentWait  = TimeSpan.FromMinutes(1);
+
+            var (status, started) = await hub.Ask(E1);
+
+            Assert.That(status, Is.EqualTo(HttpStatusCode.Created), started.ToString());
+
+            var sessionId  = started["sessionId"]!.Value<String>()!;
+            var secret     = started["secret"]!.Value<String>()!;
+
+            // The poll under way ends by the deadline; the ones after it do not reach the merchant backend, until well past it.
+            hub.Merchant.Down = true;
+            await Task.Delay(TimeSpan.FromSeconds(2.5));
+            hub.Merchant.Pay(started["offer"]!["orderId"]!.Value<String>()!);
+            await Task.Delay(TimeSpan.FromSeconds(2));
+            hub.Merchant.Down = false;
+
+            var seen = await hub.Until(sessionId, secret, "paid", []);
+            await WaitFor(() => hub.Control.Events.ContainsKey(sessionId));
+            await hub.Stop(sessionId, secret);
+            await hub.Until(sessionId, secret, "settlement", seen);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(seen.Select(json => json["type"]!.Value<String>()),  Is.EqualTo(new[] { "offer", "paid", "stopped", "settlement" }));
+                Assert.That(hub.Control.Calls,                                    Is.EqualTo(new[] { "start DE*GEF*E1*1 5 kWh", "stop" }));
+                Assert.That(hub.Errors,                                           Has.Some.Contains("is not known"));
             }
 
         }

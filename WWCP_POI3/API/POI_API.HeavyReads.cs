@@ -161,14 +161,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private)        TooManyHeavyReads(Request)
+        #region TooManyHeavyReads(Request)
 
         /// <summary>
         /// Take one of the heavy reads the client of the given request may make: null where there was one,
         /// otherwise 429 Too Many Requests with the seconds to wait, in Retry-After as well; readable from every
-        /// origin, as what it refuses is.
+        /// origin, as what it refuses is. Endpoints added to this API that cost as much take one as well, e.g. the
+        /// start of an EV Taler session, which proves a charging station.
         /// </summary>
-        private HTTPResponse? TooManyHeavyReads(HTTPRequest Request)
+        public HTTPResponse? TooManyHeavyReads(HTTPRequest Request)
         {
 
             if (heavyReads?.TryAcquire(ClientKeyOf(Request), HeavyReadNow) is not { Allowed: false } decision)
@@ -242,12 +243,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region (private)        ClientKeyOf      (Request)
+        #region ClientKeyOf      (Request)
 
         /// <summary>
-        /// Whom a heavy read of the given request is counted against: its client's address, an IPv6 one by its /64.
+        /// Whom a heavy read of the given request is counted against: its client's address, an IPv6 one by its /64;
+        /// behind a trusted proxy the one ClientAddressOf says. Endpoints added to this API count their own limits per
+        /// client by it as well, e.g. the open EV Taler sessions of a client.
         /// </summary>
-        private String ClientKeyOf(HTTPRequest Request)
+        public String ClientKeyOf(HTTPRequest Request)
 
             => ClientAddressOf?.Invoke(Request) is IPAddress address
                    ? ClientKeyOf(address)

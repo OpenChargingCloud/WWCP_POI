@@ -151,6 +151,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public TimeSpan                        RetryStep              { get; set; } = TimeSpan.FromSeconds(10);
 
         /// <summary>
+        /// How long after the deadline of a step the merchant backend is still asked whether it was paid, when it does not
+        /// say: a step is unpaid when the merchant backend says so after its deadline; one it still does not say anything
+        /// of after this time is taken as unpaid, and reported.
+        /// </summary>
+        public TimeSpan                        UnknownPaymentWait     { get; set; } = TimeSpan.FromMinutes(10);
+
+        /// <summary>
         /// The time provider.
         /// </summary>
         public TimeProvider                    TimeProvider           { get; }
@@ -577,7 +584,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region (private) WatchPayment(Session, Step)
 
         /// <summary>
-        /// Wait for the payment of the given step by long polling, until its deadline.
+        /// Wait for the payment of the given step by long polling, until its deadline, and end the step: paid, or unpaid
+        /// once the merchant backend says so after the deadline. Where it does not say, failing or not reached, it is asked
+        /// again, UnknownPaymentWait after the deadline at most; then the step is taken as unpaid, and reported. The watch
+        /// always ends the step, so that the session and its EVSE are never held without one.
         /// </summary>
         private async Task WatchPayment(BackendSession  Session,
                                         StepState       Step)
@@ -589,23 +599,48 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 while (true)
                 {
 
-                    var asked      = TimeProvider.GetUtcNow();
-                    var remaining  = Step.PayDeadline - asked;
-                    var status     = await Merchant.GetOrder(Step.OrderId, remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
+                    var asked = TimeProvider.GetUtcNow();
+                    TalerMerchantResponse<TalerOrderStatus>? status;
 
-                    if (status.IsSuccess && status.Result.IsPaid)
+                    try
+                    {
+                        var remaining = Step.PayDeadline - asked;
+                        status = await Merchant.GetOrder(Step.OrderId, remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero);
+                    }
+                    catch (Exception e)
+                    {
+                        status = null;
+                        Report(Session, $"Waiting for the payment of step {Step.Step} failed: {e.Message}");
+                    }
+
+                    if (status is { IsSuccess: true } && status.Result.IsPaid)
                     {
                         Session.Post(() => OnPaid(Session, Step));
                         return;
                     }
 
-                    if (TimeProvider.GetUtcNow() >= Step.PayDeadline + TimeSpan.FromSeconds(1))
+                    var now = TimeProvider.GetUtcNow();
+
+                    if (now >= Step.PayDeadline + TimeSpan.FromSeconds(1))
                     {
-                        Session.Post(() => OnUnpaid(Session, Step));
-                        return;
+
+                        // The merchant backend says it is not paid, after its deadline: no wallet pays it any more.
+                        if (status is { IsSuccess: true })
+                        {
+                            Session.Post(() => OnUnpaid(Session, Step));
+                            return;
+                        }
+
+                        if (now >= Step.PayDeadline + UnknownPaymentWait)
+                        {
+                            Report(Session, $"The payment of step {Step.Step} is still not known {UnknownPaymentWait} after its deadline: it is taken as unpaid; the order '{Step.OrderId}' at the merchant backend says whether it was.");
+                            Session.Post(() => OnUnpaid(Session, Step));
+                            return;
+                        }
+
                     }
 
-                    if (!status.IsSuccess)
+                    if (status is { IsSuccess: false })
                         Report(Session, $"The payment of step {Step.Step} is not known: {status}");
 
                     // A backend answering at once, or not at all, is asked again a moment later.
@@ -617,7 +652,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
             catch (Exception e)
             {
-                Report(Session, $"Waiting for the payment of step {Step.Step} failed: {e.Message}");
+                // Not to come: the step ends unpaid, rather than holding the session and its EVSE.
+                Report(Session, $"Waiting for the payment of step {Step.Step} failed, it is taken as unpaid: {e.Message}");
+                Session.Post(() => OnUnpaid(Session, Step));
             }
 
         }
@@ -661,7 +698,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
                 catch (Exception e)
                 {
-                    why = $"The charging station management system failed: {e.Message}";
+                    Report(Session, $"The charging station management system failed to start charging: {e.Message}");
+                    why = "The charging station management system failed to start charging.";
                 }
 
                 if (why is not null)
@@ -789,8 +827,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
                 catch (ArgumentException e)
                 {
+                    Report(Session, $"The settlement statement is not made: {e.Message}");
                     price    = null;
-                    noPrice  = $"the settlement statement is invalid: {e.Message}";
+                    noPrice  = "the settlement statement is not made";
                 }
 
             }
