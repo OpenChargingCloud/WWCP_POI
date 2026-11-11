@@ -185,7 +185,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             try
             {
-                percent = percentJSON.Value<Decimal>();
+                percent = percentJSON.AsDecimal();
             }
             catch (OverflowException)
             {

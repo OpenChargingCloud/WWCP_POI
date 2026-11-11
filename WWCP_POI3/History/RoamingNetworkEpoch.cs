@@ -500,7 +500,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (JSON is not JObject json ||
                 json[PropertyKeys.Epoch] is not JValue { Type: JTokenType.Integer } number ||
-                number.Value<Decimal>() < 1 || number.Value<Decimal>() > UInt32.MaxValue)
+                number.AsDecimal() < 1 || number.AsDecimal() > UInt32.MaxValue)
             {
                 ErrorResponse = "An epoch must be { epoch, profiles }, its number from 1 on!";
                 return false;
@@ -642,7 +642,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (JSON is not JObject json ||
                     json[PropertyKeys.Epoch] is not JValue { Type: JTokenType.Integer } epoch ||
-                    epoch.Value<Decimal>() < 1 || epoch.Value<Decimal>() > UInt32.MaxValue ||
+                    epoch.AsDecimal() < 1 || epoch.AsDecimal() > UInt32.MaxValue ||
                     !RoamingNetworkCheckpoint_Id.TryParse(json[PropertyKeys.CheckpointId]?.Type == JTokenType.String ? json[PropertyKeys.CheckpointId]!.Value<String>() : null, out var checkpointId) ||
                     json[PropertyKeys.ETags] is not JArray { Count: > 0 } eTagsJSON)
                 {

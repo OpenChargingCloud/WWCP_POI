@@ -24,6 +24,8 @@ using System.Text.RegularExpressions;
 
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Illias;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -807,7 +809,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 if (component["price"] is not JValue { Type: JTokenType.Integer or JTokenType.Float } price ||
-                    Convert.ToDecimal(price.Value, CultureInfo.InvariantCulture) < 0)
+                    price.AsDecimal() < 0)
                 {
                     return null;
                 }

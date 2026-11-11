@@ -203,13 +203,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return !Mandatory;
             }
 
-            if (token.Type is not (JTokenType.Integer or JTokenType.Float) || token.Value<Decimal>() < 0)
+            if (token.Type is not (JTokenType.Integer or JTokenType.Float) || token.AsDecimal() < 0)
             {
                 ErrorResponse = $"The '{PropertyName}' of an energy status must be a number, not negative!";
                 return false;
             }
 
-            Value          = token.Value<Decimal>();
+            Value          = token.AsDecimal();
             ErrorResponse  = null;
             return true;
 

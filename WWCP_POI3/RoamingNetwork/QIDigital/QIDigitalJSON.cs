@@ -217,7 +217,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             try
             {
-                Value = token.Value<Decimal>();
+                Value = token.AsDecimal();
             }
             catch (OverflowException)
             {

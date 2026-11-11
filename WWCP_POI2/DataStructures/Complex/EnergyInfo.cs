@@ -265,13 +265,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
 
                     if (remainingChargingTimeToken.Type is not (JTokenType.Integer or JTokenType.Float) ||
-                        remainingChargingTimeToken.Value<Decimal>() < 0)
+                        remainingChargingTimeToken.AsDecimal() < 0)
                     {
                         ErrorResponse = "The remaining charging time must be a number of seconds, not negative!";
                         return false;
                     }
 
-                    remainingChargingTime = FromSeconds(remainingChargingTimeToken.Value<Decimal>());
+                    remainingChargingTime = FromSeconds(remainingChargingTimeToken.AsDecimal());
 
                 }
 

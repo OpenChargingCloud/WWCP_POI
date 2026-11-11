@@ -116,7 +116,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (JSON[PropertyKeys.Sequence]?.Type != JTokenType.Integer || JSON[PropertyKeys.Sequence]!.Value<Decimal>() < 0)
+            if (JSON[PropertyKeys.Sequence]?.Type != JTokenType.Integer || JSON[PropertyKeys.Sequence]!.AsDecimal() < 0)
             {
                 ErrorResponse = "A journal entry of a witness needs its sequence!";
                 return false;

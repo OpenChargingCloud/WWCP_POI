@@ -871,7 +871,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 }
 
                 if (JSON[PropertyKeys.Sequence] is not JValue { Type: JTokenType.Integer } sequenceJSON ||
-                    sequenceJSON.Value<Decimal>() < 0 || sequenceJSON.Value<Decimal>() > UInt64.MaxValue)
+                    sequenceJSON.AsDecimal() < 0 || sequenceJSON.AsDecimal() > UInt64.MaxValue)
                 {
                     ErrorResponse = "Missing or invalid sequence!";
                     return false;

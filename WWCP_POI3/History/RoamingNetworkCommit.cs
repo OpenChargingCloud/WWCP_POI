@@ -637,7 +637,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
 
                     if (epochJSON is not JValue { Type: JTokenType.Integer } epochValue ||
-                        epochValue.Value<Decimal>() < 2 || epochValue.Value<Decimal>() > UInt32.MaxValue)
+                        epochValue.AsDecimal() < 2 || epochValue.AsDecimal() > UInt32.MaxValue)
                     {
                         ErrorResponse = "Invalid epoch: a commit names it from the second one on!";
                         return false;

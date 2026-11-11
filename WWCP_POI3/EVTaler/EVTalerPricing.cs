@@ -23,6 +23,8 @@ using System.Text.RegularExpressions;
 
 using Newtonsoft.Json.Linq;
 
+using org.GraphDefined.Vanaheimr.Illias;
+
 #endregion
 
 namespace cloud.charging.open.protocols.WWCP.POI
@@ -277,12 +279,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                var price = Convert.ToDecimal(priceJSON.Value, CultureInfo.InvariantCulture);
+                var price = priceJSON.AsDecimal();
                 var vat   = component["vat"] is JValue { Type: JTokenType.Integer or JTokenType.Float } vatJSON
-                                ? Convert.ToDecimal(vatJSON.Value, CultureInfo.InvariantCulture)
+                                ? vatJSON.AsDecimal()
                                 : 0m;
                 var step  = component["stepSize"] is JValue { Type: JTokenType.Integer or JTokenType.Float } stepJSON
-                                ? Convert.ToDecimal(stepJSON.Value, CultureInfo.InvariantCulture)
+                                ? stepJSON.AsDecimal()
                                 : (Decimal?) null;
                 var gross = price * (100m + vat) / 100m;
 
@@ -380,7 +382,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 price += EnergyPerKWh.Value * Billed(Energy * 1000m, EnergyStepWh!.Value) / 1000m;
 
             if (TimePerHour.HasValue)
-                price += TimePerHour.Value * Billed((Decimal) Duration.TotalSeconds, TimeStepSeconds!.Value) / 3600m;
+                price += TimePerHour.Value * Billed(Duration.TotalSeconds.AsDecimal(), TimeStepSeconds!.Value) / 3600m;
 
             return EVTalerAmounts.Round(price, Currency);
 

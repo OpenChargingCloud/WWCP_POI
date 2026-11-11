@@ -1228,8 +1228,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
             Value = 0;
 
             if (JSON[PropertyName] is not JValue { Type: JTokenType.Integer } value ||
-                value.Value<Decimal>() < 0 ||
-                value.Value<Decimal>() > UInt64.MaxValue)
+                value.AsDecimal() < 0 ||
+                value.AsDecimal() > UInt64.MaxValue)
             {
                 ErrorResponse = $"Missing or invalid '{PropertyName}'!";
                 return false;

@@ -1210,7 +1210,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 {
 
                     if (revisionJSON is not JValue { Type: JTokenType.Integer } revisionValue ||
-                        revisionValue.Value<Decimal>() < 0 || revisionValue.Value<Decimal>() > UInt64.MaxValue)
+                        revisionValue.AsDecimal() < 0 || revisionValue.AsDecimal() > UInt64.MaxValue)
                     {
                         ErrorResponse = "Invalid revision!";
                         return false;
