@@ -86,7 +86,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       - name: Build
         id: build
@@ -140,7 +140,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          dotnet WWCP_POI3_LoadTests/bin/Release/net10.0/WWCP_POI3_LoadTests.dll --suite quick --label nightly --output artifacts/loadtests 2>&1 | tee loadtests.txt
+          dotnet WWCP_POI3_LoadTests/bin/Release/net11.0/WWCP_POI3_LoadTests.dll --suite quick --label nightly --output artifacts/loadtests 2>&1 | tee loadtests.txt
           status=${PIPESTATUS[0]}
           {
             echo '## Load tests, quick suite (informational)'

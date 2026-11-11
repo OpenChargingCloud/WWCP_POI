@@ -108,7 +108,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '11.0.x'
 
       # Both test projects, the load tests and the examples, so that all of
       # them still compile against the libraries at their tips. old/ is not
