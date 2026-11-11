@@ -49,6 +49,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region Properties
 
+        #region (internal static) ReadProperties
+
+        /// <summary>
+        /// What a change names, as TryParse reads it.
+        /// </summary>
+        internal static readonly String[] ReadProperties = [ PropertyKeys.Context,       PropertyKeys.Kind,              PropertyKeys.EntityType,
+                                                             PropertyKeys.EntityId,      PropertyKeys.PropertyName,      PropertyKeys.ParentEntityType,
+                                                             PropertyKeys.ParentEntityId, PropertyKeys.ElementPath,      PropertyKeys.OldValue,
+                                                             PropertyKeys.NewValue ];
+
+        #endregion
+
         #region (static) class PropertyKeys
 
         /// <summary>

@@ -345,6 +345,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private static) ReadProperties
+
+        /// <summary>
+        /// What a change set names, as TryParse reads it.
+        /// </summary>
+        private static readonly String[] ReadProperties = [ PropertyKeys.Id,            PropertyKeys.Context,       PropertyKeys.RoamingNetworkId,
+                                                            PropertyKeys.CreatedAt,     PropertyKeys.Description,   PropertyKeys.Metadata,
+                                                            PropertyKeys.Changes,       PropertyKeys.Preconditions, PropertyKeys.BeforeETags,
+                                                            PropertyKeys.AfterETags,    PropertyKeys.Signatures ];
+
+        #endregion
+
         #region IdentificationError(MayBeMerge = false)
 
         /// <summary>
@@ -752,7 +764,28 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Read properties
+
+                // Only what a change set names: another property would be left out as it is written again, and the same
+                // identification and signatures, which are of it as written, would be of another text.
+                if (JSON.Properties().FirstOrDefault(property => !ReadProperties.Contains(property.Name)) is JProperty unread)
+                {
+                    ErrorResponse = $"A change set must not name the property '{unread.Name}'!";
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse RoamingNetworkId    [mandatory]
+
+                // A text: one given as a number would be written again as a text.
+                if (JSON[PropertyKeys.RoamingNetworkId] is JToken roamingNetworkIdJSON &&
+                    roamingNetworkIdJSON.Type != JTokenType.String &&
+                    roamingNetworkIdJSON.Type != JTokenType.Null)
+                {
+                    ErrorResponse = $"The roaming network of the change set '{id}' must be a text!";
+                    return false;
+                }
 
                 if (!JSON.ParseMandatory(PropertyKeys.RoamingNetworkId,
                                          "roaming network identification",
@@ -775,6 +808,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                // Written as it is written again (SPECIFICATION.md, section 2): UTC, to the millisecond.
+                if (JSON[PropertyKeys.CreatedAt] is JValue { Type: JTokenType.String } createdAtJSON &&
+                    createdAtJSON.Value<String>() != createdAt.ToISO8601())
+                {
+                    ErrorResponse = $"The createdAt of the change set '{id}' must be written as yyyy-MM-ddTHH:mm:ss.fffZ, not '{createdAtJSON.Value<String>()}'!";
+                    return false;
+                }
+
                 #endregion
 
                 #region Parse Changes             [mandatory]
@@ -793,6 +834,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     if (changeJSON is not JObject changeObject)
                     {
                         ErrorResponse = $"Change {changes.Count} must be a JSON object!";
+                        return false;
+                    }
+
+                    // Only what a change names, as of the change set.
+                    if (changeObject.Properties().FirstOrDefault(property => !RoamingNetworkChange.ReadProperties.Contains(property.Name)) is JProperty unreadOfChange)
+                    {
+                        ErrorResponse = $"Change {changes.Count} must not name the property '{unreadOfChange.Name}'!";
                         return false;
                     }
 

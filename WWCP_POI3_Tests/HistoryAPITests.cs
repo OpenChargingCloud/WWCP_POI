@@ -149,7 +149,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
             var single = await Get($"commits/{leader!.Head.Commit.Id}");
 
             var infosJSON   = JArray.Parse(infos.Text);
-            var pageJSON    = JArray.Parse(page.Text);
+            // As POIJSON reads it: JArray.Parse would read createdAt as a date and write it again without its milliseconds.
+            var pageJSON    = (JArray) POIJSON.Read(page.Text);
 
             using (Assert.EnterMultipleScope())
             {

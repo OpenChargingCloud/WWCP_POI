@@ -101,6 +101,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
+                // Only what a precondition names: another property would be left out as it is written again.
+                if (JSON.Properties().FirstOrDefault(property => property.Name is not (PropertyKeys.Context or PropertyKeys.EntityType or PropertyKeys.EntityId or PropertyKeys.ETag)) is JProperty unread)
+                {
+                    ErrorResponse = $"A precondition must not name the property '{unread.Name}'!";
+                    return false;
+                }
+
                 if (!JSON.ParseMandatoryText(PropertyKeys.EntityType, "entity type", out var entityType, out ErrorResponse) ||
                     !JSON.ParseMandatoryText(PropertyKeys.EntityId,   "entity identification", out var entityId, out ErrorResponse))
                 {
