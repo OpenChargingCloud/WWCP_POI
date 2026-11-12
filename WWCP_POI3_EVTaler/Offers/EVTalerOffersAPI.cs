@@ -44,7 +44,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
     ///        "step": { "quantity": "5", "unit": "kWh" }, "cap": "30.00" }
     ///      → 201 { "sessionId", "secret", "events": "&lt;path&gt;", "offer": { … } }
     ///      → 403 without the one-time password the EVSE gives right then, in the URL of its secure dynamic QR code
-    ///            (decision D8): asked after the limits of the client, before anything else of the EVSE
+    ///            (decision D8): asked after the limits of the client, before anything else of the EVSE; missing, wrong
+    ///            or past alike. Never 401 (decision D9): RFC 9110 lets a server answer 401 only with a WWW-Authenticate
+    ///            header naming a challenge (15.5.2), an authentication scheme whose credentials the client sends in its
+    ///            Authorization header (11.6). The password is a part of the body, which no scheme carries: a 401
+    ///            without the header breaks the RFC, one with a scheme made up for it names one no client knows. 403 is
+    ///            a request understood and refused, which may be repeated with new credentials (15.5.4): the code read
+    ///            again.
     ///      → 404 where the EVSE offers no EV Taler, or no sessions are made here for its operator
     ///      → 409 when the EVSE takes no session now (no vehicle plugged in, one charging already)
     ///      → 422 when the step or the exchange is not accepted, with the step sizes that are
@@ -56,10 +62,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET  ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/events?after={seq}&amp;timeout_ms={ms}
     ///      Authorization: Bearer &lt;secret&gt;
     ///      → { "events": [ { "seq": 4, "type": "offer", … }, … ], "ended": false }   waits for the next one (long polling)
+    ///      → 401 with WWW-Authenticate: Bearer without the secret, with another one or for an unknown session, alike
     ///
     /// POST ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/stop
     ///      Authorization: Bearer &lt;secret&gt;
     ///      → 202
+    ///      → 401 as the events
     ///
     /// Events: offer, paid, unpaid, refused (an offer of the backend failed a check and was not relayed: the session
     /// ends), meterValue, stopped, settlement. Sessions are kept in memory: a restart of the server ends them for it.
@@ -346,7 +354,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             // Decision D8: only whoever names the one-time password the EVSE gives right then is at it. Without it nothing
-            // is held, no order made, and nothing of the EVSE told, not even whether a vehicle is plugged in.
+            // is held, no order made, and nothing of the EVSE told, not even whether a vehicle is plugged in. Missing,
+            // wrong or past, it is 403, never 401: RFC 9110 sends 401 only with a WWW-Authenticate challenge, and no
+            // scheme carries the password in the body (decision D9, the remarks of the class).
             Boolean atEVSE;
 
             try
@@ -840,6 +850,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #region (private static) Unauthorized(Request)
 
+        /// <summary>
+        /// 401 for the events and the stop of a session: its secret is a credential of the scheme Bearer, sent in the
+        /// Authorization header, so the challenge of WWW-Authenticate RFC 9110 asks for (15.5.2) is Bearer. The one-time
+        /// password of a new session is in its body, a credential of no scheme, and refused with 403 (decision D9).
+        /// </summary>
         private static HTTPResponse Unauthorized(HTTPRequest Request)
 
             => new HTTPResponse.Builder(Request) {

@@ -46,7 +46,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Whether the given time-based one-time password is the one the given EVSE gives right then, in the URL of its
         /// secure dynamic QR code, as OCPP 2.1's WebPaymentsCtrlr makes it: whoever names it is at the EVSE (decision D8).
         /// Asked before anything is held or ordered; false where the EVSE gives none. It keeps no state: a password is
-        /// current as long as its time slot or the one before or after it is.
+        /// current as long as its time slot or the one before or after it is. False is answered 403, as a password
+        /// missing is, never 401 (decision D9).
         /// </summary>
         Task<Boolean> IsCurrentTOTP(EVSE_Id            EVSEId,
                                     String             TOTP,

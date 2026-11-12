@@ -1478,6 +1478,41 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_session_without_the_one_time_password_is_forbidden_not_unauthorized()
+
+        /// <summary>
+        /// Decision D9: a session asked for without a current one-time password is answered 403, never 401. RFC 9110 lets a
+        /// server answer 401 only with a WWW-Authenticate header naming a challenge (15.5.2), an authentication scheme whose
+        /// credentials the client sends in its Authorization header; the password is a part of the body, which no scheme
+        /// carries. The secret of a session is such a credential, of the scheme Bearer: its events read without it are 401,
+        /// with WWW-Authenticate: Bearer.
+        /// </summary>
+        [Test]
+        public async Task A_session_without_the_one_time_password_is_forbidden_not_unauthorized()
+        {
+
+            await using var hub = await Hub.Start();
+
+            using var ask     = new HttpRequestMessage(HttpMethod.Post, $"EVSEs/{E1}/evTaler/sessions") {
+                                    Content = new StringContent($"{{\"exchange\":\"{EURExchangeKey}\",\"step\":{{\"quantity\":\"5\",\"unit\":\"kWh\"}}}}", Encoding.UTF8, "application/json")
+                                };
+            using var asked   = await hub.Client.SendAsync(ask);
+
+            using var read    = await hub.Client.GetAsync("evTaler/sessions/unknown/events?after=0&timeout_ms=0");
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(asked.StatusCode,                                          Is.EqualTo(HttpStatusCode.Forbidden));
+                Assert.That(asked.Headers.WwwAuthenticate,                             Is.Empty, "a challenge, of no scheme the password is sent in");
+                Assert.That(read.StatusCode,                                           Is.EqualTo(HttpStatusCode.Unauthorized));
+                Assert.That(read.Headers.WwwAuthenticate.Select(challenge => challenge.Scheme), Is.EqualTo(new[] { "Bearer" }));
+                Assert.That(hub.Control.Asked,                                         Is.Zero, "the charging station management system asked");
+            }
+
+        }
+
+        #endregion
+
         #region Where_the_one_time_password_is_not_checked_the_operator_is_told()
 
         /// <summary>

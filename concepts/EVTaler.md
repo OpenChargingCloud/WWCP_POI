@@ -457,7 +457,7 @@ POST ~/RNs/{RN_Id}/EVSEs/{EVSE_Id}/evTaler/sessions
      { "totp": "<the TOTP the EVSE gives right then>", "exchange": "<masterPublicKey>",
        "step": { "quantity": "5", "unit": "kWh" }, "cap": "30.00" }
      → 201 { "sessionId", "secret", "events": "<URL>", "offer": { … } }
-     → 403 without the TOTP the EVSE gives right then
+     → 403 without the TOTP the EVSE gives right then, missing, wrong or past alike; never 401 (decision D9)
      → 409 when the EVSE takes no session now (no vehicle plugged in, one charging already)
      → 422 when the step or the exchange is not accepted, with the step sizes that are
 
@@ -492,8 +492,14 @@ POST ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/stop
   EVSE takes a session: without a valid TOTP nothing is held, and the client learns nothing of the EVSE, not even
   whether a vehicle is plugged in. The check keeps no state: a TOTP is valid for its time slot and the one before and
   after it, however often it is named; against one photographed or passed on helps the short validity time the
-  operator sets (5.6). A TOTP missing, wrong or past is answered alike, 403. An EVSE whose station gives no TOTP
-  offers no EV Taler.
+  operator sets (5.6). A TOTP missing, wrong or past is answered alike, 403, and never 401 (decision D9): RFC 9110
+  lets a server answer 401 only with a `WWW-Authenticate` header naming at least one challenge (15.5.2), an
+  authentication scheme whose credentials the client sends in its `Authorization` header (11.6). The TOTP is no such
+  credential: it is a part of the request, in its body, as the URL of the code gives it, and no scheme carries it. A
+  401 without the header breaks the RFC, and one with a scheme made up for it names a scheme no client knows. 403 is
+  a request the server understood and refuses, which the client may repeat with new credentials (15.5.4): with the
+  code read again. The events and the stop of a session, whose secret is a credential of the scheme `Bearer`, answer
+  401 with `WWW-Authenticate: Bearer`. An EVSE whose station gives no TOTP offers no EV Taler.
 - **The server checks before it relays** what the backend gives it, against the version it holds: the merchant base
   URL of the `taler://pay` URI and the order's merchant are those of `evTaler`, its exchanges are among those of
   `evTaler` in the tariff's currency, `extra.wwcp` names this EVSE, this session, the step after the last one, the
@@ -517,14 +523,16 @@ POST ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/stop
   against that station and the price statements current then, with phase 2's `EVTalerContractTerms.TryVerify`. From
   step 2 on that verifies the signed start value too, with a transparency software the server is given.
 - **The answers:** 201, or 404 where the EVSE offers no EV Taler or no sessions are made here for its operator, 403
-  without the TOTP the EVSE gives right then (D8), 409 when the EVSE takes no session now or has one, only after a
-  valid TOTP, 415 for a body that is no `application/json`, 422 for a step, an exchange or
+  without the TOTP the EVSE gives right then (D8), missing, wrong or past alike, never 401 (D9), 409 when the EVSE
+  takes no session now or has one, only after a valid TOTP, 415 for a body that is no `application/json`, 422 for a
+  step, an exchange or
   a cap not accepted, with `acceptedSteps` where the step is not, 429 for a client with too many sessions open or with
   all its heavy reads made, 502 when the offer of step 1 was refused, in the words of the server's check, or when the
   systems of the operator failed. What failed there, a merchant backend not reached or a charging station management
   system answering with an error, is told to the operator (`OnError`), not to the client; so is a failure to start
   charging once step 1 is paid, which the driver sees as `stopped` by the operator. Reading the events or stopping
-  with another secret, or of an unknown session, is answered alike, 401.
+  with another secret, or of an unknown session, is answered alike, 401 with `WWW-Authenticate: Bearer`, the scheme
+  its secret is sent in (D9).
 
 
 ## 7. Evidence: what the app checks and keeps
@@ -669,6 +677,9 @@ WWCP_POI checks only that the merchant is the operator's. Doing it as well would
   are not known is reported with `OnError`, one whose settings can not be used as well, answered 502. The
   authentication mode `SecureDynamicQRCode` with its `channels`, needed by a pool naming `EVTaler` (4.1), and example
   A15 naming both.
+- Decision D9, done 2026-11-12: a session asked for without a current TOTP is answered 403, missing, wrong or past
+  alike, never 401 (6); reading the events or stopping without the secret of the session is answered 401 with
+  `WWW-Authenticate: Bearer`. `A_session_without_the_one_time_password_is_forbidden_not_unauthorized` holds both.
 - Not yet: `IEVTalerChargingControl` at the charging station management system of CSMSCLI, with OCPP 2.1's
   RequestStartTransaction and its transactionLimit, the limit raised in the answer to the next TransactionEvent, the
   signed meter values of Transaction.Begin and Transaction.End, and the web payments of its stations, as their
@@ -691,6 +702,7 @@ knowing the driver; e-mobility providers as merchants of their own offers; walle
 | D6, decided 2026-10-29 and 2026-11-05: "EV Taler", without "GNU" | The name | "GNU EV Taler"; "EV Taler" | "EV Taler" in the data (`EVTaler`, `evTaler`, `EV_TALER`) and as the name of what is built here; "GNU" is left out, as it names GNU packages. GNU Taler stays the name of the payment system it uses. |
 | D7, decided 2026-11-10: (a) | Where does the EV Taler backend of an operator run? | (a) at its charging station management system, which serves the offers itself; (b) in the RoamingHub, for the operators it hosts; (c) the hub serving the offers, the charging station management system the backend, joined by an SSH subsystem of WWCP_Node | (a): the access token of the merchant instance and the key for payments stay with the operator, and OCPP 2.1 is there |
 | D8, decided 2026-11-12: (a) | How is an EVSE kept from being held by sessions no driver at it asked for (E1)? | (a) every session names the dynamic TOTP of OCPP 2.1 the EVSE gives right then, as a QR code, over BLE or NFC; (b) "who pays first charges": offers of step 1 to several sessions at an EVSE, the EVSE held only by the one paid first; (c) a static code shown at the station | (a): it proves that the driver is at the EVSE, which is what OCPP 2.1's dynamic QR codes are for; without it the offers are an open side door, so an EVSE whose station gives no TOTP offers no EV Taler. Neither (b) nor (c) takes its place |
+| D9, decided 2026-11-12: (a) | Which status answers a session asked for without a current TOTP? | (a) 403 alike, the TOTP missing, wrong or past; (b) 401 where it is missing, 403 where it is wrong or past | (a): RFC 9110 lets a server answer 401 only with a `WWW-Authenticate` header naming a challenge (15.5.2), an authentication scheme whose credentials the client sends in its `Authorization` header (11.6). The TOTP is in the body of the request, and no scheme carries it: a 401 would break the RFC, or name a scheme made up for it that no client knows. 403 is a request understood and refused, which may be repeated with new credentials (15.5.4), the code read again; and alike it tells no one which of the three it was. 401 stays where a credential is sent in `Authorization`: the secret of a session, with `WWW-Authenticate: Bearer` |
 
 
 ## 11. Open points
