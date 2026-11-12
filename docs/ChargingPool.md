@@ -106,7 +106,12 @@ should send them in that order, as it compares old values as JSON.
 `EVTaler` among the `paymentOptions`, the pool's own or of its templates, says that its EVSEs can be paid for with GNU
 Taler, step by step ([concepts/EVTaler.md](../concepts/EVTaler.md)), with the exchanges its operator accepts: a pool
 naming it needs the `evTaler` merchant of its [operator](ChargingStationOperator.md#ev-taler-merchant), and so does a
-[charging pool template](ChargingPoolTemplate.md) naming it, checked after the last change of a change set. Which
+[charging pool template](ChargingPoolTemplate.md) naming it, checked after the last change of a change set. As every EV
+Taler session names the one-time password its EVSE gives right then (decision D8), a pool naming it, as it is at
+runtime, also names the [authentication mode](#authentication-modes) `SecureDynamicQRCode`, its own or of a template,
+checked as well after the last change of a change set: "The charging pool '…' names the payment option 'EVTaler'
+without the authentication mode 'SecureDynamicQRCode': an EV Taler session names the one-time password its EVSE gives
+right then!" Which
 tariff a step is priced by, and with which exchanges it is paid, `chargingStationOperator.TryGetEVTalerTariff(EVSEId,
 out tariff)` and `EVTalerExchangesAt(EVSEId)` tell; their `PaymentOptionName` is what drivers see, e.g.
 `EV Taler (Example Exchange, EUR)`. POI_API answers the same at `…/EVSEs/{EVSE_Id}/evTaler`, and for the pool, its EVSEs
@@ -159,14 +164,25 @@ A type only once, in the ordinal order of the types. Source: [AuthenticationMode
 
 | JSON key | Type | Description |
 |---|---|---|
-| `type` | text | Mandatory, without surrounding whitespace: `Free Charging`, `RFID`, `PINPAD`, `ISO/IEC 15118 PLC`, `ISO/IEC 15118 Over-the-Air`, `REMOTE`, `CreditCard`, `DebitCard`, `PrepaidCard`, `NFC`, `Bluetooth`, `WLAN`, `No authentication required`, `DirectPayment`, `SMS`, `PhoneCall`, or another name. |
+| `type` | text | Mandatory, without surrounding whitespace: `Free Charging`, `RFID`, `PINPAD`, `ISO/IEC 15118 PLC`, `ISO/IEC 15118 Over-the-Air`, `REMOTE`, `CreditCard`, `DebitCard`, `PrepaidCard`, `NFC`, `Bluetooth`, `WLAN`, `No authentication required`, `DirectPayment`, `SMS`, `PhoneCall`, `SecureDynamicQRCode`, or another name. |
 | `cardTypes` | array of texts | RFID only: the card types it reads, `MifareClassic`, `MifareDESFire`, `Calypso`; ordinal order, each once. |
 | `brands` | array of objects | RFID only: the [brands](Brand.md) whose cards it takes, its own, embedded completely; ordered by `@id`, each once. `brandIds` is refused. |
 | `number` | text | Mandatory for `SMS` and `PhoneCall`, the number to send an SMS to or to call; refused for other types. |
 | `stationCode` | text | `SMS` only: the code of the station to send. |
+| `channels` | array of texts | Mandatory for `SecureDynamicQRCode`, refused for other types: how its stations give the URL of the code, `BLE`, `Display`, `NFC`; ordinal order, each once. |
 
 C#: `AuthenticationMode.RFID(cardTypes, brands)`, `AuthenticationMode.SMS(number, stationCode)`,
-`AuthenticationMode.PhoneCall(number)`, and static instances for the others, e.g. `AuthenticationMode.CreditCard`.
+`AuthenticationMode.PhoneCall(number)`, `AuthenticationMode.SecureDynamicQRCode(channels)`, and static instances for
+the others, e.g. `AuthenticationMode.CreditCard`.
+
+`SecureDynamicQRCode`: its stations give a URL with a time-based one-time password, as OCPP 2.1's `WebPaymentsCtrlr`
+makes it from a shared secret, on a display as a QR code, over Bluetooth Low Energy or NFC; whoever names the password
+stands at the EVSE. Every [EV Taler](#ev-taler) session needs it (decision D8 of
+[concepts/EVTaler.md](../concepts/EVTaler.md)).
+
+```json
+{ "type": "SecureDynamicQRCode", "channels": [ "BLE", "Display", "NFC" ] }
+```
 
 
 ## Opening times

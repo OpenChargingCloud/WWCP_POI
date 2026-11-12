@@ -108,6 +108,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                     Created:     Created) ],
                                                                              ChargingPools:    [ new ChargingPool(P1,
                                                                                                                   PaymentOptions:    [ PaymentOptions.EVTaler ],
+                                                                                                                  AuthenticationModes:  [ AuthenticationMode.SecureDynamicQRCode([ SecureDynamicQRCodeChannels.Display ]) ],
                                                                                                                   Created:           Created,
                                                                                                                   ChargingStations:  [ new ChargingStation(S1,
                                                                                                                                                            Created:  Created,
@@ -426,11 +427,39 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
             public ConcurrentQueue<String>                    Calls       { get; } = new ();
             public ConcurrentDictionary<String, IEVTalerChargingEvents> Events { get; } = new ();
             public EVTalerSignedMeterValue?                   EndValue    { get; set; }
+            public Int32                                      Asked       => asked;
+            public String?                                    FailWebPayments { get; set; }
+
+            /// <summary>
+            /// The web payments of the EVSEs, as their WebPaymentsCtrlr is set: a secret of its own for each.
+            /// </summary>
+            public ConcurrentDictionary<EVSE_Id, EVTalerWebPayments> WebPayments { get; } = new (new Dictionary<EVSE_Id, EVTalerWebPayments> {
+                                                                                                     { E1, new EVTalerWebPayments("E1-shared-secret-of-the-test", TimeSpan.FromSeconds(30)) },
+                                                                                                     { E2, new EVTalerWebPayments("E2-shared-secret-of-the-test", TimeSpan.FromSeconds(30)) }
+                                                                                                 });
+
+            private Int32 asked;
+
+            public Task<EVTalerWebPayments?> WebPaymentsOf(EVSE_Id EVSEId, CancellationToken CancellationToken)
+                => FailWebPayments is not null
+                       ? throw new InvalidOperationException(FailWebPayments)
+                       : Task.FromResult(WebPayments.TryGetValue(EVSEId, out var webPayments) ? webPayments : null);
+
+            /// <summary>
+            /// The one-time password the given EVSE gives now, as its station shows it in its secure dynamic QR code.
+            /// </summary>
+            public String? TOTPOf(EVSE_Id EVSEId, DateTimeOffset? At = null)
+                => WebPayments.TryGetValue(EVSEId, out var webPayments)
+                       ? TOTPGenerator.GenerateTOTP(webPayments.SharedSecret, webPayments.ValidityTime, webPayments.Length, TOTPTimestamp: At ?? DateTimeOffset.UtcNow).Current
+                       : null;
 
             public Task<String?> WhyNotStart(EVSE_Id EVSEId, CancellationToken CancellationToken)
-                => FailAsked is not null
-                       ? throw new InvalidOperationException(FailAsked)
-                       : Task.FromResult(Busy);
+            {
+                Interlocked.Increment(ref asked);
+                return FailAsked is not null
+                           ? throw new InvalidOperationException(FailAsked)
+                           : Task.FromResult(Busy);
+            }
 
             public Task<String?> Start(EVSE_Id EVSEId, String SessionId, EVTalerChargingLimit Limit, IEVTalerChargingEvents Events, CancellationToken CancellationToken)
             {
@@ -536,7 +565,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 return (response.StatusCode, (JObject) POIJSON.Read(await response.Content.ReadAsStringAsync()));
             }
 
-            public Task<(HttpStatusCode Status, JObject JSON)> Ask(EVSE_Id EVSEId, Decimal Quantity = 5, String Unit = "kWh", String Exchange = EURExchangeKey, String? Cap = null, String? Client = null)
+            /// <summary>
+            /// Ask for a session with the one-time password the EVSE gives now, as a driver at it reads it, unless another
+            /// one is given, or none (NoTOTP).
+            /// </summary>
+            public Task<(HttpStatusCode Status, JObject JSON)> Ask(EVSE_Id EVSEId, Decimal Quantity = 5, String Unit = "kWh", String Exchange = EURExchangeKey, String? Cap = null, String? Client = null, String? TOTP = null, Boolean NoTOTP = false)
             {
 
                 var json = new JObject(new JProperty("exchange", Exchange),
@@ -545,6 +578,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 if (Cap is not null)
                     json.Add("cap", Cap);
+
+                if (!NoTOTP && (TOTP ?? Control.TOTPOf(EVSEId)) is String totp)
+                    json.AddFirst(new JProperty("totp", totp));
 
                 return Ask(EVSEId, json.ToString(), Client: Client);
 
@@ -1360,6 +1396,179 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+
+        #region A_session_needs_the_one_time_password_the_EVSE_gives_right_then()
+
+        /// <summary>
+        /// Decision D8, E1 of the security review of 2026-11-11: a session is made only with the one-time password the EVSE
+        /// gives right then, in the URL of its secure dynamic QR code. Without it, with a wrong one, one of another EVSE or one
+        /// too old, the answer is 403 alike: nothing is held, no order made, the charging station management system not
+        /// asked, and nothing of the EVSE told, not even whether a vehicle is plugged in. The limits of the client come
+        /// first. The check keeps no state: a password is taken again while it is current.
+        /// </summary>
+        [Test]
+        public async Task A_session_needs_the_one_time_password_the_EVSE_gives_right_then()
+        {
+
+            await using var hub = await Hub.Start();
+
+            hub.Control.Busy = "No vehicle is plugged in.";
+
+            var validity  = hub.Control.WebPayments[E1].ValidityTime;
+            var current   = hub.Control.TOTPOf(E1)!;
+            var tooOld    = hub.Control.TOTPOf(E1, DateTimeOffset.UtcNow - 3 * validity)!;
+            var refusal   = "The EVSE 'DE*GEF*E1*1' is asked for without the one-time password it gives right now: read its secure dynamic QR code again!";
+
+            var refused   = new List<(String What, HttpStatusCode Status, JObject JSON)>();
+
+            foreach (var (what, totp, none) in new (String, String?, Boolean)[] {
+                                                   ("none",            null,                        true),
+                                                   ("a wrong one",     "abcdefghijkl",              false),
+                                                   ("of another EVSE", hub.Control.TOTPOf(E2),      false),
+                                                   ("too old",         tooOld,                      false),
+                                                   ("empty",           "",                          false)
+                                               })
+            {
+                var (status, json) = await hub.Ask(E1, TOTP: totp, NoTOTP: none);
+                refused.Add((what, status, json));
+            }
+
+            var (notText, _)   = await hub.Ask(E1, $"{{\"totp\":5,\"exchange\":\"{EURExchangeKey}\",\"step\":{{\"quantity\":\"5\",\"unit\":\"kWh\"}}}}");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                foreach (var (what, status, json) in refused)
+                {
+                    Assert.That(status,                                    Is.EqualTo(HttpStatusCode.Forbidden), what);
+                    Assert.That(json["description"]?.Value<String>(),      Is.EqualTo(refusal),                  what);
+                }
+
+                Assert.That(notText,                                       Is.EqualTo(HttpStatusCode.BadRequest), "a password that is no text");
+                Assert.That(hub.Control.Asked,                             Is.Zero, "the charging station management system asked");
+                Assert.That(hub.Offers.Sessions,                           Is.Empty);
+                Assert.That(hub.Merchant.Orders,                           Is.Empty);
+
+            }
+
+            // With it, the EVSE is told to take no session now; the same password is taken again once it does.
+            var (busy, _)      = await hub.Ask(E1, TOTP: current);
+            hub.Control.Busy   = null;
+            var (created, _)   = await hub.Ask(E1, TOTP: current);
+
+            // Without the password, not even a session held at the EVSE is told.
+            var (heldNoTOTP, _) = await hub.Ask(E1, NoTOTP: true);
+            var (heldTOTP,   _) = await hub.Ask(E1);
+
+            // The limits of the client come before the password: the client has as many sessions open as it may.
+            hub.Offers.MaxOpenSessionsPerClient = 1;
+            var (tooMany, _)   = await hub.Ask(E2, NoTOTP: true);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(busy,                                          Is.EqualTo(HttpStatusCode.Conflict));
+                Assert.That(created,                                       Is.EqualTo(HttpStatusCode.Created), String.Join(" | ", hub.Errors));
+                Assert.That(heldNoTOTP,                                    Is.EqualTo(HttpStatusCode.Forbidden), "a session held, without the password");
+                Assert.That(heldTOTP,                                      Is.EqualTo(HttpStatusCode.Conflict),  "a session held, with it");
+                Assert.That(hub.Control.Asked,                             Is.EqualTo(2));
+                Assert.That(tooMany,                                       Is.EqualTo(HttpStatusCode.TooManyRequests));
+            }
+
+        }
+
+        #endregion
+
+        #region Where_the_one_time_password_is_not_checked_the_operator_is_told()
+
+        /// <summary>
+        /// Where the web payments of an EVSE are not known, the driver gets 403, as with a wrong password, and the operator is
+        /// told that no session is made there; where they can not be read, or are set wrongly, the driver is told only that the
+        /// systems of the operator failed (502), and the operator what failed. Nothing is held either way.
+        /// </summary>
+        [Test]
+        public async Task Where_the_one_time_password_is_not_checked_the_operator_is_told()
+        {
+
+            await using var hub = await Hub.Start();
+
+            var totp = hub.Control.TOTPOf(E2)!;
+
+            hub.Control.WebPayments.TryRemove(E2, out _);
+            var (unknown, unknownJSON)  = await hub.Ask(E2, TOTP: totp);
+
+            hub.Control.WebPayments[E2] = new EVTalerWebPayments("too-short", TimeSpan.FromSeconds(30));
+            var (wrong, wrongJSON)      = await hub.Ask(E2, TOTP: totp);
+
+            hub.Control.FailWebPayments = "The device model at 10.0.0.7:5432 refused.";
+            var (failed, failedJSON)    = await hub.Ask(E2, TOTP: totp);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(unknown,                                          Is.EqualTo(HttpStatusCode.Forbidden));
+                Assert.That(unknownJSON["description"]?.Value<String>(),      Does.StartWith("The EVSE 'DE*GEF*E1*2' is asked for without the one-time password"));
+
+                Assert.That(wrong,                                            Is.EqualTo(HttpStatusCode.BadGateway));
+                Assert.That(wrongJSON["description"]?.Value<String>(),        Is.EqualTo(EVTalerOffersAPI.NotStarted));
+                Assert.That(failed,                                           Is.EqualTo(HttpStatusCode.BadGateway));
+                Assert.That(failedJSON["description"]?.Value<String>(),       Is.EqualTo(EVTalerOffersAPI.NotStarted));
+
+                Assert.That(hub.Errors,                                       Has.Some.EqualTo("The EVSE 'DE*GEF*E1*2' gives no one-time password: no web payments of it are known, and no EV Taler session is made there!"));
+                Assert.That(hub.Errors,                                       Has.Some.Contains("The one-time password of the EVSE 'DE*GEF*E1*2' was not checked: ").And.Contains("shared secret"));
+                Assert.That(hub.Errors,                                       Has.Some.EqualTo("The one-time password of the EVSE 'DE*GEF*E1*2' was not checked: The device model at 10.0.0.7:5432 refused."));
+
+                Assert.That(hub.Control.Asked,                                Is.Zero);
+                Assert.That(hub.Offers.Sessions,                              Is.Empty);
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_one_time_password_is_current_in_its_slot_and_the_ones_beside_it()
+
+        /// <summary>
+        /// The check of a one-time password keeps no state: it is current in its time slot and in the one before and after
+        /// it, as the clocks of the station and of its charging station management system differ; not two slots away, not of
+        /// another secret, not shorter. A validity time of 1 s is taken, and the shared secret is never written.
+        /// </summary>
+        [Test]
+        public void A_one_time_password_is_current_in_its_slot_and_the_ones_beside_it()
+        {
+
+            var webPayments  = new EVTalerWebPayments("E1-shared-secret-of-the-test", TimeSpan.FromSeconds(3));
+            var at           = DateTimeOffset.Parse("2026-11-12T12:00:01.500Z");
+
+            String TOTPAt(EVTalerWebPayments WebPayments, Int32 Slots)
+                => TOTPGenerator.GenerateTOTP(WebPayments.SharedSecret, WebPayments.ValidityTime, WebPayments.Length, TOTPTimestamp: at + Slots * WebPayments.ValidityTime).Current;
+
+            var oneSecond    = webPayments with { ValidityTime = TimeSpan.FromSeconds(1) };
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(TOTPAt(webPayments,  0),                                                         Has.Length.EqualTo(12));
+                Assert.That(webPayments.IsCurrent(TOTPAt(webPayments, -1), at),                               Is.True,  "the slot before");
+                Assert.That(webPayments.IsCurrent(TOTPAt(webPayments,  0), at),                               Is.True,  "its slot");
+                Assert.That(webPayments.IsCurrent(TOTPAt(webPayments,  1), at),                               Is.True,  "the slot after");
+                Assert.That(webPayments.IsCurrent(TOTPAt(webPayments, -2), at),                               Is.False, "two slots before");
+                Assert.That(webPayments.IsCurrent(TOTPAt(webPayments,  2), at),                               Is.False, "two slots after");
+                Assert.That(webPayments.IsCurrent(TOTPAt(webPayments,  0)[..11], at),                         Is.False, "shorter");
+                Assert.That(webPayments.IsCurrent(TOTPAt(webPayments with { SharedSecret = "another-shared-secret-of-it" }, 0), at), Is.False, "another secret");
+
+                Assert.That(oneSecond.IsCurrent(TOTPAt(oneSecond,  1), at),                                   Is.True,  "1 s");
+                Assert.That(oneSecond.IsCurrent(TOTPAt(oneSecond, -2), at),                                   Is.False, "1 s, two slots before");
+
+                Assert.That(webPayments.ToString(),                                                           Does.Not.Contain(webPayments.SharedSecret));
+                Assert.That(() => new EVTalerWebPayments("too-short", TimeSpan.FromSeconds(30)).IsCurrent("abcdefghijkl", at),
+                            Throws.ArgumentException);
+
+            }
+
+        }
+
+        #endregion
 
         #region (static) WaitFor(Condition)
 

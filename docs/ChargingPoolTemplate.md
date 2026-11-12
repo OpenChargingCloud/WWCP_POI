@@ -84,7 +84,8 @@ a pool names can not be removed: update the pool first, in the same or an earlie
 - **Properties of its members:** as a charging pool checks them, e.g. no facility twice; `gridConnectionPointId` a
   grid connection point of the network; every effective charging pool naming it valid; `EVTaler` among its
   `paymentOptions` only where its operator has an [EV Taler merchant](ChargingStationOperator.md#ev-taler-merchant),
-  whether a pool names it or not.
+  whether a pool names it or not; a member taking `EVTaler` from it names the authentication mode
+  `SecureDynamicQRCode` too, its own or of a template ([EV Taler](ChargingPool.md#ev-taler)).
 - **Change sets:** `UpdateProperty`/`RemoveProperty` only of `name`, `description`, `dataSource`,
   `chargingTariffId`, `customData` and the properties of its members above. After every change the whole operator is
   read again, so the rules above hold for the result; a tariff the template names can not be removed.

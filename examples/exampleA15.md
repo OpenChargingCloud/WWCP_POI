@@ -4,8 +4,9 @@
 ([concepts/EVTaler.md](../concepts/EVTaler.md)). In GNU Taler, coins are those of an **exchange**, and they pay only
 where the merchant accepts that exchange. So `DE*GEF` names its **merchant** at a GNU Taler merchant backend, `evTaler`,
 and the exchanges whose coins it accepts, signed by a key for `payments` alone: whoever changes the merchant redirects
-the payments of every station. The pool names the payment option `EVTaler`. The station proof the driver's app gets
-gives the merchant: the app shows "EV Taler (provider)" for the exchanges in the currency of the EVSE's tariff, and
+the payments of every station. The pool names the payment option `EVTaler` and, as every EV Taler session names the
+one-time password its EVSE gives right then, the authentication mode `SecureDynamicQRCode`. The station proof the
+driver's app gets gives the merchant: the app shows "EV Taler (provider)" for the exchanges in the currency of the EVSE's tariff, and
 knows the merchant every offer must come from. Nothing here pays: offers, payments and refunds are GNU Taler's
 ([ChargingStationOperator](../docs/ChargingStationOperator.md#ev-taler-merchant), [ChargingPool](../docs/ChargingPool.md#ev-taler)).
 
@@ -14,7 +15,7 @@ knows the merchant every offer must come from. Nothing here pays: offers, paymen
 | 0 to 8 | see [example A11](exampleA11.md) to [example A14](exampleA14.md) | |
 | 9 | `DE*GEF`, its `party` key | a new signing key of `DE*GEF` that may sign `payments` |
 | 10 | `DE*GEF`, its `payments` key | its merchant at `https://taler.gef.example/instances/de-gef/`, accepting an exchange in euros and one in Swiss francs |
-| 11 | `DE*GEF`, its `infrastructure` key | Jena Paradies, `DE*GEF*P1`: the payment option `EVTaler` |
+| 11 | `DE*GEF`, its `infrastructure` key | Jena Paradies, `DE*GEF*P1`: the payment option `EVTaler` and the authentication mode `SecureDynamicQRCode` |
 
 The code is [exampleA15.cs](csharp/exampleA15.cs), called by [Program.cs](csharp/Program.cs) with what example A11 left:
 
@@ -79,12 +80,19 @@ RoamingNetworkChange.UpdateProperty(gef, ChargingStationOperator.PropertyKeys.EV
 ## 3. Jena Paradies names the payment option EVTaler
 
 `paymentOptions` is an open set of names; `EVTaler` is one of them, and a pool or pool template of an operator without
-a merchant naming it is refused. The EV Taler tariff of `DE*GEF*E1*1` is `DE*GEF*T_DC` of [example A8](exampleA8.md): it
+a merchant naming it is refused. Every EV Taler session names the one-time password its EVSE gives right then
+(decision D8 of concepts/EVTaler.md), in the URL of the secure dynamic QR code OCPP 2.1's `WebPaymentsCtrlr` makes: a
+pool naming `EVTaler`, as it is at runtime, names the authentication mode `SecureDynamicQRCode` too, with the channels
+its stations give the URL over, here their displays. The option alone is refused; the change set names both. The EV Taler tariff of `DE*GEF*E1*1` is `DE*GEF*T_DC` of [example A8](exampleA8.md): it
 has no type and names no payment means. The server shows the exchanges in its currency, euros, with
 `EVTalerExchangesAt`.
 
 ```csharp
-RoamingNetworkChange.UpdateProperty(jenaParadies, ChargingPool.PropertyKeys.PaymentOptions, null, new JArray(PaymentOptions.EVTaler.ToString()))
+var addOption = RoamingNetworkChange.UpdateProperty(jenaParadies, ChargingPool.PropertyKeys.PaymentOptions,      null, new JArray(PaymentOptions.EVTaler.ToString()));
+var addQRCode = RoamingNetworkChange.UpdateProperty(jenaParadies, ChargingPool.PropertyKeys.AuthenticationModes, null, new JArray(AuthenticationMode.SecureDynamicQRCode([ SecureDynamicQRCodeChannels.Display ]).ToJSON(Embedded: true)));
+
+history.Head.RoamingNetwork.CreateChangeSet([ addOption ]);              // refused
+history.Head.RoamingNetwork.CreateChangeSet([ addOption, addQRCode ]);   // signed by its infrastructure key
 
 foreach (var exchange in Operator(history).EVTalerExchangesAt(ExampleA10.EVSEId))
     Console.WriteLine($"At {ExampleA10.EVSEId}, as the server sees it: {exchange.PaymentOptionName.FirstText()}");
@@ -108,18 +116,19 @@ A merchant key changed on the way makes the proof one of no version the attestat
 Committed, revision 9 of epoch 2: DE*GEF: a signing key for payments
 Signed by the key of DE*GEF for the party: Change 0: UpdateProperty of the ChargingStationOperator 'DE*GEF' ('evTaler') needs a signature by a signing key of the ChargingStationOperator 'DE*GEF' that may sign 'payments'!
 Committed, revision 10 of epoch 2: DE*GEF: its EV Taler merchant, accepting an exchange in euros and one in Swiss francs
-Committed, revision 11 of epoch 2: Jena Paradies: EV Taler
+EVTaler without a secure dynamic QR code: The charging pool 'DE*GEF*P1' names the payment option 'EVTaler' without the authentication mode 'SecureDynamicQRCode': an EV Taler session names the one-time password its EVSE gives right then!
+Committed, revision 11 of epoch 2: Jena Paradies: EV Taler, with a secure dynamic QR code
 At DE*GEF*E1*1, as the server sees it: EV Taler (Example Exchange, EUR)
 
 The station proof of DE*GEF*E1*1, revision 11: 146 KiB
 
 The station proof, revision 11, by its attestations: valid
-DE*GEF*P1, Jena Paradies: payment options EVTaler
+DE*GEF*P1, Jena Paradies: payment options EVTaler, authentication modes SecureDynamicQRCode (Display)
 DE*GEF*E1*1: its EV Taler tariff DE*GEF*T_DC, in EUR
   EV Taler (Example Exchange, EUR): coins of the exchange F80MFRG8HVH6R9CQ47KRFQSJP3T6DBJ4K1D9B703RJY3Z39TBMJ0 at https://exchange.example.eu/
   not offered there: EV Taler (Example Franc Exchange, CHF)
 An offer for DE*GEF*E1*1 is DE*GEF's when its taler://pay URI names https://taler.gef.example/instances/de-gef/ and its contract terms are signed by ESMBKNR5CMZPAYH9AD0QNKCPYSJSE0EN5MH4FMPKN683R63HMD3G
-Another merchant key: Valid attestations of trusted keys of 0 holders attest the root effectiveTree:sha256:hex:a256aa5085bc650cf6b7b080466a41d60738ba4c08eea10dbefb246052ad3b70 of the proof, not of 2!
+Another merchant key: Valid attestations of trusted keys of 0 holders attest the root effectiveTree:sha256:hex:8022eec03d1e79b7c5f7694245ae59a152aa4dd33132b17bb4e75f122f12136a of the proof, not of 2!
 ```
 
 

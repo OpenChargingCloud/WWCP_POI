@@ -115,9 +115,11 @@ parking product ids compare case-sensitively.
   `entranceAddress`/`entranceLocation`, `exitAddress`/`exitLocation`, `arrivalInstructions`, `chargingWhenClosed`,
   `facilities`, `paymentOptions`, `uiFeatures`, `features` and `parkingRestrictions` (sets of names, in their order),
   `locationLanguages` (in their given order), `relatedLocations` (`{geoLocation, name?}`, in their given order) and
-  `authenticationModes` (`{type, cardTypes?, brands?, number?, stationCode?}` with the types of WWCP, e.g. `RFID`,
-  `CreditCard`, `SMS`; a type only once, in the order of the types). RFID may name card types and embed the
-  brands whose cards it takes; SMS and PhoneCall need their `number`. Their accessibility, as the OCPI
+  `authenticationModes` (`{type, cardTypes?, brands?, number?, stationCode?, channels?}` with the types of WWCP,
+  e.g. `RFID`, `CreditCard`, `SMS`, `SecureDynamicQRCode`; a type only once, in the order of the types). RFID may
+  name card types and embed the brands whose cards it takes; SMS and PhoneCall need their `number`;
+  SecureDynamicQRCode its `channels` (`BLE`, `Display`, `NFC`), which a pool naming the payment option `EVTaler`
+  needs. Their accessibility, as the OCPI
   Accessibility Extension: `services` (e.g. `ACCESSIBLE_CHARGING`, `ASSISTANCE`) and `standards` (e.g.
   `PAS 1899:2022`), sets of names, and `assistanceServiceDetails`. The NUTS regions it is in: `nutsCodes`, e.g. `DEG`.
 - **Web payment page:** `webPaymentURL` of a charging station operator, a pool and a station (and of their templates):
@@ -783,7 +785,7 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/CSs/{CS_Id}/priceStatements`, `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/priceStatements` | the price statements of the pool, the station and its EVSEs, or the EVSE; also below the full path of the station |
 | `GET ~/RNs/{id}/history/priceStatements` | the current price statement of every entity |
 | `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/evTaler`, `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/evTaler` | how charging there is paid with EV Taler ([concepts/EVTaler.md](concepts/EVTaler.md)): the EV Taler tariff of the EVSE, the merchant of its operator and the exchanges in the tariff's currency, each with its `paymentOptionName`; of a pool its EVSEs with an EV Taler tariff and the exchanges of all of them; 404 where none. The EVSE also below the full path of its station |
-| `POST ~/RNs/{id}/EVSEs/{EVSE_Id}/evTaler/sessions` `{exchange, step, cap?}` | where an operator's charging station management system serves its EV Taler offers (`EVTalerOffersAPI` of `WWCP_POI3_EVTaler`, [concepts/EVTaler.md](concepts/EVTaler.md#6-asking-for-offers-over-poi_api)): 201 `{sessionId, secret, events, offer}`; 404 elsewhere |
+| `POST ~/RNs/{id}/EVSEs/{EVSE_Id}/evTaler/sessions` `{totp, exchange, step, cap?}` | where an operator's charging station management system serves its EV Taler offers (`EVTalerOffersAPI` of `WWCP_POI3_EVTaler`, [concepts/EVTaler.md](concepts/EVTaler.md#6-asking-for-offers-over-poi_api)): 201 `{sessionId, secret, events, offer}`; 403 without the one-time password the EVSE gives right then, in the URL of its secure dynamic QR code (D8); 404 elsewhere |
 | `GET ~/RNs/{id}/evTaler/sessions/{sessionId}/events?after=&timeout_ms=`, `POST ~/RNs/{id}/evTaler/sessions/{sessionId}/stop` | with `Authorization: Bearer <secret>`: the events of the session, waiting for the next one, and stopping it |
 | `POST ~/RNs/{id}/history/priceStatements` `{priceStatements: […]}` | 200 `{taken, known, outdated, refused, refusals}`, 422 when one was refused |
 | `GET ~/RNs/{id}/history/checkpoints/{checkpointId}/priceStatements` | the price statements a checkpoint names, in the order of its tree |
@@ -1152,6 +1154,17 @@ Decisions taken by the maintainer between alternatives the agent laid out:
   there. A RoamingHub publishes `offersURL` and makes no offers. The offers
   are in an assembly of their own, `WWCP_POI3_EVTaler`, so that WWCP_POI3
   does not depend on GNU Taler.
+- **2026-11-12 – EV Taler, decision D8 of [concepts/EVTaler.md](concepts/EVTaler.md):**
+  every session names the time-based one-time password its EVSE gives right
+  then, in the URL of the secure dynamic QR code OCPP 2.1's
+  `WebPaymentsCtrlr` makes (E1 of the security review of 2026-11-11: else an
+  EVSE could be held by sessions no driver at it asked for). It is checked
+  without state, current in its time slot and the ones beside it: a short
+  validity time, down to 1 s, keeps one passed on from being worth much;
+  taking each only once would lose the ones of requests lost to a network
+  failure. A pool naming `EVTaler` names the authentication mode
+  `SecureDynamicQRCode`, with its `channels`, so that an app knows where a
+  session can be asked for.
 
 ### Rejected suggestions
 

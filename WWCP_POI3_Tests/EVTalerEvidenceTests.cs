@@ -121,6 +121,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                     Created:     Created) ],
                                                                              ChargingPools:    [ new ChargingPool(P1,
                                                                                                                   PaymentOptions:    [ PaymentOptions.EVTaler ],
+                                                                                                                  AuthenticationModes:  [ AuthenticationMode.SecureDynamicQRCode([ SecureDynamicQRCodeChannels.Display ]) ],
                                                                                                                   Created:           Created,
                                                                                                                   ChargingStations:  [ new ChargingStation(S1,
                                                                                                                                                            Created:  Created,

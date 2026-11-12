@@ -1,16 +1,18 @@
 # EV Taler: paying for charging with GNU Taler, step by step
 
-*Concept paper, draft of 2026-10-28, revised on 2026-11-05, 2026-11-10 and 2026-11-11. It proposes what WWCP_POI would carry and
-check when charging is paid with [GNU Taler](https://taler.net). Phase 1, the content of section 4, is implemented
-since 2026-10-29, phase 2, the steps and the evidence of sections 5 and 7, since 2026-11-05, phase 3, the offers of
-section 6 and the backend of an operator, since 2026-11-10 (`WWCP_POI3_EVTaler`); what runs at the charging station
-management system with OCPP 2.1 (5.6) is not built yet. All decisions of [section 10](#10-decisions-needed) are
-taken; open point 11, an EVSE held without paying, waits for one.*
+*Concept paper, draft of 2026-10-28, revised on 2026-11-05, 2026-11-10, 2026-11-11 and 2026-11-12. It proposes what
+WWCP_POI would carry and check when charging is paid with [GNU Taler](https://taler.net). Phase 1, the content of
+section 4, is implemented since 2026-10-29, phase 2, the steps and the evidence of sections 5 and 7, since 2026-11-05,
+phase 3, the offers of section 6 and the backend of an operator, since 2026-11-10 (`WWCP_POI3_EVTaler`), decision D8
+of 2026-11-12, every session naming the dynamic one-time password its EVSE gives right then, since 2026-11-12; what
+runs at the charging station management system with OCPP 2.1 (5.6) is not built yet. All decisions of
+[section 10](#10-decisions-needed) are taken; open point 11 asks where the URL of the dynamic code leads.*
 
 **In short.** A charging station operator that accepts GNU Taler says so in its WWCP_POI data, signed like
 everything else it owns: `EVTaler` among the payment options of its charging pools, and, once for the operator,
-its merchant at a hosted GNU Taler merchant backend and the exchanges it accepts. On request, a driver's app
-gets real GNU Taler offers for an EVSE: one order per **step**, e.g. "the next 5 kWh at 0.65 €/kWh". Each step
+its merchant at a hosted GNU Taler merchant backend and the exchanges it accepts. On request, a driver's app at an
+EVSE, naming the one-time password the EVSE gives right then (OCPP 2.1's dynamic QR code), gets real GNU Taler
+offers for it: one order per **step**, e.g. "the next 5 kWh at 0.65 €/kWh". Each step
 is paid before it is delivered, the next one is offered before the credit runs out, and at the end the session
 costs what the operator's tariff says: whatever was paid beyond that is refunded. Every order names the EVSE, the
 tariff and the signed price statement it is priced by, so that the app can check it against the station proof
@@ -110,7 +112,11 @@ orders; WWCP_POI says what they must agree with, and lets everybody check that t
 `Free`, `Contract`, `Direct`, `Cash`, `CreditCard`, `DebitCard`, `PrepaidCard`, `SMS`), of which only the names are
 read. A new name **`EVTaler`** says: the EVSEs of the pool can be paid for with EV Taler, step by step, with the
 exchanges its operator names in `evTaler` (4.2). A pool naming it while its operator has no `evTaler` is invalid,
-and a change set making it so is refused. Templates give it as they give every payment option (they are united).
+and a change set making it so is refused. Templates give it as they give every payment option (they are united). As
+every session names the one-time password its EVSE gives right then (decision D8, 5.6), a pool naming `EVTaler`, as it
+is at runtime, also names the authentication mode `SecureDynamicQRCode`, with the channels its stations give the URL
+of the code over, e.g. `{ "type": "SecureDynamicQRCode", "channels": [ "Display" ] }`: so an app knows where a session
+can be asked for, and does not fail at a station with a static sticker.
 
 **"EV Taler (provider)".** Drivers should see which exchange a station takes, e.g.
 `EV Taler (Example Exchange, EUR)`. Apps write that line from the data, one per exchange the operator accepts in
@@ -288,7 +294,10 @@ sequenceDiagram
     participant X as Exchange (hosted)
     participant S as Charging station
     App->>P: station proof, price statements (8.4, 12.4)
-    App->>P: POST …/EVSEs/DE*GEF*E1*1/evTaler/sessions
+    S-->>App: dynamic QR code, BLE or NFC: a URL with the TOTP of the EVSE (5.6)
+    App->>P: POST …/EVSEs/DE*GEF*E1*1/evTaler/sessions, naming the TOTP
+    P->>B: the TOTP of the EVSE?
+    B-->>P: valid, by the shared secret of the EVSE (5.6)
     P->>B: start: EVSE, exchange, step size, cap
     B->>M: POST /private/orders (step 1)
     M-->>B: order_id, claim token
@@ -382,6 +391,19 @@ session when the credit, the reserve included, is used, and what accrues beyond 
 The operator's backend starts, limits and stops charging through its charging station management system, outside
 WWCP_POI. OCPP 2.1 has what a session in steps needs:
 
+- **The driver at the EVSE: a dynamic one-time password.** OCPP 2.1's `WebPaymentsCtrlr`, of a station or of one of
+  its EVSEs, makes a URL from its `URLTemplate` that carries a time-based one-time password (TOTP): an HMAC, SHA-256 by
+  default, of the current time slot (`ValidityTime`, 30 s by default) under a `SharedSecret` the station shares with
+  its charging station management system, written in `Length` letters and digits, 12 by default. The station shows
+  the URL as a dynamic QR code or gives it over BLE or NFC, to a phone or to a vehicle; for EV Taler it is the same
+  URL. Only whoever reads it there can name the TOTP, and every EV Taler session must (decision D8, section 6). The
+  backend checks it with the shared secret of that EVSE, or of its station where the station has one controller for
+  all its EVSEs, against the current slot and the one before and after it, as the clocks of the station and the
+  backend differ and a driver takes a moment: a TOTP is valid for about three slots. Against one photographed or
+  passed on helps a short validity time, which the operator sets at its stations, e.g. 3 s where 30 s are too long,
+  down to 1 s. A TOTP is not taken once only: in distributed systems a request lost to a network failure would then
+  lose its TOTP as well. A station giving no such TOTP offers no EV Taler: a static QR code proves nothing about who
+  reads it.
 - **Start, limited to the credit.** A remote start at the EVSE, with an `idToken` of type `Central` that names the
   EV Taler session and no driver, and the limit of step 1:
 
@@ -432,8 +454,10 @@ operator.
 
 ```
 POST ~/RNs/{RN_Id}/EVSEs/{EVSE_Id}/evTaler/sessions
-     { "exchange": "<masterPublicKey>", "step": { "quantity": "5", "unit": "kWh" }, "cap": "30.00" }
+     { "totp": "<the TOTP the EVSE gives right then>", "exchange": "<masterPublicKey>",
+       "step": { "quantity": "5", "unit": "kWh" }, "cap": "30.00" }
      → 201 { "sessionId", "secret", "events": "<URL>", "offer": { … } }
+     → 403 without the TOTP the EVSE gives right then
      → 409 when the EVSE takes no session now (no vehicle plugged in, one charging already)
      → 422 when the step or the exchange is not accepted, with the step sizes that are
 
@@ -462,6 +486,14 @@ POST ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/stop
   beyond, the settled ones are forgotten, those settled first first, never an open one.
 - **The secret** is 256 random bits, given once, kept by the server only as its hash (as API keys are). It names no
   driver; nothing else does either.
+- **The driver at the EVSE** (decision D8): a session is made only with the TOTP the EVSE gives right
+  then (5.6), read from its dynamic QR code or over BLE or NFC. The backend checks it with the shared secret of that
+  EVSE before the EVSE is held, an order is made or the charging station management system is asked whether the
+  EVSE takes a session: without a valid TOTP nothing is held, and the client learns nothing of the EVSE, not even
+  whether a vehicle is plugged in. The check keeps no state: a TOTP is valid for its time slot and the one before and
+  after it, however often it is named; against one photographed or passed on helps the short validity time the
+  operator sets (5.6). A TOTP missing, wrong or past is answered alike, 403. An EVSE whose station gives no TOTP
+  offers no EV Taler.
 - **The server checks before it relays** what the backend gives it, against the version it holds: the merchant base
   URL of the `taler://pay` URI and the order's merchant are those of `evTaler`, its exchanges are among those of
   `evTaler` in the tariff's currency, `extra.wwcp` names this EVSE, this session, the step after the last one, the
@@ -470,9 +502,9 @@ POST ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/stop
   check is not relayed, and the session ends.
 - **Limits:** sessions only where the backend accepts one (409 otherwise), one at an EVSE at a time, and a few open
   per client, four by default. The client is counted as the server counts its heavy reads: by its address, an IPv6
-  one by its /64, behind a trusted proxy the one the proxy names. These limits are checked before the station is
-  proven, and proving it takes one of the heavy reads the client may make: a start the limits refuse costs the
-  server no signature check.
+  one by its /64, behind a trusted proxy the one the proxy names. The limits of the client are checked first, then the
+  TOTP, then whether the EVSE has a session; then the station is proven, which takes one of the heavy reads the client
+  may make, and last the backend is asked to start. A start the limits refuse costs the server no signature check.
 - **A payment not known:** a step is unpaid when the merchant backend says so after its payment deadline. Where it
   does not say, failing or not reached, it is asked again, ten minutes after the deadline at most; then the step is
   taken as unpaid, and the operator is told. A step paid while the backend did not reach the merchant backend counts
@@ -484,8 +516,9 @@ POST ~/RNs/{RN_Id}/evTaler/sessions/{sessionId}/stop
   proof of the EVSE's station from the head it holds when a session is asked for, verifies it, and checks every offer
   against that station and the price statements current then, with phase 2's `EVTalerContractTerms.TryVerify`. From
   step 2 on that verifies the signed start value too, with a transparency software the server is given.
-- **The answers:** 201, or 404 where the EVSE offers no EV Taler or no sessions are made here for its operator, 409 when
-  the EVSE takes no session now or has one, 415 for a body that is no `application/json`, 422 for a step, an exchange or
+- **The answers:** 201, or 404 where the EVSE offers no EV Taler or no sessions are made here for its operator, 403
+  without the TOTP the EVSE gives right then (D8), 409 when the EVSE takes no session now or has one, only after a
+  valid TOTP, 415 for a body that is no `application/json`, 422 for a step, an exchange or
   a cap not accepted, with `acceptedSteps` where the step is not, 429 for a client with too many sessions open or with
   all its heavy reads made, 502 when the offer of step 1 was refused, in the words of the server's check, or when the
   systems of the operator failed. What failed there, a merchant backend not reached or a charging station management
@@ -546,16 +579,23 @@ payment, the signed meter values, the settlement statement and the refunds. From
 - **Taken orders:** an order is claimed with its claim token, which only the session gets, and is then bound to
   one wallet's nonce: another wallet is refused.
 - **The wrong vehicle:** the app shows the EVSE as it is labelled; the backend starts a session only where a vehicle
-  is plugged in and not charging, and step 1 must be paid within minutes.
+  is plugged in and not charging, and step 1 must be paid within minutes. The TOTP is checked with the secret of the
+  EVSE the request names, so a TOTP read at one EVSE starts no other (unless their station has one controller for
+  all of them).
 - **Spam:** see the limits of section 6; an order costs the merchant backend little, and an unpaid one expires at its
   payment deadline.
-- **An EVSE held without paying:** a session holds its EVSE from the start, before step 1 is paid, for the payment
-  deadline of step 1. Asking again and again keeps a driver from it; open point 11.
+- **An EVSE held without paying** (security review 2026-11-11, E1): a session holds its EVSE from its start, before
+  step 1 is paid, for the payment deadline of step 1. It is made only with the TOTP the EVSE gives right then
+  (decision D8): whoever keeps a driver from the EVSE must stand at it, or be sent its TOTP by someone who does, for
+  every session anew and within the validity time the operator sets (5.6). A web page asking from the browsers of
+  its visitors has no TOTP to give, and a static QR code proves nothing; so neither "who pays first charges" nor a
+  static code takes its place.
 - **Refunds** follow the settlement only and never exceed what was paid.
 - **Privacy:** contracts, events and statements name the EVSE and the session, never the driver; vehicle identifiers
   (e.g. those of ISO 15118) go into none of them. The operator learns amounts, times and the EVSE, as with cash.
   The offers server sees the client's address and keeps it no longer than its limits need: while the session is open.
-  A settled session keeps neither it nor the station proof and the price statements, only its events.
+  A settled session keeps neither it nor the station proof and the price statements, only its events. A TOTP names
+  no driver, and none is kept.
 
 
 ## 9. Implementation in WWCP_POI
@@ -620,10 +660,19 @@ WWCP_POI checks only that the merchant is the operator's. Doing it as well would
   step paid are kept ten minutes, at most `MaxSessions` held, and a settled one keeps neither its client nor the proof;
   what failed at the operator goes to `OnError`, the client is told only that it failed; the watch of a payment always
   ends its step, unpaid only once the merchant backend says so or `UnknownPaymentWait` passed. E1, an EVSE held
-  without paying, is open point 11.
+  without paying, is decided by D8.
+- Decision D8, done 2026-11-12: the request names `totp`; after the limits of the client the backend checks it,
+  `IEVTalerBackend.IsCurrentTOTP`, with the web payments of the EVSE its charging station management system knows
+  (`IEVTalerChargingControl.WebPaymentsOf`, `EVTalerWebPayments`: the shared secret, the validity time, the length and
+  the hash algorithm of the `WebPaymentsCtrlr`), with Hermod's `TOTPGenerator`, keeping no state; only then is it asked
+  whether the EVSE has a session, and the station proven. 403 alike without a current TOTP; an EVSE whose web payments
+  are not known is reported with `OnError`, one whose settings can not be used as well, answered 502. The
+  authentication mode `SecureDynamicQRCode` with its `channels`, needed by a pool naming `EVTaler` (4.1), and example
+  A15 naming both.
 - Not yet: `IEVTalerChargingControl` at the charging station management system of CSMSCLI, with OCPP 2.1's
-  RequestStartTransaction and its transactionLimit, the limit raised in the answer to the next TransactionEvent, and
-  the signed meter values of Transaction.Begin and Transaction.End (5.6).
+  RequestStartTransaction and its transactionLimit, the limit raised in the answer to the next TransactionEvent, the
+  signed meter values of Transaction.Begin and Transaction.End, and the web payments of its stations, as their
+  `WebPaymentsCtrlr` is set (5.6).
 
 **Phase 4, later:** wallets paying the steps of an accepted session alone; Taler's token families (contract terms of
 version 1, e.g. discount tokens) for charging tariff offers (9.4), so that `maxSessionsPerContract` applies without
@@ -641,6 +690,7 @@ knowing the driver; e-mobility providers as merchants of their own offers; walle
 | D5, decided 2026-11-05: (a) | Does the operator sign settlement statements? | (a) yes, not in checkpoints; (b) yes, and checkpoints name them, as price statements; (c) no | (a): evidence for the driver, no load on histories |
 | D6, decided 2026-10-29 and 2026-11-05: "EV Taler", without "GNU" | The name | "GNU EV Taler"; "EV Taler" | "EV Taler" in the data (`EVTaler`, `evTaler`, `EV_TALER`) and as the name of what is built here; "GNU" is left out, as it names GNU packages. GNU Taler stays the name of the payment system it uses. |
 | D7, decided 2026-11-10: (a) | Where does the EV Taler backend of an operator run? | (a) at its charging station management system, which serves the offers itself; (b) in the RoamingHub, for the operators it hosts; (c) the hub serving the offers, the charging station management system the backend, joined by an SSH subsystem of WWCP_Node | (a): the access token of the merchant instance and the key for payments stay with the operator, and OCPP 2.1 is there |
+| D8, decided 2026-11-12: (a) | How is an EVSE kept from being held by sessions no driver at it asked for (E1)? | (a) every session names the dynamic TOTP of OCPP 2.1 the EVSE gives right then, as a QR code, over BLE or NFC; (b) "who pays first charges": offers of step 1 to several sessions at an EVSE, the EVSE held only by the one paid first; (c) a static code shown at the station | (a): it proves that the driver is at the EVSE, which is what OCPP 2.1's dynamic QR codes are for; without it the offers are an open side door, so an EVSE whose station gives no TOTP offers no EV Taler. Neither (b) nor (c) takes its place |
 
 
 ## 11. Open points
@@ -666,13 +716,10 @@ knowing the driver; e-mobility providers as merchants of their own offers; walle
     longer reads the events, and orders paid and not yet settled are settled by hand, before their refund deadline.
     Keeping sessions in a store of their own, and the backend asking the merchant instance for its orders again, would
     let them go on.
-11. **An EVSE held without paying** (security review 2026-11-11, E1): a session holds its EVSE from its start, before
-    step 1 is paid, for the payment deadline of step 1 (two minutes by default). Whoever asks for the next one as soon
-    as it ends keeps a driver from the EVSE; 409 tells the moment a vehicle is plugged in, and with `*` for CORS any
-    web page can ask from the browsers of its visitors, each with an address of its own. Ways out: offers of step 1 to
-    several sessions at an EVSE, the EVSE held only by the session whose step 1 is paid first, the others expiring or
-    refunded in full ("who pays first charges"); or a code shown at the station that proves the driver is there. To be
-    decided by the maintainer.
+11. **The URL of the dynamic code** (after D8, which settled E1 of the security review of 2026-11-11): where it leads
+    and how an app finds the EVSE and the TOTP in it: the operator's web payment page, the `offersURL` or a link into
+    the app, with parameters of fixed names. How the data say that an EVSE gives the dynamic TOTP is decided: the
+    authentication mode `SecureDynamicQRCode` of its pool (4.1). To be decided by the maintainer.
 
 
 ## References

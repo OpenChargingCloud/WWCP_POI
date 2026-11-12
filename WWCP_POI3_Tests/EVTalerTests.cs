@@ -89,12 +89,13 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         #region (static) NewNetwork(Merchant, AdHocPaymentMeans)
 
         /// <summary>
-        /// DE*GEF with the given merchant: the pool P1 takes the payment option EVTaler from its template (without a merchant,
-        /// there is no template), its EVSE E1 names an ad hoc tariff in euros with the given payment means and a regular one;
-        /// the pool P2 names no EVTaler.
+        /// DE*GEF with the given merchant: the pool P1 takes the payment option EVTaler and a secure dynamic QR code from its
+        /// template (without a merchant, there is no template), its EVSE E1 names an ad hoc tariff in euros with the given
+        /// payment means and a regular one; the pool P2 names no EVTaler, and a secure dynamic QR code unless told otherwise.
         /// </summary>
         private static RoamingNetwork NewNetwork(EVTalerMerchant?  Merchant,
-                                                 PaymentMeans[]?   AdHocPaymentMeans   = null)
+                                                 PaymentMeans[]?   AdHocPaymentMeans        = null,
+                                                 Boolean           P2SecureDynamicQRCode    = true)
 
             => new RoamingNetwork(RoamingNetwork_Id.Parse("rn1"),
                     Created:                   Created,
@@ -103,8 +104,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                              EVTaler:                Merchant,
                                                                              ChargingPoolTemplates:  Merchant is not null
                                                                                                          ? [ new ChargingPoolTemplate(EVTalerPool,
-                                                                                                                                      PaymentOptions:  [ PaymentOptions.EVTaler, PaymentOptions.Direct ],
-                                                                                                                                      Created:         Created) ]
+                                                                                                                                      PaymentOptions:       [ PaymentOptions.EVTaler, PaymentOptions.Direct ],
+                                                                                                                                      AuthenticationModes:  [ AuthenticationMode.SecureDynamicQRCode([ SecureDynamicQRCodeChannels.Display ]) ],
+                                                                                                                                      Created:              Created) ]
                                                                                                          : [],
                                                                              ChargingTariffs:        [ new ChargingTariff(AdHoc,
                                                                                                                           Currency.EUR,
@@ -126,8 +128,11 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                                                                                                                                                                       ChargingTariffIds:  [ AdHoc, Regular ],
                                                                                                                                                                                       Created:            Created) ]) ]),
                                                                                                        new ChargingPool(P2,
-                                                                                                                        PaymentOptions:    [ PaymentOptions.Contract ],
-                                                                                                                        Created:           Created,
+                                                                                                                        PaymentOptions:       [ PaymentOptions.Contract ],
+                                                                                                                        AuthenticationModes:  P2SecureDynamicQRCode
+                                                                                                                                                  ? [ AuthenticationMode.SecureDynamicQRCode([ SecureDynamicQRCodeChannels.Display, SecureDynamicQRCodeChannels.NFC ]) ]
+                                                                                                                                                  : [],
+                                                                                                                        Created:              Created,
                                                                                                                         ChargingStations:  [ new ChargingStation(S2,
                                                                                                                                                                  Created:  Created,
                                                                                                                                                                  EVSEs:    [ new EVSE(E2,
@@ -376,6 +381,111 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
                 Assert.That(() => withMerchant.CreateSignedChangeSet([ removeMerchant ], CreatedAt: T0),
                             Throws.ArgumentException.With.Message.Contains("charging pool template 'DE*GEF*PTEVTALER' names the payment option 'EVTaler'"), "the merchant of the template's pools");
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_secure_dynamic_QR_code_names_its_channels()
+
+        /// <summary>
+        /// The authentication mode SecureDynamicQRCode: a URL with the one-time password a station gives right then, as
+        /// OCPP 2.1's WebPaymentsCtrlr makes it, over the channels it names, in the ordinal order of their names, each once;
+        /// at least one, and no other type names channels. A version naming them in another order is refused.
+        /// </summary>
+        [Test]
+        public void A_secure_dynamic_QR_code_names_its_channels()
+        {
+
+            var mode  = AuthenticationMode.SecureDynamicQRCode([ SecureDynamicQRCodeChannels.NFC, SecureDynamicQRCodeChannels.Display, SecureDynamicQRCodeChannels.BLE ]);
+            var json  = NewNetwork(Merchant()).ToJSON();
+            var pool  = (JObject) OperatorJSON(json)["chargingPools"]![1]!;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(mode.ToJSON(Embedded: true).ToString(Newtonsoft.Json.Formatting.None),
+                            Is.EqualTo("{\"type\":\"SecureDynamicQRCode\",\"channels\":[\"BLE\",\"Display\",\"NFC\"]}"));
+
+                Assert.That(AuthenticationMode.TryParse(mode.ToJSON(), out var read, out var readError),                     Is.True, readError);
+                Assert.That(read,                                                                                              Is.EqualTo(mode));
+
+                Assert.That(() => new AuthenticationMode(AuthenticationMode.SecureDynamicQRCodeType),
+                            Throws.ArgumentException.With.Message.Contains("needs the channels its URL is given over: BLE, Display, NFC"));
+                Assert.That(() => AuthenticationMode.SecureDynamicQRCode([ SecureDynamicQRCodeChannels.NFC, SecureDynamicQRCodeChannels.NFC ]),
+                            Throws.ArgumentException.With.Message.Contains("must not be given twice"));
+                Assert.That(() => new AuthenticationMode(AuthenticationMode.RFIDType, Channels: [ SecureDynamicQRCodeChannels.NFC ]),
+                            Throws.ArgumentException.With.Message.Contains("Only SecureDynamicQRCode names channels, not 'RFID'"));
+
+                Assert.That(AuthenticationMode.TryParse(JObject.Parse("{\"type\":\"SecureDynamicQRCode\",\"channels\":[\"QR\"]}"), out _, out var error), Is.False);
+                Assert.That(error,                                                                                             Does.Contain("channel of the secure dynamic QR code"));
+                Assert.That(AuthenticationMode.TryParse(JObject.Parse("{\"type\":\"SecureDynamicQRCode\"}"),                    out _, out error), Is.False);
+                Assert.That(error,                                                                                             Does.Contain("needs the channels"));
+
+                Assert.That(RoamingNetwork.TryParse(json, out var network, out error),                                         Is.True, error);
+                Assert.That(Operator(network!).ChargingPools.Single(chargingPool => chargingPool.Id == P2).AuthenticationModes.Single().Channels,
+                            Is.EqualTo(new[] { SecureDynamicQRCodeChannels.Display, SecureDynamicQRCodeChannels.NFC }));
+
+                pool["authenticationModes"]![0]!["channels"] = new JArray("NFC", "Display");
+                Assert.That(RoamingNetwork.TryParse(json, out _, out error),                                                   Is.False);
+                Assert.That(error,                                                                                             Does.Contain("is not written as the content holds it"));
+
+            }
+
+        }
+
+        #endregion
+
+        #region The_payment_option_EVTaler_needs_a_secure_dynamic_QR_code()
+
+        /// <summary>
+        /// Decision D8: every EV Taler session names the one-time password its EVSE gives right then, so a charging pool, as
+        /// it is at runtime, names the payment option EVTaler only with the authentication mode SecureDynamicQRCode, its own or
+        /// of a template. Checked when an operator is made, and by a change set after its last change, so that it may add
+        /// both in either order; a pool without EVTaler needs none.
+        /// </summary>
+        [Test]
+        public void The_payment_option_EVTaler_needs_a_secure_dynamic_QR_code()
+        {
+
+            var network      = NewNetwork(Merchant(), P2SecureDynamicQRCode: false);
+            var gef          = Operator(network);
+            var pool         = gef.ChargingPools.Single(chargingPool => chargingPool.Id == P2);
+            var template     = gef.ChargingPoolTemplates.Single();
+
+            var addOption    = RoamingNetworkChange.UpdateProperty(pool, "paymentOptions",      new JArray("Contract"), new JArray("Contract", "EVTaler"));
+            var addMode      = RoamingNetworkChange.UpdateProperty(pool, "authenticationModes", null,                   new JArray(AuthenticationMode.SecureDynamicQRCode([ SecureDynamicQRCodeChannels.BLE ]).ToJSON(Embedded: true)));
+            var removeMode   = RoamingNetworkChange.RemoveProperty(template, "authenticationModes");
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(() => new ChargingStationOperator(GEF, EVTaler: Merchant(), ChargingPools: [ new ChargingPool(P1, PaymentOptions: [ PaymentOptions.EVTaler ]) ]),
+                            Throws.ArgumentException.With.Message.EqualTo("The charging pool 'DE*GEF*P1' names the payment option 'EVTaler' without the authentication mode 'SecureDynamicQRCode': an EV Taler session names the one-time password its EVSE gives right then! (Parameter 'EVTaler')"));
+
+                Assert.That(() => new ChargingStationOperator(GEF, EVTaler: Merchant(), ChargingPools: [ new ChargingPool(P1, PaymentOptions: [ PaymentOptions.EVTaler ], AuthenticationModes: [ AuthenticationMode.RFID() ]) ]),
+                            Throws.ArgumentException.With.Message.Contains("without the authentication mode 'SecureDynamicQRCode'"), "another mode");
+
+                Assert.That(new ChargingStationOperator(GEF, EVTaler: Merchant(), ChargingPools: [ new ChargingPool(P1, PaymentOptions: [ PaymentOptions.EVTaler ], AuthenticationModes: [ AuthenticationMode.SecureDynamicQRCode([ SecureDynamicQRCodeChannels.Display ]) ]) ]).ChargingPools.Count,
+                            Is.EqualTo(1), "its own");
+
+                // P1 takes both from its template; P2 names neither.
+                Assert.That(gef.EffectiveChargingPool(gef.ChargingPools.Single(chargingPool => chargingPool.Id == P1)).AuthenticationModes.Single().Type,
+                            Is.EqualTo(AuthenticationMode.SecureDynamicQRCodeType));
+
+                Assert.That(() => network.CreateSignedChangeSet([ addOption ], CreatedAt: T0),
+                            Throws.ArgumentException.With.Message.Contains("charging pool 'DE*GEF*P2' names the payment option 'EVTaler' without the authentication mode 'SecureDynamicQRCode'"), "the option alone");
+
+                Assert.That(network.TryApplyChangeSet(network.CreateSignedChangeSet([ addOption, addMode ], CreatedAt: T0), out var both, out var error1), Is.True, error1);
+                Assert.That(network.TryApplyChangeSet(network.CreateSignedChangeSet([ addMode, addOption ], CreatedAt: T0), out _,        out var error2), Is.True, error2);
+
+                Assert.That(() => both!.CreateSignedChangeSet([ RoamingNetworkChange.RemoveProperty(Operator(both!).ChargingPools.Single(chargingPool => chargingPool.Id == P2), "authenticationModes") ], CreatedAt: T0),
+                            Throws.ArgumentException.With.Message.Contains("charging pool 'DE*GEF*P2' names the payment option 'EVTaler' without"), "the mode of a pool removed");
+
+                Assert.That(() => network.CreateSignedChangeSet([ removeMode ], CreatedAt: T0),
+                            Throws.ArgumentException.With.Message.Contains("charging pool 'DE*GEF*P1' names the payment option 'EVTaler' without"), "the mode of the template removed");
 
             }
 

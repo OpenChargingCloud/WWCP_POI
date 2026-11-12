@@ -91,9 +91,22 @@ public static class ExampleA15
         var infrastructureKey = A11.GEF.SigningKeys[POIKeyUsages.Infrastructure];
         var jenaParadies      = Operator(history).ChargingPools.Single(chargingPool => chargingPool.Id == JenaParadies);
 
+        var addOption         = RoamingNetworkChange.UpdateProperty(jenaParadies, ChargingPool.PropertyKeys.PaymentOptions,      null, new JArray(PaymentOptions.EVTaler.ToString()));
+        var addQRCode         = RoamingNetworkChange.UpdateProperty(jenaParadies, ChargingPool.PropertyKeys.AuthenticationModes, null, new JArray(AuthenticationMode.SecureDynamicQRCode([ SecureDynamicQRCodeChannels.Display ]).ToJSON(Embedded: true)));
+
+        // The payment option alone: refused, every EV Taler session names the one-time password its EVSE gives right then.
+        try
+        {
+            history.Head.RoamingNetwork.CreateChangeSet([ addOption ]);
+        }
+        catch (ArgumentException e)
+        {
+            Console.WriteLine($"EVTaler without a secure dynamic QR code: {e.Message.Replace($" (Parameter '{e.ParamName}')", "")}");
+        }
+
         var nameOption        = history.Head.RoamingNetwork.CreateChangeSet(
-                                    [ RoamingNetworkChange.UpdateProperty(jenaParadies, ChargingPool.PropertyKeys.PaymentOptions, null, new JArray(PaymentOptions.EVTaler.ToString())) ],
-                                    Description: ImmutableI18NString.Create(Languages.en, "Jena Paradies: EV Taler")
+                                    [ addOption, addQRCode ],
+                                    Description: ImmutableI18NString.Create(Languages.en, "Jena Paradies: EV Taler, with a secure dynamic QR code")
                                 );
 
         Committed(history, nameOption.Sign(infrastructureKey.Private, POIPublicKey.From(infrastructureKey.Private).Id, infrastructureKey.Algorithm));
@@ -156,7 +169,7 @@ public static class ExampleA15
         if (!EVTalerMerchant.TryParse(merchantJSON, out var merchant, out error))
             Helpers.Fail(error);
 
-        Console.WriteLine($"{pool["@id"]}, {pool["name"]?["en"]}: payment options {String.Join(", ", pool[ChargingPool.PropertyKeys.PaymentOptions]?.Values<String>() ?? [])}");
+        Console.WriteLine($"{pool["@id"]}, {pool["name"]?["en"]}: payment options {String.Join(", ", pool[ChargingPool.PropertyKeys.PaymentOptions]?.Values<String>() ?? [])}, authentication modes {String.Join(", ", (pool[ChargingPool.PropertyKeys.AuthenticationModes] as JArray ?? []).Select(mode => $"{mode["type"]} ({String.Join(", ", mode["channels"]?.Values<String>() ?? [])})"))}");
 
         // The EV Taler tariff of the EVSE: its ad hoc tariff, else the one without a type, naming no payment means or EV_TALER.
         var applying = evse[EVSE.PropertyKeys.ChargingTariffIds]!.Values<String>().OfType<String>().Select(id => tariffs[id]).ToArray();

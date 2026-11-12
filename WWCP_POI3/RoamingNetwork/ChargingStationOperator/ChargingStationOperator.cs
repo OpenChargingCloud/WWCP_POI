@@ -1580,7 +1580,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region The payment option EVTaler only with an EV Taler merchant
+            #region The payment option EVTaler only with an EV Taler merchant and a secure dynamic QR code
 
             if (CheckGroupsAndOffers && InvalidPaymentOption() is String paymentOptionError)
                 throw new ArgumentException(paymentOptionError, nameof(EVTaler));
@@ -1655,24 +1655,41 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The error, when a charging pool or charging pool template of this operator names the payment option EVTaler
-        /// while the operator has no EV Taler merchant (concepts/EVTaler.md, section 4.1); null when there is none. A change
-        /// set checks it after its last change, as InvalidGroupOrOffer(), so that it may add the merchant and the payment
-        /// option in either order. Checking the templates as well covers every effective charging pool, as it takes their
-        /// payment options.
+        /// while the operator has no EV Taler merchant (concepts/EVTaler.md, section 4.1), or a charging pool as it is at
+        /// runtime, with what its templates give it, names it without the authentication mode SecureDynamicQRCode: every
+        /// EV Taler session names the one-time password its EVSE gives right then (decision D8); null when there is none.
+        /// A change set checks it after its last change, as InvalidGroupOrOffer(), so that it may add the merchant, the
+        /// payment option and the authentication mode in any order. Checking the templates as well covers every effective
+        /// charging pool, as it takes their payment options.
         /// </summary>
         internal String? InvalidPaymentOption()
         {
 
-            if (EVTaler is not null)
+            if (EVTaler is null)
+            {
+
+                foreach (var chargingPool in ChargingPools)
+                    if (chargingPool.PaymentOptions.Contains(PaymentOptions.EVTaler))
+                        return $"The charging pool '{chargingPool.Id}' names the payment option '{PaymentOptions.EVTaler}', but its operator '{Id}' has no EV Taler merchant!";
+
+                foreach (var chargingPoolTemplate in ChargingPoolTemplates)
+                    if (chargingPoolTemplate.PaymentOptions.Contains(PaymentOptions.EVTaler))
+                        return $"The charging pool template '{chargingPoolTemplate.Id}' names the payment option '{PaymentOptions.EVTaler}', but its operator '{Id}' has no EV Taler merchant!";
+
                 return null;
 
-            foreach (var chargingPool in ChargingPools)
-                if (chargingPool.PaymentOptions.Contains(PaymentOptions.EVTaler))
-                    return $"The charging pool '{chargingPool.Id}' names the payment option '{PaymentOptions.EVTaler}', but its operator '{Id}' has no EV Taler merchant!";
+            }
 
-            foreach (var chargingPoolTemplate in ChargingPoolTemplates)
-                if (chargingPoolTemplate.PaymentOptions.Contains(PaymentOptions.EVTaler))
-                    return $"The charging pool template '{chargingPoolTemplate.Id}' names the payment option '{PaymentOptions.EVTaler}', but its operator '{Id}' has no EV Taler merchant!";
+            foreach (var chargingPool in ChargingPools)
+            {
+
+                var effectiveChargingPool = EffectiveChargingPool(chargingPool);
+
+                if (effectiveChargingPool.PaymentOptions.Contains(PaymentOptions.EVTaler) &&
+                    !effectiveChargingPool.AuthenticationModes.Any(authenticationMode => authenticationMode.Type == AuthenticationMode.SecureDynamicQRCodeType))
+                    return $"The charging pool '{chargingPool.Id}' names the payment option '{PaymentOptions.EVTaler}' without the authentication mode '{AuthenticationMode.SecureDynamicQRCodeType}': an EV Taler session names the one-time password its EVSE gives right then!";
+
+            }
 
             return null;
 

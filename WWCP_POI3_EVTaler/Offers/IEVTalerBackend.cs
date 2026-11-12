@@ -43,6 +43,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                        ChargingStationOperator_Id  OperatorId);
 
         /// <summary>
+        /// Whether the given time-based one-time password is the one the given EVSE gives right then, in the URL of its
+        /// secure dynamic QR code, as OCPP 2.1's WebPaymentsCtrlr makes it: whoever names it is at the EVSE (decision D8).
+        /// Asked before anything is held or ordered; false where the EVSE gives none. It keeps no state: a password is
+        /// current as long as its time slot or the one before or after it is.
+        /// </summary>
+        Task<Boolean> IsCurrentTOTP(EVSE_Id            EVSEId,
+                                    String             TOTP,
+                                    CancellationToken  CancellationToken);
+
+        /// <summary>
         /// Start a session: check that the EVSE takes one now and that the step and the exchange are accepted, make the
         /// order of step 1 and tell it as an offer (Session.Events.Offer) before answering. Everything after that is told
         /// to Session.Events as it happens: payments, signed meter values, the next offers, the end and the settlement.
@@ -243,18 +253,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
     /// <summary>
     /// What a driver asks for, POST ~/RNs/{RN_Id}/EVSEs/{EVSE_Id}/evTaler/sessions:
-    /// { "exchange": "&lt;masterPublicKey&gt;", "step": { "quantity": "5", "unit": "kWh" }, "cap": "30.00" }.
+    /// { "totp": "&lt;the one-time password the EVSE gives right then&gt;", "exchange": "&lt;masterPublicKey&gt;",
+    ///   "step": { "quantity": "5", "unit": "kWh" }, "cap": "30.00" }.
     /// </summary>
     /// <param name="RoamingNetworkId">The roaming network.</param>
     /// <param name="EVSEId">The EVSE.</param>
     /// <param name="Exchange">The master public key of the exchange the driver's coins are of.</param>
     /// <param name="Step">The size of the steps.</param>
     /// <param name="Cap">The most the whole session may cost, in the currency of the tariff, if the driver sets one.</param>
+    /// <param name="TOTP">The time-based one-time password the EVSE gives right then, in the URL of its secure dynamic QR
+    /// code (decision D8): a session is made only with it; one asked for without it is answered as one with a wrong one.</param>
     public sealed record EVTalerSessionRequest(RoamingNetwork_Id  RoamingNetworkId,
                                                EVSE_Id            EVSEId,
                                                String             Exchange,
                                                EVTalerStepSize    Step,
-                                               Decimal?           Cap)
+                                               Decimal?           Cap,
+                                               String?            TOTP   = null)
     {
 
         /// <summary>
@@ -269,9 +283,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             Request = null;
 
-            if (JSON.Properties().FirstOrDefault(property => property.Name is not "exchange" and not "step" and not "cap") is JProperty unknown)
+            if (JSON.Properties().FirstOrDefault(property => property.Name is not "totp" and not "exchange" and not "step" and not "cap") is JProperty unknown)
             {
-                ErrorResponse = $"A session is asked for without '{unknown.Name}': exchange, step and cap are all it names!";
+                ErrorResponse = $"A session is asked for without '{unknown.Name}': totp, exchange, step and cap are all it names!";
+                return false;
+            }
+
+            if (JSON["totp"] is JToken totp && totp.Type != JTokenType.String)
+            {
+                ErrorResponse = "The one-time password of a session is a text, as the URL of the EVSE's secure dynamic QR code carries it!";
                 return false;
             }
 
@@ -299,7 +319,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             }
 
-            Request        = new EVTalerSessionRequest(RoamingNetworkId, EVSEId, JSON["exchange"]!.Value<String>()!, step, cap);
+            Request        = new EVTalerSessionRequest(RoamingNetworkId, EVSEId, JSON["exchange"]!.Value<String>()!, step, cap, JSON["totp"]?.Value<String>());
             ErrorResponse  = null;
             return true;
 

@@ -41,12 +41,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
 
     /// <summary>
+    /// How the stations of a charging pool give the URL of their secure dynamic QR code, with its time-based one-time
+    /// password: as OCPP 2.1's WebPaymentsCtrlr makes it, on a display, over Bluetooth Low Energy or over NFC.
+    /// </summary>
+    public enum SecureDynamicQRCodeChannels
+    {
+        BLE,
+        Display,
+        NFC
+    }
+
+
+    /// <summary>
     /// How a driver authenticates at a charging pool, with the names of WWCP:
     /// an immutable value without an identification.
     /// </summary>
     /// <remarks>
     /// RFID may name the card types it reads and the brands whose cards it takes, its own, embedded completely;
-    /// SMS and PhoneCall need the number to call, SMS optionally a station code.
+    /// SMS and PhoneCall need the number to call, SMS optionally a station code; SecureDynamicQRCode needs the channels
+    /// its stations give the URL of the code over: whoever names its one-time password is at the EVSE (decision D8 of
+    /// concepts/EVTaler.md), which a charging pool naming the payment option EVTaler requires.
     /// Other types are given by their name alone.
     /// </remarks>
     public sealed class AuthenticationMode : IEquatable<AuthenticationMode>
@@ -70,6 +84,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public const String DirectPaymentType             = "DirectPayment";
         public const String SMSType                       = "SMS";
         public const String PhoneCallType                 = "PhoneCall";
+        public const String SecureDynamicQRCodeType       = "SecureDynamicQRCode";
 
         #endregion
 
@@ -127,6 +142,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             public const String  StationCode   = "stationCode";
 
+            /// <summary>
+            /// The property of the channels the URL of a secure dynamic QR code is given over.
+            /// </summary>
+            public const String  Channels      = "channels";
+
         }
 
         #endregion
@@ -157,6 +177,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public String?                        StationCode    { get; }
 
+        /// <summary>
+        /// The channels the URL of a secure dynamic QR code is given over, in the order of their names.
+        /// </summary>
+        public ImmutableArray<SecureDynamicQRCodeChannels>  Channels  { get; }
+
         #endregion
 
         #region Constructor(s)
@@ -169,11 +194,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="Brands">The brands whose RFID cards it takes.</param>
         /// <param name="Number">The number to send an SMS to or to call.</param>
         /// <param name="StationCode">The code of the station to send by SMS.</param>
-        public AuthenticationMode(String                       Type,
-                                  IEnumerable<RFIDCardTypes>?  CardTypes     = null,
-                                  IEnumerable<Brand>?          Brands        = null,
-                                  String?                      Number        = null,
-                                  String?                      StationCode   = null)
+        /// <param name="Channels">The channels the URL of a secure dynamic QR code is given over.</param>
+        public AuthenticationMode(String                                     Type,
+                                  IEnumerable<RFIDCardTypes>?                CardTypes     = null,
+                                  IEnumerable<Brand>?                        Brands        = null,
+                                  String?                                    Number        = null,
+                                  String?                                    StationCode   = null,
+                                  IEnumerable<SecureDynamicQRCodeChannels>?  Channels      = null)
         {
 
             if (String.IsNullOrWhiteSpace(Type) || Type.Trim() != Type)
@@ -184,11 +211,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (cardTypes.Distinct().Count() != cardTypes.Length)
                 throw new ArgumentException("An RFID card type must not be given twice!", nameof(CardTypes));
 
+            var channels  = (Channels  ?? []).ToArray();
+
+            if (channels.Distinct().Count() != channels.Length)
+                throw new ArgumentException("A channel of the secure dynamic QR code must not be given twice!", nameof(Channels));
+
             this.Type         = Type;
             this.CardTypes    = [.. cardTypes.OrderBy(cardType => cardType.ToString(), StringComparer.Ordinal)];
             this.Brands       = new (Brands, brand => brand.Id, "brand", "an RFID authentication mode");
             this.Number       = Number;
             this.StationCode  = StationCode;
+            this.Channels     = [.. channels. OrderBy(channel  => channel. ToString(), StringComparer.Ordinal)];
 
             if ((this.CardTypes.Length > 0 || this.Brands.Count > 0) && Type != RFIDType)
                 throw new ArgumentException($"Only RFID names card types and brands, not '{Type}'!");
@@ -203,6 +236,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (StationCode is not null && Type != SMSType)
                 throw new ArgumentException($"Only SMS names a station code, not '{Type}'!", nameof(StationCode));
+
+            if (Type == SecureDynamicQRCodeType)
+            {
+                if (this.Channels.Length == 0)
+                    throw new ArgumentException($"The authentication mode '{Type}' needs the channels its URL is given over: {String.Join(", ", Enum.GetNames<SecureDynamicQRCodeChannels>())}!", nameof(Channels));
+            }
+            else if (this.Channels.Length > 0)
+                throw new ArgumentException($"Only {SecureDynamicQRCodeType} names channels, not '{Type}'!", nameof(Channels));
 
         }
 
@@ -248,6 +289,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => new (PhoneCallType, Number: Number);
 
+        /// <summary>
+        /// A secure dynamic QR code, as OCPP 2.1's WebPaymentsCtrlr makes it: a URL with a time-based one-time password
+        /// its stations give right then over the given channels. Whoever names the password is at the EVSE.
+        /// </summary>
+        public static AuthenticationMode SecureDynamicQRCode(IEnumerable<SecureDynamicQRCodeChannels> Channels)
+
+            => new (SecureDynamicQRCodeType, Channels: Channels);
+
         #endregion
 
 
@@ -280,6 +329,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (StationCode is not null)
                 json.Add(PropertyKeys.StationCode,  StationCode);
+
+            if (Channels.Length > 0)
+                json.Add(PropertyKeys.Channels,     new JArray(Channels.Select(channel => channel.ToString())));
 
             return CustomAuthenticationModeSerializer is not null
                        ? CustomAuthenticationModeSerializer(this, json)
@@ -315,7 +367,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     !POIJSON.TryParseIds   (JSON, PropertyKeys.CardTypes,    "RFID card type",            POIJSON.TryParseName, out ImmutableArray<RFIDCardTypes> cardTypes, out ErrorResponse) ||
                     !POIJSON.TryParseChildren<Brand>(JSON, PropertyKeys.Brands, PropertyKeys.BrandIds, "brands", Brand.TryParse, out var brands, out ErrorResponse) ||
                     !POIJSON.TryParseString(JSON, PropertyKeys.Number,       "number",                    out var number,       out ErrorResponse) ||
-                    !POIJSON.TryParseString(JSON, PropertyKeys.StationCode,  "station code",              out var stationCode,  out ErrorResponse))
+                    !POIJSON.TryParseString(JSON, PropertyKeys.StationCode,  "station code",              out var stationCode,  out ErrorResponse) ||
+                    !POIJSON.TryParseIds   (JSON, PropertyKeys.Channels,     "channel of the secure dynamic QR code", POIJSON.TryParseName, out ImmutableArray<SecureDynamicQRCodeChannels> channels, out ErrorResponse))
                 {
                     return false;
                 }
@@ -326,7 +379,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                AuthenticationMode  = new AuthenticationMode(type, cardTypes, brands, number, stationCode);
+                AuthenticationMode  = new AuthenticationMode(type, cardTypes, brands, number, stationCode, channels);
                 ErrorResponse       = null;
                 return true;
 

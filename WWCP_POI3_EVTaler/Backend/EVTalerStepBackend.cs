@@ -167,7 +167,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
         #region Events
 
         /// <summary>
-        /// What went wrong in a session, for the operator's log: a merchant backend not answering, a refund not granted, …
+        /// What went wrong in a session, for the operator's log: a merchant backend not answering, a refund not granted, …;
+        /// the session, or the EVSE where none is made yet, e.g. one whose web payments are not known.
         /// </summary>
         public event Action<String, String>?   OnError;
 
@@ -225,6 +226,38 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             => RoamingNetworkId == this.RoamingNetworkId &&
                OperatorId       == this.OperatorId;
+
+        #endregion
+
+        #region IsCurrentTOTP(EVSEId, TOTP, CancellationToken)
+
+        public async Task<Boolean> IsCurrentTOTP(EVSE_Id            EVSEId,
+                                                 String             TOTP,
+                                                 CancellationToken  CancellationToken)
+        {
+
+            if (EVSEId.OperatorId != OperatorId)
+                return false;
+
+            var webPayments = await ChargingControl.WebPaymentsOf(EVSEId, CancellationToken);
+
+            if (webPayments is null)
+            {
+
+                try
+                {
+                    OnError?.Invoke(EVSEId.ToString(), $"The EVSE '{EVSEId}' gives no one-time password: no web payments of it are known, and no EV Taler session is made there!");
+                }
+                catch
+                { }
+
+                return false;
+
+            }
+
+            return webPayments.IsCurrent(TOTP, TimeProvider.GetUtcNow());
+
+        }
 
         #endregion
 

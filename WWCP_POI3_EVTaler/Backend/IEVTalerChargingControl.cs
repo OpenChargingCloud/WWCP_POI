@@ -15,6 +15,15 @@
  * limitations under the License.
  */
 
+#region Usings
+
+using System.Security.Cryptography;
+using System.Text;
+
+using org.GraphDefined.Vanaheimr.Hermod;
+
+#endregion
+
 namespace cloud.charging.open.protocols.WWCP.POI
 {
 
@@ -24,10 +33,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// stopped; with OCPP 2.1 RequestStartTransaction with a transactionLimit, the limit raised in the answer to the next
     /// TransactionEvent (after a TriggerMessage), RequestStopTransaction. The system tells the backend what happens through
     /// IEVTalerChargingEvents: the start with its signed meter value (Transaction.Begin), what was delivered, and the end
-    /// with its signed meter value (Transaction.End).
+    /// with its signed meter value (Transaction.End). It knows the web payments of its EVSEs, as OCPP 2.1's WebPaymentsCtrlr
+    /// of an EVSE or of its station is set: every session names the one-time password of its EVSE (decision D8).
     /// </summary>
     public interface IEVTalerChargingControl
     {
+
+        /// <summary>
+        /// The web payments of the given EVSE, as OCPP 2.1's WebPaymentsCtrlr of the EVSE, or else of its station, is set:
+        /// what the one-time password of its secure dynamic QR code is made of; null where it gives none.
+        /// </summary>
+        Task<EVTalerWebPayments?> WebPaymentsOf(EVSE_Id            EVSEId,
+                                                CancellationToken  CancellationToken);
 
         /// <summary>
         /// Why the given EVSE takes no session now, e.g. no vehicle plugged in or one charging already; null when it does.
@@ -114,6 +131,62 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         public override String ToString()
             => $"{EVTalerAmounts.WriteDecimal(Quantity)} {Unit}";
+
+    }
+
+
+    /// <summary>
+    /// The web payments of an EVSE, as OCPP 2.1's WebPaymentsCtrlr of the EVSE or of its station is set: what the time-based
+    /// one-time password (TOTP) in the URL of its secure dynamic QR code is made of (concepts/EVTaler.md, 5.6), as Hermod's
+    /// TOTPGenerator makes it. The check keeps no state: a password is current in its time slot and in the one before and
+    /// after it, however often it is named, as the clocks of the station and of the system differ and a driver takes a
+    /// moment. A short validity time keeps a password photographed or passed on from being worth much.
+    /// </summary>
+    /// <param name="SharedSecret">The shared secret of the station and the charging station management system (SharedSecret).</param>
+    /// <param name="ValidityTime">How long a password is valid (ValidityTime): whole seconds, 1 s at least.</param>
+    /// <param name="Length">The length of a password (Length), 12 by default.</param>
+    /// <param name="HashAlgorithm">The hash algorithm of its HMAC, SHA-256 by default.</param>
+    public sealed record EVTalerWebPayments(String             SharedSecret,
+                                            TimeSpan           ValidityTime,
+                                            Byte               Length          = 12,
+                                            TOTPHashAlgorithm  HashAlgorithm   = TOTPHashAlgorithm.SHA256)
+    {
+
+        /// <summary>
+        /// Whether the given password is the one the EVSE gives at the given time, or in the time slot before or after it.
+        /// Settings TOTPGenerator does not take, e.g. a shared secret of less than 16 characters, throw: the system is set
+        /// wrongly, which is no fault of the driver.
+        /// </summary>
+        /// <param name="TOTP">The password, as the URL of the code carries it.</param>
+        /// <param name="Now">The time.</param>
+        public Boolean IsCurrent(String          TOTP,
+                                 DateTimeOffset  Now)
+        {
+
+            var (previous, current, next, _, _) = TOTPGenerator.GenerateTOTPs(SharedSecret,
+                                                                              ValidityTime,
+                                                                              Length,
+                                                                              TOTPTimestamp:  Now,
+                                                                              HashAlgorithm:  HashAlgorithm);
+
+            var given = Encoding.UTF8.GetBytes(TOTP);
+
+            return Same(given, previous) |
+                   Same(given, current)  |
+                   Same(given, next);
+
+        }
+
+        private static Boolean Same(Byte[]  Given,
+                                    String  Expected)
+
+            => CryptographicOperations.FixedTimeEquals(Given, Encoding.UTF8.GetBytes(Expected));
+
+        /// <summary>
+        /// Without the shared secret.
+        /// </summary>
+        public override String ToString()
+            => $"{Length} characters, valid {ValidityTime.TotalSeconds} s, HMAC-{HashAlgorithm}";
 
     }
 

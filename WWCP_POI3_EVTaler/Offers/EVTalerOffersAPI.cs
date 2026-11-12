@@ -40,8 +40,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// </summary>
     /// <remarks>
     /// POST ~/RNs/{RN_Id}/EVSEs/{EVSE_Id}/evTaler/sessions
-    ///      { "exchange": "&lt;masterPublicKey&gt;", "step": { "quantity": "5", "unit": "kWh" }, "cap": "30.00" }
+    ///      { "totp": "&lt;the one-time password the EVSE gives right then&gt;", "exchange": "&lt;masterPublicKey&gt;",
+    ///        "step": { "quantity": "5", "unit": "kWh" }, "cap": "30.00" }
     ///      → 201 { "sessionId", "secret", "events": "&lt;path&gt;", "offer": { … } }
+    ///      → 403 without the one-time password the EVSE gives right then, in the URL of its secure dynamic QR code
+    ///            (decision D8): asked after the limits of the client, before anything else of the EVSE
     ///      → 404 where the EVSE offers no EV Taler, or no sessions are made here for its operator
     ///      → 409 when the EVSE takes no session now (no vehicle plugged in, one charging already)
     ///      → 422 when the step or the exchange is not accepted, with the step sizes that are
@@ -188,7 +191,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// A session was not started because the backend, the merchant backend or the charging station management system
-        /// failed: the session, and what failed, which the client is not told.
+        /// failed: the session, or the EVSE whose one-time password was not checked, and what failed, which the client is
+        /// not told.
         /// </summary>
         public event Action<String, String>?   OnError;
 
@@ -328,12 +332,36 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
-            #region The limits, before the proof: a few sessions per client, one at an EVSE
+            #region The limits, before the proof: a few sessions per client, the driver at the EVSE, one session at an EVSE
 
             if (!trustAnchors.TryGetValue(roamingNetworkId, out var trustAnchor))
                 return Error(Request, HTTPStatusCode.ServiceUnavailable, $"No trust anchor of the roaming network '{roamingNetworkId}' is pinned here: its stations are not proven!");
 
             var client = POIAPI.ClientKeyOf(Request);
+
+            lock (startLock)
+            {
+                if (RefusedForClient(Request, client) is HTTPResponse refused)
+                    return refused;
+            }
+
+            // Decision D8: only whoever names the one-time password the EVSE gives right then is at it. Without it nothing
+            // is held, no order made, and nothing of the EVSE told, not even whether a vehicle is plugged in.
+            Boolean atEVSE;
+
+            try
+            {
+                atEVSE = sessionRequest.TOTP is String totp &&
+                         await Backend.IsCurrentTOTP(evseId, totp, CancellationToken.None);
+            }
+            catch (Exception e)
+            {
+                Report(evseId.ToString(), $"The one-time password of the EVSE '{evseId}' was not checked: {e.Message}");
+                return Error(Request, HTTPStatusCode.BadGateway, NotStarted);
+            }
+
+            if (!atEVSE)
+                return Error(Request, HTTPStatusCode.Forbidden, $"The EVSE '{evseId}' is asked for without the one-time password it gives right now: read its secure dynamic QR code again!");
 
             lock (startLock)
             {
@@ -594,19 +622,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region (private) RefusedForClient(Request, Client)
+
+        /// <summary>
+        /// Whether the limits refuse a new session of the given client: 429 when it has as many sessions open as it may.
+        /// Called under the start lock.
+        /// </summary>
+        private HTTPResponse? RefusedForClient(HTTPRequest  Request,
+                                               String       Client)
+
+            => openPerClient.GetValueOrDefault(Client) >= MaxOpenSessionsPerClient
+                   ? Error(Request, HTTPStatusCode.TooManyRequests, "Too many EV Taler sessions of this client are open!")
+                   : null;
+
+        #endregion
+
         #region (private) RefusedByLimits(Request, Client, EVSEId)
 
         /// <summary>
         /// Whether the limits refuse a new session of the given client at the given EVSE: 429 when the client has as many
-        /// sessions open as it may, 409 when the EVSE has one. Called under the start lock.
+        /// sessions open as it may, 409 when the EVSE has one; asked only once the one-time password of the EVSE is known
+        /// to be current. Called under the start lock.
         /// </summary>
         private HTTPResponse? RefusedByLimits(HTTPRequest  Request,
                                               String       Client,
                                               EVSE_Id      EVSEId)
         {
 
-            if (openPerClient.GetValueOrDefault(Client) >= MaxOpenSessionsPerClient)
-                return Error(Request, HTTPStatusCode.TooManyRequests, "Too many EV Taler sessions of this client are open!");
+            if (RefusedForClient(Request, Client) is HTTPResponse refused)
+                return refused;
 
             if (sessionAtEVSE.ContainsKey(EVSEId))
                 return Error(Request, HTTPStatusCode.Conflict, $"The EVSE '{EVSEId}' has an EV Taler session already!");
