@@ -6,7 +6,8 @@ section 4, is implemented since 2026-10-29, phase 2, the steps and the evidence 
 phase 3, the offers of section 6 and the backend of an operator, since 2026-11-10 (`WWCP_POI3_EVTaler`), decision D8
 of 2026-11-12, every session naming the dynamic one-time password its EVSE gives right then, since 2026-11-12; what
 runs at the charging station management system with OCPP 2.1 (5.6) is not built yet. All decisions of
-[section 10](#10-decisions-needed) are taken; open point 11 asks where the URL of the dynamic code leads.*
+[section 10](#10-decisions-needed) are taken, the last one D10 of 2026-11-13: the URL of the dynamic code leads to a
+web payment page of the charging station management system (5.6), not built yet either.*
 
 **In short.** A charging station operator that accepts GNU Taler says so in its WWCP_POI data, signed like
 everything else it owns: `EVTaler` among the payment options of its charging pools, and, once for the operator,
@@ -404,6 +405,13 @@ WWCP_POI. OCPP 2.1 has what a session in steps needs:
   down to 1 s. A TOTP is not taken once only: in distributed systems a request lost to a network failure would then
   lose its TOTP as well. A station giving no such TOTP offers no EV Taler: a static QR code proves nothing about who
   reads it.
+- **Where the URL leads: the web payment page** (decision D10). The URL of the dynamic code leads to a page of the
+  charging station management system made for it, a page of its own as the display of a charging station is, and so
+  best served by an HTTP server of its own (Hermod's `HTTPServer`), apart from the management system's other APIs.
+  Called, it checks the TOTP of the URL. Where that fits, the page shows the EVSE, its tariffs and the ways to pay,
+  EV Taler among them, and the management system tells the station that a web payment has begun at this EVSE, with
+  its timeout (`NotifyWebPaymentStarted`). Once a tariff and, where offered, the options of charging (the most time,
+  the most cost, …) are chosen and paid, the management system starts charging at the EVSE, as the next point says.
 - **Start, limited to the credit.** A remote start at the EVSE, with an `idToken` of type `Central` that names the
   EV Taler session and no driver, and the limit of step 1:
 
@@ -680,10 +688,12 @@ WWCP_POI checks only that the merchant is the operator's. Doing it as well would
 - Decision D9, done 2026-11-12: a session asked for without a current TOTP is answered 403, missing, wrong or past
   alike, never 401 (6); reading the events or stopping without the secret of the session is answered 401 with
   `WWW-Authenticate: Bearer`. `A_session_without_the_one_time_password_is_forbidden_not_unauthorized` holds both.
+- Decision D10, of 2026-11-13, not built: the URL of the dynamic code leads to a web payment page of the charging
+  station management system, on an HTTP server of its own (5.6). It is no part of WWCP_POI.
 - Not yet: `IEVTalerChargingControl` at the charging station management system of CSMSCLI, with OCPP 2.1's
   RequestStartTransaction and its transactionLimit, the limit raised in the answer to the next TransactionEvent, the
-  signed meter values of Transaction.Begin and Transaction.End, and the web payments of its stations, as their
-  `WebPaymentsCtrlr` is set (5.6).
+  signed meter values of Transaction.Begin and Transaction.End, the web payments of its stations, as their
+  `WebPaymentsCtrlr` is set, and the web payment page of D10 with its NotifyWebPaymentStarted (5.6).
 
 **Phase 4, later:** wallets paying the steps of an accepted session alone; Taler's token families (contract terms of
 version 1, e.g. discount tokens) for charging tariff offers (9.4), so that `maxSessionsPerContract` applies without
@@ -703,6 +713,7 @@ knowing the driver; e-mobility providers as merchants of their own offers; walle
 | D7, decided 2026-11-10: (a) | Where does the EV Taler backend of an operator run? | (a) at its charging station management system, which serves the offers itself; (b) in the RoamingHub, for the operators it hosts; (c) the hub serving the offers, the charging station management system the backend, joined by an SSH subsystem of WWCP_Node | (a): the access token of the merchant instance and the key for payments stay with the operator, and OCPP 2.1 is there |
 | D8, decided 2026-11-12: (a) | How is an EVSE kept from being held by sessions no driver at it asked for (E1)? | (a) every session names the dynamic TOTP of OCPP 2.1 the EVSE gives right then, as a QR code, over BLE or NFC; (b) "who pays first charges": offers of step 1 to several sessions at an EVSE, the EVSE held only by the one paid first; (c) a static code shown at the station | (a): it proves that the driver is at the EVSE, which is what OCPP 2.1's dynamic QR codes are for; without it the offers are an open side door, so an EVSE whose station gives no TOTP offers no EV Taler. Neither (b) nor (c) takes its place |
 | D9, decided 2026-11-12: (a) | Which status answers a session asked for without a current TOTP? | (a) 403 alike, the TOTP missing, wrong or past; (b) 401 where it is missing, 403 where it is wrong or past | (a): RFC 9110 lets a server answer 401 only with a `WWW-Authenticate` header naming a challenge (15.5.2), an authentication scheme whose credentials the client sends in its `Authorization` header (11.6). The TOTP is in the body of the request, and no scheme carries it: a 401 would break the RFC, or name a scheme made up for it that no client knows. 403 is a request understood and refused, which may be repeated with new credentials (15.5.4), the code read again; and alike it tells no one which of the three it was. 401 stays where a credential is sent in `Authorization`: the secret of a session, with `WWW-Authenticate: Bearer` |
+| D10, decided 2026-11-13: (a) | Where does the URL of the dynamic code lead? | (a) A web payment page of the charging station management system; (b) the `offersURL` of the POI server; (c) a link into an app | (a): the management system shares the secret of the station, so it checks the TOTP where the URL is called, shows the EVSE, its tariffs and the ways to pay, EV Taler among them, tells the station of the web payment begun, with its timeout (`NotifyWebPaymentStarted`), and starts charging once a tariff and the options of charging are chosen and paid. A page of its own, as the display of a charging station is, on an HTTP server of its own (5.6) |
 
 
 ## 11. Open points
@@ -729,9 +740,12 @@ knowing the driver; e-mobility providers as merchants of their own offers; walle
     Keeping sessions in a store of their own, and the backend asking the merchant instance for its orders again, would
     let them go on.
 11. **The URL of the dynamic code** (after D8, which settled E1 of the security review of 2026-11-11): where it leads
-    and how an app finds the EVSE and the TOTP in it: the operator's web payment page, the `offersURL` or a link into
-    the app, with parameters of fixed names. How the data say that an EVSE gives the dynamic TOTP is decided: the
-    authentication mode `SecureDynamicQRCode` of its pool (4.1). To be decided by the maintainer.
+    is decided, to the web payment page of the charging station management system (D10, 5.6), and how the data say
+    that an EVSE gives the dynamic TOTP as well: the authentication mode `SecureDynamicQRCode` of its pool (4.1).
+    Still open: the names of the parameters by which an app, not a browser, finds the EVSE and the TOTP in the URL;
+    how the page asks for an EV Taler session (section 6) when the TOTP of its URL has passed while the driver was
+    choosing, e.g. the session asked for at once when the page is called; and what the page shows for a TOTP that
+    does not fit, without telling anything of the EVSE.
 
 
 ## References
