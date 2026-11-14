@@ -92,6 +92,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             #endregion
 
+            #region GET ~/RNs/{RN_Id}/keyStatements
+
+            // The key statements of its operator one after the other, the oldest this server knows of first, the one of
+            // the head last: a verifier follows them from the identity keys it pinned to those of today
+            // (RoamingNetworkKeyStatement.TryVerifyChain; SPECIFICATION.md, section 8.6).
+            AddEntityHandlers(roamingNetworkPath + "/keyStatements",
+                              request => !TryGetRequestedRoamingNetwork(request, out var roamingNetwork, out var errorResponse)
+                                             ? errorResponse
+                                             : EntityResponse(request,
+                                                              new JObject(
+                                                                  new JProperty(PropertyKeys.KeyStatements,
+                                                                                new JArray((roamingNetworkHistories.TryGetValue(roamingNetwork.Id, out var history)
+                                                                                                ? history.KeyStatements()
+                                                                                                : roamingNetwork.Operator?.KeyStatement is RoamingNetworkKeyStatement keyStatement
+                                                                                                      ? [ keyStatement ]
+                                                                                                      : []).Select(statement => statement.ToJSON(Embedded: true))))
+                                                              )));
+
+            #endregion
+
             #region GET ~/RNs/{RN_Id}/trustAnchor
 
             // What an app pins, for a QR code: the roaming network as this request names it, the identity keys of its
@@ -109,8 +129,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   var host          = request.Host;
                                   var local         = host.Name is "localhost" or "127.0.0.1" or "[::1]" or "::1";
                                   var path          = request.Path.ToString();
+                                  var requested     = URL.Parse($"{(local ? "http" : "https")}://{host}{path[..path.LastIndexOf("/trustAnchor", StringComparison.Ordinal)]}");
+
+                                  // The roaming network as this request names it first, then where it names its other copies.
                                   var trustAnchor   = new RoamingNetworkTrustAnchor(roamingNetwork.Id,
-                                                                                    [ URL.Parse($"{(local ? "http" : "https")}://{host}{path[..path.LastIndexOf("/trustAnchor", StringComparison.Ordinal)]}") ],
+                                                                                    [ requested, .. roamingNetwork.URLs.Where(url => !String.Equals(url.ToString(), requested.ToString(), StringComparison.Ordinal)) ],
                                                                                     roamingNetwork.Operator.IdentityKeys.GroupBy(identityKey => identityKey.HolderOrUnnamed, StringComparer.Ordinal).
                                                                                                                          Select (holder      => holder.Select(identityKey => identityKey.Id)),
                                                                                     roamingNetwork.Operator.MinConsensus,
@@ -251,6 +274,16 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 Task.FromResult(
                     request.Respond(new JObject(
                                         new JProperty(PropertyKeys.Attestations, new JArray(History.CurrentAttestations(TimeProvider.GetUtcNow()).Select(attestation => attestation.ToJSON(Embedded: true))))
+                                    ))
+                )
+
+            );
+
+            WebSocketServer.AddCommand("keyStatements", request =>
+
+                Task.FromResult(
+                    request.Respond(new JObject(
+                                        new JProperty(PropertyKeys.KeyStatements, new JArray(History.KeyStatements().Select(statement => statement.ToJSON(Embedded: true))))
                                     ))
                 )
 

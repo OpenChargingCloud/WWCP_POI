@@ -5,10 +5,10 @@ using cloud.charging.open.protocols.WWCP.POI;
 public static class ExampleA5
 {
 
-    // The roaming network operator makes the next checkpoint, of revision 9, with the AC stations of the pools 3 and 4 as
+    // The roaming network operator makes the next checkpoint, of revision 11, with the AC stations of the pools 3 and 4 as
     // example A4 recorded them; then DE*GEF corrects them, 22 kW each with two EVSEs of 11 kW, and the roaming network
-    // operator makes the checkpoint after, of revision 10. The data before the correction stays what the checkpoint of
-    // revision 9 states.
+    // operator makes the checkpoint after, of revision 12. The data before the correction stays what the checkpoint of
+    // revision 11 states.
 
 
     public static void Run(ExampleA1.Result A1, ExampleA2.Result A2)
@@ -16,13 +16,13 @@ public static class ExampleA5
 
         #region 1. The second checkpoint: before the correction
 
-        // It names the first one as the one before, and its commits are those since: the revisions 8 and 9.
+        // It names the first one as the one before, and its commits are those since: the revisions 10 and 11.
         var checkpoint1  = ExampleA4.MakeCheckpoint(A1);
 
-        if (!A1.History.TryGetCommitProof(ExampleA4.CommitOf(A1, 8).Id, out var proof8, out var error))
+        if (!A1.History.TryGetCommitProof(ExampleA4.CommitOf(A1, 10).Id, out var proof10, out var error))
             Helpers.Fail(error);
 
-        File.WriteAllText("published/QA-proof-revision-8.json", proof8.ToJSON().ToString());
+        File.WriteAllText("published/QA-proof-revision-10.json", proof10.ToJSON().ToString());
 
         #endregion
 
@@ -53,10 +53,10 @@ public static class ExampleA5
 
         var checkpoint2  = ExampleA4.MakeCheckpoint(A1);
 
-        if (!A1.History.TryGetCommitProof(A1.History.Head.Commit.Id, out var proof10, out error))
+        if (!A1.History.TryGetCommitProof(A1.History.Head.Commit.Id, out var proof12, out error))
             Helpers.Fail(error);
 
-        File.WriteAllText("published/QA-proof-revision-10.json", proof10.ToJSON().ToString());
+        File.WriteAllText("published/QA-proof-revision-12.json", proof12.ToJSON().ToString());
 
         Console.WriteLine();
 
@@ -156,8 +156,8 @@ public static class ExampleA5
 
         #region 7. The proofs, and what is refused
 
-        // a) The commits of revisions 4, 8 and 10 in the checkpoints whose commits include them.
-        foreach (var (revision, sequence) in new[] { (4, 0), (8, 1), (10, 2) })
+        // a) The commits of revisions 6, 10 and 12 in the checkpoints whose commits include them.
+        foreach (var (revision, sequence) in new[] { (6, 0), (10, 1), (12, 2) })
         {
 
             if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON($"published/QA-proof-revision-{revision}.json"), out var proof, out error))
@@ -168,12 +168,12 @@ public static class ExampleA5
         }
 
         // b) The proof of the correction against the checkpoint before it: the correction is no commit of it.
-        if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-10.json"), out var proof10, out error))
+        if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-12.json"), out var proof12, out error))
             Helpers.Fail(error);
 
-        Console.WriteLine($"The proof of revision 10 in checkpoint 1: {(proof10.Verify(checkpoints[1], out error) ? "valid" : error)}");
+        Console.WriteLine($"The proof of revision 12 in checkpoint 1: {(proof12.Verify(checkpoints[1], out error) ? "valid" : error)}");
 
-        // c) A checkpoint skipping the one before: joined from checkpoint 0 and at revision 10, checkpoint 2 is refused
+        // c) A checkpoint skipping the one before: joined from checkpoint 0 and at revision 12, checkpoint 2 is refused
         //    without checkpoint 1.
         if (!RoamingNetworkHistory.TryFromCheckpointSnapshot(File.ReadAllText("published/QA-checkpoint-0-snapshot.json"), out var skipping, out error, verify, roles))
             Helpers.Fail(error);

@@ -749,6 +749,111 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
 
         #endregion
 
+        #region The_URLs_of_the_copies_of_a_roaming_network()
+
+        /// <summary>
+        /// A roaming network names where its copies are served, urls (SPECIFICATION.md, section 2): content, changed by
+        /// its operator as a whole, so part of its ETags and of what its commits sign; each an https URL of this roaming
+        /// network, ~/RNs/{RN_Id}, once, without user information, at most 16 of at most 512 characters. Its trust anchor
+        /// names them, unless given others.
+        /// </summary>
+        [Test]
+        public void The_URLs_of_the_copies_of_a_roaming_network()
+        {
+
+            var history   = RoamingNetworkHistory.Start(NewNetwork());
+            var before    = history.Head.RoamingNetwork;
+            var alpha     = $"https://alpha.example/poi/RNs/{RN}";
+            var beta      = $"https://beta.example/poi/RNs/{RN}";
+
+            var first     = history.Commit(before.CreateSignedChangeSet(
+                                               [ RoamingNetworkChange.UpdateProperty(before, POINetworkURLs.JSONProperty, null, new JArray(alpha)) ],
+                                               CreatedAt: T0));
+
+            Assert.That(first.Status,  Is.EqualTo(RoamingNetworkCommitStatus.Committed), first.ErrorResponse);
+
+            var one       = history.Head.RoamingNetwork;
+
+            var second    = history.Commit(one.CreateSignedChangeSet(
+                                               [ RoamingNetworkChange.UpdateProperty(one, POINetworkURLs.JSONProperty, new JArray(alpha), new JArray(alpha, beta)) ],
+                                               CreatedAt: T0.AddMinutes(1)));
+
+            Assert.That(second.Status,  Is.EqualTo(RoamingNetworkCommitStatus.Committed), second.ErrorResponse);
+
+            var two       = history.Head.RoamingNetwork;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(before.URLs,                                                  Is.Empty);
+                Assert.That(before.ToJSON().ContainsKey(POINetworkURLs.JSONProperty),     Is.False, "written unless none");
+                Assert.That(one.URLs.Select(url => url.ToString()),                       Is.EqualTo(new[] { alpha }));
+                Assert.That(two.URLs.Select(url => url.ToString()),                       Is.EqualTo(new[] { alpha, beta }));
+                Assert.That(two.ToJSON()[POINetworkURLs.JSONProperty]!.Select(url => url.Value<String>()),  Is.EqualTo(new[] { alpha, beta }));
+
+                // Content: other ETags, and the commit names them.
+                Assert.That(one.ETags,                                                    Is.Not.EqualTo(before.ETags));
+                Assert.That(two.ETags,                                                    Is.Not.EqualTo(one.ETags));
+                Assert.That(two.MatchesCommitETags(second.Commit!.ETags),                 Is.True);
+
+                // Read back from its JSON and from its CBOR, as it is written.
+                Assert.That(RoamingNetwork.TryParse(two.ToJSON(), out var fromJSON, out var error),  Is.True, error);
+                Assert.That(fromJSON!.URLs,                                               Is.EqualTo(two.URLs));
+                Assert.That(fromJSON.CalcETags(),                                         Is.EqualTo(two.ETags));
+                Assert.That(RoamingNetwork.TryParse(CBORValue.Parse(two.ToCBOR().ToByteArray(CBORWriterOptions.Canonical)), out var fromCBOR, out error),  Is.True, error);
+                Assert.That(fromCBOR!.URLs,                                               Is.EqualTo(two.URLs));
+                Assert.That(fromCBOR.CalcETags(),                                         Is.EqualTo(two.ETags));
+
+                // Its trust anchor names them, unless it is given others.
+                if (two.Operator?.KeyStatement is RoamingNetworkKeyStatement keyStatement)
+                {
+                    Assert.That(two.CreateTrustAnchor(keyStatement).URLs,                         Is.EqualTo(two.URLs));
+                    Assert.That(two.CreateTrustAnchor(keyStatement, URL.Parse(beta)).URLs,        Is.EqualTo(new[] { URL.Parse(beta) }));
+                }
+
+                // What is refused: a URL twice, of another roaming network, of no roaming network, with a query or a
+                // trailing slash, without TLS, another scheme, with user information, too long, too many, none at all, and
+                // an element of them.
+                foreach (var (urls, why) in new (JToken, String)[] {
+                             (new JArray(alpha, alpha),                                  "twice"),
+                             (new JArray("https://alpha.example/poi/RNs/other"),         "is one of the roaming network 'other'"),
+                             (new JArray("https://alpha.example/poi"),                   "is not the one of a roaming network"),
+                             (new JArray($"{alpha}?x=1"),                                "is not the one of a roaming network"),
+                             (new JArray($"{alpha}/"),                                   "is not the one of a roaming network"),
+                             (new JArray($"ftp://alpha.example/poi/RNs/{RN}"),           "is no https URL"),
+                             (new JArray($"http://alpha.example/poi/RNs/{RN}"),          "is no https URL"),
+                             (new JArray($"https://user:secret@alpha.example/poi/RNs/{RN}"),  "must not name user information"),
+                             (new JArray($"https://alpha.example/{new String('a', 500)}/RNs/{RN}"),  "more than 512"),
+                             (new JArray(Enumerable.Range(1, 17).Select(number => $"https://copy{number}.example/poi/RNs/{RN}")),  "at most 16 URLs, not 17"),
+                             (new JArray(),                                              "at least one URL, or be left out"),
+                             (new JArray(1),                                             "absolute URLs"),
+                             (new JValue(alpha),                                         "must be a JSON array of URLs")
+                         })
+                {
+                    Assert.That(() => two.CreateChangeSet([ RoamingNetworkChange.UpdateProperty(two, POINetworkURLs.JSONProperty, null, urls) ]),
+                                Throws.ArgumentException.With.Message.Contains(why), urls.ToString(Newtonsoft.Json.Formatting.None));
+                }
+
+                Assert.That(() => two.CreateChangeSet([ RoamingNetworkChange.AddElement(nameof(RoamingNetwork), RN.ToString(), [ new POIElementPathSegment(POINetworkURLs.JSONProperty, beta) ], beta) ]),
+                            Throws.ArgumentException.With.Message.Contains("as a whole"));
+
+                Assert.That(() => new RoamingNetwork(RN, URLs: [ URL.Parse("https://alpha.example/poi/RNs/other") ]),
+                            Throws.ArgumentException.With.Message.Contains("is one of the roaming network 'other'"));
+
+            }
+
+            // Removed again: the roaming network names none.
+            var third     = history.Commit(two.CreateSignedChangeSet(
+                                               [ RoamingNetworkChange.RemoveProperty(two, POINetworkURLs.JSONProperty) ],
+                                               CreatedAt: T0.AddMinutes(2)));
+
+            Assert.That(third.Status,                         Is.EqualTo(RoamingNetworkCommitStatus.Committed), third.ErrorResponse);
+            Assert.That(history.Head.RoamingNetwork.URLs,     Is.Empty);
+
+        }
+
+        #endregion
+
         #region A_second_tree_hash_algorithm()
 
         [Test]
@@ -844,6 +949,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
             var byEVSE        = await httpClient.GetStringAsync("EVSEs/DE*GEF*E1*2/proof");
             var byFullEVSE    = await httpClient.GetStringAsync("CSOs/DE*GEF/CPs/DE*GEF*P1/CSs/DE*GEF*S1/EVSEs/DE*GEF*E1*1/proof");
             var attestations  = JObject.Parse(await httpClient.GetStringAsync("attestations"));
+            var keyStatements = JObject.Parse(await httpClient.GetStringAsync("keyStatements"));
             var otherHash     = await httpClient.GetAsync("CSs/DE*GEF*S1/proof?hashAlgorithm=sha384");
             var unknown       = await httpClient.GetAsync("CSs/DE*GEF*S9/proof");
 
@@ -856,6 +962,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Proofs
                 Assert.That(JToken.DeepEquals(JObject.Parse(byStation), JObject.Parse(byEVSE)),           Is.True);
                 Assert.That(JToken.DeepEquals(JObject.Parse(byStation), JObject.Parse(byFullEVSE)),       Is.True);
                 Assert.That(attestations["attestations"]!.Count(),                                        Is.EqualTo(1));
+                Assert.That(keyStatements["keyStatements"]!.Select(statement => statement.ToString()),      Is.EqualTo(history.KeyStatements().Select(statement => statement.ToJSON(Embedded: true).ToString())));
+                Assert.That(keyStatements["keyStatements"]!.Count(),                                        Is.EqualTo(history.Head.RoamingNetwork.Operator?.KeyStatement is null ? 0 : 1));
                 Assert.That(otherHash.StatusCode,                                                         Is.EqualTo(HttpStatusCode.BadRequest));
                 Assert.That(unknown.StatusCode,                                                           Is.EqualTo(HttpStatusCode.NotFound));
                 Assert.That(String.Join(", ", full.Headers.GetValues("ETag")),                                                       Does.StartWith("\"json:sha256:hex:"));

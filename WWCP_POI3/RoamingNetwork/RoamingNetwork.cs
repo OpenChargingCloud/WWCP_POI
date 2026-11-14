@@ -27,6 +27,7 @@ using Newtonsoft.Json.Linq;
 using org.GraphDefined.Vanaheimr.Styx;
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 using org.GraphDefined.Vanaheimr.Styx.Arrows;
 
 
@@ -253,6 +254,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             /// </summary>
             public const String  TreeHashAlgorithms                  = POITreeHashAlgorithms.JSONProperty;
 
+            /// <summary>
+            /// The property of the URLs of its copies, ~/RNs/{RN_Id} at every server holding it (SPECIFICATION.md, section 2).
+            /// </summary>
+            public const String  URLs                                = POINetworkURLs.JSONProperty;
+
         }
 
         #endregion
@@ -298,6 +304,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region URLs
+
+        /// <summary>
+        /// The URLs of its copies, urls (SPECIFICATION.md, section 2): ~/RNs/{RN_Id} at every server holding this
+        /// roaming network, e.g. one of each holder of its operator, the preferred one first; none when it names none.
+        /// Content, owned by its operator: so whoever verified one copy knows where the others are, and compares them.
+        /// </summary>
+        public ImmutableArray<URL>                 URLs                       { get; }
+
+        #endregion
+
         #endregion
 
         #region Constructor(s)
@@ -337,7 +354,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                               IEnumerable<ConformityAssessmentBody>?         ConformityAssessmentBodies         = null,
                               IEnumerable<EnergyMeterManufacturer>?          EnergyMeterManufacturers           = null,
                               RoamingNetworkOperator?                        Operator                           = null,
-                              IEnumerable<ETagHashAlgorithm>?                TreeHashAlgorithms                 = null)
+                              IEnumerable<ETagHashAlgorithm>?                TreeHashAlgorithms                 = null,
+                              IEnumerable<URL>?                              URLs                               = null)
 
             : this(Id,
                    Name,
@@ -362,6 +380,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                    EnergyMeterManufacturers,
                    Operator,
                    TreeHashAlgorithms,
+                   URLs,
                    Checked: null)
 
         { }
@@ -409,6 +428,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                IEnumerable<EnergyMeterManufacturer>?          EnergyMeterManufacturers,
                                RoamingNetworkOperator?                        Operator,
                                IEnumerable<ETagHashAlgorithm>?                TreeHashAlgorithms,
+                               IEnumerable<URL>?                              URLs,
                                CheckedEntities?                               Checked)
 
             : base(Id,
@@ -447,6 +467,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 this.GivenTreeHashAlgorithms = treeHashAlgorithms;
 
             }
+
+            this.URLs = URLs is not null ? [ .. URLs ] : [];
+
+            if (POINetworkURLs.Invalid(this.URLs, Id) is String urlsError)
+                throw new ArgumentException(urlsError, nameof(URLs));
 
             #region Data licenses and charging station operators
 
@@ -949,6 +974,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse URLs               [optional]
+
+                if (!POINetworkURLs.TryParse(JSON[PropertyKeys.URLs],
+                                             id,
+                                             out var urls,
+                                             out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse Operator       [optional]
 
                 // The keys of a roaming network are the keys of its operator.
@@ -1110,7 +1147,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      ConformityAssessmentBodies:         conformityAssessmentBodies,
                                      EnergyMeterManufacturers:           energyMeterManufacturers,
                                      Operator:                           roamingNetworkOperator,
-                                     TreeHashAlgorithms:                 treeHashAlgorithms
+                                     TreeHashAlgorithms:                 treeHashAlgorithms,
+                                     URLs:                               urls
 
                                  );
 
@@ -1396,6 +1434,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             if (GivenTreeHashAlgorithms.HasValue)
                 json.Add(PropertyKeys.TreeHashAlgorithms,                POITreeHashAlgorithms.ToJSON(GivenTreeHashAlgorithms.Value));
 
+            if (!URLs.IsEmpty)
+                json.Add(PropertyKeys.URLs,                              POINetworkURLs.ToJSON(URLs));
+
             POIEntityMetadata.AddTo(json, Created, LastChangeDate, CustomData);
 
             // The ETags describe the content without them, irrespective of the view options.
@@ -1585,6 +1626,20 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 #endregion
 
+                #region Parse URLs               [optional]
+
+                if (!POINetworkURLs.TryParse(CBOR.TryGetValue(CBORValue.FromText(PropertyKeys.URLs), out var urlsCBOR)
+                                                 ? CBORJSON.ToJSON(urlsCBOR)
+                                                 : null,
+                                             id,
+                                             out var urls,
+                                             out ErrorResponse))
+                {
+                    return false;
+                }
+
+                #endregion
+
                 #region Parse Operator       [optional]
 
                 // The keys of a roaming network are the keys of its operator.
@@ -1728,7 +1783,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      ConformityAssessmentBodies:  conformityAssessmentBodies,
                                      EnergyMeterManufacturers:  energyMeterManufacturers,
                                      Operator:                  roamingNetworkOperator,
-                                     TreeHashAlgorithms:        treeHashAlgorithms
+                                     TreeHashAlgorithms:        treeHashAlgorithms,
+                                     URLs:                      urls
                                  );
 
                 #region Check written form
@@ -1854,6 +1910,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             if (GivenTreeHashAlgorithms.HasValue)
                 cbor.Add(CBORValue.FromText(PropertyKeys.TreeHashAlgorithms),  POITreeHashAlgorithms.ToCBOR(GivenTreeHashAlgorithms.Value));
+
+            if (!URLs.IsEmpty)
+                cbor.Add(CBORValue.FromText(PropertyKeys.URLs),                POINetworkURLs.ToCBOR(URLs));
 
             // Always part of the content, as in the JSON representation; custom data is JSON.
             cbor.Add(CBORValue.FromText(BasePropertyKeys.Created),             CBORValue.FromText(Created.       ToISO8601()));

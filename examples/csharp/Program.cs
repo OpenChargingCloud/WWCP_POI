@@ -9,10 +9,14 @@ foreach (var directory in new[] { "AlphaOrg", "BetaOrg", "GammaOrg", "DE-GEF", "
         Directory.Delete(directory, recursive: true);
 
 
-// The roaming network is created and the organizations behind it sign the quorum.
+// The roaming network is created by one organization alone; a second and a third join it, the quorum growing with them.
 using var a1 = ExampleA1.Run();
 
 ExampleA1.Validate();
+
+Console.WriteLine();
+
+ExampleA1.ValidateSuccession();
 
 Console.WriteLine();
 Console.WriteLine();

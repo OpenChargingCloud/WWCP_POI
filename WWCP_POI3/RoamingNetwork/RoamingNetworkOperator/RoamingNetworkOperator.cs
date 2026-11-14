@@ -92,6 +92,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <param name="EnergyMeterManufacturers">The energy meter manufacturers linked to the roaming network.</param>
         /// 
         /// <param name="TreeHashAlgorithms">The hash algorithms used for tree hash calculations.</param>
+        /// <param name="URLs">The URLs of its copies, ~/RNs/{RN_Id} at every server holding it, the preferred one first.</param>
         public static RoamingNetwork CreateRoamingNetwork(this RoamingNetworkOperator                    RoamingNetworkOperator,
 
                                                           RoamingNetwork_Id                              RoamingNetworkId,
@@ -119,7 +120,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                           IEnumerable<ConformityAssessmentBody>?         ConformityAssessmentBodies         = null,
                                                           IEnumerable<EnergyMeterManufacturer>?          EnergyMeterManufacturers           = null,
 
-                                                          IEnumerable<ETagHashAlgorithm>?                TreeHashAlgorithms                 = null)
+                                                          IEnumerable<ETagHashAlgorithm>?                TreeHashAlgorithms                 = null,
+                                                          IEnumerable<URL>?                              URLs                               = null)
 
 
             => new (RoamingNetworkId,
@@ -147,7 +149,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     ConformityAssessmentBodies,
                     EnergyMeterManufacturers,
                     RoamingNetworkOperator,
-                    TreeHashAlgorithms);
+                    TreeHashAlgorithms,
+                    URLs);
 
         #endregion
 
@@ -367,6 +370,71 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                       CustomDataNew?                                       CustomData                   = null,
                                       UserDefinedDictionary?                               InternalData                 = null)
 
+            : this(true,
+
+                   Id,
+                   Name,
+                   Description,
+                   Address,
+                   Homepage,
+                   EMail,
+                   HotlinePhoneNumber,
+                   HotlineEMail,
+                   IdentityKeys,
+                   KeyStatement,
+                   MinConsensus,
+                   SigningKeyCertificates,
+
+                   InitialAdminStatus,
+                   InitialStatus,
+                   MaxAdminStatusScheduleSize,
+                   MaxStatusScheduleSize,
+
+                   DataSource,
+                   Created,
+                   LastChange,
+
+                   CustomData,
+                   InternalData)
+
+        { }
+
+        #endregion
+
+        #region (private) RoamingNetworkOperator (CheckQuorum, Id, ...)
+
+        /// <summary>
+        /// Create a new roaming network operator, its quorum checked or not: between the changes of one change set
+        /// its keys and its minConsensus need not fit each other, as the version after all of them is checked
+        /// (QuorumError; SPECIFICATION.md, section 4.1).
+        /// </summary>
+        private RoamingNetworkOperator(Boolean                                              CheckQuorum,
+
+                                       RoamingNetworkOperator_Id                            Id,
+                                       I18NString?                                          Name,
+                                       I18NString?                                          Description,
+                                       Address?                                             Address,
+                                       URL?                                                 Homepage,
+                                       EMailAddress?                                        EMail,
+                                       PhoneNumber?                                         HotlinePhoneNumber,
+                                       EMailAddress?                                        HotlineEMail,
+                                       IEnumerable<POIPublicKey>?                           IdentityKeys,
+                                       RoamingNetworkKeyStatement?                          KeyStatement,
+                                       Byte?                                                MinConsensus,
+                                       IEnumerable<RoamingNetworkSigningKeyCertificate>?    SigningKeyCertificates,
+
+                                       Timestamped<RoamingNetworkOperatorAdminStatusType>?  InitialAdminStatus,
+                                       Timestamped<RoamingNetworkOperatorStatusType>?       InitialStatus,
+                                       UInt16?                                              MaxAdminStatusScheduleSize,
+                                       UInt16?                                              MaxStatusScheduleSize,
+
+                                       String?                                              DataSource,
+                                       DateTimeOffset?                                      Created,
+                                       DateTimeOffset?                                      LastChange,
+
+                                       CustomDataNew?                                       CustomData,
+                                       UserDefinedDictionary?                               InternalData)
+
             : base(Id,
                    Name,
                    Description,
@@ -400,7 +468,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             this.MinConsensus        = MinConsensus ?? 1;
 
-            POIPartyKeys.CheckQuorum(this.MinConsensus, this.SigningKeys, this.IdentityKeys, $"the roaming network operator '{Id}'");
+            if (CheckQuorum && QuorumError() is String quorumError)
+                throw new ArgumentException(quorumError);
 
             this.KeyStatement            = KeyStatement;
             this.keyStatementError       = new (CheckKeyStatement);
@@ -464,6 +533,19 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+
+        #region (internal) QuorumError()
+
+        /// <summary>
+        /// Why its minConsensus does not fit its keys, or null: of its signing and of its identity keys, at least as many
+        /// holders as must sign, and more than half of them (SPECIFICATION.md, section 4.1). Checked as it is created;
+        /// between the changes of one change set (TryParseBetweenChanges) the version after all of them is checked.
+        /// </summary>
+        internal String? QuorumError()
+
+            => POIPartyKeys.QuorumError(MinConsensus, SigningKeys, IdentityKeys, $"the roaming network operator '{Id}'");
+
+        #endregion
 
         #region (internal) KeyStatementError(RoamingNetworkId)
 
@@ -660,6 +742,39 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                        [NotNullWhen(true)]  out RoamingNetworkOperator?      RoamingNetworkOperator,
                                        [NotNullWhen(false)] out String?                      ErrorResponse,
                                        CustomJObjectParserDelegate<RoamingNetworkOperator>?  CustomRoamingNetworkOperatorParser)
+
+            => TryParse(JSON,
+                        out RoamingNetworkOperator,
+                        out ErrorResponse,
+                        CustomRoamingNetworkOperatorParser,
+                        true);
+
+
+        /// <summary>
+        /// Try to parse the given JSON representation of a roaming network operator between the changes of one change
+        /// set: its keys and its minConsensus need not fit each other yet, as a change set changes them one by one, e.g.
+        /// a second holder joining the only one. Whoever applies the change set checks the operator after all of its
+        /// changes (QuorumError; SPECIFICATION.md, section 4.1).
+        /// </summary>
+        /// <param name="JSON">The JSON to parse.</param>
+        /// <param name="RoamingNetworkOperator">The parsed roaming network operator.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        internal static Boolean TryParseBetweenChanges(JObject                                           JSON,
+                                                       [NotNullWhen(true)]  out RoamingNetworkOperator?  RoamingNetworkOperator,
+                                                       [NotNullWhen(false)] out String?                  ErrorResponse)
+
+            => TryParse(JSON,
+                        out RoamingNetworkOperator,
+                        out ErrorResponse,
+                        null,
+                        false);
+
+
+        private static Boolean TryParse(JObject                                               JSON,
+                                        [NotNullWhen(true)]  out RoamingNetworkOperator?      RoamingNetworkOperator,
+                                        [NotNullWhen(false)] out String?                      ErrorResponse,
+                                        CustomJObjectParserDelegate<RoamingNetworkOperator>?  CustomRoamingNetworkOperatorParser,
+                                        Boolean                                               CheckQuorum)
         {
 
             RoamingNetworkOperator  = null;
@@ -792,6 +907,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 RoamingNetworkOperator = new RoamingNetworkOperator(
 
+                                             CheckQuorum,
+
                                              id,
                                              name,
                                              description,
@@ -805,11 +922,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                              minConsensus,
                                              signingKeyCertificates,
 
-                                             DataSource:  dataSource,
-                                             Created:     created,
-                                             LastChange:  lastChange,
+                                             null,
+                                             null,
+                                             null,
+                                             null,
 
-                                             CustomData:  customData
+                                             dataSource,
+                                             created,
+                                             lastChange,
+
+                                             customData,
+                                             null
 
                                          );
 

@@ -221,6 +221,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             BasePropertyKeys.DataSource,
             BasePropertyKeys.DataLicenses,
             PropertyKeys.    TreeHashAlgorithms,
+            PropertyKeys.    URLs,
             BasePropertyKeys.CustomData
         ];
 
@@ -858,6 +859,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             return !POIPartyKeys.IsKeyProperty(PropertyName) &&
                    PropertyName != POIElements.TemplateIdsProperty &&
                    PropertyName != PropertyKeys.TreeHashAlgorithms &&
+                   PropertyName != PropertyKeys.URLs &&
                    POIElements.TryMerge(PropertyName, Base, Left, Right, out Merged);
 
         }
@@ -868,8 +870,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The changes of a property leading from the value of the left version to the merged one: element by element,
-        /// where they can be (see POIElements.Diff), the keys of a party, the templates of a member and the tree hash
-        /// algorithms as a whole; without old values,
+        /// where they can be (see POIElements.Diff), the keys of a party, the templates of a member, the tree hash
+        /// algorithms and the URLs of the roaming network as a whole; without old values,
         /// so that they get the values they find.
         /// </summary>
         private static IEnumerable<RoamingNetworkChange> PropertyChanges(String   EntityType,
@@ -879,7 +881,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                          JToken?  NewValue)
         {
 
-            if (POIPartyKeys.IsKeyProperty(PropertyName) || PropertyName == POIElements.TemplateIdsProperty || PropertyName == PropertyKeys.TreeHashAlgorithms)
+            if (POIPartyKeys.IsKeyProperty(PropertyName) || PropertyName == POIElements.TemplateIdsProperty || PropertyName == PropertyKeys.TreeHashAlgorithms || PropertyName == PropertyKeys.URLs)
                 return [ NewValue is not null
                              ? RoamingNetworkChange.UpdateProperty(EntityType, EntityId, PropertyName, null, NewValue.DeepClone())
                              : RoamingNetworkChange.RemoveProperty(EntityType, EntityId, PropertyName) ];

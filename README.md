@@ -601,7 +601,13 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   the keys of one holder by `;`), at one URL or more, e.g. a mirror for when the hub is down
   (`RoamingNetwork.CreateTrustAnchor(keyStatement, url, mirrorURL)`), and verifies proofs with `proof.Verify(anchor, …)`:
   only the thumbprints, which of them one holder holds, and the `minConsensus` are pinned. The holders are counted as
-  the trust anchor names them, never as a key statement names them, and a key keeps its holder.
+  the trust anchor names them, never as a key statement names them, and a key keeps its holder. The holders and the
+  quorum change by change sets of the operator, signed by the quorum before and by every new identity key: one holder
+  alone, a second joining, two of three (`examples/exampleA1.md`); the quorum fits the keys in every version, not
+  between the changes of one change set. A roaming network names the URLs of its copies in `urls`
+  (`RoamingNetwork.URLs`, `POINetworkURLs`), which its trust anchor takes; and whoever pinned older keys follows the
+  key statements one after the other (`RoamingNetworkHistory.KeyStatements()`, `GET ~/RNs/{id}/keyStatements`,
+  `RoamingNetworkKeyStatement.TryVerifyChain(…)`).
 - **Trust contexts:** an app that lets its users import a trust anchor before they trust its keys verifies not
   against that anchor, which trusts every identity key it pins, but against a context it evaluates of the keys it
   trusts locally, as WWCP_POI.TS 0.1.1 does (`TrustContext`): `RoamingNetworkTrustContext.Evaluate(anchor,
@@ -778,7 +784,8 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/history/archive/{number}` | one segment: `{info, base, commits}` |
 | `GET ~/RNs/{id}/attestations` | the attestations of the head valid now: `{attestations: […]}` |
 | `GET ~/RNs/{id}/keyStatement` | the key statement of the roaming network operator |
-| `GET ~/RNs/{id}/trustAnchor` | what an app pins: `{roamingNetworkId, identityKeyIds, minConsensus, uri, qrCode, trustAnchor}`, `identityKeyIds` per holder, `qrCode` the text of its QR code |
+| `GET ~/RNs/{id}/keyStatements` | its key statements one after the other, the oldest the history knows of first, the one of the head last: `{keyStatements: […]}`; who pinned older keys follows them with `RoamingNetworkKeyStatement.TryVerifyChain(…)` |
+| `GET ~/RNs/{id}/trustAnchor` | what an app pins: `{roamingNetworkId, identityKeyIds, minConsensus, uri, qrCode, trustAnchor}`, `identityKeyIds` per holder, `qrCode` the text of its QR code; its URLs the one of the request, then the other `urls` the roaming network names |
 | `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/proof` | the proof of a charging station of the head, `?hashAlgorithm=` one of the network's |
 | `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/proof` | the proof of the charging station of an EVSE |
 | `GET ~/RNs/{id}/CSs/{CS_Id}/proof`, `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/proof` | the same, found by the identification alone |
@@ -917,7 +924,7 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
   `signCommit {commitId, signatures}` → `{commitId, signatures, added}`; checkpoints: `checkpoints {since?, max?}`
   or `{latest: true}`, `checkpoint {checkpointId}`, `checkpointSnapshot {checkpointId}`, `commitProof {commitId,
   checkpointId?}`, `signCheckpoint {checkpointId, signatures}`, `pushCheckpoints {checkpoints}`; archive: `archive`, `archiveSegment {number}`;
-  proofs: `attestations`, `chargingStationProof {chargingStationId | EVSEId, hashAlgorithm?}`; price statements:
+  proofs: `attestations`, `keyStatements`, `chargingStationProof {chargingStationId | EVSEId, hashAlgorithm?}`; price statements:
   `priceStatements {chargingStationId | EVSEId}?`, `addPriceStatements {priceStatements}`, `checkpointPriceStatements
   {checkpointId}`, `priceStatementProof {checkpointId, digest}`; `pushCheckpoints` takes `priceStatements` as well;
   epochs: `epoch`; co-signing: `pendingChangeSets`, `pendingChangeSet {changeSetId}`, `coSignChangeSet {changeSet}`,

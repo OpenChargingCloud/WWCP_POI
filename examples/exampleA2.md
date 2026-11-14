@@ -230,12 +230,12 @@ var added                 = A1.History.Commit(byAlphaAndBetaOrg);
 ```
 Sent by DE*GEF, signed by its 2 identity keys and the ones of its manufacturers; missing: Change 0: Add of the ChargingStationOperator 'DE*GEF' needs signatures by signing keys of 2 holders of the roaming network operator 'OCC'! Change 1: Add of the ChargingStationManufacturer 'GraphDefined' needs signatures by signing keys of 2 holders of the roaming network operator 'OCC'! Change 2: Add of the EnergyMeterManufacturer 'SAALE' needs signatures by signing keys of 2 holders of the roaming network operator 'OCC'! Change 3: Add of the EnergyMeterManufacturer 'KERNBERG' needs signatures by signing keys of 2 holders of the roaming network operator 'OCC'!
 Signed by AlphaOrg alone: Refused, Change 0: Add of the ChargingStationOperator 'DE*GEF' needs signatures by signing keys of 2 holders of the roaming network operator 'OCC'!
-Signed by AlphaOrg and BetaOrg: Committed, revision 1, commit 1fa68005fcfd0ad35b2a44e9d1a6a932862e03c4f44bcd3449b7b99f1466e8a1
+Signed by AlphaOrg and BetaOrg: Committed, revision 3, commit 1fa68005fcfd0ad35b2a44e9d1a6a932862e03c4f44bcd3449b7b99f1466e8a1
 ```
 
 Had `DE*GEF` or a manufacturer not signed with one of its identity keys, the missing signatures would name it as well:
 `… needs a signature by the new identity key '…' of the ChargingStationOperator 'DE*GEF', as the proof that it holds
-it!`. The commit, revision 1, names the genesis commit in its `parentIds` and carries the change set with its seven
+it!`. The commit, revision 3, names the commit before it, of revision 2, in its `parentIds` and carries the change set with its seven
 signatures, by the two identity keys of `DE*GEF`, the identity keys of the three manufacturers and the signing keys of
 `AlphaOrg` and `BetaOrg`; the commit itself is signed by the signers of the history, the three holders of `OCC`.
 
@@ -294,7 +294,7 @@ File.WriteAllText($"published/{A1.RoamingNetwork.Id}-commit.json",  A1.History.H
 
 ```
 The models signed by the roaming network operator: Refused, Change 0: Add of the ChargingStationModel 'GD-DC300' needs a signature by a signing key of the ChargingStationManufacturer 'GraphDefined'!
-Signed by the three manufacturers: Committed, revision 2
+Signed by the three manufacturers: Committed, revision 4
 ```
 
 `GraphDefined` in `published/QA.json` then, its models embedded:
@@ -325,7 +325,7 @@ Its `lastChange` is the one of the change set adding its models: a change of a m
 
 ## 5. Checking, as `DE*GEF`, that `QA` names it with its keys
 
-`ExampleA2.Validate()` checks `QA` as everybody does, `ExampleA1.Validate()` now at revision 2, then that it names
+`ExampleA2.Validate()` checks `QA` as everybody does, `ExampleA1.Validate()` now at revision 4, then that it names
 `DE*GEF` with exactly the keys it sent, from what is published and its own `operator.json` only, and shows the
 manufacturers with their models:
 
@@ -353,7 +353,7 @@ if (KeyIds(gef.SigningKeys)  != KeyIds(gefSent.SigningKeys) ||
 ```
 
 ```
-QA is checked: revision 2, commit 39e1bbe68021679daf954f91127682ff8463ed766aa0d7ec706e8a10e2d3ca82, signed by AlphaOrg and BetaOrg and GammaOrg
+QA is checked: revision 4, commit 39e1bbe68021679daf954f91127682ff8463ed766aa0d7ec706e8a10e2d3ca82, signed by AlphaOrg and BetaOrg and GammaOrg
 beforeETags of the next change set: json:sha256:hex:f1df53cf33d81396eea7220725bdb72d1bbd3c5eb45452723347b152deaefbc3, cbor:sha256:hex:cf2e9d2a5559fb4b3d981a18881c3faa656c9f5c279b73b0e816f76e735f1306
 
 DE*GEF is a member of QA with its keys:

@@ -147,20 +147,21 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
-        #region CheckQuorum(MinConsensus, SigningKeys, IdentityKeys, Party)
+        #region QuorumError(MinConsensus, SigningKeys, IdentityKeys, Party)
 
         /// <summary>
-        /// The given quorum must fit the given keys of a party: of each kind it has, at least as many holders as must sign,
-        /// and more than half of them, so that two quorums always share a holder (SPECIFICATION.md, section 4.1).
+        /// Why the given quorum does not fit the given keys of a party, or null: of each kind it has, at least as many
+        /// holders as must sign, and more than half of them, so that two quorums always share a holder
+        /// (SPECIFICATION.md, section 4.1).
         /// </summary>
-        internal static void CheckQuorum(Byte                       MinConsensus,
-                                         IEnumerable<POIPublicKey>  SigningKeys,
-                                         IEnumerable<POIPublicKey>  IdentityKeys,
-                                         String                     Party)
+        internal static String? QuorumError(Byte                       MinConsensus,
+                                            IEnumerable<POIPublicKey>  SigningKeys,
+                                            IEnumerable<POIPublicKey>  IdentityKeys,
+                                            String                     Party)
         {
 
             if (MinConsensus < 1)
-                throw new ArgumentException($"The minConsensus of {Party} must be at least 1!");
+                return $"The minConsensus of {Party} must be at least 1!";
 
             foreach (var (kind, keys) in new[] { ("signing", SigningKeys), ("identity", IdentityKeys) })
             {
@@ -170,17 +171,37 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (holders == 0)
                 {
                     if (MinConsensus > 1)
-                        throw new ArgumentException($"The minConsensus {MinConsensus} of {Party} needs {kind} keys of as many holders!");
+                        return $"The minConsensus {MinConsensus} of {Party} needs {kind} keys of as many holders!";
                     continue;
                 }
 
                 if (MinConsensus > holders)
-                    throw new ArgumentException($"The minConsensus {MinConsensus} of {Party} needs {kind} keys of as many holders, not of {holders}!");
+                    return $"The minConsensus {MinConsensus} of {Party} needs {kind} keys of as many holders, not of {holders}!";
 
                 if (2 * MinConsensus <= holders)
-                    throw new ArgumentException($"The minConsensus {MinConsensus} of {Party} must be more than half of the {holders} holders of its {kind} keys!");
+                    return $"The minConsensus {MinConsensus} of {Party} must be more than half of the {holders} holders of its {kind} keys!";
 
             }
+
+            return null;
+
+        }
+
+        #endregion
+
+        #region CheckQuorum(MinConsensus, SigningKeys, IdentityKeys, Party)
+
+        /// <summary>
+        /// The given quorum must fit the given keys of a party (QuorumError).
+        /// </summary>
+        internal static void CheckQuorum(Byte                       MinConsensus,
+                                         IEnumerable<POIPublicKey>  SigningKeys,
+                                         IEnumerable<POIPublicKey>  IdentityKeys,
+                                         String                     Party)
+        {
+
+            if (QuorumError(MinConsensus, SigningKeys, IdentityKeys, Party) is String quorumError)
+                throw new ArgumentException(quorumError);
 
         }
 

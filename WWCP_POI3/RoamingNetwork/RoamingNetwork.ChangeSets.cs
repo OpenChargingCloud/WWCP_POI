@@ -24,6 +24,7 @@ using Newtonsoft.Json.Linq;
 
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 #endregion
 
@@ -91,6 +92,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                      energyMeterManufacturers,
                                      Operator,
                                      GivenTreeHashAlgorithms,
+                                     URLs,
                                      // The version it copies was checked: the copy is not checked again.
                                      new CheckedEntities(
                                          [ .. energyMeters.Values ],
@@ -640,6 +642,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var licenses              = DataLicenses.ToImmutableArray();
             var customData            = CustomData;
             var treeHashAlgorithms    = GivenTreeHashAlgorithms;
+            var urls                  = URLs;
             var networkOperators      = new Dictionary<RoamingNetworkOperator_Id, RoamingNetworkOperator>();
             var operators             = new Dictionary<ChargingStationOperator_Id, ChargingStationOperator>(chargingStationOperators.Index);
             var manufacturers         = new Dictionary<ChargingStationManufacturer_Id, ChargingStationManufacturer>(chargingStationManufacturers.Index);
@@ -871,7 +874,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                         var networkJSON = new JObject();
 
-                        if (CurrentValue(change.EntityPropertyName!, name, description, dataSource, licenses, customData, treeHashAlgorithms) is JToken networkPropertyValue)
+                        if (CurrentValue(change.EntityPropertyName!, name, description, dataSource, licenses, customData, treeHashAlgorithms, urls) is JToken networkPropertyValue)
                             networkJSON[change.EntityPropertyName!] = networkPropertyValue;
 
                         if (!TryResolveElementChange(ref applied, networkJSON, "roaming network", out networkElementValue, out var networkElementError))
@@ -883,7 +886,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     }
 
                     var propertyName  = applied.PropertyName ?? "";
-                    currentValue      = CurrentValue(propertyName, name, description, dataSource, licenses, customData, treeHashAlgorithms);
+                    currentValue      = CurrentValue(propertyName, name, description, dataSource, licenses, customData, treeHashAlgorithms, urls);
 
                     if (applied.OldValue is JToken oldValue &&
                         !OldValueMatches(oldValue, currentValue))
@@ -949,6 +952,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     treeHashAlgorithms = newTreeHashAlgorithms;
                                     break;
 
+                                case PropertyKeys.URLs:
+                                    if (!POINetworkURLs.TryParse(newValue, Id, out var newURLs, out var urlsError))
+                                    {
+                                        ErrorResponse = $"Change {index}: {urlsError}";
+                                        return false;
+                                    }
+                                    urls = newURLs;
+                                    break;
+
                                 case BasePropertyKeys.CustomData:
                                     if (newValue is not JObject newCustomData)
                                     {
@@ -1006,6 +1018,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                     treeHashAlgorithms = null;
                                     break;
 
+                                case PropertyKeys.URLs:
+                                    urls = [];
+                                    break;
+
                                 case BasePropertyKeys.CustomData:
                                     customData   = CustomDataNew.Empty;
                                     break;
@@ -1028,7 +1044,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                     // What is signed is what is held: the property as the roaming network writes it (SPECIFICATION.md, section 4).
                     if (!TryHeldAsGiven(change,
-                                        () => CurrentValue(change.EntityPropertyName ?? "", name, description, dataSource, licenses, customData, treeHashAlgorithms) is JToken heldProperty
+                                        () => CurrentValue(change.EntityPropertyName ?? "", name, description, dataSource, licenses, customData, treeHashAlgorithms, urls) is JToken heldProperty
                                                   ? new JObject { [change.EntityPropertyName!] = heldProperty }
                                                   : new JObject(),
                                         "roaming network",
@@ -1265,7 +1281,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             EnergyMeter[]? effectiveEnergyMeters = null;
             EnergyMeter[]  EffectiveEnergyMeters() => effectiveEnergyMeters ??= [ .. AllEffectiveEnergyMeters(operators.Values, gridOps.Values) ];
 
-            if ((networkOperators.Values.SingleOrDefault()?.KeyStatementError(Id) ??
+            // The quorum of the roaming network operator fits its keys in the version after the change set: its changes
+            // change them one by one, a second holder joining the only one or the last but one leaving
+            // (SPECIFICATION.md, section 4.1).
+            if ((networkOperators.Values.SingleOrDefault()?.QuorumError()         ??
+                 networkOperators.Values.SingleOrDefault()?.KeyStatementError(Id) ??
                  UnknownManufacturer (operators.Values, manufacturers) ??
                  DuplicateGridConnectionPoint(gridOps.Values)          ??
                  UnknownGridConnectionPoint(operators.Values, gridOps.Values) ??
@@ -1362,6 +1382,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  meterManufacturers.Values,
                                  networkOperators.Values.SingleOrDefault(),
                                  treeHashAlgorithms,
+                                 urls,
                                  // Checked above: it is not checked again.
                                  new CheckedEntities(
                                      allEnergyMeters,
@@ -1442,10 +1463,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                             String?                             DataSource,
                                             ImmutableArray<DataLicense>         DataLicenses,
                                             CustomDataNew                       CustomData,
-                                            ImmutableArray<ETagHashAlgorithm>?  TreeHashAlgorithms)
+                                            ImmutableArray<ETagHashAlgorithm>?  TreeHashAlgorithms,
+                                            ImmutableArray<URL>                 URLs)
 
             => PropertyName switch {
                    PropertyKeys.    TreeHashAlgorithms  => TreeHashAlgorithms.HasValue          ? POITreeHashAlgorithms.ToJSON(TreeHashAlgorithms.Value) : null,
+                   PropertyKeys.    URLs                => !URLs.IsEmpty                        ? POINetworkURLs.ToJSON(URLs) : null,
                    BasePropertyKeys.Name                => Name.       IsNotNullOrEmpty()       ? Name.       ToJSON()      : null,
                    BasePropertyKeys.Description         => Description.IsNotNullOrEmpty()       ? Description.ToJSON()      : null,
                    BasePropertyKeys.DataSource          => DataSource.IsNeitherNullNorEmpty()   ? (JToken) DataSource       : null,

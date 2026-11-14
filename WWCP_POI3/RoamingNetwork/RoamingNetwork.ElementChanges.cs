@@ -72,8 +72,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            // Keys, and the tree hash algorithms, whose order is content.
-            if (POIPartyKeys.IsKeyProperty(propertyName) || propertyName == POITreeHashAlgorithms.JSONProperty)
+            // Keys, and the tree hash algorithms and the URLs of a roaming network, whose order is content.
+            if (POIPartyKeys.IsKeyProperty(propertyName) || propertyName == POITreeHashAlgorithms.JSONProperty || propertyName == POINetworkURLs.JSONProperty)
             {
                 ErrorResponse = $"the {propertyName} of the {Description} '{Change.EntityId}' are changed as a whole, not element by element!";
                 return false;

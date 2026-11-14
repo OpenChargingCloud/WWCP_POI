@@ -136,7 +136,7 @@ Commit("The templates of the DC and the AC stations, EVSEs and energy meters",
 ```
 
 ```
-Committed, revision 3: The templates of the DC and the AC stations, EVSEs and energy meters
+Committed, revision 5: The templates of the DC and the AC stations, EVSEs and energy meters
 ```
 
 All six in one change set, so in one commit. POI_API serves them, `GET ~/RNs/QA/CSOs/DE*GEF/CSTs` lists the charging station templates
@@ -255,7 +255,7 @@ Commit("Jena Paradies, a DC and an AC station", RoamingNetworkChange.Add(Pool(1,
 ```
 Signed by its tariffs key: Refused, Change 0: Add of the ChargingPool 'DE*GEF*P1' needs a signature by a signing key of the ChargingStationOperator 'DE*GEF' that may sign 'infrastructure'!
 Signed by AlphaOrg of OCC: Refused, Change 0: Add of the ChargingPool 'DE*GEF*P1' needs a signature by a signing key of the ChargingStationOperator 'DE*GEF'!
-Committed, revision 4: Jena Paradies, a DC and an AC station
+Committed, revision 6: Jena Paradies, a DC and an AC station
 ```
 
 A key of `DE*GEF` for its tariffs signs no pools, and the roaming network operator signs none of the data of a party;
@@ -277,7 +277,7 @@ Commit("Jena Nord, a DC and an AC station",     RoamingNetworkChange.Add(Pool(2,
 ```
 
 ```
-Committed, revision 5: Jena Nord, a DC and an AC station
+Committed, revision 7: Jena Nord, a DC and an AC station
 ```
 
 
@@ -299,7 +299,7 @@ Commit("The DC and the AC charging stations",
 ```
 
 ```
-Committed, revision 6: The DC and the AC charging stations
+Committed, revision 8: The DC and the AC charging stations
 ```
 
 `GET ~/RNs/QA/CSOs/DE*GEF/CSGs` lists both, as the operator embeds them:
@@ -345,7 +345,7 @@ Commit("The DC and the AC EVSEs",
 ```
 
 ```
-Committed, revision 7: The DC and the AC EVSEs
+Committed, revision 9: The DC and the AC EVSEs
 ```
 
 `GET ~/RNs/QA/CSOs/DE*GEF/EVSEGs/DE*GEF*EG_DC`:
@@ -369,7 +369,7 @@ may name several templates: of two giving a value, the one it names first gives 
 
 ## 7. As they are at runtime
 
-`ExampleA3.Validate()` checks `QA` as everybody does, now at revision 7, and shows the pools of `DE*GEF` as they are at
+`ExampleA3.Validate()` checks `QA` as everybody does, now at revision 9, and shows the pools of `DE*GEF` as they are at
 runtime, with what their templates give them, every EVSE with its energy meter, from what is published only:
 
 ```csharp
@@ -411,7 +411,7 @@ foreach (var pool in gef.EffectiveChargingPools)
 ```
 
 ```
-QA is checked: revision 7, commit 6b4309ffd15468b8cb160bdaa7293e03475e1e281d35ede3238846acd8b538cc, signed by AlphaOrg and BetaOrg and GammaOrg
+QA is checked: revision 9, commit 6b4309ffd15468b8cb160bdaa7293e03475e1e281d35ede3238846acd8b538cc, signed by AlphaOrg and BetaOrg and GammaOrg
 
 DE*GEF*P1  Jena Paradies
   DE*GEF*S1  300 kW  GraphDefined GD-DC300  (templates DE*GEF*ST_DC)

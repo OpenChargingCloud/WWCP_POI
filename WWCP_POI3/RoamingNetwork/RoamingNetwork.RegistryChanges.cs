@@ -105,7 +105,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             "a",
             ChangeableRoamingNetworkOperatorProperties,
             RoamingNetworkOperator_Id.TryParse,
-            RoamingNetworkOperator.   TryParse,
+            RoamingNetworkOperator.   TryParseBetweenChanges,
             roamingNetworkOperator => roamingNetworkOperator.Id,
             roamingNetworkOperator => roamingNetworkOperator.ToJSON(Embedded: true),
             (changed, previous)    => changed.ShareRuntimeOf(previous)

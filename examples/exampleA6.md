@@ -68,7 +68,7 @@ var journals = keys.Keys.ToDictionary(witness => witness,
 ## 2. What the roaming network operator publishes for them
 
 A witness begins where `QA` begins: at the genesis snapshot, `published/QA-genesis.json`, which
-[example A1](exampleA1.md#6-the-history-and-its-genesis-commit) published, `{ timestamp, commit, roamingNetwork }` of
+[example A1](exampleA1.md#the-history-and-its-genesis-commit) published, `{ timestamp, commit, roamingNetwork }` of
 revision 0. Then it takes the commits since the genesis, `published/QA-commits-since-genesis.json`, as
 `GET ~/RNs/QA/history/commits?since={genesis}` gives them, and the checkpoints of examples A4 and A5.
 
@@ -84,10 +84,13 @@ File.WriteAllText("published/QA-commits-since-genesis.json", new JArray(commits.
 
 `WitnessHistory(…)` builds the history of `QA` as a witness keeps it, from what is published only:
 
-- the genesis: of the roaming network of the trust anchor, its key statement signed by enough holders, and the genesis
-  commit signed by the quorum of `OCC`;
+- the genesis: of the roaming network of the trust anchor as it was then, `published/QA-trustAnchor-revision0.txt`,
+  when `AlphaOrg` held the keys of `OCC` alone ([example A1](exampleA1.md)): its key statement signed by enough
+  holders, and the genesis commit signed by the quorum of `OCC`, both as that trust anchor names them. Who holds
+  the keys since, the commits say;
 - every commit since, with `TryAppend`: its change set signed by its owners and leading to its ETags, the commit signed as
-  the roaming network operator;
+  the roaming network operator; so also the two commits by which `BetaOrg` and `GammaOrg` joined, each signed by the
+  holders before it;
 - every checkpoint, with `TryAddCheckpoint`: its commit held, with its revision and ETags, its commits those since the
   checkpoint before, with the Merkle root it signs, and signed by `OCC`. Signatures of other witnesses are not checked
   there.
@@ -111,11 +114,11 @@ foreach (var checkpoint in history.Checkpoints)
 ```
 
 ```
-calibration.example: the genesis and 10 commits checked, 3 checkpoints taken
+calibration.example: the genesis and 12 commits checked, 3 checkpoints taken
 calibration.example signs checkpoint 0
 calibration.example signs checkpoint 1
 calibration.example signs checkpoint 2
-association.example: the genesis and 10 commits checked, 3 checkpoints taken
+association.example: the genesis and 12 commits checked, 3 checkpoints taken
 association.example signs checkpoint 0
 association.example signs checkpoint 1
 association.example signs checkpoint 2
@@ -228,25 +231,25 @@ c) Joining from the latest checkpoint, requiring both roles, `roamingNetworkOper
 must be valid, by the verifier given, and of the roles required.
 
 ```
-Checkpoint 0 of epoch 1: revision 7, 8 commit(s) since the genesis, signed by AlphaOrg, BetaOrg, GammaOrg
+Checkpoint 0 of epoch 1: revision 9, 10 commit(s) since the genesis, signed by AlphaOrg, BetaOrg, GammaOrg
   witnessed by calibration.example, association.example
-Checkpoint 1 of epoch 1: revision 9, 2 commit(s) since checkpoint 62b7ced1…, signed by AlphaOrg, BetaOrg, GammaOrg
+Checkpoint 1 of epoch 1: revision 11, 2 commit(s) since checkpoint 62b7ced1…, signed by AlphaOrg, BetaOrg, GammaOrg
   witnessed by calibration.example, association.example
-Checkpoint 2 of epoch 1: revision 10, 1 commit(s) since checkpoint 5346668e…, signed by AlphaOrg, BetaOrg, GammaOrg
+Checkpoint 2 of epoch 1: revision 12, 1 commit(s) since checkpoint 5346668e…, signed by AlphaOrg, BetaOrg, GammaOrg
   witnessed by calibration.example, association.example
 
-Joined from checkpoint 2, signed by the roaming network operator and its witnesses: revision 10
+Joined from checkpoint 2, signed by the roaming network operator and its witnesses: revision 12
 ```
 
 
 ## 7. Evidence
 
-The proof of revision 8 of [example A5](exampleA5.md), the pool "Jena Lobeda" with its AC station as example A4 recorded
+The proof of revision 10 of [example A5](exampleA5.md), the pool "Jena Lobeda" with its AC station as example A4 recorded
 it, in checkpoint 1. Kept, e.g. by an e-mobility provider disputing an invoice of a session there, it shows without
 asking the server of `QA` that this commit is part of the history both witnesses saw:
 
 ```
-The proof of revision 8 in checkpoint 1, witnessed by calibration.example, association.example: valid
+The proof of revision 10 in checkpoint 1, witnessed by calibration.example, association.example: valid
 ```
 
 

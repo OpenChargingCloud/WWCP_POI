@@ -157,7 +157,7 @@ public static class ExampleA3
 
 
     /// <summary>
-    /// Checks QA as everybody does, now at revision 7, and shows the pools of DE*GEF as they are at runtime: with what
+    /// Checks QA as everybody does, now at revision 9, and shows the pools of DE*GEF as they are at runtime: with what
     /// their templates give them; from what is published only.
     /// </summary>
     public static void Validate()

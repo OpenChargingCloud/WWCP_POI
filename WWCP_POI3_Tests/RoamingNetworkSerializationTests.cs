@@ -23,6 +23,7 @@ using NUnit.Framework;
 
 using org.GraphDefined.Vanaheimr.Illias;
 using org.GraphDefined.Vanaheimr.Hermod;
+using org.GraphDefined.Vanaheimr.Hermod.HTTP;
 
 #endregion
 
@@ -47,7 +48,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         /// <summary>
         /// A roaming network with everything it can have: the children of a test network, an operator with a key
-        /// statement, data licenses, two tree hash algorithms, metadata and its ETags.
+        /// statement, data licenses, two tree hash algorithms, the URLs of two copies, metadata and its ETags.
         /// </summary>
         internal static RoamingNetwork Full()
         {
@@ -72,7 +73,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                ConformityAssessmentBodies:        basis.ConformityAssessmentBodies,
                                EnergyMeterManufacturers:          basis.EnergyMeterManufacturers,
                                Operator:                          RoamingNetworkOperatorSerializationTests.Full(),
-                               TreeHashAlgorithms:                [ ETagHashAlgorithm.SHA256, ETagHashAlgorithm.SHA512 ]
+                               TreeHashAlgorithms:                [ ETagHashAlgorithm.SHA256, ETagHashAlgorithm.SHA512 ],
+                               URLs:                              [ URL.Parse($"https://hub.example/poi/RNs/{basis.Id}"), URL.Parse($"https://mirror.example/poi/RNs/{basis.Id}") ]
                            );
 
             network.CalcETags();
@@ -130,7 +132,8 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                                       RoamingNetwork.PropertyKeys.EnergyMeterManufacturers,
                                       RoamingNetwork.PropertyKeys.TransparencySoftwareManufacturers,
                                       RoamingNetwork.PropertyKeys.ConformityAssessmentBodies,
-                                      RoamingNetwork.PropertyKeys.TreeHashAlgorithms };
+                                      RoamingNetwork.PropertyKeys.TreeHashAlgorithms,
+                                      RoamingNetwork.PropertyKeys.URLs };
             var idsOnly     = network.ToJSON(ExpandDataLicenses:                InfoStatus.ShowIdOnly,
                                              ExpandChargingStationOperatorIds:  InfoStatus.ShowIdOnly);
 
@@ -176,6 +179,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                     Assert.That(Convert.ToHexString(again.ToCBOR(IncludeETags: false).ToByteArray(CBORWriterOptions.Canonical)),     Is.EqualTo(cbor), format);
                     Assert.That(again.Operator?.KeyStatement,                                                                               Is.Not.Null, format);
                     Assert.That(again.GivenTreeHashAlgorithms,                                                                              Is.EqualTo(new[] { ETagHashAlgorithm.SHA256, ETagHashAlgorithm.SHA512 }), format);
+                    Assert.That(again.URLs.Select(url => url.ToString()),                                                                   Is.EqualTo(new[] { $"https://hub.example/poi/RNs/{network.Id}", $"https://mirror.example/poi/RNs/{network.Id}" }), format);
                     Assert.That(again.CalcETags(),                                                                                          Is.EqualTo(network.ETags), format);
                 }
 

@@ -99,7 +99,7 @@ A version of a roaming network is identified by its **content**: its JSON repres
       `locationLanguages`, the `hardwareRevisions` and `firmwareVersions` of a model, of a certificate and of the
       `energyMeters` of a certificate, these as well, regular openings and exceptional periods, `energySources`,
       `environmentalImpacts`, `marketLocationIds`, `meteringLocationIds`, `officialLanguages`, `treeHashAlgorithms`,
-      certificate chains, and the arrays of custom data.
+      the `urls` of a roaming network, certificate chains, and the arrays of custom data.
   - **Identifications** trimmed, as their type writes them: of charging station operators and grid operators in upper
     case with `*` (`DE*GEF`), of charging pools, stations, EVSEs, tariffs, groups and templates with their operator so,
     of e-mobility providers in upper case with the separator given, every other one as given. A charging tariff is
@@ -131,6 +131,17 @@ A version of a roaming network is identified by its **content**: its JSON repres
   *effective* members, section 9.2). The content, the ETags of the network and of its entities, change
   sets and merges know them only in the template. A version whose templates make an effective member
   invalid, or whose offers overlap (section 9.4), is invalid.
+- **The URLs of a roaming network** (`urls`): a roaming network MAY name where it is served, `~/RNs/{RN_Id}` at
+  every server holding a copy of it, e.g. one of each holder of the keys of its operator (section 4.1): an array of at
+  least one and at most 16 absolute `https` URLs of this roaming network, each once and of at most 512 characters,
+  without user information, a query, a fragment or a trailing slash, the preferred one first; left out when it names
+  none. Their order is content. They are a property
+  of the roaming network, owned by its operator and changed as a whole, part of its ETags and so of what every commit
+  signs: whoever verified one copy knows where the others are, and whoever reads the same head at several of them
+  need not believe any one. A server serving a copy is not trusted for it, and naming a URL gives it no trust: what
+  it serves is checked as everything read anywhere. They are for whoever reads the roaming network to follow; a
+  server SHOULD NOT follow them by itself, and one that does MUST NOT follow redirects, nor ask hosts of its own or
+  of private networks. The trust anchor of a roaming network (8.6) names them, unless it is given others.
 
 
 ## 3. ETags
@@ -230,8 +241,8 @@ and the element changes `AddElement`, `RemoveElement`, `ReplaceElement`, `Update
   `RemoveElementProperty` change `propertyName` of the object named, never `@id`. An array left empty is removed;
 - an element change MUST be checked as the `UpdateProperty`, or `RemoveProperty` when nothing is left, of the
   property its first segment names: owners (section 4.1), changeable properties, the result. The `signingKeys` and
-  `identityKeys` of a party and the `treeHashAlgorithms` of a roaming network (section 8.3) are not changed
-  element by element;
+  `identityKeys` of a party and the `treeHashAlgorithms` (section 8.3) and `urls` (section 2) of a roaming network
+  are not changed element by element;
 - its `oldValue` is the element, or the property of the element, it names (JSON `null`: absent); `AddElement` has
   none.
 
@@ -451,6 +462,17 @@ an odd number of holders is not needed, e.g. 3 of 4. A version that breaks this 
 quorum of the version a change set is applied to counts, as its keys do. The key statement of an RNO with a
 quorum is signed by as many holders (8.6), and a verifier needs attestations of as many (8.5).
 
+**Holders joining and leaving.** Who holds the keys of the RNO, and how many of the holders decide, changes as
+everything it owns: by a change set of its `identityKeys`, its `keyStatement`, its `signingKeyCertificates` and,
+where the quorum changes, its `minConsensus`, signed by identity keys of `minConsensus` holders of the version it is
+applied to, and by every identity key it enters anew (see above). So a roaming network MAY begin with one holder,
+a second one joining it, both deciding from then on, a third one after, two of three deciding; and a holder leaves
+the same way, by the quorum before, which need not include it. The rule above holds for every version, not between
+the changes of one change set: a change set MUST be refused when the version it leads to breaks it, and MUST NOT be
+refused for the keys and the `minConsensus` of the RNO as they are between two of its changes, e.g. two holders
+with a `minConsensus` of 1 before the change of the `minConsensus` follows. Otherwise no change set led from one
+holder to two, or back.
+
 **Own signing keys.** Each holder certifies its own signing keys with one of its identity keys (8.6). A change of
 the `signingKeyCertificates` of the RNO that adds and removes only certificates of one holder, compared with the
 version it is applied to, is also signed by one identity key of that holder alone: so a holder renews its signing
@@ -630,7 +652,7 @@ it, and an added entity names its parent as the second version writes it:
 - a property only one version changed takes that change; both changed it alike, it is kept once;
   both changed it differently, they **conflict**, unless it is an array of identified elements (section 4)
   in all three, an absent one counting as empty (but not in an entity that is a conflict marker as a whole,
-  see above), and it is neither the keys of a party nor `templateIds` nor `treeHashAlgorithms`, whose order is content: then the merge is
+  see above), and it is neither the keys of a party nor `templateIds` nor `treeHashAlgorithms` nor the `urls` of a roaming network, whose order is content: then the merge is
   the first version's array with the changes of the second one against the base, element by element,
   taken in the order of the second one: an element it removed is removed, unless the first one changed it; one it
   added is added (section 4), unless the first one added it differently; one it changed is replaced, unless
@@ -646,7 +668,7 @@ The changes are written in this order: `Add` (of the topmost added entities, wit
 embed, in the order of the second version), the changes of properties (in the order of the first
 version, properties in the order of the union of their names), removals and additions of moved
 entities, `Remove` (of the topmost removed entities). A property whose old and new values are both
-arrays of identified elements (absent counting as empty), except the keys of a party, `templateIds` and `treeHashAlgorithms`, is changed by
+arrays of identified elements (absent counting as empty), except the keys of a party, `templateIds`, `treeHashAlgorithms` and `urls`, is changed by
 `RemoveElement` of the removed elements (in their old order), then `AddElement` of the added ones and
 `UpdateElementProperty`/`RemoveElementProperty` of the changed objects, property by property in the
 order of the union of their names, or `ReplaceElement` of other changed elements (in the new order),
@@ -1288,6 +1310,24 @@ Section 6 has an example.
 - **Succession:** a verifier trusting a statement MAY trust its `identityKeys` for later statements, with the
   holders it names, e.g. when the operator replaces an identity key before it expires: a later statement is
   checked against them as above.
+- **Succession over several statements:** the holders and the quorum of an RNO change over time (4.1), and a
+  single later statement is then not signed by enough holders an older trust anchor knows: two decide, and it knows
+  one. A verifier MAY follow the key statements of the RNO one after the other, the oldest first, as a server
+  gives them. It passes over those before the first one it verifies as above, e.g. those older than its trust
+  anchor. Every statement after that one MUST name the same roaming network and operator, MUST be signed not before
+  the one before it and while that one was valid (`signedAt` of the one before ≤ its `signedAt` ≤ `validUntil` of the one
+  before), MUST be signed by identity keys the one before names, of as many of the holders that one names as the
+  `minConsensus` of that one requires, and MUST be signed by its own identity keys of as many holders as its own
+  `minConsensus` requires; the signing keys are found among its own identity keys and those of the one before. So the
+  quorum before decides who holds the keys after it, as it signs the change set stating them (4.1), and every holder
+  a statement counts for its own quorum signed it. The last statement MUST be valid at the time the verifier checks,
+  and its identity keys are trusted then, with the holders it names. A statement that does not follow the one before
+  ends the succession: the verifier MUST then trust none of the statements given, and needs a newer trust anchor. A
+  server that dropped older commits (10.6), or started from a snapshot, gives the statements from the oldest it still
+  knows of, and of many the latest. The statements say who held the keys one after the other, not that the last of
+  them is the one of today: a server leaving out the latest ones gives a succession that verifies, to keys that
+  held once, and what those keys attest counts for a verifier following it as for one that never left its old
+  trust anchor. A key that expired or was removed since still verifies the statement it signed while it held.
 - **Trust anchor:** what a verifier pins of a roaming network, e.g. from a QR code on the website or in the
   documents of the roaming network operator:
 
@@ -1317,9 +1357,13 @@ Section 6 has an example.
   as well, the holders separated by `,`, the keys of one holder by `;`, the preferred URL with each further one
   escaped as an `alsoAt`. A QR code is as trustworthy
   as the place it is found: one stuck on a charging station may be anybody's.
-- POI_API serves the key statement of the operator of the head as `GET ~/RNs/{RN_Id}/keyStatement` and its
+- POI_API serves the key statement of the operator of the head as `GET ~/RNs/{RN_Id}/keyStatement`, its key
+  statements one after the other as `GET ~/RNs/{RN_Id}/keyStatements`, `{keyStatements: […]}`, the oldest its
+  history knows of first, the one of the head last, each once, at most the latest 100: the one the first commit
+  changing it found, those the commits the head follows stated since, and the one of the head; and its
   trust anchor as `GET ~/RNs/{RN_Id}/trustAnchor`, `{roamingNetworkId, identityKeyIds, minConsensus, uri, qrCode,
-  trustAnchor}`, the URIs as the request names the roaming network, with the name and description of the network.
+  trustAnchor}`, the URIs as the request names the roaming network, with the name and description of the network,
+  the URL of the request first, then the other `urls` the roaming network names (section 2).
 
 ### 8.7 Cost (informative)
 
@@ -1368,6 +1412,10 @@ Section 6 has an example.
 7. **CBOR skeletons:** whether the tree also hashes deterministic CBOR skeletons, for clients that read
    CBOR only.
 8. **Offers:** a station proof gives no charging tariff offers (9.5, point 2).
+9. **Key statements kept:** the key statements one after the other (8.6) are those of the commits a history still
+   holds. Whether a history keeps all of them, also after it dropped the commits stating them (10.6) and across
+   epochs (section 11), or names the archive segments holding them, is open; so is how they relate to a compact
+   delegation of trust signed by the quorums of both sides.
 
 
 ## 9. Templates, groups and offers

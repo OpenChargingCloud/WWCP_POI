@@ -659,6 +659,26 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                  [NotNullWhen(false)] out String?                                  ErrorResponse,
                                  Byte                                                              MinConsensus   = 1,
                                  DateTimeOffset?                                                   At             = null)
+
+            => TryVerifyRequiring(TrustedHolders,
+                                  OtherIdentityKeys,
+                                  out HolderOf,
+                                  out ErrorResponse,
+                                  Math.Max(MinConsensus, this.MinConsensus),
+                                  At);
+
+
+        /// <summary>
+        /// Verify this key statement against the given trusted identity keys, per holder, signed by trusted ones of as
+        /// many holders as required: the given minConsensus and its own, or, as the successor of a statement trusted
+        /// (TryVerifyChain), the quorum of that one alone.
+        /// </summary>
+        private Boolean TryVerifyRequiring(IEnumerable<IEnumerable<String>>                                  TrustedHolders,
+                                           IEnumerable<POIPublicKey>?                                        OtherIdentityKeys,
+                                           [NotNullWhen(true)]  out IReadOnlyDictionary<String, String>?     HolderOf,
+                                           [NotNullWhen(false)] out String?                                  ErrorResponse,
+                                           Int32                                                             Required,
+                                           DateTimeOffset?                                                   At)
         {
 
             HolderOf = null;
@@ -699,7 +719,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             }
 
             var keys      = IdentityKeys.Concat(OtherIdentityKeys ?? []).ToArray();
-            var required  = Math.Max(MinConsensus, this.MinConsensus);
+            var required  = Required;
             var holders   = new HashSet<Int32>();
 
             if (Signatures.Length == 1 && required == 1 && !trusted.ContainsKey(Signatures[0].KeyId))
@@ -752,6 +772,139 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     result.TryAdd(id, nameOf.TryGetValue(holder, out var name) ? name : $"\0{trustedHolders[holder][0]}");
 
             HolderOf       = result;
+            ErrorResponse  = null;
+            return true;
+
+        }
+
+        #endregion
+
+        #region (static) TryVerifyChain(KeyStatements, TrustedHolders, out Verified, out HolderOf, out ErrorResponse, MinConsensus = 1, At = null, OtherIdentityKeys = null)
+
+        /// <summary>
+        /// Verify the given key statements of one roaming network operator, the oldest first, as a server gives them
+        /// (GET ~/RNs/{RN_Id}/keyStatements), against identity keys the verifier trusts by their @ids, per holder, e.g.
+        /// those of a trust anchor it scanned some time ago: the succession from what it trusts to the last of them
+        /// (SPECIFICATION.md, section 8.6). The statements before the first one verified as a single one is
+        /// (TryVerify), e.g. those older than the trust anchor, are passed over. Every statement after it must follow
+        /// the one before:
+        ///  - of the same roaming network and operator, signed not before it and while it was valid;
+        ///  - signed by identity keys the one before names, of as many of its holders as its minConsensus requires:
+        ///    the quorum before decides who holds the keys after it, as it signs the change set stating them
+        ///    (section 4.1), so a second holder joins the only one, and one of three leaves;
+        ///  - and signed by its own identity keys of as many holders as its own minConsensus requires, as every key
+        ///    statement of a version is.
+        /// The last one must be valid at the given time. A chain not leading from the trusted keys to its last
+        /// statement is refused: nothing of it is trusted then.
+        /// </summary>
+        /// <param name="KeyStatements">The key statements, the oldest first.</param>
+        /// <param name="TrustedHolders">The @ids of the identity keys the verifier trusts, per holder.</param>
+        /// <param name="Verified">The last key statement: the one of the head of the server that gave them.</param>
+        /// <param name="HolderOf">The holder of every identity key of the last key statement, by its @id.</param>
+        /// <param name="ErrorResponse">An optional error response.</param>
+        /// <param name="MinConsensus">How many holders of trusted identity keys must have signed the first statement verified at least, e.g. as a trust anchor names it.</param>
+        /// <param name="At">An optional time the last statement must be valid at, e.g. now.</param>
+        /// <param name="OtherIdentityKeys">Other identity keys, whose @ids the verifier may trust, e.g. those of the roaming network operator.</param>
+        public static Boolean TryVerifyChain(IEnumerable<RoamingNetworkKeyStatement>                   KeyStatements,
+                                             IEnumerable<IEnumerable<String>>                          TrustedHolders,
+                                             [NotNullWhen(true)]  out RoamingNetworkKeyStatement?      Verified,
+                                             [NotNullWhen(true)]  out IReadOnlyDictionary<String, String>?  HolderOf,
+                                             [NotNullWhen(false)] out String?                          ErrorResponse,
+                                             Byte                                                      MinConsensus        = 1,
+                                             DateTimeOffset?                                           At                  = null,
+                                             IEnumerable<POIPublicKey>?                                OtherIdentityKeys   = null)
+        {
+
+            Verified  = null;
+            HolderOf  = null;
+
+            var statements  = KeyStatements.ToArray();
+            var others      = OtherIdentityKeys?.ToArray() ?? [];
+
+            RoamingNetworkKeyStatement?           before    = null;
+            IReadOnlyDictionary<String, String>?  holderOf  = null;
+            String?                               firstError = null;
+
+            for (var index = 0; index < statements.Length; index++)
+            {
+
+                var statement  = statements[index];
+                var last       = index == statements.Length - 1;
+
+                // A statement but the last was replaced by the one after it: valid then, whatever became of it since.
+                var at         = last ? At : statements[index + 1].SignedAt;
+
+                if (before is null)
+                {
+
+                    // Not yet on trusted ground: as a single statement is verified, or passed over.
+                    if (statement.TryVerify(TrustedHolders, others, out holderOf, out var error, MinConsensus, at))
+                        before = statement;
+
+                    else
+                        firstError ??= error;
+
+                    continue;
+
+                }
+
+                if (statement.RoamingNetworkId         != before.RoamingNetworkId ||
+                    statement.RoamingNetworkOperatorId != before.RoamingNetworkOperatorId)
+                {
+                    ErrorResponse = $"The key statement {index + 1} of {statements.Length} is one of the roaming network operator '{statement.RoamingNetworkOperatorId}' of '{statement.RoamingNetworkId}', not of '{before.RoamingNetworkOperatorId}' of '{before.RoamingNetworkId}'!";
+                    return false;
+                }
+
+                if (statement.SignedAt < before.SignedAt)
+                {
+                    ErrorResponse = $"The key statement {index + 1} of {statements.Length} was signed before the one it follows!";
+                    return false;
+                }
+
+                // By the quorum before, among the keys the statement before names, as it names their holders ...
+                if (!statement.TryVerifyRequiring(before.Holders,
+                                                  [ .. before.IdentityKeys, .. others ],
+                                                  out _,
+                                                  out var successionError,
+                                                  before.MinConsensus,
+                                                  at))
+                {
+                    ErrorResponse = $"The key statement {index + 1} of {statements.Length} does not follow the one before: {successionError}";
+                    return false;
+                }
+
+                // ... and by its own quorum, among its own keys.
+                if (!statement.TryVerifyRequiring(statement.Holders,
+                                                  [ .. before.IdentityKeys, .. others ],
+                                                  out holderOf,
+                                                  out var ownError,
+                                                  statement.MinConsensus,
+                                                  at))
+                {
+                    ErrorResponse = $"The key statement {index + 1} of {statements.Length} is not signed by its own quorum: {ownError}";
+                    return false;
+                }
+
+                before = statement;
+
+            }
+
+            if (before is null || holderOf is null)
+            {
+                ErrorResponse = statements.Length == 0
+                                    ? "No key statement is given!"
+                                    : $"None of the {statements.Length} key statements is signed by the trusted identity keys: {firstError}";
+                return false;
+            }
+
+            if (!ReferenceEquals(before, statements[^1]))
+            {
+                ErrorResponse = "The key statements do not lead to the last of them!";
+                return false;
+            }
+
+            Verified       = before;
+            HolderOf       = before.IdentityKeys.ToDictionary(identityKey => identityKey.Id, identityKey => identityKey.HolderOrUnnamed, StringComparer.Ordinal);
             ErrorResponse  = null;
             return true;
 

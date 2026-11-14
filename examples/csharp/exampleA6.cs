@@ -214,10 +214,10 @@ public static class ExampleA6
 
         #region 7. Evidence
 
-        // The proof of revision 8, the pool "Jena Lobeda" with its AC station as A4 recorded it, in checkpoint 1: kept,
+        // The proof of revision 10, the pool "Jena Lobeda" with its AC station as A4 recorded it, in checkpoint 1: kept,
         // e.g. by an e-mobility provider disputing an invoice of a session there, it shows without asking the server of QA
         // that this commit is part of the history both witnesses saw.
-        if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-8.json"), out var proof, out error))
+        if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-10.json"), out var proof, out error))
             Helpers.Fail(error);
 
         Console.WriteLine($"The proof of revision {proof.Revision} in checkpoint 1, witnessed by {String.Join(", ", WitnessedBy(checkpoints[1], witnesses))}: {(proof.Verify(checkpoints[1], out error) ? "valid" : error)}");
@@ -255,8 +255,10 @@ public static class ExampleA6
                                                         UInt64?  UpToSequence   = null)
     {
 
-        // The trust anchor of QA, as scanned; the genesis version and its commit.
-        if (!RoamingNetworkTrustAnchor.TryParse(File.ReadAllText("published/QA-trustAnchor.txt"), out var anchor, out var error))
+        // The trust anchor of QA as it was when QA began, with AlphaOrg alone (example A1), as a witness following QA
+        // from its start scanned it then; the genesis version and its commit. Who holds the keys of OCC since, the
+        // commits after the genesis say, each checked as it is appended.
+        if (!RoamingNetworkTrustAnchor.TryParse(File.ReadAllText("published/QA-trustAnchor-revision0.txt"), out var anchor, out var error))
             Helpers.Fail(error);
 
         if (!RoamingNetworkHistory.TryFromSnapshot(File.ReadAllText("published/QA-genesis.json"), out var history, out error))

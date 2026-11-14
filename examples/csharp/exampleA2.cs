@@ -292,7 +292,7 @@ public static class ExampleA2
 
         #region 5. Checking, as DE*GEF, that QA names it with its keys
 
-        // a) QA as everybody checks it: from the QR code, the roaming network and its commit, now at revision 2.
+        // a) QA as everybody checks it: from the QR code, the roaming network and its commit, now at revision 4.
         ExampleA1.Validate();
 
         // b) DE*GEF in it, with the keys it sent, and none other.

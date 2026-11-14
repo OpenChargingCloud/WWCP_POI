@@ -35,14 +35,15 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         /// <summary>
         /// The trust anchor of the given roaming network as the given key statement states its keys, their holders and its
-        /// quorum, with the given URLs of the roaming network, the preferred one first, and its name and description.
+        /// quorum, with the given URLs of the roaming network, the preferred one first, or, given none, with the URLs the
+        /// roaming network names itself, and its name and description.
         /// </summary>
         public static RoamingNetworkTrustAnchor CreateTrustAnchor(this RoamingNetwork          RoamingNetwork,
                                                                   RoamingNetworkKeyStatement   KeyStatement,
                                                                   params IEnumerable<URL>      URLs)
 
             => new (KeyStatement.RoamingNetworkId,
-                    URLs,
+                    URLs.Any() ? URLs : RoamingNetwork.URLs,
                     KeyStatement.Holders,
                     KeyStatement.MinConsensus,
                     RoamingNetwork.Name,

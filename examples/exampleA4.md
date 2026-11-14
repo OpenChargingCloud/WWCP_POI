@@ -1,6 +1,6 @@
 # Example A4: the first checkpoint, two pools more, and joining from the checkpoint
 
-The roaming network operator `OCC` makes the first **checkpoint** of `QA`, of its revision 7: a statement, signed by
+The roaming network operator `OCC` makes the first **checkpoint** of `QA`, of its revision 9: a statement, signed by
 its quorum, that this commit and every commit before it are the history of `QA`. Then `DE*GEF` of
 [example A3](exampleA3.md) adds two pools more, after the same pattern. Their AC stations are recorded as those of A3,
 with the AC template, 44 kW, and EVSEs of 22 kW, although they have two EVSEs of 11 kW only;
@@ -10,7 +10,7 @@ checkpoint, instead of taking every commit since the genesis.
 | Revision | Signed by | Commit |
 |---|---|---|
 | 0 to 7 | see [example A1](exampleA1.md) to [example A3](exampleA3.md) | `QA`, `DE*GEF`, its templates, the pools `P1` and `P2` and the groups |
-| | `OCC`, its three holders | **checkpoint 0**, of revision 7: the 8 commits since the genesis |
+| | `OCC`, its three holders | **checkpoint 0**, of revision 9: the 10 commits since the genesis |
 | 8 | `DE*GEF`, its `infrastructure` key | `Add` of the pool `DE*GEF*P3`, Jena Lobeda: the DC station `DE*GEF*S5`, the AC station `DE*GEF*S6`, two EVSEs each |
 | 9 | `DE*GEF` | `Add` of the pool `DE*GEF*P4`, Jena Winzerla: the DC station `DE*GEF*S7`, the AC station `DE*GEF*S8` |
 
@@ -41,7 +41,7 @@ The output is what one run printed, `…` for elided digests and timestamps.
 
 The roaming network operator signs its checkpoints as it signs its commits, with the signing keys of `AlphaOrg`,
 `BetaOrg` and `GammaOrg`. A server of the RNO makes one when there are new commits and the last one is older than an
-interval, e.g. one hour (section 10.3); here it is made by hand, of the latest commit, revision 7.
+interval, e.g. one hour (section 10.3); here it is made by hand, of the latest commit, revision 9.
 
 ```csharp
 A1.History.CheckpointSigners = [.. A1.Signers];
@@ -62,7 +62,7 @@ File.WriteAllText($"published/QA-checkpoint-{checkpoint.Sequence}.json",        
 File.WriteAllText($"published/QA-checkpoint-{checkpoint.Sequence}-snapshot.json",  snapshot.          ToString());
 ```
 
-The server keeps a proof for every commit of a checkpoint. Here it is the proof of the commit of revision 4, the one
+The server keeps a proof for every commit of a checkpoint. Here it is the proof of the commit of revision 6, the one
 adding the pool "Jena Paradies":
 
 ```csharp
@@ -71,12 +71,12 @@ var revision4   = CommitOf(A1, 4);
 if (!A1.History.TryGetCommitProof(revision4.Id, out var proof, out var error))
     Helpers.Fail(error);
 
-File.WriteAllText("published/QA-proof-revision-4.json", proof.ToJSON().ToString());
+File.WriteAllText("published/QA-proof-revision-6.json", proof.ToJSON().ToString());
 ```
 
 ```
-Checkpoint 0 of revision 7: 8 commit(s), 3 signatures, c11fec63…
-The commit of revision 4 is the commit 4 of the 8 of checkpoint 0
+Checkpoint 0 of revision 9: 10 commit(s), 3 signatures, c11fec63…
+The commit of revision 6 is the commit 6 of the 10 of checkpoint 0
 ```
 
 The checkpoint, as `published/QA-checkpoint-0.json` has it; its `@id` is the SHA-256 of its canonical JSON without
@@ -90,9 +90,9 @@ The checkpoint, as `published/QA-checkpoint-0.json` has it; its `@id` is the SHA
   "epoch": 1,
   "sequence": 0,
   "commitId": "…",
-  "revision": 6,
+  "revision": 9,
   "eTags": [ [ "json", "sha256", "hex", "…" ], [ "cbor", "sha256", "hex", "…" ], [ "effectiveTree", "sha256", "hex", "…" ] ],
-  "commits": { "@merkleRoot": "…", "@size": 7 },
+  "commits": { "@merkleRoot": "…", "@size": 10 },
   "createdAt": "…",
   "signatures": [
     { "role": "roamingNetworkOperator", "signer": "OCC", "signedAt": "…", "algorithm": "ES256", "keyId": "…", "value": "…" },
@@ -119,12 +119,12 @@ version is invalid where a charging station has more power than its effective EV
 after the latest checkpoint is part of none yet, so there is no proof of it:
 
 ```
-Committed, revision 8: Jena Lobeda, a DC and an AC station
-Committed, revision 9: Jena Winzerla, a DC and an AC station
-The proof of revision 9: No checkpoint here includes the commit '7947f051…' yet!
+Committed, revision 10: Jena Lobeda, a DC and an AC station
+Committed, revision 11: Jena Winzerla, a DC and an AC station
+The proof of revision 11: No checkpoint here includes the commit '7947f051…' yet!
 ```
 
-What everybody may read then: `QA.json` and `QA-commit.json` at revision 9, and the commits since the checkpoint,
+What everybody may read then: `QA.json` and `QA-commit.json` at revision 11, and the commits since the checkpoint,
 `QA-commits-since-checkpoint-0.json`, as `GET ~/RNs/QA/history/commits?since=…` gives them.
 
 
@@ -132,8 +132,8 @@ What everybody may read then: `QA.json` and `QA-commit.json` at revision 9, and 
 
 `ExampleA4.Validate()` joins `QA` as a server or an app does that has no history of it, from what is published only.
 
-a) `QA` at its head, as everybody checks it ([example A1](exampleA1.md#8-checking-qa-as-a-charging-station-operator-or-an-app)):
-the trust anchor, the roaming network, its key statement and certificates, and the commit of revision 9.
+a) `QA` at its head, as everybody checks it ([example A1](exampleA1.md#7-checking-qa-as-a-charging-station-operator-or-an-app)):
+the trust anchor, the roaming network, its key statement and certificates, and the commit of revision 11.
 
 b) The checkpoint: `TryParse` calculates its `@id` from its content and refuses it when it differs. It must be of `QA`
 and signed as the roaming network operator by signing keys of as many holders as the quorum requires, each certified
@@ -186,30 +186,30 @@ foreach (var commit in CommitsSince(0))
 e) The head reached is the published one:
 
 ```
-Checkpoint 0 of epoch 1: revision 7, 8 commit(s) since the genesis, signed by AlphaOrg, BetaOrg, GammaOrg
-Joined at revision 7, the checkpoint's: the same; checkpoints: 1
-Appended revision 8: Jena Lobeda, a DC and an AC station
-Appended revision 9: Jena Winzerla, a DC and an AC station
+Checkpoint 0 of epoch 1: revision 9, 10 commit(s) since the genesis, signed by AlphaOrg, BetaOrg, GammaOrg
+Joined at revision 9, the checkpoint's: the same; checkpoints: 1
+Appended revision 10: Jena Lobeda, a DC and an AC station
+Appended revision 11: Jena Winzerla, a DC and an AC station
 The head of the joined history and the published commit: the same
 ```
 
 
 ## 4. The proof of a commit
 
-The proof of the commit of revision 4 is its leaf, its commit id, revision and ETags, with the audit path to the root
+The proof of the commit of revision 6 is its leaf, its commit id, revision and ETags, with the audit path to the root
 of the commits the checkpoint signs (section 10.4, RFC 9162). The joined history does not hold this commit; whoever
 kept it, or a proof of a charging station of its version (section 8.4), shows with this proof that it is part of the
 history the checkpoint states.
 
 ```csharp
-if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-4.json"), out var proof, out error))
+if (!RoamingNetworkCheckpointProof.TryParse(Helpers.ReadJSON("published/QA-proof-revision-6.json"), out var proof, out error))
     Helpers.Fail(error);
 
 Console.WriteLine($"The proof of the commit of revision {proof.Revision} in checkpoint {checkpoint0.Sequence}: {(proof.Verify(checkpoint0, out error) ? "valid" : error)}");
 ```
 
 ```
-The proof of the commit of revision 4 in checkpoint 0: valid
+The proof of the commit of revision 6 in checkpoint 0: valid
 ```
 
 

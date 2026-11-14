@@ -110,6 +110,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             public const String  Attestations             = "attestations";
 
             /// <summary>
+            /// The property of the key statements of the operator of a roaming network, the oldest first.
+            /// </summary>
+            public const String  KeyStatements            = "keyStatements";
+
+            /// <summary>
             /// The property of a list of status updates.
             /// </summary>
             public const String  StatusUpdates            = "statusUpdates";
