@@ -410,7 +410,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         /// <summary>
         /// Gamma is dismissed by Alpha and Beta, the quorum of the version before: without its signature, and never by
         /// one of them alone. Two of two afterwards, so minConsensus stays; its keys, the certificate of its signing
-        /// key and the URL of its copy are gone, and the commits after it are signed by the two.
+        /// key and the URL of its copy are gone, and its signing key signs no commit any more: not even this one.
         /// </summary>
         [Test]
         public void Two_of_three_dismiss_the_third_without_it()
@@ -441,7 +441,15 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
             gammaLeaves     = beta.SignWithSigningKey(beta.SignWithIdentityKey(gammaLeaves));
 
-            // The version after this commit certifies the signing key of Gamma no longer: it signs none from here on.
+            // The version after this commit certifies the signing key of Gamma no longer: while it still signs here, the
+            // commit is refused, as no verifier would take its signature. Nothing is committed, the head stays.
+            var head        = history.Head.Commit.Id;
+            var withGamma   = history.Commit(gammaLeaves);
+
+            Assert.That(withGamma.IsCommitted,      Is.False);
+            Assert.That(withGamma.ErrorResponse,    Does.Contain(gamma.SigningKeyId).And.Contain("a key it takes the role 'roamingNetworkOperator' from"));
+            Assert.That(history.Head.Commit.Id,     Is.EqualTo(head));
+
             history.Signers = [ alpha.CommitSignerFor(OCC), beta.CommitSignerFor(OCC) ];
 
             var left        = history.Commit(gammaLeaves);

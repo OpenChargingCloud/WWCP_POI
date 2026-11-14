@@ -66,13 +66,31 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public static Boolean KeyMaySignIn(RoamingNetworkCommitSignature  Signature,
                                            RoamingNetwork                 Version)
 
-            => Signature.Role switch {
+            => KeyMaySignIn(Signature.Role,
+                            Signature.KeyId,
+                            Signature.Signer,
+                            Version);
 
-                   RoamingNetworkOperator   => Version.Operator?.SigningKeyCertificates.Any(certificate => certificate.SigningKey.Id == Signature.KeyId) == true,
+        /// <summary>
+        /// Whether the key of the given identification may sign in the given role, as far as the given version tells it:
+        /// as KeyMaySignIn(Signature, Version), before anything is signed.
+        /// </summary>
+        /// <param name="Role">The role of the signer.</param>
+        /// <param name="KeyId">The identification of its key.</param>
+        /// <param name="Signer">The optional name of the signer.</param>
+        /// <param name="Version">The version of the roaming network the commit leads to.</param>
+        public static Boolean KeyMaySignIn(String          Role,
+                                           String          KeyId,
+                                           String?         Signer,
+                                           RoamingNetwork  Version)
 
-                   ChargingStationOperator  => ChargingStationOperator_Id.TryParse(Signature.Signer ?? "", out var operatorId) &&
+            => Role switch {
+
+                   RoamingNetworkOperator   => Version.Operator?.SigningKeyCertificates.Any(certificate => certificate.SigningKey.Id == KeyId) == true,
+
+                   ChargingStationOperator  => ChargingStationOperator_Id.TryParse(Signer ?? "", out var operatorId) &&
                                                Version.TryGetChargingStationOperatorById(operatorId, out var chargingStationOperator) &&
-                                               chargingStationOperator.SigningKeys.Any(key => key.Id == Signature.KeyId),
+                                               chargingStationOperator.SigningKeys.Any(key => key.Id == KeyId),
 
                    _                        => true
 

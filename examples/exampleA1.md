@@ -1438,8 +1438,14 @@ From the trust anchor of today: the keys of AlphaOrg, BetaOrg, minConsensus 2
 QA stays at revision 2: AlphaOrg, BetaOrg, GammaOrg
 ```
 
-Committed, it were revision 3, and from then on the commits of `QA` are signed by the signing keys of `AlphaOrg` and
-`BetaOrg` only: `history.Signers` without the signer of `GammaOrg`, whose signing key no version certifies any more.
+Committed, it were revision 3, signed by the signing keys of `AlphaOrg` and `BetaOrg` only, as every commit after
+it: `history.Signers` without the signer of `GammaOrg`, set before `history.Commit`. The version of revision 3
+certifies the signing key of `GammaOrg` no longer, and whoever checks a commit checks its signatures in the version
+it leads to. So a history refuses a commit signed by a key that very commit takes its role from:
+
+```
+The commit would be signed by roamingNetworkOperator OCC with '…' (ES256), a key it takes the role 'roamingNetworkOperator' from: the version it leads to does not let it sign in it. Change the signers of this history first!
+```
 
 
 ## 10. Where example A2 starts

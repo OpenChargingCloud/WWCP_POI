@@ -862,6 +862,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The new commit is merged with the other tips where it does not conflict.
         /// It must be identified by its content and have changes; a change set committed before, also in a rebased
         /// version, is not committed again (SPECIFICATION.md, section 4).
+        /// No signer of this history signs a commit that takes its role from it: one the version the change set was made
+        /// for lets sign in its role, and the version the commit leads to does not
+        /// (RoamingNetworkCommitSignatureRoles.KeyMaySignIn). So a commit by which a signing key of the roaming network
+        /// operator is certified no longer, e.g. the one of a shareholder dismissed or a key replaced, is refused while
+        /// that key still signs here, as a verifier checks its signature in the version it leads to. The signers are
+        /// changed first. A signer no version lets sign in its role, trusted by configuration alone, is not judged here.
         /// </summary>
         /// <param name="ChangeSet">The change set.</param>
         /// <param name="VerifySignature">An optional verifier of its signatures, in addition to those of its owners.</param>
@@ -922,6 +928,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                 if (VersionEpochError(roamingNetwork) is String versionError)
                     return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: versionError);
+
+                // Signed here by no key this very commit takes its role from.
+                if (SignerError(Signers, parentVersion, roamingNetwork) is String signerMayNotSign)
+                    return new (RoamingNetworkCommitStatus.Refused, Head, ErrorResponse: signerMayNotSign);
 
                 var unsigned = RoamingNetworkCommit.Next(parent, ChangeSet, roamingNetwork);
 
@@ -1465,6 +1475,35 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             ErrorResponse = null;
             return true;
+
+        }
+
+        #endregion
+
+        #region (private static) SignerError(Signers, Before, After)
+
+        /// <summary>
+        /// Why one of the given signers must not sign a commit leading from the one given version to the other, if one
+        /// must not: the commit takes its role from its key, which the version before lets sign in it and the version
+        /// after does not, e.g. a signing key of the roaming network operator certified no longer, or one a charging
+        /// station operator names no longer (RoamingNetworkCommitSignatureRoles.KeyMaySignIn).
+        /// </summary>
+        /// <param name="Signers">The signers of this history.</param>
+        /// <param name="Before">The version of the roaming network the change set was made for.</param>
+        /// <param name="After">The version of the roaming network the commit leads to.</param>
+        private static String? SignerError(ImmutableArray<RoamingNetworkCommitSigner>  Signers,
+                                           RoamingNetwork                              Before,
+                                           RoamingNetwork                              After)
+        {
+
+            foreach (var signer in Signers.IsDefault ? [] : Signers.AsEnumerable())
+                if ( RoamingNetworkCommitSignatureRoles.KeyMaySignIn(signer.Role, signer.KeyId, signer.Signer, Before) &&
+                    !RoamingNetworkCommitSignatureRoles.KeyMaySignIn(signer.Role, signer.KeyId, signer.Signer, After))
+                {
+                    return $"The commit would be signed by {signer}, a key it takes the role '{signer.Role}' from: the version it leads to does not let it sign in it. Change the signers of this history first!";
+                }
+
+            return null;
 
         }
 
