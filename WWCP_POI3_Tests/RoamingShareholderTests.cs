@@ -360,6 +360,212 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+
+        #region (static) Joined(Founder, Others)
+
+        /// <summary>
+        /// The history of QA begun by the given founder, the given others admitted one after the other: two decide as
+        /// soon as there are two, and every commit is signed by all of them.
+        /// </summary>
+        private static RoamingNetworkHistory Joined(RoamingShareholder           Founder,
+                                                    params RoamingShareholder[]  Others)
+        {
+
+            var history       = RoamingNetworkHistory.Start(Begun(Founder), Signers: [ Founder.CommitSignerFor(OCC) ]);
+            var shareholders  = new List<RoamingShareholder> { Founder };
+
+            foreach (var joining in Others)
+            {
+
+                var before     = shareholders.ToArray();
+
+                shareholders.Add(joining);
+
+                var changeSet  = joining.SignWithIdentityKey(
+                                     history.Head.RoamingNetwork.Admit(joining,
+                                                                       Statement(2, [ .. shareholders ]),
+                                                                       SigningKeyNotAfter:  T0.AddYears(1),
+                                                                       CreatedAt:           T0.AddMinutes(shareholders.Count))
+                                 );
+
+                foreach (var shareholder in before)
+                    changeSet = shareholder.SignWithSigningKey(shareholder.SignWithIdentityKey(changeSet));
+
+                history.Signers = [ .. shareholders.Select(shareholder => shareholder.CommitSignerFor(OCC)) ];
+
+                var joined     = history.Commit(changeSet);
+
+                Assert.That(joined.IsCommitted, Is.True, joined.ErrorResponse);
+
+            }
+
+            return history;
+
+        }
+
+        #endregion
+
+        #region Two_of_three_dismiss_the_third_without_it()
+
+        /// <summary>
+        /// Gamma is dismissed by Alpha and Beta, the quorum of the version before: without its signature, and never by
+        /// one of them alone. Two of two afterwards, so minConsensus stays; its keys, the certificate of its signing
+        /// key and the URL of its copy are gone, and the commits after it are signed by the two.
+        /// </summary>
+        [Test]
+        public void Two_of_three_dismiss_the_third_without_it()
+        {
+
+            var alpha    = Shareholder("Alpha");
+            var beta     = Shareholder("Beta",  COSEKeyPair.NewEd448());
+            var gamma    = Shareholder("Gamma", COSEKeyPair.NewMLDsa65());
+            var history  = Joined(alpha, beta, gamma);
+
+            var gammaLeaves = history.Head.RoamingNetwork.Dismiss(gamma,
+                                                                  Statement(2, alpha, beta),
+                                                                  CreatedAt: T0.AddMinutes(10));
+
+            Assert.That(gammaLeaves.Changes.Select(change => change.EntityPropertyName),
+                        Is.EqualTo([ POIPartyKeys.IdentityKeysProperty,
+                                     RoamingNetworkKeyStatement.JSONProperty,
+                                     RoamingNetworkSigningKeyCertificate.JSONProperty,
+                                     POINetworkURLs.JSONProperty ]),
+                        "two of two after two of three: the quorum stays");
+
+            gammaLeaves     = alpha.SignWithSigningKey(alpha.SignWithIdentityKey(gammaLeaves));
+
+            var byAlphaOnly = history.Commit(gammaLeaves);
+
+            Assert.That(byAlphaOnly.IsCommitted,    Is.False);
+            Assert.That(byAlphaOnly.ErrorResponse,  Does.Contain("identity keys of 2 holders"));
+
+            gammaLeaves     = beta.SignWithSigningKey(beta.SignWithIdentityKey(gammaLeaves));
+
+            // The version after this commit certifies the signing key of Gamma no longer: it signs none from here on.
+            history.Signers = [ alpha.CommitSignerFor(OCC), beta.CommitSignerFor(OCC) ];
+
+            var left        = history.Commit(gammaLeaves);
+
+            Assert.That(left.IsCommitted,           Is.True, left.ErrorResponse);
+
+            var both        = history.Head.RoamingNetwork;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(POIPartyKeys.Holders(both.Operator!.IdentityKeys),  Is.EquivalentTo([ "Alpha", "Beta" ]));
+                Assert.That(POIPartyKeys.Holders(both.Operator. SigningKeys),   Is.EquivalentTo([ "Alpha", "Beta" ]));
+                Assert.That(both.Operator.MinConsensus,                         Is.EqualTo(2));
+                Assert.That(both.URLs,                                          Is.EqualTo([ alpha.URL!.Value, beta.URL!.Value ]));
+            }
+
+            // Whoever pinned the keys when Alpha was alone follows the key statements, one after the other, to the two.
+            Assert.That(RoamingNetworkKeyStatement.TryVerifyChain(history.KeyStatements(),
+                                                                  [[ alpha.IdentityPublicKey.Id ]],
+                                                                  out var verified,
+                                                                  out var holderOf,
+                                                                  out var error,
+                                                                  At: T0.AddMinutes(11)),
+                        Is.True, error);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(history.KeyStatements().Count(),     Is.EqualTo(4));
+                Assert.That(verified!.MinConsensus,              Is.EqualTo(2));
+                Assert.That(holderOf!.Values.Distinct(),         Is.EquivalentTo([ "Alpha", "Beta" ]));
+            }
+
+        }
+
+        #endregion
+
+        #region Of_two_the_one_leaving_signs_as_well()
+
+        /// <summary>
+        /// Two deciding together: Beta is not dismissed by Alpha alone, it resigns, signing as well. One of one
+        /// afterwards: minConsensus is removed, as one is not written, and Alpha decides alone again.
+        /// </summary>
+        [Test]
+        public void Of_two_the_one_leaving_signs_as_well()
+        {
+
+            var alpha    = Shareholder("Alpha");
+            var beta     = Shareholder("Beta");
+            var history  = Joined(alpha, beta);
+
+            var betaLeaves  = history.Head.RoamingNetwork.Dismiss(beta,
+                                                                  Statement(1, alpha),
+                                                                  CreatedAt: T0.AddMinutes(10));
+
+            Assert.That(betaLeaves.Changes.Select(change => (change.Kind, change.EntityPropertyName)),
+                        Is.EqualTo([ (RoamingNetworkChangeKind.UpdateProperty,  POIPartyKeys.IdentityKeysProperty),
+                                     (RoamingNetworkChangeKind.UpdateProperty,  RoamingNetworkKeyStatement.JSONProperty),
+                                     (RoamingNetworkChangeKind.UpdateProperty,  RoamingNetworkSigningKeyCertificate.JSONProperty),
+                                     (RoamingNetworkChangeKind.RemoveProperty,  POIPartyKeys.MinConsensusProperty),
+                                     (RoamingNetworkChangeKind.UpdateProperty,  POINetworkURLs.JSONProperty) ]));
+
+            betaLeaves      = alpha.SignWithSigningKey(alpha.SignWithIdentityKey(betaLeaves));
+
+            var byAlphaOnly = history.Commit(betaLeaves);
+
+            Assert.That(byAlphaOnly.IsCommitted,    Is.False, "by the one staying alone");
+            Assert.That(byAlphaOnly.ErrorResponse,  Does.Contain("identity keys of 2 holders"));
+
+            history.Signers = [ alpha.CommitSignerFor(OCC) ];
+
+            var left        = history.Commit(beta.SignWithSigningKey(beta.SignWithIdentityKey(betaLeaves)));
+
+            Assert.That(left.IsCommitted,           Is.True, left.ErrorResponse);
+
+            var alone       = history.Head.RoamingNetwork;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(POIPartyKeys.Holders(alone.Operator!.IdentityKeys),                       Is.EquivalentTo([ "Alpha" ]));
+                Assert.That(alone.Operator.MinConsensus,                                              Is.EqualTo(1));
+                Assert.That(alone.Operator.ToJSON().ContainsKey(POIPartyKeys.MinConsensusProperty),   Is.False, "written unless one");
+                Assert.That(alone.URLs,                                                               Is.EqualTo([ alpha.URL!.Value ]));
+            }
+
+        }
+
+        #endregion
+
+        #region Nobody_is_dismissed_who_holds_no_keys_and_never_the_last_one()
+
+        /// <summary>
+        /// Only a holder of the keys is dismissed, never the last one, and only with a URL the roaming network names.
+        /// </summary>
+        [Test]
+        public void Nobody_is_dismissed_who_holds_no_keys_and_never_the_last_one()
+        {
+
+            var alpha  = Shareholder("Alpha");
+            var beta   = Shareholder("Beta");
+            var alone  = Begun(alpha);
+            var both   = Joined(alpha, beta).Head.RoamingNetwork;
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(() => both. Dismiss("Gamma", Statement(2, alpha, beta)),
+                            Throws.ArgumentException.With.Message.Contains("'Gamma' holds no keys of the roaming network operator 'OCC'"));
+
+                Assert.That(() => alone.Dismiss(alpha, Statement(1, alpha)),
+                            Throws.ArgumentException.With.Message.Contains("is the last one holding keys"));
+
+                Assert.That(() => both. Dismiss("Beta", Statement(1, alpha), URL.Parse($"https://elsewhere.example/RNs/{QA}")),
+                            Throws.ArgumentException.With.Message.Contains("does not name the URL"));
+
+                // The key statement must state the quorum the keys that stay need: two of one is none.
+                Assert.That(() => both. Dismiss(beta, Statement(2, alpha, beta)),
+                            Throws.ArgumentException);
+
+            }
+
+        }
+
+        #endregion
+
     }
 
 }

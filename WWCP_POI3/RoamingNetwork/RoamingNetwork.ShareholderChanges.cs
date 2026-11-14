@@ -28,7 +28,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 {
 
     /// <summary>
-    /// Changes of who holds the keys of the roaming network operator: its shareholders.
+    /// Changes of who holds the keys of the roaming network operator: its shareholders, admitted and dismissed.
     /// </summary>
     public sealed partial class RoamingNetwork
     {
@@ -159,6 +159,138 @@ namespace cloud.charging.open.protocols.WWCP.POI
                          Description,
                          Metadata,
                          CreatedAt);
+
+        }
+
+        #endregion
+
+
+        #region Dismiss(Holder, KeyStatement, URL = null, Description = null, Metadata = null, CreatedAt = null)
+
+        /// <summary>
+        /// Prepare the unsigned change set by which the given shareholder holds the keys of the roaming network operator
+        /// of this version no longer (SPECIFICATION.md, section 4.1): the identity keys without its ones, the key
+        /// statement naming those that stay, the certificates without those of its signing keys, the minConsensus of the
+        /// key statement unless it stays, not written when it is one, and the URLs without the one of its copy, if given.
+        /// It is one change set, as the quorum must fit the keys in every version, not between its changes.
+        /// To be committed it is signed as every change of the keys: by identity keys, and for the key statement and
+        /// the URLs by signing keys, of as many shareholders as this version requires. So two of three dismiss the
+        /// third without it, and of two deciding together the one leaving signs as well: it resigns, as nobody is
+        /// dismissed by the other one alone. This version stays unchanged.
+        /// </summary>
+        /// <param name="Holder">The name of the shareholder, as its keys name it as their holder.</param>
+        /// <param name="KeyStatement">The key statement of the identity keys that stay, signed by the quorum so far and by its own.</param>
+        /// <param name="URL">Where the shareholder serves its copy of this roaming network, a URL this version names, if it serves one.</param>
+        /// <param name="Description">An optional multi-language description.</param>
+        /// <param name="Metadata">Optional application metadata.</param>
+        /// <param name="CreatedAt">An optional commit timestamp, now by default.</param>
+        public RoamingNetworkChangeSet Dismiss(String                      Holder,
+                                               RoamingNetworkKeyStatement  KeyStatement,
+                                               URL?                        URL           = null,
+                                               ImmutableI18NString?        Description   = null,
+                                               JObject?                    Metadata      = null,
+                                               DateTimeOffset?             CreatedAt     = null)
+        {
+
+            ArgumentNullException.ThrowIfNull(Holder);
+            ArgumentNullException.ThrowIfNull(KeyStatement);
+
+            if (Operator is null)
+                throw new InvalidOperationException($"The roaming network '{Id}' has no roaming network operator a shareholder could be dismissed from!");
+
+            if (Holder.Length == 0)
+                throw new ArgumentException("A shareholder is dismissed by its name: the holder its keys name!", nameof(Holder));
+
+            if (!POIPartyKeys.Holders(Operator.IdentityKeys).Contains(Holder))
+                throw new ArgumentException($"'{Holder}' holds no keys of the roaming network operator '{Operator.Id}'!", nameof(Holder));
+
+            var identityKeys  = Operator.IdentityKeys.Where(identityKey => identityKey.HolderOrUnnamed != Holder).ToArray();
+
+            if (identityKeys.Length == 0)
+                throw new ArgumentException($"'{Holder}' is the last one holding keys of the roaming network operator '{Operator.Id}': it can not be dismissed!", nameof(Holder));
+
+            if (URL.HasValue && !URLs.Contains(URL.Value))
+                throw new ArgumentException($"The roaming network '{Id}' does not name the URL '{URL}'!", nameof(URL));
+
+            var changes = new List<RoamingNetworkChange> {
+
+                              RoamingNetworkChange.UpdateProperty(Operator,
+                                                                  POIPartyKeys.IdentityKeysProperty,
+                                                                  null,
+                                                                  new JArray(identityKeys.Select(identityKey => identityKey.ToJSON(Embedded: true)))),
+
+                              RoamingNetworkChange.UpdateProperty(Operator,
+                                                                  RoamingNetworkKeyStatement.JSONProperty,
+                                                                  null,
+                                                                  KeyStatement.ToJSON(Embedded: true)),
+
+                              RoamingNetworkChange.UpdateProperty(Operator,
+                                                                  RoamingNetworkSigningKeyCertificate.JSONProperty,
+                                                                  null,
+                                                                  new JArray(Operator.SigningKeyCertificates.
+                                                                                 Where (certificate => certificate.Holder != Holder).
+                                                                                 Select(certificate => certificate.ToJSON(Embedded: true))))
+
+                          };
+
+            // The quorum stays, e.g. two of two after two of three, or it is changed with the keys it fits: a
+            // minConsensus of one is not written.
+            if (KeyStatement.MinConsensus != Operator.MinConsensus)
+                changes.Add(KeyStatement.MinConsensus > 1
+                                ? RoamingNetworkChange.UpdateProperty(Operator,
+                                                                      POIPartyKeys.MinConsensusProperty,
+                                                                      null,
+                                                                      new JValue(KeyStatement.MinConsensus))
+                                : RoamingNetworkChange.RemoveProperty(Operator,
+                                                                      POIPartyKeys.MinConsensusProperty));
+
+            if (URL.HasValue)
+                changes.Add(URLs.Length > 1
+                                ? RoamingNetworkChange.UpdateProperty(this,
+                                                                      POINetworkURLs.JSONProperty,
+                                                                      null,
+                                                                      POINetworkURLs.ToJSON(URLs.Where(url => url != URL.Value)))
+                                : RoamingNetworkChange.RemoveProperty(this,
+                                                                      POINetworkURLs.JSONProperty));
+
+            return CreateChangeSet(changes,
+                                   Description,
+                                   Metadata,
+                                   CreatedAt);
+
+        }
+
+        #endregion
+
+        #region Dismiss(Shareholder, KeyStatement, Description = null, Metadata = null, CreatedAt = null)
+
+        /// <summary>
+        /// Prepare the unsigned change set by which the given shareholder holds the keys of the roaming network operator
+        /// of this version no longer, as Dismiss(Holder, …) does: by its name, and with the URL of its copy where this
+        /// version names it.
+        /// </summary>
+        /// <param name="Shareholder">The shareholder leaving.</param>
+        /// <param name="KeyStatement">The key statement of the identity keys that stay, signed by the quorum so far and by its own.</param>
+        /// <param name="Description">An optional multi-language description.</param>
+        /// <param name="Metadata">Optional application metadata.</param>
+        /// <param name="CreatedAt">An optional commit timestamp, now by default.</param>
+        public RoamingNetworkChangeSet Dismiss(RoamingShareholder          Shareholder,
+                                               RoamingNetworkKeyStatement  KeyStatement,
+                                               ImmutableI18NString?        Description   = null,
+                                               JObject?                    Metadata      = null,
+                                               DateTimeOffset?             CreatedAt     = null)
+        {
+
+            ArgumentNullException.ThrowIfNull(Shareholder);
+
+            return Dismiss(Shareholder.Name,
+                           KeyStatement,
+                           Shareholder.URL.HasValue && URLs.Contains(Shareholder.URL.Value)
+                               ? Shareholder.URL
+                               : null,
+                           Description,
+                           Metadata,
+                           CreatedAt);
 
         }
 

@@ -34,7 +34,8 @@ The examples are one console project, [csharp/](csharp/), referencing `WWCP_POI3
 [exampleA10.cs](csharp/exampleA10.cs), and [Program.cs](csharp/Program.cs) calling them in their order. What one example makes, the next is given:
 `ExampleA1.Run()` returns the three organizations as the shareholders of `OCC`, each with its private keys, the trust
 anchor and the history of `QA`, whose head is the current version of `QA`. Each check, `ExampleA1.Validate()` and `ExampleA1.ValidateSuccession()` here,
-reads only what is published, as a charging station operator or an app would.
+reads only what is published, as a charging station operator or an app would. `ExampleA1.WithoutGammaOrg(a1)` tries
+what it took if `GammaOrg` left again, and commits nothing.
 
 ```csharp
 using var a1 = ExampleA1.Run();
@@ -42,6 +43,8 @@ using var a1 = ExampleA1.Run();
 ExampleA1.Validate();
 
 ExampleA1.ValidateSuccession();
+
+ExampleA1.WithoutGammaOrg(a1);
 ```
 
 ```
@@ -1345,7 +1348,101 @@ A server or a witness following the history itself needs none of this: it takes 
 change of the holders, checked as it is appended ([example A6](exampleA6.md)).
 
 
-## 9. Where example A2 starts
+## 9. If `GammaOrg` left again: two of two
+
+A consortium shrinks as it grows: by one change set, signed by the quorum of the version before it. What it took if
+`GammaOrg` left is tried here on the head of `QA` and **not committed**: the examples after this one go on with the
+three.
+
+The key statement of the two that stay names their identity keys and a quorum of two. `AlphaOrg` and `BetaOrg` sign
+it: the quorum so far, two of three, and its own, two of two.
+
+```csharp
+var keyStatement          = beta.CoSign(
+                                alpha.StateKeys(
+                                    qa.Id,
+                                    qa.Operator!.Id,
+                                    IdentityKeys:  [ alpha.IdentityPublicKey, beta.IdentityPublicKey ],
+                                    MinConsensus:  minConsensus,
+                                    SignedAt:      now,
+                                    ValidUntil:    now.AddYears(1)
+                                )
+                            );
+```
+
+`Dismiss` prepares the change set, the opposite of `Admit`. It takes the name of the shareholder, as its keys name it
+as their `holder`, and the URL of its copy: nothing of `GammaOrg` is needed but what `QA` names.
+
+```csharp
+var gammaLeaves           = qa.Dismiss(
+                                A1.GammaOrg.Name,
+                                keyStatement,
+                                A1.GammaOrg.URL,
+                                Description:  ImmutableI18NString.Create(Languages.en, "GammaOrg leaves AlphaOrg and BetaOrg: two of two")
+                            );
+```
+
+| Change | Of | Property | New value |
+|---|---|---|---|
+| 0 | `OCC` | `identityKeys` | the identity keys without those of `GammaOrg` |
+| 1 | `OCC` | `keyStatement` | the key statement of `AlphaOrg` and `BetaOrg` |
+| 2 | `OCC` | `signingKeyCertificates` | the certificates without those of the signing keys of `GammaOrg` |
+| 3 | `QA` | `urls` | the URLs without the one of `GammaOrg` |
+
+The quorum stays two, of two now, so `minConsensus` is not changed. Where it changes it is the fourth change of
+five; a `minConsensus` of one, as when the second of two leaves, is removed, as it is not written.
+
+It is signed as every change of the keys: by identity keys of as many holders as the version before requires, and by
+their signing keys, as the key statement and the URLs are content of `OCC` and `QA`. No new identity key enters, so
+none proves anything.
+
+```csharp
+var byAlphaOrg            = alpha.SignWithSigningKey(alpha.SignWithIdentityKey(gammaLeaves));
+
+qa.TryApplyChangeSet(byAlphaOrg, out _, out var error);
+
+var byAlphaAndBetaOrg     = beta.SignWithSigningKey(beta.SignWithIdentityKey(byAlphaOrg));
+
+qa.TryApplyChangeSet(byAlphaAndBetaOrg, out var without, out error);
+```
+
+```
+GammaOrg leaves, signed by AlphaOrg only: Change 0: UpdateProperty of the RoamingNetworkOperator 'OCC' ('identityKeys') needs signatures by identity keys of 2 holders of the roaming network operator 'OCC'!
+GammaOrg leaves, signed by AlphaOrg and BetaOrg: applies, 4 changes
+  holders AlphaOrg, BetaOrg; minConsensus 2; 2 certificates
+  urls https://alpha.example/RNs/QA, https://beta.example/RNs/QA
+  trust anchor: QR code of 495 characters
+```
+
+**Dismissed, or resigning.** `GammaOrg` is not asked: two of three are the quorum, and they dismiss the third without
+it. Of two deciding together it is otherwise: both are the quorum, so the one leaving signs as well. It resigns;
+nobody is dismissed by the other one alone. And the last shareholder does not leave at all: `Dismiss` refuses it.
+
+The trust anchor is the one of revision 1 again in what it pins, two holders and a quorum of two, with the URLs of
+two copies. Whoever pinned the trust anchor of today, of three holders, follows the key statements to the two, as in
+[section 8](#8-from-an-older-trust-anchor-to-the-keys-of-today): the one more is signed by two of the three it
+trusts.
+
+```csharp
+RoamingNetworkKeyStatement.TryVerifyChain([ .. A1.History.KeyStatements(), keyStatement ],
+                                          A1.TrustAnchor.Holders,
+                                          out var verified,
+                                          out var holderOf,
+                                          out error,
+                                          A1.TrustAnchor.MinConsensus,
+                                          At: Timestamp.Now)
+```
+
+```
+From the trust anchor of today: the keys of AlphaOrg, BetaOrg, minConsensus 2
+QA stays at revision 2: AlphaOrg, BetaOrg, GammaOrg
+```
+
+Committed, it were revision 3, and from then on the commits of `QA` are signed by the signing keys of `AlphaOrg` and
+`BetaOrg` only: `history.Signers` without the signer of `GammaOrg`, whose signing key no version certifies any more.
+
+
+## 10. Where example A2 starts
 
 Checked, `QA` is a version a charging station operator may build on:
 

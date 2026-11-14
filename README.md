@@ -608,7 +608,8 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   its identity and its signing key pair and the URL of its copy: it states and co-signs key statements
   (`StateKeys(…)`, `CoSign(…)`), certifies its signing key (`CertifySigningKey(…)`), signs change sets
   (`SignWithIdentityKey(…)`, `SignWithSigningKey(…)`) and commits (`CommitSignerFor(…)`); `RoamingNetwork.Admit(…)`
-  prepares the one change set by which one more of them holds the keys. A roaming network names the URLs of its copies in `urls`
+  prepares the one change set by which one more of them holds the keys, `RoamingNetwork.Dismiss(…)` the one by which
+  one of them holds them no longer: two of three dismiss the third, of two the one leaving signs as well. A roaming network names the URLs of its copies in `urls`
   (`RoamingNetwork.URLs`, `POINetworkURLs`), which its trust anchor takes; and whoever pinned older keys follows the
   key statements one after the other (`RoamingNetworkHistory.KeyStatements()`, `GET ~/RNs/{id}/keyStatements`,
   `RoamingNetworkKeyStatement.TryVerifyChain(…)`).

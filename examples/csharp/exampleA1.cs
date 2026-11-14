@@ -475,4 +475,82 @@ public static class ExampleA1
 
     }
 
+
+    /// <summary>
+    /// What it took if GammaOrg left again: tried on the head of `QA` and not committed, as the examples after this
+    /// one go on with the three shareholders.
+    /// </summary>
+    /// <param name="A1">What Run() left.</param>
+    public static void WithoutGammaOrg(Result A1)
+    {
+
+        #region 7. If GammaOrg left again: two of two
+
+        var now                   = Timestamp.Now;
+        var qa                    = A1.RoamingNetwork;
+        var alpha                 = A1.AlphaOrg;
+        var beta                  = A1.BetaOrg;
+
+        // The key statement of the two that stay, both deciding: signed by AlphaOrg and BetaOrg, the quorum so far,
+        // two of three, and its own, two of two.
+        var keyStatement          = beta.CoSign(
+                                        alpha.StateKeys(
+                                            qa.Id,
+                                            qa.Operator!.Id,
+                                            IdentityKeys:  [ alpha.IdentityPublicKey, beta.IdentityPublicKey ],
+                                            MinConsensus:  minConsensus,
+                                            SignedAt:      now,
+                                            ValidUntil:    now.AddYears(1)
+                                        )
+                                    );
+
+        // One change set dismisses GammaOrg, by its name: the identity keys and the certificates without its ones, the
+        // key statement, and the URLs of QA without the one of its copy. The quorum stays two, of two now. Nothing of
+        // GammaOrg is needed for it but what QA names.
+        var gammaLeaves           = qa.Dismiss(
+                                        A1.GammaOrg.Name,
+                                        keyStatement,
+                                        A1.GammaOrg.URL,
+                                        Description:  ImmutableI18NString.Create(Languages.en, "GammaOrg leaves AlphaOrg and BetaOrg: two of two")
+                                    );
+
+        // AlphaOrg alone, with its identity key and its signing key: refused, as two of the three decide.
+        var byAlphaOrg            = alpha.SignWithSigningKey(alpha.SignWithIdentityKey(gammaLeaves));
+
+        Console.WriteLine($"GammaOrg leaves, signed by AlphaOrg only: {(qa.TryApplyChangeSet(byAlphaOrg, out _, out var error) ? "applies" : error)}");
+
+        // BetaOrg signs as well: the quorum. GammaOrg is not asked, two of three dismiss the third.
+        var byAlphaAndBetaOrg     = beta.SignWithSigningKey(beta.SignWithIdentityKey(byAlphaOrg));
+
+        if (!qa.TryApplyChangeSet(byAlphaAndBetaOrg, out var without, out error))
+            Helpers.Fail(error);
+
+        var trustAnchor           = without.CreateTrustAnchor(without.Operator!.KeyStatement!);
+
+        Console.WriteLine($"GammaOrg leaves, signed by AlphaOrg and BetaOrg: applies, {gammaLeaves.Changes.Length} changes");
+        Console.WriteLine($"  holders {String.Join(", ", POIPartyKeys.Holders(without.Operator.IdentityKeys).Order())}; minConsensus {without.Operator.MinConsensus}; {without.Operator.SigningKeyCertificates.Length} certificates");
+        Console.WriteLine($"  urls {String.Join(", ", without.URLs)}");
+        Console.WriteLine($"  trust anchor: QR code of {trustAnchor.ToQRCode().Length} characters");
+
+        // Whoever pinned the trust anchor of today, of three holders, follows the key statements to the two: the one
+        // more is signed by two of the three it trusts.
+        if (!RoamingNetworkKeyStatement.TryVerifyChain([ .. A1.History.KeyStatements(), keyStatement ],
+                                                       A1.TrustAnchor.Holders,
+                                                       out var verified,
+                                                       out var holderOf,
+                                                       out error,
+                                                       A1.TrustAnchor.MinConsensus,
+                                                       At: Timestamp.Now))
+            Helpers.Fail(error);
+
+        Console.WriteLine($"From the trust anchor of today: the keys of {String.Join(", ", holderOf.Values.Distinct().Order())}, minConsensus {verified.MinConsensus}");
+
+        // Committed, it were revision 3, signed by the signing keys of AlphaOrg and BetaOrg only from then on. It is
+        // not: QA stays at revision 2, with its three shareholders.
+        Console.WriteLine($"QA stays at revision {A1.History.Head.Commit.Revision}: {String.Join(", ", POIPartyKeys.Holders(A1.RoamingNetwork.Operator!.IdentityKeys).Order())}");
+
+        #endregion
+
+    }
+
 }

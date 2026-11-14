@@ -19,6 +19,10 @@ Console.WriteLine();
 ExampleA1.ValidateSuccession();
 
 Console.WriteLine();
+
+ExampleA1.WithoutGammaOrg(a1);
+
+Console.WriteLine();
 Console.WriteLine();
 
 
