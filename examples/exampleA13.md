@@ -93,12 +93,12 @@ of the station is refused before anybody signs it.
 
 ```csharp
 ConformityCertificate CertificateUnder(String Legislation)
-    => new (certificateId, ExampleA2.stationMakerId, ChargingStationModel_Id.Parse("GD-DC300"), [ "1.0" ], [ "2.5.0" ], [ chargyId ], [],
+    => new (certificateId, ExampleA2.stationMakerId, ChargingStationModel_Id.Parse("GD-DC300"), [ HardwareRevision.Parse("1.0") ], [ FirmwareVersion.Parse("2.5.0") ], [ chargyId ], [],
             …,
             Legislation:   Legislation,
-            EnergyMeters:  [ new CertifiedEnergyMeter(ExampleA2.dcMeterMakerId, kdm500, [ "2.1" ], [ "3.2" ]) ]);
+            EnergyMeters:  [ new CertifiedEnergyMeter(ExampleA2.dcMeterMakerId, kdm500, [ HardwareRevision.Parse("2.1") ], [ FirmwareVersion.Parse("3.2") ]) ]);
 
-var meterCertificate = new ConformityCertificate(meterCertificateId, ExampleA2.dcMeterMakerId, kdm500, [ "2.1" ], [ "3.2" ], [ chargyId ], [], …);
+var meterCertificate = new ConformityCertificate(meterCertificateId, ExampleA2.dcMeterMakerId, kdm500, [ HardwareRevision.Parse("2.1") ], [ FirmwareVersion.Parse("3.2") ], [ chargyId ], [], …);
 ```
 
 ```

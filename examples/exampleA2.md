@@ -248,8 +248,8 @@ roaming network operator signs none of them.
 var models                = new[] {
                                 RoamingNetworkChange.Add(new ChargingStationModel(ChargingStationModel_Id.Parse("GD-DC300"),
                                                          ImmutableI18NString.Create(Languages.en, "GraphDefined DC 300"),
-                                                         HardwareRevisions:  [ "1.0", "1.1" ],
-                                                         FirmwareVersions:   [ "2.4.0", "2.5.0" ],
+                                                         HardwareRevisions:  [ HardwareRevision.Parse("1.0"), HardwareRevision.Parse("1.1") ],
+                                                         FirmwareVersions:   [ FirmwareVersion.Parse("2.4.0"), FirmwareVersion.Parse("2.5.0") ],
                                                          DatasheetURL:       URL.Parse("https://stations.graphdefined.example/gd-dc300/datasheet.pdf"),
                                                          MaxPower:           Watt.FromKW(300),
                                                          CurrentTypes:       CurrentTypes.DC,
@@ -259,8 +259,8 @@ var models                = new[] {
                                 …                                                 // GD-AC44 of GraphDefined
                                 RoamingNetworkChange.Add(new EnergyMeterModel(EnergyMeterModel_Id.Parse("KDM-500"),
                                                          ImmutableI18NString.Create(Languages.en, "Kernberg DC meter 500 A"),
-                                                         HardwareRevisions:  [ "2.1" ],
-                                                         FirmwareVersions:   [ "3.2" ],
+                                                         HardwareRevisions:  [ HardwareRevision.Parse("2.1") ],
+                                                         FirmwareVersions:   [ FirmwareVersion.Parse("3.2") ],
                                                          CurrentTypes:       CurrentTypes.DC,
                                                          MaxCurrent:         Ampere.FromA(500),
                                                          AccuracyClass:      "B",
@@ -273,7 +273,7 @@ var models                = new[] {
 var addModels             = A1.History.Head.RoamingNetwork.CreateChangeSet(models, Description: ImmutableI18NString.Create(Languages.en, "The models of GraphDefined, KERNBERG and SAALE"));
 
 // Signed by the roaming network operator: refused, the models are their manufacturers'.
-var byOCCOnly             = A1.History.Commit(SignedBy(SignedBy(addModels, "AlphaOrg"), "BetaOrg"));
+var byOCCOnly             = A1.History.Commit(A1.BetaOrg.SignWithSigningKey(A1.AlphaOrg.SignWithSigningKey(addModels)));
 
 foreach (var modelsKey in new[] { stationMakerKeys.Models, dcMeterMakerKeys.Models, acMeterMakerKeys.Models })
     addModels             = addModels.Sign(modelsKey.Private, POIPublicKey.From(modelsKey.Private).Id, modelsKey.Algorithm);
@@ -367,8 +367,8 @@ examples building on this one. The manufacturers keep theirs in their folders.
 
 ## With the hub
 
-A [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI) operating `QA` is its RNO with keys of a single
-holder, so it signs alone. An administrator (`poi:edit`) asks it to add the party with its public keys; the hub signs
+A [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI) operating `QA` alone is its RNO with keys of a
+single holder, so it signs alone; with several hubs holding its keys, see [example A1 with three hubs](gui/exampleA1.md). An administrator (`poi:edit`) asks it to add the party with its public keys; the hub signs
 the change set and lets it wait (section 4.2) until the party signed it with each of its identity keys. Then it is
 committed.
 
@@ -430,7 +430,7 @@ keys; it is committed at once, `201` with the commit.
 
 The hub adds each manufacturer as it adds `DE*GEF`, on its own, before or after it: a change set it signs as the RNO,
 waiting for the signatures of the identity key of the manufacturer; so on a hub they are commits of their own, and the
-revisions of the examples after this one are three higher. A charging station or energy meter manufacturer takes a
+revisions of the examples after this one are one higher. A charging station or energy meter manufacturer takes a
 `homepage` after its keys at the prompt:
 
 ```

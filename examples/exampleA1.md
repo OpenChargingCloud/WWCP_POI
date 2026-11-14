@@ -31,7 +31,7 @@ The examples are one console project, [csharp/](csharp/), referencing `WWCP_POI3
 [exampleA4.cs](csharp/exampleA4.cs), [exampleA5.cs](csharp/exampleA5.cs), [exampleA6.cs](csharp/exampleA6.cs),
 [exampleA7.cs](csharp/exampleA7.cs), [exampleA8.cs](csharp/exampleA8.cs),
 [exampleA9.cs](csharp/exampleA9.cs),
-[exampleA10.cs](csharp/exampleA10.cs), and [Program.cs](csharp/Program.cs) calling them in their order. What one example makes, the next is given:
+[exampleA10.cs](csharp/exampleA10.cs), and so on up to [exampleA16.cs](csharp/exampleA16.cs), and [Program.cs](csharp/Program.cs) calling them in their order. What one example makes, the next is given:
 `ExampleA1.Run()` returns the three organizations as the shareholders of `OCC`, each with its private keys, the trust
 anchor and the history of `QA`, whose head is the current version of `QA`. Each check, `ExampleA1.Validate()` and `ExampleA1.ValidateSuccession()` here,
 reads only what is published, as a charging station operator or an app would. `ExampleA1.WithoutGammaOrg(a1)` tries

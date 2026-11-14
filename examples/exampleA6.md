@@ -199,7 +199,7 @@ var witnessOf   = new RoamingNetworkWitness(SignerOf(Witnesses[0], keys[Witnesse
 anew.TryAddCheckpoint(other, …);
 anew.TryWitness(other.Id, witnessOf, …);
 
-RoamingNetworkHistory.TryFromCheckpointSnapshot(File.ReadAllText("published/QA-checkpoint-2-snapshot.json"), out var joined, out error, verify);
+RoamingNetworkHistory.TryFromCheckpointSnapshot(File.ReadAllText("published/QA-checkpoint-2-snapshot.json"), out var joined, out error, verify, roles);
 joined.TryWitness(latest.Id, witnessOf, …);
 ```
 

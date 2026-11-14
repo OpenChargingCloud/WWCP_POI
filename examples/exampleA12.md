@@ -83,7 +83,11 @@ var mirror = new RoamingNetworkPeer(occURL,
 
 await mirror.StartAsync(…);
 
-mirrorAPI.AddRoamingNetworkHistory(mirror.History!);
+var mirrored = mirror.History!;
+
+…
+
+mirrorAPI.AddRoamingNetworkHistory(mirrored);
 ```
 
 ```

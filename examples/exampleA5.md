@@ -35,10 +35,10 @@ revisions 10 and 11. The proof of revision 10 is published as well.
 ```csharp
 var checkpoint1  = ExampleA4.MakeCheckpoint(A1);
 
-if (!A1.History.TryGetCommitProof(ExampleA4.CommitOf(A1, 8).Id, out var proof8, out var error))
+if (!A1.History.TryGetCommitProof(ExampleA4.CommitOf(A1, 10).Id, out var proof10, out var error))
     Helpers.Fail(error);
 
-File.WriteAllText("published/QA-proof-revision-10.json", proof8.ToJSON().ToString());
+File.WriteAllText("published/QA-proof-revision-10.json", proof10.ToJSON().ToString());
 ```
 
 ```

@@ -66,9 +66,9 @@ The server keeps a proof for every commit of a checkpoint. Here it is the proof 
 adding the pool "Jena Paradies":
 
 ```csharp
-var revision4   = CommitOf(A1, 4);
+var revision6   = CommitOf(A1, 6);
 
-if (!A1.History.TryGetCommitProof(revision4.Id, out var proof, out var error))
+if (!A1.History.TryGetCommitProof(revision6.Id, out var proof, out var error))
     Helpers.Fail(error);
 
 File.WriteAllText("published/QA-proof-revision-6.json", proof.ToJSON().ToString());

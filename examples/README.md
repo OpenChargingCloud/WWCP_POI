@@ -12,7 +12,8 @@ and its calibration certificate, digital, and EV Taler: an operator's merchant f
 steps, settled and kept as evidence. They are C# with POI 3 alone, without a hub, in one console project,
 [csharp/](csharp/); A2 and A3 also show the same with the
 [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI): at its prompt or over SSH, in its web interface and
-over HTTP.
+over HTTP. Example A1 with three hubs, one per organization, each doing its part in the web interface, is
+[gui/exampleA1.md](gui/exampleA1.md), with what is missing for the hubs to do it by themselves.
 
 | | What it does | Revisions | Signed by |
 |---|---|---|---|

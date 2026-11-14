@@ -99,15 +99,15 @@ Commit("The templates of the DC and the AC stations, EVSEs and energy meters",
                                                                   Name:                I18NString.Create(Languages.en, "DC charging station"),
                                                                   ManufacturerId:      ExampleA2.stationMakerId,
                                                                   ModelId:             ChargingStationModel_Id.Parse("GD-DC300"),
-                                                                  HardwareRevision:    "1.0",
-                                                                  FirmwareVersion:     "2.5.0",
+                                                                  HardwareRevision:    HardwareRevision.Parse("1.0"),
+                                                                  FirmwareVersion:     FirmwareVersion.Parse("2.5.0"),
                                                                   MaxPower:            Watt.FromKW(300))),
              RoamingNetworkChange.Add(new ChargingStationTemplate(ChargingStationTemplate_Id.Parse("DE*GEF*ST_AC"),
                                                                   Name:                I18NString.Create(Languages.en, "AC charging station"),
                                                                   ManufacturerId:      ExampleA2.stationMakerId,
                                                                   ModelId:             ChargingStationModel_Id.Parse("GD-AC44"),
-                                                                  HardwareRevision:    "1.0",
-                                                                  FirmwareVersion:     "1.8.2",
+                                                                  HardwareRevision:    HardwareRevision.Parse("1.0"),
+                                                                  FirmwareVersion:     FirmwareVersion.Parse("1.8.2"),
                                                                   MaxPower:            Watt.FromKW(44))),
              RoamingNetworkChange.Add(new EVSETemplate(EVSETemplate_Id.Parse("DE*GEF*ET_DC"),
                                                        Name:                I18NString.Create(Languages.en, "DC EVSE"),
@@ -120,8 +120,8 @@ Commit("The templates of the DC and the AC stations, EVSEs and energy meters",
                                                               Role:                EnergyMeterRole.EVSE,
                                                               ManufacturerId:      ExampleA2.dcMeterMakerId,
                                                               ModelId:             EnergyMeterModel_Id.Parse("KDM-500"),
-                                                              HardwareRevision:    "2.1",
-                                                              FirmwareVersion:     "3.2",
+                                                              HardwareRevision:    HardwareRevision.Parse("2.1"),
+                                                              FirmwareVersion:     FirmwareVersion.Parse("3.2"),
                                                               SignatureMethods:    [ SignatureMethod.OCMF ]),
                                       ExampleA2.gefId),
              RoamingNetworkChange.Add(new EnergyMeterTemplate(EnergyMeterTemplate_Id.Parse("DE*GEF*EMT_AC"),
@@ -129,8 +129,8 @@ Commit("The templates of the DC and the AC stations, EVSEs and energy meters",
                                                               Role:                EnergyMeterRole.EVSE,
                                                               ManufacturerId:      ExampleA2.acMeterMakerId,
                                                               ModelId:             EnergyMeterModel_Id.Parse("SM-3"),
-                                                              HardwareRevision:    "1.4",
-                                                              FirmwareVersion:     "1.0.7",
+                                                              HardwareRevision:    HardwareRevision.Parse("1.4"),
+                                                              FirmwareVersion:     FirmwareVersion.Parse("1.0.7"),
                                                               SignatureMethods:    [ SignatureMethod.OCMF ]),
                                       ExampleA2.gefId));
 ```
@@ -546,7 +546,7 @@ of a version gives them: `TryGetEffectiveEVSE(evseId, out var evse)`, `Effective
 A [RoamingHubCLI](https://github.com/OpenChargingCloud/RoamingHubCLI) serving `QA` takes the change sets of `DE*GEF`
 over HTTP, `COMMIT /poi/RNs/QA/history/changeSets`, from anybody, and serves the pools as above. The templates,
 stations and energy meters name the manufacturers of [example A2](exampleA2.md) and their models, which the hub added
-and they stated [before](exampleA2.md#the-manufacturers); its revisions are three higher than above.
+and they stated [before](exampleA2.md#the-manufacturers); its revisions are one higher than above.
 
 ### The program of `DE*GEF`, over HTTP
 
@@ -663,7 +663,7 @@ Over HTTP, for everybody:
 | `GET /poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1` | the pool at runtime, its keys in canonical order; `?view=stored` as it is stored |
 | `GET /poi/RNs/QA/EVSEs/DE*GEF*E1*2` | `307` to `/poi/RNs/QA/CSOs/DE*GEF/CPs/DE*GEF*P1/CSs/DE*GEF*S1/EVSEs/DE*GEF*E1*2` |
 | `GET /poi/RNs/QA/CSOs/DE*GEF/{CSTs \| EVSETs \| CSGs \| EVSEGs}` | its templates and its groups |
-| `GET /poi/RNs/QA/history/head` | the head commit: `revision` 9, its `parentIds`, `eTags` and `signatureKeyIds`, the one of `DE*GEF` |
+| `GET /poi/RNs/QA/history/head` | the head commit: `revision` 10, its `parentIds`, `eTags` and `signatureKeyIds`, the one of `DE*GEF` |
 
 
 ## Next
