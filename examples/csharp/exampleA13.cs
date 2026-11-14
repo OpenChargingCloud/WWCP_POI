@@ -103,7 +103,7 @@ public static class ExampleA13
                                 Description: ImmutableI18NString.Create(Languages.en, "GraphDefined, transparency software manufacturer, the PTB and the BSI, conformity assessment bodies")
                             );
 
-        foreach (var key in new[] { A11.SigningKeys["AlphaOrg"], A11.SigningKeys["BetaOrg"], softwareIdentityKey, ptbIdentityKey })
+        foreach (var key in new[] { A11.AlphaOrg.SigningKey, A11.BetaOrg.SigningKey, softwareIdentityKey, ptbIdentityKey })
             addParties    = addParties.Sign(key.Private, POIPublicKey.From(key.Private).Id, key.Algorithm);
 
         Committed(history, addParties);
@@ -127,7 +127,7 @@ public static class ExampleA13
                             );
 
         // Signed by the roaming network operator: refused, the release is its manufacturer's.
-        Console.WriteLine($"Signed by the roaming network operator: {history.Commit(addChargy.Sign(A11.SigningKeys["AlphaOrg"].Private, POIPublicKey.From(A11.SigningKeys["AlphaOrg"].Private).Id, A11.SigningKeys["AlphaOrg"].Algorithm).Sign(A11.SigningKeys["BetaOrg"].Private, POIPublicKey.From(A11.SigningKeys["BetaOrg"].Private).Id, A11.SigningKeys["BetaOrg"].Algorithm)).ErrorResponse}");
+        Console.WriteLine($"Signed by the roaming network operator: {history.Commit(A11.BetaOrg.SignWithSigningKey(A11.AlphaOrg.SignWithSigningKey(addChargy))).ErrorResponse}");
 
         Committed(history, addChargy.Sign(softwareKey.Private, POIPublicKey.From(softwareKey.Private).Id, softwareKey.Algorithm));
 

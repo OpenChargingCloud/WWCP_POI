@@ -37,7 +37,8 @@ printed.
 
 `AlphaOrg` and `BetaOrg` make a new identity key, ML-DSA-87; the one of `GammaOrg` is ML-DSA-65 since
 [example A1](exampleA1.md). Each organization makes a new signing key, ML-DSA-65, and certifies it with its post-quantum
-identity key, alone. `DE*GEF` makes two identity keys, ML-DSA-65 and ML-DSA-87, and an ML-DSA-65 signing key for each
+identity key, alone. They stay the three shareholders of `OCC`, each with the one voice it had:
+`A1.AlphaOrg.WithKeys(…)` is `AlphaOrg` with its new keys, the holder its old and its new keys name. `DE*GEF` makes two identity keys, ML-DSA-65 and ML-DSA-87, and an ML-DSA-65 signing key for each
 usage. The witnesses make ML-DSA-65 keys, trusted by configuration as their first ones were: `trusted/witnesses-mldsa.json`.
 
 
@@ -49,14 +50,16 @@ of `AlphaOrg` and `BetaOrg`: a verifier trusting the old trust anchor trusts the
 *Succession*).
 
 ```csharp
-var bridgeStatement  = RoamingNetworkKeyStatement.Create(A1.IdentityKeys["AlphaOrg"],
-                                                         ExampleA1.minConsensus,
-                                                         A1.RoamingNetwork.Id,
-                                                         occ.Id,
-                                                         IdentityKeys:  allIdentityKeys,
-                                                         SignedAt:      now,
-                                                         ValidUntil:    now.AddYears(1)).
-                           WithSignature(A1.IdentityKeys["BetaOrg"]);
+var bridgeStatement  = A1.BetaOrg.CoSign(
+                           A1.AlphaOrg.StateKeys(
+                               A1.RoamingNetwork.Id,
+                               occ.Id,
+                               IdentityKeys:  allIdentityKeys,
+                               MinConsensus:  ExampleA1.minConsensus,
+                               SignedAt:      now,
+                               ValidUntil:    now.AddYears(1)
+                           )
+                       );
 ```
 
 The change set is signed by the quorum, two of the three holders: with their identity keys for the identity keys and

@@ -25,19 +25,22 @@ public static class ExampleA11
 
 
     /// <summary>
-    /// What example A11 leaves to the examples building on it: the post-quantum keys of the organizations, of DE*GEF and of
-    /// the witnesses, the new trust anchor of `QA`, and its history in epoch 2. Disposing it closes the store of the history.
+    /// What example A11 leaves to the examples building on it: the shareholders of `OCC` with their post-quantum keys, the
+    /// ones of DE*GEF and of the witnesses, the new trust anchor of `QA`, and its history in epoch 2. Disposing it closes the
+    /// store of the history.
     /// </summary>
-    /// <param name="IdentityKeys">The ML-DSA identity key of each organization.</param>
-    /// <param name="SigningKeys">The ML-DSA signing key of each organization.</param>
-    /// <param name="Signers">The signers of commits as the roaming network operator, one of each organization.</param>
+    /// <param name="AlphaOrg">AlphaOrg, with its ML-DSA identity key and signing key.</param>
+    /// <param name="BetaOrg">BetaOrg, with its ML-DSA identity key and signing key.</param>
+    /// <param name="GammaOrg">GammaOrg, with its ML-DSA identity key of example A1 and its ML-DSA signing key.</param>
+    /// <param name="Signers">The signers of commits as the roaming network operator, one of each shareholder.</param>
     /// <param name="GEF">The ML-DSA keys of DE*GEF.</param>
     /// <param name="Witnesses">The ML-DSA keys of the witnesses, their copies of the history of `QA` in epoch 2, and their journals, kept since epoch 1.</param>
     /// <param name="TrustAnchor">The trust anchor of `QA` naming the ML-DSA identity keys.</param>
     /// <param name="History">The history of `QA` in epoch 2.</param>
     /// <param name="Store">The store of the history, in poi/QA-epoch-2.</param>
-    public sealed record Result(IReadOnlyDictionary<String, COSEKeyPair>   IdentityKeys,
-                                IReadOnlyDictionary<String, COSEKeyPair>   SigningKeys,
+    public sealed record Result(RoamingShareholder                         AlphaOrg,
+                                RoamingShareholder                         BetaOrg,
+                                RoamingShareholder                         GammaOrg,
                                 IReadOnlyList<RoamingNetworkCommitSigner>  Signers,
                                 ExampleA2.Result                           GEF,
                                 ExampleA6.Result                           Witnesses,
@@ -62,39 +65,28 @@ public static class ExampleA11
         #region 1. New locks next to the old ones: ML-DSA keys
 
         // AlphaOrg and BetaOrg make a new identity key, ML-DSA-87; the one of GammaOrg is ML-DSA-65 already. Each makes a new
-        // signing key, ML-DSA-65, and certifies it with its post-quantum identity key, alone, as in example A1.
-        var identityKeys  = new Dictionary<String, COSEKeyPair> {
-                                { "AlphaOrg", COSEKeyPair.NewMLDsa87() },
-                                { "BetaOrg",  COSEKeyPair.NewMLDsa87() },
-                                { "GammaOrg", A1.IdentityKeys["GammaOrg"] }
-                            };
+        // signing key, ML-DSA-65, and certifies it with its post-quantum identity key, alone, as in example A1. The same
+        // three shareholders with other keys: each has the one voice it had.
+        var alpha         = A1.AlphaOrg.WithKeys(COSEKeyPair.NewMLDsa87(),  COSEKeyPair.NewMLDsa65());
+        var beta          = A1.BetaOrg. WithKeys(COSEKeyPair.NewMLDsa87(),  COSEKeyPair.NewMLDsa65());
+        var gamma         = A1.GammaOrg.WithKeys(A1.GammaOrg.IdentityKey,   COSEKeyPair.NewMLDsa65());
 
-        var signingKeys   = identityKeys.Keys.ToDictionary(organization => organization,
-                                                           organization => COSEKeyPair.NewMLDsa65());
+        RoamingShareholder[] shareholders = [ alpha, beta, gamma ];
 
-        foreach (var organization in identityKeys.Keys)
+        foreach (var shareholder in shareholders)
         {
 
-            if (organization != "GammaOrg")
-                Helpers.SaveKey(identityKeys[organization].Private, $"{organization}/identity-mldsa-privateKey.pem");
+            if (shareholder != gamma)
+                Helpers.SaveKey(shareholder.IdentityKey.Private, $"{shareholder.Name}/identity-mldsa-privateKey.pem");
 
-            Helpers.SaveKey(signingKeys[organization].Private, $"{organization}/signing-mldsa-privateKey.pem");
+            Helpers.SaveKey(shareholder.SigningKey.Private, $"{shareholder.Name}/signing-mldsa-privateKey.pem");
 
         }
 
-        var newIdentityKeys  = identityKeys.Where (identityKey => identityKey.Key != "GammaOrg").
-                                            Select(identityKey => POIPublicKey.From(identityKey.Value.Private, Holder: identityKey.Key)).
-                                            ToArray();
+        var newIdentityKeys  = new[] { alpha.IdentityPublicKey, beta.IdentityPublicKey };
 
-        var newCertificates  = identityKeys.Keys.Select(organization => RoamingNetworkSigningKeyCertificate.Create(
-                                                                            identityKeys[organization],
-                                                                            occ.Id,
-                                                                            POIPublicKey.From(signingKeys[organization].Private,
-                                                                                              NotAfter:  now.AddYears(1),
-                                                                                              Holder:    organization,
-                                                                                              Usages:    [ POIKeyUsages.Party ]),
-                                                                            now
-                                                                        )).ToArray();
+        var newCertificates  = shareholders.Select(shareholder => shareholder.CertifySigningKey(occ.Id, now, NotAfter: now.AddYears(1))).
+                                            ToArray();
 
         // The witnesses make ML-DSA-65 keys as well; trusted by configuration, as their first ones.
         var witnessKeys   = ExampleA6.Witnesses.ToDictionary(witness => witness,
@@ -114,14 +106,16 @@ public static class ExampleA11
         // statement, as its data, with signing keys; every new identity key signs as the proof that its holder holds it.
         var allIdentityKeys  = occ.IdentityKeys.Concat(newIdentityKeys).ToArray();
 
-        var bridgeStatement  = RoamingNetworkKeyStatement.Create(A1.IdentityKeys["AlphaOrg"],
-                                                                 ExampleA1.minConsensus,
-                                                                 A1.RoamingNetwork.Id,
-                                                                 occ.Id,
-                                                                 IdentityKeys:  allIdentityKeys,
-                                                                 SignedAt:      now,
-                                                                 ValidUntil:    now.AddYears(1)).
-                                   WithSignature(A1.IdentityKeys["BetaOrg"]);
+        var bridgeStatement  = A1.BetaOrg.CoSign(
+                                   A1.AlphaOrg.StateKeys(
+                                       A1.RoamingNetwork.Id,
+                                       occ.Id,
+                                       IdentityKeys:  allIdentityKeys,
+                                       MinConsensus:  ExampleA1.minConsensus,
+                                       SignedAt:      now,
+                                       ValidUntil:    now.AddYears(1)
+                                   )
+                               );
 
         var addKeys          = A1.RoamingNetwork.CreateChangeSet(
                                    [
@@ -132,18 +126,16 @@ public static class ExampleA11
                                    Description: ImmutableI18NString.Create(Languages.en, "OCC: ML-DSA keys next to the old ones")
                                );
 
-        foreach (var key in new[] { A1.IdentityKeys["AlphaOrg"], A1.IdentityKeys["BetaOrg"], identityKeys["AlphaOrg"], identityKeys["BetaOrg"], A1.SigningKeys["AlphaOrg"], A1.SigningKeys["BetaOrg"] })
-            addKeys = addKeys.Sign(key.Private, POIPublicKey.From(key.Private).Id, key.Algorithm);
+        foreach (var shareholder in new[] { A1.AlphaOrg, A1.BetaOrg, alpha, beta })
+            addKeys = shareholder.SignWithIdentityKey(addKeys);
+
+        foreach (var shareholder in new[] { A1.AlphaOrg, A1.BetaOrg })
+            addKeys = shareholder.SignWithSigningKey(addKeys);
 
         Committed(A1.History, addKeys);
 
         // Signed by the new signing keys from now on; the final checkpoint by the old ones as well.
-        RoamingNetworkCommitSigner[] signers = [ .. identityKeys.Keys.Select(organization => new RoamingNetworkCommitSigner(
-                                                                                                   signingKeys[organization].Private,
-                                                                                                   POIPublicKey.From(signingKeys[organization].Private).Id,
-                                                                                                   signingKeys[organization].Algorithm,
-                                                                                                   RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator,
-                                                                                                   occ.Id.ToString())) ];
+        RoamingNetworkCommitSigner[] signers = [ .. shareholders.Select(shareholder => shareholder.CommitSignerFor(occ.Id)) ];
 
         A1.History.Signers             = [ .. signers ];
         A1.History.AttestationSigners  = [ .. signers ];
@@ -292,14 +284,16 @@ public static class ExampleA11
         // OCC keeps only its ML-DSA identity keys, a key statement of them, signed by the new identity keys of AlphaOrg and
         // BetaOrg, and the certificates of its ML-DSA signing keys: signed by those identity keys and their signing keys, as
         // the quorum.
-        var pqStatement  = RoamingNetworkKeyStatement.Create(identityKeys["AlphaOrg"],
-                                                             ExampleA1.minConsensus,
-                                                             epoch2.RoamingNetworkId,
-                                                             occ.Id,
-                                                             IdentityKeys:  [ .. allIdentityKeys.Where(identityKey => identityKeys.Values.Any(pair => POIPublicKey.From(pair.Private).Id == identityKey.Id)) ],
-                                                             SignedAt:      now,
-                                                             ValidUntil:    now.AddYears(1)).
-                               WithSignature(identityKeys["BetaOrg"]);
+        var pqStatement  = beta.CoSign(
+                               alpha.StateKeys(
+                                   epoch2.RoamingNetworkId,
+                                   occ.Id,
+                                   IdentityKeys:  [ .. shareholders.Select(shareholder => shareholder.IdentityPublicKey) ],
+                                   MinConsensus:  ExampleA1.minConsensus,
+                                   SignedAt:      now,
+                                   ValidUntil:    now.AddYears(1)
+                               )
+                           );
 
         var occ2         = epoch2.Head.RoamingNetwork.Operator!;
         var removeKeys   = epoch2.Head.RoamingNetwork.CreateChangeSet(
@@ -314,13 +308,19 @@ public static class ExampleA11
         // By the old identity keys, as in epoch 1: refused, ES512 and Ed448 are no algorithms of epoch 2.
         var byOldKeys = removeKeys;
 
-        foreach (var key in new[] { A1.IdentityKeys["AlphaOrg"], A1.IdentityKeys["BetaOrg"], A1.SigningKeys["AlphaOrg"], A1.SigningKeys["BetaOrg"] })
-            byOldKeys = byOldKeys.Sign(key.Private, POIPublicKey.From(key.Private).Id, key.Algorithm);
+        foreach (var shareholder in new[] { A1.AlphaOrg, A1.BetaOrg })
+            byOldKeys = shareholder.SignWithIdentityKey(byOldKeys);
+
+        foreach (var shareholder in new[] { A1.AlphaOrg, A1.BetaOrg })
+            byOldKeys = shareholder.SignWithSigningKey(byOldKeys);
 
         Console.WriteLine($"Signed by the old identity keys: {epoch2.Commit(byOldKeys).ErrorResponse}");
 
-        foreach (var key in new[] { identityKeys["AlphaOrg"], identityKeys["BetaOrg"], signingKeys["AlphaOrg"], signingKeys["BetaOrg"] })
-            removeKeys = removeKeys.Sign(key.Private, POIPublicKey.From(key.Private).Id, key.Algorithm);
+        foreach (var shareholder in new[] { alpha, beta })
+            removeKeys = shareholder.SignWithIdentityKey(removeKeys);
+
+        foreach (var shareholder in new[] { alpha, beta })
+            removeKeys = shareholder.SignWithSigningKey(removeKeys);
 
         Committed(epoch2, removeKeys);
 
@@ -447,8 +447,9 @@ public static class ExampleA11
 
         #endregion
 
-        return new (identityKeys,
-                    signingKeys,
+        return new (alpha,
+                    beta,
+                    gamma,
                     signers,
                     new (gefIdentityKeys, gefSigningKeys),
                     new (witnessKeys, witnessHistories, A6.Journals),

@@ -82,7 +82,7 @@ public static class ExampleA14
                                 Description: ImmutableI18NString.Create(Languages.en, "EM-LAB, a calibration laboratory")
                             );
 
-        foreach (var key in new[] { A11.SigningKeys["AlphaOrg"], A11.SigningKeys["BetaOrg"], labIdentityKey })
+        foreach (var key in new[] { A11.AlphaOrg.SigningKey, A11.BetaOrg.SigningKey, labIdentityKey })
             addLab        = addLab.Sign(key.Private, POIPublicKey.From(key.Private).Id, key.Algorithm);
 
         Committed(history, addLab);
@@ -179,7 +179,7 @@ public static class ExampleA14
 
         // Signed by the roaming network operator: refused, the declaration is the manufacturer's. SAALE signs with its key
         // for its models, which it keeps since example A2.
-        var alphaOrg        = A11.SigningKeys["AlphaOrg"];
+        var alphaOrg        = A11.AlphaOrg.SigningKey;
         var byOCC           = declaration.Sign(alphaOrg.Private, POIPublicKey.From(alphaOrg.Private).Id, alphaOrg.Algorithm);
 
         Console.WriteLine($"Signed by the roaming network operator: {(byOCC.TryVerify(qa, out error, now) ? "valid" : error)}");

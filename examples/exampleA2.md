@@ -211,19 +211,12 @@ if (!RoamingNetworkChangeSet.TryParse(Helpers.ReadJSON("DE-GEF/addGEF.json"), ou
 if (!A1.RoamingNetwork.TryCheckCoSigning(addGEFSent, out var missing, out _, out error))
     Helpers.Fail(error);
 
-// The change set signed by the signing key of the given organization.
-RoamingNetworkChangeSet SignedBy(RoamingNetworkChangeSet ChangeSet, String Organization)
-
-    => ChangeSet.Sign(A1.SigningKeys[Organization].Private,
-                      POIPublicKey.From(A1.SigningKeys[Organization].Private).Id,
-                      A1.SigningKeys[Organization].Algorithm);
-
-// AlphaOrg alone: refused, nothing is committed.
-var byAlphaOrg            = SignedBy(addGEFSent, "AlphaOrg");
+// AlphaOrg alone, a shareholder of OCC signing with its signing key: refused, nothing is committed.
+var byAlphaOrg            = A1.AlphaOrg.SignWithSigningKey(addGEFSent);
 var refused               = A1.History.Commit(byAlphaOrg);
 
 // BetaOrg signs it as well: 2/3 quorum reached!
-var byAlphaAndBetaOrg     = SignedBy(byAlphaOrg, "BetaOrg");
+var byAlphaAndBetaOrg     = A1.BetaOrg.SignWithSigningKey(byAlphaOrg);
 var added                 = A1.History.Commit(byAlphaAndBetaOrg);
 ```
 

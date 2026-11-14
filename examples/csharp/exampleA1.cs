@@ -11,31 +11,41 @@ public static class ExampleA1
 
     // The roaming network "QA" and its roaming network operator "OCC" begin with one organization, AlphaOrg, alone.
     // BetaOrg joins, two of two deciding from then on; GammaOrg joins, two of three. Each of them serves a copy of QA.
+    // Each of them is a RoamingShareholder: an organization with its identity key, its signing key and the URL of its
+    // copy, holding one voice among those who decide as OCC.
 
     /// <summary>
-    /// How many of the organizations holding the keys of `OCC` decide, since BetaOrg joined AlphaOrg.
+    /// How many of the shareholders of `OCC` decide, since BetaOrg joined AlphaOrg.
     /// </summary>
     public const Byte minConsensus = 2;
 
 
     /// <summary>
-    /// What example A1 leaves to the examples building on it: the private keys of the three organizations, the trust
-    /// anchor of `QA`, and its history, whose head is the current version of `QA`. Disposing it closes the store of the
-    /// history.
+    /// What example A1 leaves to the examples building on it: the three shareholders of `OCC` with their private keys,
+    /// the trust anchor of `QA`, and its history, whose head is the current version of `QA`. Disposing it closes the
+    /// store of the history.
     /// </summary>
-    /// <param name="IdentityKeys">The identity key of each organization.</param>
-    /// <param name="SigningKeys">The signing key of each organization.</param>
-    /// <param name="Signers">The signers of commits as the roaming network operator, one of each organization.</param>
+    /// <param name="AlphaOrg">The shareholder who began `QA`.</param>
+    /// <param name="BetaOrg">The shareholder who joined first.</param>
+    /// <param name="GammaOrg">The shareholder who joined second.</param>
+    /// <param name="Signers">The signers of commits as the roaming network operator, one of each shareholder.</param>
     /// <param name="TrustAnchor">The trust anchor of `QA`, as its QR code shows it.</param>
     /// <param name="History">The history of `QA`, its genesis commit and all later ones.</param>
     /// <param name="Store">The store of the history, in poi/QA.</param>
-    public sealed record Result(IReadOnlyDictionary<String, COSEKeyPair>     IdentityKeys,
-                                IReadOnlyDictionary<String, COSEKeyPair>     SigningKeys,
+    public sealed record Result(RoamingShareholder                           AlphaOrg,
+                                RoamingShareholder                           BetaOrg,
+                                RoamingShareholder                           GammaOrg,
                                 IReadOnlyList<RoamingNetworkCommitSigner>    Signers,
                                 RoamingNetworkTrustAnchor                    TrustAnchor,
                                 RoamingNetworkHistory                        History,
                                 RoamingNetworkHistoryFileStore               Store) : IDisposable
     {
+
+        /// <summary>
+        /// The shareholders of `OCC`, in the order they came.
+        /// </summary>
+        public IReadOnlyList<RoamingShareholder> Shareholders
+            => [ AlphaOrg, BetaOrg, GammaOrg ];
 
         /// <summary>
         /// The current version of `QA`: the head of its history, not the genesis version.
@@ -56,79 +66,30 @@ public static class ExampleA1
         var occId         = RoamingNetworkOperator_Id.Parse("OCC");
         var qaId          = RoamingNetwork_Id.        Parse("QA");
 
-        // Where each organization serves its copy of QA: one roaming network, reachable at each of them.
-        var urls          = new Dictionary<String, URL> {
-                                { "AlphaOrg", URL.Parse($"https://alpha.example/RNs/{qaId}") },
-                                { "BetaOrg",  URL.Parse($"https://beta.example/RNs/{qaId}")  },
-                                { "GammaOrg", URL.Parse($"https://gamma.example/RNs/{qaId}") }
-                            };
-
-        var identityKeys  = new Dictionary<String, COSEKeyPair>();
-        var signingKeys   = new Dictionary<String, COSEKeyPair>();
-
         Directory.CreateDirectory("published");
 
-        #region Helpers: the keys of an organization, its certificate, its signatures, and what a revision publishes
+        #region Helpers: a new shareholder, and what a revision publishes
 
         // An organization makes an identity key, the long-term key that states who holds the keys of OCC and certifies its
-        // own signing keys, and a signing key for everyday use: it signs commits, change sets and attestations, for the
-        // party only (POIKeyUsages). It keeps both private keys to itself.
-        void MakeKeys(String Organization, COSEKeyPair IdentityKey)
+        // own signing key, and a signing key for everyday use, ES256: it signs commits, change sets and attestations, for
+        // the party only (POIKeyUsages). It keeps both private keys to itself, and serves its copy of QA at a URL of its
+        // own: one roaming network, reachable at each of them.
+        RoamingShareholder NewShareholder(String Name, COSEKeyPair IdentityKey, String Host)
         {
 
-            identityKeys[Organization]  = IdentityKey;
-            signingKeys [Organization]  = COSEKeyPair.NewES256();
+            var shareholder = RoamingShareholder.Create(
+                                  Name,
+                                  IdentityKey,
+                                  URL: URL.Parse($"https://{Host}/RNs/{qaId}")
+                              );
 
-            Directory.CreateDirectory(Organization);
-            Helpers.SaveKey(identityKeys[Organization].Private, $"{Organization}/identity-privateKey.pem");
-            Helpers.SaveKey(signingKeys [Organization].Private, $"{Organization}/signing-privateKey.pem");
+            Directory.CreateDirectory(Name);
+            Helpers.SaveKey(shareholder.IdentityKey.Private, $"{Name}/identity-privateKey.pem");
+            Helpers.SaveKey(shareholder.SigningKey. Private, $"{Name}/signing-privateKey.pem");
+
+            return shareholder;
 
         }
-
-        // The public half of its identity key, naming the organization as its holder.
-        POIPublicKey IdentityKeyOf(String Organization)
-
-            => POIPublicKey.From(identityKeys[Organization].Private, Holder: Organization);
-
-        // Each organization certifies its own signing key with its identity key, alone: renewing a signing key later
-        // needs no one else, as it gives its organization one voice only.
-        var certificates  = new Dictionary<String, RoamingNetworkSigningKeyCertificate>();
-
-        RoamingNetworkSigningKeyCertificate CertificateOf(String Organization)
-
-            => certificates.TryGetValue(Organization, out var certificate)
-                   ? certificate
-                   : certificates[Organization] = RoamingNetworkSigningKeyCertificate.Create(
-                                                      identityKeys[Organization],
-                                                      occId,
-                                                      POIPublicKey.From(signingKeys[Organization].Private,
-                                                                        NotAfter:  now.AddYears(1),
-                                                                        Holder:    Organization,
-                                                                        Usages:    [ POIKeyUsages.Party ]),
-                                                      now
-                                                  );
-
-        // A signer of commits as the roaming network operator, with the signing key of an organization.
-        RoamingNetworkCommitSigner SignerOf(String Organization)
-
-            => new (signingKeys[Organization].Private,
-                    POIPublicKey.From(signingKeys[Organization].Private).Id,
-                    signingKeys[Organization].Algorithm,
-                    RoamingNetworkCommitSignatureRoles.RoamingNetworkOperator,
-                    occId.ToString());
-
-        // A change set signed by the identity key, or by the signing key, of an organization.
-        RoamingNetworkChangeSet SignedByIdentityKeyOf(RoamingNetworkChangeSet ChangeSet, String Organization)
-
-            => ChangeSet.Sign(identityKeys[Organization].Private,
-                              IdentityKeyOf(Organization).Id,
-                              identityKeys[Organization].Algorithm);
-
-        RoamingNetworkChangeSet SignedBySigningKeyOf(RoamingNetworkChangeSet ChangeSet, String Organization)
-
-            => ChangeSet.Sign(signingKeys[Organization].Private,
-                              POIPublicKey.From(signingKeys[Organization].Private).Id,
-                              signingKeys[Organization].Algorithm);
 
         // What everybody may read of a revision: the roaming network with its ETags, the commit leading to it, and its
         // trust anchor, as a QR code: the @ids of the identity keys per holder, the quorum and the URLs of QA.
@@ -158,24 +119,25 @@ public static class ExampleA1
 
         #region 1. AlphaOrg alone: its keys, its key statement, `OCC` and `QA`, revision 0
 
-        MakeKeys("AlphaOrg", COSEKeyPair.NewES512());
+        var alpha                 = NewShareholder("AlphaOrg", COSEKeyPair.NewES512(), "alpha.example");
 
         // The key statement: who holds the identity keys of OCC in QA, and how many of the holders decide. One holder, one
         // deciding, signed by its identity key.
-        var keyStatementAlpha     = RoamingNetworkKeyStatement.Create(
-                                        identityKeys["AlphaOrg"],
-                                        1,
+        var keyStatementAlpha     = alpha.StateKeys(
                                         qaId,
                                         occId,
-                                        IdentityKeys:  [ IdentityKeyOf("AlphaOrg") ],
+                                        IdentityKeys:  [ alpha.IdentityPublicKey ],
+                                        MinConsensus:  1,
                                         SignedAt:      now,
                                         ValidUntil:    now.AddYears(1)
                                     );
 
+        // AlphaOrg certifies its own signing key with its identity key, alone: renewing a signing key later needs no one
+        // else, as it gives its shareholder one voice only.
         var occ                   = new RoamingNetworkOperator(
                                         keyStatementAlpha,
                                         Name:                    I18NString.Create("Open Charging Cloud"),
-                                        SigningKeyCertificates:  [ CertificateOf("AlphaOrg") ]
+                                        SigningKeyCertificates:  [ alpha.CertifySigningKey(occId, now, NotAfter: now.AddYears(1)) ]
                                     );
 
         // QA names where it is served: so far at AlphaOrg only.
@@ -183,7 +145,7 @@ public static class ExampleA1
                                         qaId,
                                         Name:          ImmutableI18NString.Create("Quality Assurance"),
                                         Description:   ImmutableI18NString.Create("The roaming network of the examples"),
-                                        URLs:          [ urls["AlphaOrg"] ]
+                                        URLs:          [ alpha.URL!.Value ]
                                     );
 
         // The genesis commit, signed by the signing key of AlphaOrg, as the roaming network operator. The store stays open
@@ -191,7 +153,7 @@ public static class ExampleA1
         var store                 = new RoamingNetworkHistoryFileStore($"poi/{qa.Id}");
         var history               = RoamingNetworkHistory.Start(
                                         qa,
-                                        Signers:  [ SignerOf("AlphaOrg") ],
+                                        Signers:  [ alpha.CommitSignerFor(occId) ],
                                         Store:    store
                                     );
 
@@ -206,38 +168,33 @@ public static class ExampleA1
 
         // BetaOrg read revision 0 at AlphaOrg and checked it against the trust anchor of AlphaOrg, as section 8 does.
         // It makes its own keys, sets up its own copy of QA, and asks to hold the keys of OCC with AlphaOrg.
-        MakeKeys("BetaOrg", COSEKeyPair.NewEd448());
+        var beta                  = NewShareholder("BetaOrg", COSEKeyPair.NewEd448(), "beta.example");
 
         // The key statement of two holders, both deciding: AlphaOrg, the quorum so far, states it, BetaOrg signs it too.
-        var keyStatementBeta      = RoamingNetworkKeyStatement.Create(
-                                        identityKeys["AlphaOrg"],
-                                        minConsensus,
-                                        qaId,
-                                        occId,
-                                        IdentityKeys:  [ IdentityKeyOf("AlphaOrg"), IdentityKeyOf("BetaOrg") ],
-                                        SignedAt:      Timestamp.Now,
-                                        ValidUntil:    now.AddYears(1)
-                                    ).WithSignature(identityKeys["BetaOrg"]);
+        var keyStatementBeta      = beta.CoSign(
+                                        alpha.StateKeys(
+                                            qaId,
+                                            occId,
+                                            IdentityKeys:  [ alpha.IdentityPublicKey, beta.IdentityPublicKey ],
+                                            MinConsensus:  minConsensus,
+                                            SignedAt:      Timestamp.Now,
+                                            ValidUntil:    now.AddYears(1)
+                                        )
+                                    );
 
-        // One change set: the identity keys, the key statement, the certificates of the signing keys and the quorum of
-        // OCC, and the URLs of QA, now also the one of BetaOrg. Between its changes the quorum fits the keys of no
-        // version: the version after all of them is the one checked.
-        var head                  = history.Head.RoamingNetwork;
-
-        var betaJoins             = head.CreateChangeSet(
-                                        [
-                                            RoamingNetworkChange.UpdateProperty(head.Operator!, POIPartyKeys.IdentityKeysProperty,                null, new JArray(new[] { "AlphaOrg", "BetaOrg" }.Select(organization => IdentityKeyOf(organization).ToJSON(Embedded: true)))),
-                                            RoamingNetworkChange.UpdateProperty(head.Operator!, RoamingNetworkKeyStatement.JSONProperty,          null, keyStatementBeta.ToJSON(Embedded: true)),
-                                            RoamingNetworkChange.UpdateProperty(head.Operator!, RoamingNetworkSigningKeyCertificate.JSONProperty, null, new JArray(new[] { "AlphaOrg", "BetaOrg" }.Select(organization => CertificateOf(organization).ToJSON(Embedded: true)))),
-                                            RoamingNetworkChange.UpdateProperty(head.Operator!, POIPartyKeys.MinConsensusProperty,                null, new JValue(minConsensus)),
-                                            RoamingNetworkChange.UpdateProperty(head,           POINetworkURLs.JSONProperty,                      null, POINetworkURLs.ToJSON([ urls["AlphaOrg"], urls["BetaOrg"] ]))
-                                        ],
-                                        Description: ImmutableI18NString.Create(Languages.en, "BetaOrg joins AlphaOrg: two of two")
+        // One change set admits BetaOrg: its identity key, the key statement, the certificate of its signing key and the
+        // quorum of OCC, and the URL of its copy of QA. Between its changes the quorum fits the keys of no version: the
+        // version after all of them is the one checked.
+        var betaJoins             = history.Head.RoamingNetwork.Admit(
+                                        beta,
+                                        keyStatementBeta,
+                                        SigningKeyNotAfter:  now.AddYears(1),
+                                        Description:         ImmutableI18NString.Create(Languages.en, "BetaOrg joins AlphaOrg: two of two")
                                     );
 
         // AlphaOrg signs it: with its identity key, as the one holder so far decides who holds the keys, and with its
         // signing key, as the key statement and the URLs are content of OCC and QA.
-        betaJoins                 = SignedBySigningKeyOf(SignedByIdentityKeyOf(betaJoins, "AlphaOrg"), "AlphaOrg");
+        betaJoins                 = alpha.SignWithSigningKey(alpha.SignWithIdentityKey(betaJoins));
 
         // Without BetaOrg it is refused: a new identity key signs the change set stating it, as the proof that its
         // holder has it, and asked for it.
@@ -248,8 +205,8 @@ public static class ExampleA1
 
         // BetaOrg downloads the change set at AlphaOrg, checks what it states, signs it with its identity key and sends
         // its signature back. From now on, every commit is signed by both.
-        betaJoins                 = SignedByIdentityKeyOf(betaJoins, "BetaOrg");
-        history.Signers           = [ SignerOf("AlphaOrg"), SignerOf("BetaOrg") ];
+        betaJoins                 = beta.SignWithIdentityKey(betaJoins);
+        history.Signers           = [ alpha.CommitSignerFor(occId), beta.CommitSignerFor(occId) ];
 
         var betaJoined            = history.Commit(betaJoins);
 
@@ -262,35 +219,32 @@ public static class ExampleA1
 
         #region 3. GammaOrg joins: two of three, revision 2
 
-        MakeKeys("GammaOrg", COSEKeyPair.NewMLDsa65());
+        var gamma                 = NewShareholder("GammaOrg", COSEKeyPair.NewMLDsa65(), "gamma.example");
 
         // The key statement of three holders, two deciding, signed by the quorum so far: AlphaOrg and BetaOrg.
-        var keyStatementGamma     = RoamingNetworkKeyStatement.Create(
-                                        identityKeys["AlphaOrg"],
-                                        minConsensus,
-                                        qaId,
-                                        occId,
-                                        IdentityKeys:  [ IdentityKeyOf("AlphaOrg"), IdentityKeyOf("BetaOrg"), IdentityKeyOf("GammaOrg") ],
-                                        SignedAt:      Timestamp.Now,
-                                        ValidUntil:    now.AddYears(1)
-                                    ).WithSignature(identityKeys["BetaOrg"]);
+        var keyStatementGamma     = beta.CoSign(
+                                        alpha.StateKeys(
+                                            qaId,
+                                            occId,
+                                            IdentityKeys:  [ alpha.IdentityPublicKey, beta.IdentityPublicKey, gamma.IdentityPublicKey ],
+                                            MinConsensus:  minConsensus,
+                                            SignedAt:      Timestamp.Now,
+                                            ValidUntil:    now.AddYears(1)
+                                        )
+                                    );
 
-        head                      = history.Head.RoamingNetwork;
-
-        // The quorum stays two: of three now, so minConsensus is not changed.
-        var gammaJoins            = head.CreateChangeSet(
-                                        [
-                                            RoamingNetworkChange.UpdateProperty(head.Operator!, POIPartyKeys.IdentityKeysProperty,                null, new JArray(identityKeys.Keys.Select(organization => IdentityKeyOf(organization).ToJSON(Embedded: true)))),
-                                            RoamingNetworkChange.UpdateProperty(head.Operator!, RoamingNetworkKeyStatement.JSONProperty,          null, keyStatementGamma.ToJSON(Embedded: true)),
-                                            RoamingNetworkChange.UpdateProperty(head.Operator!, RoamingNetworkSigningKeyCertificate.JSONProperty, null, new JArray(identityKeys.Keys.Select(organization => CertificateOf(organization).ToJSON(Embedded: true)))),
-                                            RoamingNetworkChange.UpdateProperty(head,           POINetworkURLs.JSONProperty,                      null, POINetworkURLs.ToJSON(urls.Values))
-                                        ],
-                                        Description: ImmutableI18NString.Create(Languages.en, "GammaOrg joins AlphaOrg and BetaOrg: two of three")
+        // The quorum stays two: of three now, so the change set admitting GammaOrg does not change minConsensus.
+        var gammaJoins            = history.Head.RoamingNetwork.Admit(
+                                        gamma,
+                                        keyStatementGamma,
+                                        SigningKeyNotAfter:  now.AddYears(1),
+                                        Description:         ImmutableI18NString.Create(Languages.en, "GammaOrg joins AlphaOrg and BetaOrg: two of three")
                                     );
 
         // GammaOrg signs with its identity key, the proof that it holds it, and AlphaOrg alone of the holders so far:
         // refused, as two of them decide.
-        gammaJoins                = SignedBySigningKeyOf(SignedByIdentityKeyOf(SignedByIdentityKeyOf(gammaJoins, "GammaOrg"), "AlphaOrg"), "AlphaOrg");
+        gammaJoins                = gamma.SignWithIdentityKey(gammaJoins);
+        gammaJoins                = alpha.SignWithSigningKey(alpha.SignWithIdentityKey(gammaJoins));
 
         var withoutBetaOrgAgain   = history.Commit(gammaJoins);
 
@@ -299,8 +253,8 @@ public static class ExampleA1
 
         // BetaOrg signs as well, with its identity key and its signing key: the quorum so far. Every commit is signed by
         // all three from now on; two of them would be enough.
-        gammaJoins                = SignedBySigningKeyOf(SignedByIdentityKeyOf(gammaJoins, "BetaOrg"), "BetaOrg");
-        history.Signers           = [ SignerOf("AlphaOrg"), SignerOf("BetaOrg"), SignerOf("GammaOrg") ];
+        gammaJoins                = beta.SignWithSigningKey(beta.SignWithIdentityKey(gammaJoins));
+        history.Signers           = [ alpha.CommitSignerFor(occId), beta.CommitSignerFor(occId), gamma.CommitSignerFor(occId) ];
 
         var gammaJoined           = history.Commit(gammaJoins);
 
@@ -334,8 +288,9 @@ public static class ExampleA1
         #endregion
 
 
-        return new (identityKeys,
-                    signingKeys,
+        return new (alpha,
+                    beta,
+                    gamma,
                     history.Signers,
                     trustAnchor,
                     history,

@@ -101,7 +101,7 @@ public static class ExampleA3
         // Signed by its key for its tariffs, or by the roaming network operator: refused, the pool is DE*GEF's
         // infrastructure. Nothing is committed.
         var byTariffsKey          = A1.History.Commit(ChangeSet("Jena Paradies, a DC and an AC station", A2.SigningKeys[POIKeyUsages.Tariffs], RoamingNetworkChange.Add(Pool(1, "Jena Paradies", 50.9271, 11.5892))));
-        var byOCC                 = A1.History.Commit(ChangeSet("Jena Paradies, a DC and an AC station", A1.SigningKeys["AlphaOrg"],           RoamingNetworkChange.Add(Pool(1, "Jena Paradies", 50.9271, 11.5892))));
+        var byOCC                 = A1.History.Commit(ChangeSet("Jena Paradies, a DC and an AC station", A1.AlphaOrg.SigningKey,               RoamingNetworkChange.Add(Pool(1, "Jena Paradies", 50.9271, 11.5892))));
 
         Console.WriteLine($"Signed by its tariffs key: {byTariffsKey.Status}, {byTariffsKey.ErrorResponse}");
         Console.WriteLine($"Signed by AlphaOrg of OCC: {byOCC.Status}, {byOCC.ErrorResponse}");

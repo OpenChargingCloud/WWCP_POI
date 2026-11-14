@@ -604,7 +604,11 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   the trust anchor names them, never as a key statement names them, and a key keeps its holder. The holders and the
   quorum change by change sets of the operator, signed by the quorum before and by every new identity key: one holder
   alone, a second joining, two of three (`examples/exampleA1.md`); the quorum fits the keys in every version, not
-  between the changes of one change set. A roaming network names the URLs of its copies in `urls`
+  between the changes of one change set. A `RoamingShareholder` is such a holder on its own machine, its name with
+  its identity and its signing key pair and the URL of its copy: it states and co-signs key statements
+  (`StateKeys(…)`, `CoSign(…)`), certifies its signing key (`CertifySigningKey(…)`), signs change sets
+  (`SignWithIdentityKey(…)`, `SignWithSigningKey(…)`) and commits (`CommitSignerFor(…)`); `RoamingNetwork.Admit(…)`
+  prepares the one change set by which one more of them holds the keys. A roaming network names the URLs of its copies in `urls`
   (`RoamingNetwork.URLs`, `POINetworkURLs`), which its trust anchor takes; and whoever pinned older keys follows the
   key statements one after the other (`RoamingNetworkHistory.KeyStatements()`, `GET ~/RNs/{id}/keyStatements`,
   `RoamingNetworkKeyStatement.TryVerifyChain(…)`).

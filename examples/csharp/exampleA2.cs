@@ -179,21 +179,14 @@ public static class ExampleA2
 
         Console.WriteLine($"Sent by DE*GEF, signed by its {identityKeys.Length} identity keys and the ones of its manufacturers; missing: {String.Join(" ", missing)}");
 
-        // The change set signed by the signing key of the given organization.
-        RoamingNetworkChangeSet SignedBy(RoamingNetworkChangeSet ChangeSet, String Organization)
-
-            => ChangeSet.Sign(A1.SigningKeys[Organization].Private,
-                              POIPublicKey.From(A1.SigningKeys[Organization].Private).Id,
-                              A1.SigningKeys[Organization].Algorithm);
-
-        // AlphaOrg alone: refused, nothing is committed.
-        var byAlphaOrg            = SignedBy(addGEFSent, "AlphaOrg");
+        // AlphaOrg alone, a shareholder of OCC signing with its signing key: refused, nothing is committed.
+        var byAlphaOrg            = A1.AlphaOrg.SignWithSigningKey(addGEFSent);
         var refused               = A1.History.Commit(byAlphaOrg);
 
         Console.WriteLine($"Signed by AlphaOrg alone: {refused.Status}, {refused.ErrorResponse}");
 
         // BetaOrg signs it as well: 2/3 quorum reached!
-        var byAlphaAndBetaOrg     = SignedBy(byAlphaOrg, "BetaOrg");
+        var byAlphaAndBetaOrg     = A1.BetaOrg.SignWithSigningKey(byAlphaOrg);
         var added                 = A1.History.Commit(byAlphaAndBetaOrg);
 
         if (!added.IsCommitted)
@@ -256,7 +249,7 @@ public static class ExampleA2
         var addModels             = A1.History.Head.RoamingNetwork.CreateChangeSet(models, Description: ImmutableI18NString.Create(Languages.en, "The models of GraphDefined, KERNBERG and SAALE"));
 
         // Signed by the roaming network operator: refused, the models are their manufacturers'.
-        var byOCCOnly             = A1.History.Commit(SignedBy(SignedBy(addModels, "AlphaOrg"), "BetaOrg"));
+        var byOCCOnly             = A1.History.Commit(A1.BetaOrg.SignWithSigningKey(A1.AlphaOrg.SignWithSigningKey(addModels)));
 
         Console.WriteLine($"The models signed by the roaming network operator: {byOCCOnly.Status}, {byOCCOnly.ErrorResponse}");
 
