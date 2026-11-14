@@ -1014,6 +1014,11 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
   the trust anchor through the versions checked (`Follow(version)`), a key statement after the other, as a holder joins
   or leaves. A server serving the copy replaces or removes it with `POI_API.ReplaceRoamingNetworkHistory(…)` and
   `RemoveRoamingNetworkHistory(…)`.
+- **Attestations of another holder:** where several holders decide, a head is attested by as many of them
+  ([SPECIFICATION.md](SPECIFICATION.md), section 8.5). A server holding keys of the operator sends the attestations it
+  makes to the one it follows (`peer.AddAttestationsAsync(…)`, the action `addAttestations { attestations: [ … ] }`),
+  which takes those whose signature its `POI_API.VerifyAttestation` verifies, of commits it holds, and pushes them to
+  whoever follows it; without that delegate it takes none.
 - **Reconnect:** a broken connection is opened again with growing delays, and it catches up.
 - **No rollback:** when the other server knows none of its commits, e.g. as it compacted them away or was restored from
   an old backup, the history is replaced (`OnHistoryReplaced`) only by one joined from a checkpoint that proves its

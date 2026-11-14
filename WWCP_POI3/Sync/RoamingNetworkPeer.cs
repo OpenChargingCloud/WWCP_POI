@@ -393,6 +393,27 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region AddAttestationsAsync(Attestations, CancellationToken = default)
+
+        /// <summary>
+        /// Send attestations made here to the other server, e.g. those of a holder of the keys of the roaming network
+        /// operator, so that a head there is attested by as many holders as its quorum requires; it takes those whose
+        /// signature it verifies, and pushes them to whoever follows it.
+        /// </summary>
+        /// <param name="Attestations">Attestations of commits the other server holds.</param>
+        /// <param name="CancellationToken">An optional cancellation token.</param>
+        /// <returns>The answer of the other server: { added, refused }.</returns>
+        public Task<JObject> AddAttestationsAsync(IEnumerable<RoamingNetworkAttestation>  Attestations,
+                                                  CancellationToken                       CancellationToken   = default)
+
+            => RequestAsync("addAttestations",
+                            new JObject(
+                                new JProperty(POI_API.PropertyKeys.Attestations,  new JArray(Attestations.Select(attestation => attestation.ToJSON(Embedded: true))))
+                            ),
+                            CancellationToken);
+
+        #endregion
+
         #region SetStatusAsync(Kind, EntityType, EntityId, Value, Timestamp = null, DataSource = null, CancellationToken = default)
 
         /// <summary>

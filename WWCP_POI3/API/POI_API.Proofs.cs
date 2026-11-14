@@ -42,8 +42,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// GET ~/RNs/{RN_Id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/proof the proof of the charging station of an EVSE
     /// GET ~/RNs/{RN_Id}/CSs/{CS_Id}/proof, ~/RNs/{RN_Id}/EVSEs/{EVSE_Id}/proof        the same, found by the identification alone
     ///
-    /// WebSocket actions: attestations {}, chargingStationProof { chargingStationId | EVSEId, hashAlgorithm? };
-    /// topic: attestations (action attestation), every attestation the history takes.
+    /// WebSocket actions: attestations {}, addAttestations { attestations: [ … ] }, chargingStationProof { chargingStationId |
+    /// EVSEId, hashAlgorithm? }; topic: attestations (action attestation), every attestation the history takes.
     /// </remarks>
     public partial class POI_API
     {
@@ -54,6 +54,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// The topic of new attestations.
         /// </summary>
         public const String AttestationsTopic = "attestations";
+
+        #endregion
+
+        #region Properties
+
+        /// <summary>
+        /// Verifies the attestations other servers send (addAttestations) with trusted keys, e.g. those of another holder
+        /// of the keys of the roaming network operator, so that a head is attested by as many holders as its quorum
+        /// requires (SPECIFICATION.md, section 8.5). Without it, they are refused.
+        /// </summary>
+        public VerifyAttestationDelegate?  VerifyAttestation    { get; set; }
 
         #endregion
 
@@ -278,6 +289,46 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 )
 
             );
+
+            // The attestations of another server, e.g. of another holder of the keys of the roaming network operator:
+            // each taken where its signature is one of a trusted key, of a commit held here, and pushed to the subscribers.
+            WebSocketServer.AddCommand("addAttestations", request => {
+
+                if (VerifyAttestation is null)
+                    return Task.FromResult(request.Error(POIWebSocketErrorCodes.SecurityError, "Adding attestations is not enabled here!"));
+
+                if (request.Payload[PropertyKeys.Attestations] is not JArray attestationsJSON || attestationsJSON.Count == 0)
+                    return Task.FromResult(request.Error(POIWebSocketErrorCodes.FormatViolation, "The request must contain { attestations: [ … ] }!"));
+
+                var added    = 0;
+                var refused  = new JArray();
+
+                foreach (var attestationJSON in attestationsJSON)
+                {
+
+                    if (attestationJSON is not JObject json || !RoamingNetworkAttestation.TryParse(json, out var attestation, out var attestationError))
+                    {
+                        refused.Add("Invalid attestation!");
+                        continue;
+                    }
+
+                    if (History.TryAddAttestation(attestation, VerifyAttestation, out attestationError, TimeProvider.GetUtcNow()))
+                        added++;
+                    else
+                        refused.Add(attestationError);
+
+                }
+
+                return Task.FromResult(
+                           added == 0
+                               ? request.Error(POIWebSocketErrorCodes.SecurityError, String.Join(" ", refused.Values<String>()))
+                               : request.Respond(new JObject(
+                                                     new JProperty("added",    added),
+                                                     new JProperty("refused",  refused)
+                                                 ))
+                       );
+
+            });
 
             WebSocketServer.AddCommand("keyStatements", request =>
 
