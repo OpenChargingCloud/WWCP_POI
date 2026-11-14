@@ -199,7 +199,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// <summary>
         /// What a roaming network may leave out: what it holds, each of them with a list of its own.
         /// </summary>
-        private static readonly String[]     RoamingNetworkOmittables = [ "chargingStationManufacturers", "chargingStationOperators", "eMobilityProviders", "energyMeterManufacturers", "gridOperators", "parkingOperators" ];
+        private static readonly String[]     RoamingNetworkOmittables = [ "chargingStationManufacturers", "chargingStationOperators", "conformityAssessmentBodies", "eMobilityProviders", "energyMeterManufacturers", "gridOperators", "parkingOperators", "transparencySoftwareManufacturers" ];
 
         /// <summary>
         /// The view of a collection as a list of its children as their parent embeds them.

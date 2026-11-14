@@ -508,6 +508,51 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.API
 
         #endregion
 
+        #region A_roaming_network_leaves_out_everything_it_holds_on_request()
+
+        /// <summary>
+        /// What a page of a roaming network asks for: what it says of itself, without anything it holds, each of
+        /// which has a list of its own - the transparency software manufacturers and the conformity assessment
+        /// bodies as well.
+        /// </summary>
+        [Test]
+        public async Task A_roaming_network_leaves_out_everything_it_holds_on_request()
+        {
+
+            var holds = new[] { "chargingStationManufacturers", "chargingStationOperators", "conformityAssessmentBodies", "eMobilityProviders",
+                                "energyMeterManufacturers", "gridOperators", "parkingOperators", "transparencySoftwareManufacturers" };
+
+            var (whole,   wholeContent)  = await Send(HttpMethod.Get, RN);
+            var (slim,    slimContent)   = await Send(HttpMethod.Get, RN + "?without=" + String.Join(",", holds));
+            var (unknown, _)             = await Send(HttpMethod.Get, RN + "?without=chargingPools");
+
+            var wholeJSON  = ParseJSON(wholeContent);
+            var slimJSON   = ParseJSON(slimContent);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(whole.StatusCode,                                          Is.EqualTo(HttpStatusCode.OK));
+                Assert.That(wholeJSON["chargingStationOperators"],                     Is.Not.Null);
+
+                Assert.That(slim.StatusCode,                                           Is.EqualTo(HttpStatusCode.OK));
+
+                foreach (var held in holds)
+                    Assert.That(slimJSON[held],                                        Is.Null, held);
+
+                foreach (var held in holds)
+                    wholeJSON.Remove(held);
+
+                Assert.That(JToken.DeepEquals(slimJSON, wholeJSON),                    Is.True);
+
+                Assert.That(unknown.StatusCode,                                        Is.EqualTo(HttpStatusCode.BadRequest));
+
+            }
+
+        }
+
+        #endregion
+
         #region An_operator_leaves_out_its_charging_pools_on_request()
 
         [Test]
