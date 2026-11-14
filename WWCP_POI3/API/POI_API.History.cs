@@ -276,6 +276,65 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         #endregion
 
+        #region RemoveRoamingNetworkHistory(RoamingNetworkId)
+
+        /// <summary>
+        /// Serve the history of the given roaming network no longer, neither over HTTP nor over its WebSocket, whose
+        /// connections are closed: e.g. a copy of a roaming network of another server that is followed no longer.
+        /// The history itself, its store and the epochs before it are left as they are.
+        /// </summary>
+        /// <param name="RoamingNetworkId">The identification of a roaming network.</param>
+        /// <returns>Whether it was served.</returns>
+        public Boolean RemoveRoamingNetworkHistory(RoamingNetwork_Id RoamingNetworkId)
+        {
+
+            POIWebSocketServer? closedWebSocketServer;
+
+            lock (epochLock)
+            {
+
+                if (!roamingNetworkHistories.TryRemove(RoamingNetworkId, out _))
+                    return false;
+
+                if (historyDisconnects.TryRemove(RoamingNetworkId, out var disconnect))
+                    disconnect();
+
+                historyWebSocketServers.TryRemove(RoamingNetworkId, out closedWebSocketServer);
+
+            }
+
+            closedWebSocketServer?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+
+            return true;
+
+        }
+
+        #endregion
+
+        #region ReplaceRoamingNetworkHistory(History)
+
+        /// <summary>
+        /// Serve the given history in place of the one served of its roaming network, or as its first one: e.g. the one
+        /// a peer started anew from another server. The connections to the WebSocket of the one before are closed, so
+        /// that whoever follows it connects again.
+        /// </summary>
+        /// <param name="History">The history of a roaming network.</param>
+        public Boolean ReplaceRoamingNetworkHistory(RoamingNetworkHistory History)
+        {
+
+            lock (epochLock)
+            {
+
+                RemoveRoamingNetworkHistory(History.RoamingNetworkId);
+
+                return AddRoamingNetworkHistory(History);
+
+            }
+
+        }
+
+        #endregion
+
         #region TryGetRoamingNetworkHistory(RoamingNetworkId, out History)
 
         /// <summary>

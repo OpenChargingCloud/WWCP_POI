@@ -38,9 +38,9 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #region Data
 
-        private static readonly DateTimeOffset             T0     = DateTimeOffset.Parse("2026-11-01T12:00:00Z");
+        internal static readonly DateTimeOffset             T0    = DateTimeOffset.Parse("2026-11-01T12:00:00Z");
         private static readonly RoamingNetwork_Id          QA     = RoamingNetwork_Id.        Parse("QA");
-        private static readonly RoamingNetworkOperator_Id  OCC    = RoamingNetworkOperator_Id.Parse("OCC");
+        internal static readonly RoamingNetworkOperator_Id  OCC   = RoamingNetworkOperator_Id.Parse("OCC");
 
         #endregion
 
@@ -49,7 +49,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         /// <summary>
         /// A new shareholder serving its copy of QA at a host of its own name.
         /// </summary>
-        private static RoamingShareholder Shareholder(String        Name,
+        internal static RoamingShareholder Shareholder(String        Name,
                                                       COSEKeyPair?  IdentityKey   = null)
 
             => RoamingShareholder.Create(Name,
@@ -63,7 +63,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         /// <summary>
         /// The key statement of the given shareholders, stated by the first one and signed by all others as well.
         /// </summary>
-        private static RoamingNetworkKeyStatement Statement(Byte                         MinConsensus,
+        internal static RoamingNetworkKeyStatement Statement(Byte                         MinConsensus,
                                                             params RoamingShareholder[]  Shareholders)
         {
 
@@ -88,7 +88,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         /// <summary>
         /// QA as the given shareholder begins it, alone: its key statement, the certificate of its signing key, its URL.
         /// </summary>
-        private static RoamingNetwork Begun(RoamingShareholder Founder)
+        internal static RoamingNetwork Begun(RoamingShareholder Founder)
 
             => new RoamingNetworkOperator(
                    Statement(1, Founder),
@@ -367,7 +367,7 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
         /// The history of QA begun by the given founder, the given others admitted one after the other: two decide as
         /// soon as there are two, and every commit is signed by all of them.
         /// </summary>
-        private static RoamingNetworkHistory Joined(RoamingShareholder           Founder,
+        internal static RoamingNetworkHistory Joined(RoamingShareholder           Founder,
                                                     params RoamingShareholder[]  Others)
         {
 

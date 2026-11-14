@@ -1007,7 +1007,13 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
   statement require, each certified by an identity key the trust anchor names, as for a proof (`VerifyHead`); a
   checkpoint it joins from must be signed so. The keys of the operator a snapshot names are public and prove nothing.
   Without a trust anchor it starts no history from the other server (fail closed), and only continues one given to it.
-  Afterwards, every change set is checked by the keys in the data.
+  Afterwards, every change set is checked by the keys in the data. The signatures of commits, checkpoints and
+  attestations are the caller's to verify (`VerifyCommitSignature`, `VerifyCheckpointSignature`, `VerifyAttestation`):
+  a `RoamingNetworkFollowerTrust` of the trust anchor gives all three, taking a signature in the role of the roaming
+  network operator by a signing key its version certifies, by an identity key the trust anchor leads to, and follows
+  the trust anchor through the versions checked (`Follow(version)`), a key statement after the other, as a holder joins
+  or leaves. A server serving the copy replaces or removes it with `POI_API.ReplaceRoamingNetworkHistory(…)` and
+  `RemoveRoamingNetworkHistory(…)`.
 - **Reconnect:** a broken connection is opened again with growing delays, and it catches up.
 - **No rollback:** when the other server knows none of its commits, e.g. as it compacted them away or was restored from
   an old backup, the history is replaced (`OnHistoryReplaced`) only by one joined from a checkpoint that proves its
