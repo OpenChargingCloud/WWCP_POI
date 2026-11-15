@@ -238,14 +238,15 @@ part in what follows from the hub alone:
   "…" } ] }`, done at every start; or said by a person, as above.
 - *Which of them it wants to hold keys of*: `"hold": true` beside the trust anchor, asked once; or `join`.
 - *Where it is reached*: `"poi": { "url": "…" }`, as no hub knows its own public URL.
+- *Whether it signs the commits of the others*: `"signCommits": "all"` beside the trust anchor signs every commit
+  the hub took into its copy, `"none"` none; where nothing is said, a hub signs the commit of a change set it signed
+  by itself, and every other commit when it is told, one by one.
 
 So hub B and hub C of this example start from their configuration, and what is left to somebody is to admit them, at
-hub A and at hub B. Not in a configuration:
+hub A and at hub B. Not in a configuration, and decided against:
 
 - *Whom it admits*: a list of the holders an organization agreed to - their names, or their identity keys - by which
-  `Admit` were pressed by the hub itself.
-- *Whether it signs the commits of the others*: a hub signs the commit of a change set it signed by itself, and every
-  other commit when it is told, one by one.
+  `Admit` were pressed by the hub itself. Who holds the keys of an operator is said by a person, each time.
 
 **The hubs tell each other that something waits, and not more.** A commit is pushed: every hub following gets it over
 the WebSocket of the history at once, and connects again when that ended. What comes before a commit is told as a
