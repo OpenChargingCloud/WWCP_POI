@@ -283,8 +283,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var holders             = TrustAnchor.Holders.Select(keys => (IReadOnlyList<String>) keys.Where(trusted.Contains).ToImmutableArray()).ToImmutableArray();
             var otherIdentityKeys   = OtherIdentityKeys?.ToArray() ?? [];
             var identityKeys        = KeyStatement.IdentityKeys.Concat(otherIdentityKeys).ToArray();
-            var signedBy            = KeyStatement.Signatures.Select(signature => signature.KeyId).ToHashSet(StringComparer.Ordinal);
-            var trustedHolderCount  = holders.Count(keys => keys.Any(signedBy.Contains));
+            var signedBy            = new HashSet<String>(StringComparer.Ordinal);
 
             var signaturesValid     = true;
             var keysValid           = true;
@@ -293,12 +292,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var signature in KeyStatement.Signatures)
             {
 
+                // By a key that is not given, e.g. one of the statement before that left with this one: passed over,
+                // as it can not be verified here, and counted for nothing.
                 if (identityKeys.FirstOrDefault(key => key.Id == signature.KeyId) is not POIPublicKey identityKey)
-                {
-                    signaturesValid = false;
-                    error           = $"The identity key '{signature.KeyId}' that signed the key statement is not given!";
-                    break;
-                }
+                    continue;
 
                 if (!KeyStatement.VerifySignature(identityKey, out var signatureError))
                 {
@@ -310,7 +307,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (!identityKey.IsValidAt(KeyStatement.SignedAt))
                     keysValid = false;
 
+                signedBy.Add(signature.KeyId);
+
             }
+
+            var trustedHolderCount  = holders.Count(keys => keys.Any(signedBy.Contains));
 
             var quorumReached       = KeyStatement.TryVerify(holders, otherIdentityKeys, out _, out var quorumError, TrustAnchor.MinConsensus, at);
             var withinValidity      = keysValid && KeyStatement.IsValidAt(at);

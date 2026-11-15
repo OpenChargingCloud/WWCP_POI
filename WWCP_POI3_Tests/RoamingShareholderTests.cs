@@ -507,6 +507,75 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
 
         #endregion
 
+        #region A_key_statement_follows_the_one_before_by_a_key_it_names_no_longer()
+
+        /// <summary>
+        /// A key statement may carry signatures of identity keys of the statement before it that it names no longer
+        /// (SPECIFICATION.md, section 8.6): the key of a holder that left, or one replaced by a key of another holder.
+        /// Verified alone, such a signature is passed over and counts for nothing, as its key is not given; followed
+        /// after the statement before, it is what leads from the keys trusted to the new ones.
+        /// </summary>
+        [Test]
+        public void A_key_statement_follows_the_one_before_by_a_key_it_names_no_longer()
+        {
+
+            var unnamed   = Shareholder("OCC");
+            var named     = Shareholder("AlphaOrg");
+            var mallory   = Shareholder("Mallory");
+
+            var before    = Statement(1, unnamed);
+
+            // The keys of AlphaOrg in the place of the ones before: stated by its identity key, and by the one it replaces.
+            var byItself  = Statement(1, named);
+            var after     = unnamed.CoSign(byItself);
+            var forged    = mallory.CoSign(byItself);
+
+            var oldAnchor = new RoamingNetworkTrustAnchor(QA, [ unnamed.URL!.Value ], [ unnamed.IdentityPublicKey.Id ]);
+            var evaluated = RoamingNetworkTrustContext.Evaluate(oldAnchor, after, oldAnchor.Keys, At: T0.AddMinutes(1));
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(after.Signatures.Select(signature => signature.KeyId),
+                            Is.EquivalentTo([ named.IdentityPublicKey.Id, unnamed.IdentityPublicKey.Id ]));
+
+                // Alone: by its own key, for whoever trusts that; the other signature is passed over.
+                Assert.That(after.TryVerify([ named.IdentityPublicKey.Id ],   null, out var ownError),  Is.True, ownError);
+                Assert.That(after.TryVerify([ unnamed.IdentityPublicKey.Id ], null, out var oldError),  Is.False, "a signature whose key is not given counts for nothing");
+                Assert.That(oldError,                                                                  Does.Contain("0 holders"));
+                Assert.That(forged.TryVerify([ named.IdentityPublicKey.Id ],  null, out _),            Is.True,  "a signature of somebody else does no harm");
+
+                Assert.That(evaluated.SignaturesValid,      Is.True);
+                Assert.That(evaluated.TrustedHolderCount,   Is.Zero, "not counted where it could not be verified");
+                Assert.That(evaluated.QuorumReached,        Is.False);
+
+                // After the one before: the key that one names signed it, so the keys trusted lead to the new ones.
+                Assert.That(RoamingNetworkKeyStatement.TryVerifyChain([ before, after ],
+                                                                      [[ unnamed.IdentityPublicKey.Id ]],
+                                                                      out var verified,
+                                                                      out var holderOf,
+                                                                      out var chainError),
+                            Is.True, chainError);
+
+                Assert.That(holderOf?[named.IdentityPublicKey.Id],  Is.EqualTo("AlphaOrg"));
+
+                // Not without it, and not by somebody else's.
+                Assert.That(RoamingNetworkKeyStatement.TryVerifyChain([ before, byItself ], [[ unnamed.IdentityPublicKey.Id ]], out _, out _, out var aloneError),   Is.False);
+                Assert.That(aloneError,                                                                                                                              Does.Contain("does not follow the one before"));
+                Assert.That(RoamingNetworkKeyStatement.TryVerifyChain([ before, forged ],   [[ unnamed.IdentityPublicKey.Id ]], out _, out _, out _),               Is.False);
+
+            }
+
+            // So does a server following by the trust anchor from before.
+            var trust     = new RoamingNetworkFollowerTrust(oldAnchor);
+
+            Assert.That(trust.FollowChain([ before, after ]),  Is.True);
+            Assert.That(trust.TrustAnchor.Keys,                Is.EqualTo([ named.IdentityPublicKey.Id ]));
+
+        }
+
+        #endregion
+
         #region Of_two_the_one_leaving_signs_as_well()
 
         /// <summary>

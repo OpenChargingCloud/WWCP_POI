@@ -731,11 +731,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             foreach (var signature in Signatures)
             {
 
+                // By a key neither the statement names nor the verifier was given, e.g. one of the statement before that
+                // left with this one: passed over, as it can not be verified here and counts for nothing. Where the
+                // statements are followed one after the other, the one before gives it (TryVerifyChain).
                 if (keys.FirstOrDefault(key => key.Id == signature.KeyId) is not POIPublicKey identityKey)
-                {
-                    ErrorResponse = $"The identity key '{signature.KeyId}' that signed the key statement is not given!";
-                    return false;
-                }
+                    continue;
 
                 if (!identityKey.IsValidAt(SignedAt))
                 {

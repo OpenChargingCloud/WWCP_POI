@@ -614,7 +614,9 @@ received.Given("chargingStationOperators", "chargingPools", "chargingStations");
   or one replaced: `history.Signers` is changed first. A roaming network names the URLs of its copies in `urls`
   (`RoamingNetwork.URLs`, `POINetworkURLs`), which its trust anchor takes; and whoever pinned older keys follows the
   key statements one after the other (`RoamingNetworkHistory.KeyStatements()`, `GET ~/RNs/{id}/keyStatements`,
-  `RoamingNetworkKeyStatement.TryVerifyChain(…)`).
+  `RoamingNetworkKeyStatement.TryVerifyChain(…)`). A key statement may carry signatures of identity keys of the one
+  before that it names no longer, e.g. of a key replaced by one of another holder (`statement.WithSignature(…)`):
+  verified alone they are passed over and count for nothing, followed after the one before they lead on from it.
 - **Trust contexts:** an app that lets its users import a trust anchor before they trust its keys verifies not
   against that anchor, which trusts every identity key it pins, but against a context it evaluates of the keys it
   trusts locally, as WWCP_POI.TS 0.1.1 does (`TrustContext`): `RoamingNetworkTrustContext.Evaluate(anchor,

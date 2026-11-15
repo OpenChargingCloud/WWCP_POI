@@ -1289,13 +1289,16 @@ Section 6 has an example.
   names this roaming network and this operator, only identity keys the operator names, as it names them, with
   their holders, its `minConsensus`, and is signed by identity keys of `minConsensus` holders valid at `signedAt`; and unless every certificate names this
   operator and is signed by one of its identity keys of the holder of the signing key, valid at `signedAt`, and no
-  signing key is certified twice in different forms. Every signature MUST be valid. Its validity in time is not checked there: a version keeps a statement that expired. So every
+  signing key is certified twice in different forms. Every signature by an identity key the operator names MUST be
+  valid; one by another key, e.g. a key of the statement before that the operator names no longer, is passed over
+  there and counts for nothing. Its validity in time is not checked there: a version keeps a statement that expired. So every
   proof of a charging station gives it with the operator, peers take it with the commits, and witnesses see
   it in the checkpoints: an operator stating other keys to some is a split view (10.2).
 - **Verification:** a verifier trusts identity keys by their `@id`s and knows which of them one holder holds,
   e.g. as a trust anchor names them, one entry per holder. It checks that the statement the proof gives is signed
   by trusted ones of as many holders as the `minConsensus` it pinned and the one of the statement require, found
-  among its `identityKeys` or those of the operator, each `@id` the thumbprint of its key (section 4.1); the
+  among its `identityKeys` or those of the operator, each `@id` the thumbprint of its key (section 4.1); a
+  signature whose key is found among neither is passed over and counts for nothing; the
   holders counted as the verifier knows them, never as the statement names them. The statement MUST name the
   trusted keys it names as the verifier knows their holders: one `holder` for the keys of one holder, another
   for those of every other holder; else it is refused. The verifier checks that it is valid at the time it
@@ -1318,7 +1321,9 @@ Section 6 has an example.
   the one before it and while that one was valid (`signedAt` of the one before ≤ its `signedAt` ≤ `validUntil` of the one
   before), MUST be signed by identity keys the one before names, of as many of the holders that one names as the
   `minConsensus` of that one requires, and MUST be signed by its own identity keys of as many holders as its own
-  `minConsensus` requires; the signing keys are found among its own identity keys and those of the one before. So the
+  `minConsensus` requires; the signing keys are found among its own identity keys and those of the one before. A
+  statement MAY so carry signatures of identity keys of the one before that it names no longer - of a holder that
+  leaves, of a key replaced by one of another holder - which lead from the one before to it. So the
   quorum before decides who holds the keys after it, as it signs the change set stating them (4.1), and every holder
   a statement counts for its own quorum signed it. The last statement MUST be valid at the time the verifier checks,
   and its identity keys are trusted then, with the holders it names. A statement that does not follow the one before
