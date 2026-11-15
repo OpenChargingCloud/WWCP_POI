@@ -64,6 +64,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<RoamingNetworkCommitSigner>  AttestationSigners    { get; set; } = [];
 
         /// <summary>
+        /// Whether an AttestationSigner attests only a head whose commit it signed, in its role: not by default. Where
+        /// commits of other servers are taken, a server that vouches only for what it signed attests a head of theirs
+        /// once it added its signature (TryAddSignatures), with the next RefreshAttestations.
+        /// </summary>
+        public Boolean                                     AttestOnlySignedHeads    { get; set; }
+
+        /// <summary>
         /// How long an attestation made here is valid: 15 minutes by default, RoamingNetworkAttestation.MaxValidity at most.
         /// </summary>
         public TimeSpan                                    AttestationValidity
@@ -514,7 +521,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var made    = new List<RoamingNetworkAttestation>();
 
             // Only with the signature algorithms of the epoch.
-            foreach (var signer in Signers.Where(signer => epoch.Profiles.AllowsSignatureAlgorithm(signer.Algorithm.Name)))
+            foreach (var signer in Signers.Where(signer => epoch.Profiles.AllowsSignatureAlgorithm(signer.Algorithm.Name) &&
+                                                           (!AttestOnlySignedHeads ||
+                                                            commit.Signatures.Any(signature => signature.KeyId == signer.KeyId && signature.Role == signer.Role))))
                 foreach (var eTag in eTags)
                 {
 

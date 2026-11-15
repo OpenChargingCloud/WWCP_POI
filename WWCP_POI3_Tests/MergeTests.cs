@@ -132,6 +132,98 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
         #endregion
 
 
+        #region A_server_signs_the_merges_it_makes_unless_told_otherwise()
+
+        [Test]
+        public void A_server_signs_the_merges_it_makes_unless_told_otherwise()
+        {
+
+            var (server1, server2) = Servers();
+
+            server1.Signers     = [ CommitSignatureTests.LeaderSigner ];
+            server2.Signers     = [ CommitSignatureTests.LeaderSigner ];
+            server2.SignMerges  = false;
+
+            var a  = Change(server1, 1, network => [ RoamingNetworkChange.UpdateProperty(EVSE(network), "maxPower", null, 11000) ]);
+            var b  = Change(server2, 2, network => [ RoamingNetworkChange.UpdateProperty(network.GetChargingStationOperatorById(EXA)!, "telephone", null, "+49 30 1") ]);
+
+            // Each merges by itself, before it sees the merge of the other one.
+            Assert.That(server1.TryAppend([ b ], out _, out var error1, VerifyCommitSignature: CommitSignatureTests.VerifyCommit),  Is.True, error1);
+            Assert.That(server2.TryAppend([ a ], out _, out var error2, VerifyCommitSignature: CommitSignatureTests.VerifyCommit),  Is.True, error2);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(a.Signatures,                                Has.Length.EqualTo(1), "a commit of a change set is signed here");
+                Assert.That(b.Signatures,                                Has.Length.EqualTo(1), "a commit of a change set is signed, also where merges are not");
+
+                Assert.That(server1.Head.Commit.IsMerge,                 Is.True);
+                Assert.That(server2.Head.Commit.Id,                      Is.EqualTo(server1.Head.Commit.Id), "the same merge commit, signed or not");
+                Assert.That(server1.Head.Commit.Signatures,              Has.Length.EqualTo(1), "a merge made here is signed");
+                Assert.That(server2.Head.Commit.Signatures,              Is.Empty,              "a merge made here is not signed where the server leaves it to later");
+
+                // Signed later, where the server signed both.
+                Assert.That(server2.TryAddSignatures(server2.Head.Commit.Id,
+                                                     [ CommitSignatureTests.LeaderSigner.Sign(server2.Head.Commit) ],
+                                                     CommitSignatureTests.VerifyCommit,
+                                                     out var signed, out _, out var addError),  Is.True, addError);
+                Assert.That(signed!.Signatures,                          Has.Length.EqualTo(1));
+
+            }
+
+        }
+
+        #endregion
+
+        #region A_server_attests_only_the_heads_it_signed_where_it_says_so()
+
+        [Test]
+        public void A_server_attests_only_the_heads_it_signed_where_it_says_so()
+        {
+
+            var (server1, server2) = Servers();
+            var signer             = CommitSignatureTests.LeaderSigner;
+
+            server1.Signers                = [ signer ];
+            server1.SignMerges             = false;
+            server1.AttestationSigners     = [ signer ];
+            server1.AttestOnlySignedHeads  = true;
+
+            Int32 Attested()
+                => server1.CurrentAttestations().Count(attestation => attestation.CommitId == server1.Head.Commit.Id);
+
+            var a          = Change(server1, 1, network => [ RoamingNetworkChange.UpdateProperty(EVSE(network), "maxPower", null, 11000) ]);
+            var itsOwn     = Attested();
+
+            // A commit of another server, and the merge with it: neither is signed here.
+            var b          = Change(server2, 2, network => [ RoamingNetworkChange.UpdateProperty(network.GetChargingStationOperatorById(EXA)!, "telephone", null, "+49 30 1") ]);
+
+            Assert.That(server1.TryAppend([ b ], out _, out var error),  Is.True, error);
+
+            var merged     = Attested();
+            var refreshed  = server1.RefreshAttestations().Count;
+
+            Assert.That(server1.TryAddSignatures(server1.Head.Commit.Id,
+                                                 [ signer.Sign(server1.Head.Commit) ],
+                                                 CommitSignatureTests.VerifyCommit,
+                                                 out _, out _, out var addError),  Is.True, addError);
+
+            var signed     = server1.RefreshAttestations().Count;
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(itsOwn,                         Is.GreaterThan(0), "the head of a commit made and signed here is attested at once");
+                Assert.That(server1.Head.Commit.IsMerge,    Is.True);
+                Assert.That(merged,                         Is.Zero,           "a head not signed here is not attested");
+                Assert.That(refreshed,                      Is.Zero,           "nor later, while it is not signed");
+                Assert.That(signed,                         Is.GreaterThan(0), "signed, it is attested");
+                Assert.That(Attested(),                     Is.EqualTo(signed));
+            }
+
+        }
+
+        #endregion
+
         #region Concurrent_commits_merge_to_the_same_commit_everywhere()
 
         [Test]

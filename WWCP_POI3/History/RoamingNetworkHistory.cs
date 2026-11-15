@@ -278,6 +278,14 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public ImmutableArray<RoamingNetworkCommitSigner>  Signers  { get; set; } = [];
 
         /// <summary>
+        /// Whether the Signers sign the merge commits made here as well; they do by default. A merge commit is the
+        /// same one at every server, whoever made it, and says nothing its two parents do not: a server that signs
+        /// only what it looked at leaves it unsigned here, and adds its signature later (TryAddSignatures) where it
+        /// signed both.
+        /// </summary>
+        public Boolean                                     SignMerges  { get; set; } = true;
+
+        /// <summary>
         /// How many revisions the version a change set is made for may be behind the head; DefaultMaxRevisionsBehindHead
         /// by default. A change set made for an older version is refused: it is prepared again for the head.
         /// Commits appended from other servers are not bound by it.
@@ -1648,7 +1656,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
                             try
                             {
-                                Take(SignedBy(Signers, RoamingNetworkCommit.Merge(left, right, changeSet, roamingNetwork)), roamingNetwork);
+                                Take(SignedBy(SignMerges ? Signers : [], RoamingNetworkCommit.Merge(left, right, changeSet, roamingNetwork)), roamingNetwork);
                             }
                             catch (Exception e)
                             {
