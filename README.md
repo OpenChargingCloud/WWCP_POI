@@ -792,7 +792,7 @@ var history = RoamingNetworkHistory.TryLoad(store, out var loaded, out _, Archiv
 | `GET ~/RNs/{id}/attestations` | the attestations of the head valid now: `{attestations: […]}` |
 | `GET ~/RNs/{id}/keyStatement` | the key statement of the roaming network operator |
 | `GET ~/RNs/{id}/keyStatements` | its key statements one after the other, the oldest the history knows of first, the one of the head last: `{keyStatements: […]}`; who pinned older keys follows them with `RoamingNetworkKeyStatement.TryVerifyChain(…)` |
-| `GET ~/RNs/{id}/trustAnchor` | what an app pins: `{roamingNetworkId, identityKeyIds, minConsensus, uri, qrCode, trustAnchor}`, `identityKeyIds` per holder, `qrCode` the text of its QR code; its URLs the one of the request, then the other `urls` the roaming network names |
+| `GET ~/RNs/{id}/trustAnchor` | what an app pins: `{roamingNetworkId, identityKeyIds, minConsensus, uri, qrCode, trustAnchor}`, `identityKeyIds` per holder, `qrCode` the text of its QR code; its URLs the one of the request - or `{PublicURL}/RNs/{id}`, where whoever runs the API says where it is reached, `POI_API.PublicURL` - then the other `urls` the roaming network names |
 | `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/proof` | the proof of a charging station of the head, `?hashAlgorithm=` one of the network's |
 | `GET ~/RNs/{id}/CSOs/{CSO_Id}/CPs/{CP_Id}/CSs/{CS_Id}/EVSEs/{EVSE_Id}/proof` | the proof of the charging station of an EVSE |
 | `GET ~/RNs/{id}/CSs/{CS_Id}/proof`, `GET ~/RNs/{id}/EVSEs/{EVSE_Id}/proof` | the same, found by the identification alone |

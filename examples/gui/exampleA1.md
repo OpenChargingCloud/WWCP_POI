@@ -215,8 +215,10 @@ following `QA`, as a copy.
 ## What differs from example A1
 
 - **`QA` names no URLs of its copies.** In example A1 `QA` names `alpha.example`, `beta.example` and `gamma.example`
-  as its `urls`. A hub does not say where it is reached: the trust anchor names the URL it was asked at, and the URL
-  of a copy is taken into `QA` only where a hub joining says one over `https`, in *Where the copy of this hub is*.
+  as its `urls`. The hubs of this run did not say where they are reached: the trust anchor names the URL it was
+  asked at, and the URL of a copy is taken into `QA` only where a hub joining says one over `https`, in *Where the
+  copy of this hub is*. A hub whose configuration says it, `"poi": { "url": "https://beta.example/poi" }`, names it
+  by itself: in the roaming networks it makes, in every trust anchor it serves, and when it asks to hold keys.
 - **The identification of the operator** is `OCC` because the configuration of hub A says so; without it, it were
   `RNO-` and eight digits of its identity key.
 - **The revisions are the same**: 0, 1 and 2. Example A2 goes on from there, at hub A, where a party added waits for
@@ -229,18 +231,21 @@ following `QA`, as a copy.
 All of the above was decided by three people, each at its own hub: to ask, and to admit. The hubs did the rest, at
 once, told by the hub where `QA` is made. For three hubs to do all of it, two things are missing.
 
-**It is not configuration.** A configuration says who a hub is, once, at its first start. It does not say what the hub
-takes part in:
+**Not all of it is configuration.** A configuration says who a hub is, once, at its first start, and of what it takes
+part in what follows from the hub alone:
 
-- *Which roaming networks it follows*, with their trust anchors, and where: said by a person, kept beside the copy
-  from then on.
-- *Which of them it wants to hold keys of*, and under which name it is reached: said by a person, `join`.
+- *Which roaming networks it follows*, with their trust anchors, and where: `"poi": { "follow": [ { "trustAnchor":
+  "…" } ] }`, done at every start; or said by a person, as above.
+- *Which of them it wants to hold keys of*: `"hold": true` beside the trust anchor, asked once; or `join`.
+- *Where it is reached*: `"poi": { "url": "…" }`, as no hub knows its own public URL.
+
+So hub B and hub C of this example start from their configuration, and what is left to somebody is to admit them, at
+hub A and at hub B. Not in a configuration:
+
 - *Whom it admits*: a list of the holders an organization agreed to - their names, or their identity keys - by which
   `Admit` were pressed by the hub itself.
 - *Whether it signs the commits of the others*: a hub signs the commit of a change set it signed by itself, and every
   other commit when it is told, one by one.
-- *Where it is reached*: no hub knows its own public URL, so `QA` names no copies, and nobody following it learns of
-  the other two.
 
 **The hubs tell each other that something waits, and not more.** A commit is pushed: every hub following gets it over
 the WebSocket of the history at once, and connects again when that ended. What comes before a commit is told as a

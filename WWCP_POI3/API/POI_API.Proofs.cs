@@ -140,7 +140,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                   var host          = request.Host;
                                   var local         = host.Name is "localhost" or "127.0.0.1" or "[::1]" or "::1";
                                   var path          = request.Path.ToString();
-                                  var requested     = URL.Parse($"{(local ? "http" : "https")}://{host}{path[..path.LastIndexOf("/trustAnchor", StringComparison.Ordinal)]}");
+                                  var requested     = PublicURL.HasValue
+                                                          ? URL.Parse($"{PublicURL.Value.ToString().TrimEnd('/')}/RNs/{roamingNetwork.Id}")
+                                                          : URL.Parse($"{(local ? "http" : "https")}://{host}{path[..path.LastIndexOf("/trustAnchor", StringComparison.Ordinal)]}");
 
                                   // The roaming network as this request names it first, then where it names its other copies.
                                   var trustAnchor   = new RoamingNetworkTrustAnchor(roamingNetwork.Id,

@@ -207,6 +207,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public Func<HTTPRequest, String?>? HostAskedFor { get; set; }
 
         /// <summary>
+        /// Where this API is reached, "https://hub.example.org/poi", as whoever runs it says: no server knows its own
+        /// public URL. The trust anchor of a roaming network served here names ~/RNs/{RN_Id} below it first, whatever
+        /// URL it was asked at; null, and it names the one it was asked at.
+        /// </summary>
+        public URL? PublicURL { get; set; }
+
+        /// <summary>
         /// The maximum size of a commit pushed completely to the subscribers of "commits", as JSON text.
         /// A larger one is pushed there as a commitAnnouncement, and fetched by whoever wants it.
         /// </summary>
