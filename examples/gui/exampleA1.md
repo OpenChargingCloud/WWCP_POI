@@ -10,12 +10,13 @@ is also a command at the prompt and a request of the JSON API, named below each 
 | Revision | Who holds the keys of `OCC` | Quorum | Done at |
 |---|---|---|---|
 | 0, the genesis | `AlphaOrg` | 1 of 1 | hub A |
-| 1 | `AlphaOrg`, `BetaOrg` | 2 of 2 | hub B, hub A, hub B |
-| 2 | `AlphaOrg`, `BetaOrg`, `GammaOrg` | 2 of 3 | hub C, hub A, hub B, hub A, hub B, hub C |
+| 1 | `AlphaOrg`, `BetaOrg` | 2 of 2 | decided at hub B and at hub A |
+| 2 | `AlphaOrg`, `BetaOrg`, `GammaOrg` | 2 of 3 | decided at hub C, at hub A and at hub B |
 
-The messages below are what one run of three hubs on one machine answered, `…` for elided digests. Every step is done
-by a person, at the right hub, in the right order: [what is missing](#what-is-missing) for three hubs to do it from
-their configuration, and to tell each other what waits, is at the end.
+The messages below are what one run of three hubs on one machine answered, `…` for elided digests. Somebody decides
+once at each hub - to ask, to admit - and what follows from that the hubs do by themselves, each looking every
+minute at what waits. [What is missing](#what-is-missing) for three hubs to do it from their configuration, and to
+tell each other at once, is at the end.
 
 
 ## 1. Three hubs
@@ -78,7 +79,7 @@ At the prompt `roamingNetworks add QA Quality assurance`; `POST /api/v1/poi/RNs`
 
 ## 3. `BetaOrg` joins: two of two, revision 1
 
-Three steps, at hub B, at hub A, and at hub B again. None follows from the one before by itself.
+Three steps by somebody: hub B follows `QA` and asks, hub A admits it. The rest hub B does by itself.
 
 **Hub B follows `QA`.** **Points of interest**, the card **Roaming networks followed**: the trust anchor of step 2 in
 *Trust anchor*, **Follow the roaming network**. Hub B reads `QA` at hub A, checks it against the trust anchor, and
@@ -93,7 +94,7 @@ sends hub A its public identity key, the certificate of its signing key as a hol
 statement of both identity keys with a quorum of two, signed with its identity key: the proof that it holds it.
 
 ```
-This hub, 'BetaOrg', asked to hold the keys of the operator 'OCC' of the roaming network 'QA' as well, 2 of 2 deciding. It waits for those who hold them to admit it; 'roamingNetworks QA join' goes on then.
+This hub, 'BetaOrg', asked to hold the keys of the operator 'OCC' of the roaming network 'QA' as well, 2 of 2 deciding. It waits for those who hold them to admit it; this hub goes on by itself then, within 1 minute(s), or at once with 'roamingNetworks QA join'.
 ```
 
 **Hub A admits it.** On the page of `QA` at hub A, **Keys of the operator** now shows what waits, `BetaOrg` asking,
@@ -104,19 +105,20 @@ signs it with its identity key and its signing key, and lets it wait:
 The change set '488689df…' admitting 'BetaOrg' is made and signed by this hub. It waits for signatures: Change 0: UpdateProperty of the RoamingNetworkOperator 'OCC' ('identityKeys') needs a signature by the new identity key '8a777de4…' of the roaming network operator 'OCC', as the proof that it holds it!
 ```
 
-**Hub B signs it.** At hub B, **Ask to hold the keys** again. It makes the change set again from its own copy, sees
-that it is exactly the one waiting, signs it with its identity key and sends the signature to hub A, where it is
-committed:
+**Hub B signs it, by itself.** It asked, so nobody says it again: within a minute hub B looks at what waits at hub
+A, makes the change set again from its own copy, sees that it is exactly the one waiting, signs it with its identity
+key and sends the signature to hub A, where it is committed. Its log, 27 seconds later in this run:
 
 ```
-The change set '488689df…' admitting 'BetaOrg' is signed by this hub, and committed at 'http://127.0.0.1:2356/poi/RNs/QA'.
+By itself: The change set 'e46c35c9…' admitting 'BetaOrg' is signed by this hub, and committed at 'http://127.0.0.1:2356/poi/RNs/QA'.
 ```
 
-**Hub B signs the commit.** Revision 1 is signed by hub A, which made it. At hub B, **Sign its head commit**: with
-both signatures whoever checks `QA` takes it, as two decide now, and hub B attests that head from then on.
+**Hub B signs the commit, by itself.** Revision 1 is signed by hub A, which made it. Hub B signed its change set, so
+it signs its commit as well when it looks next, a minute later: with both signatures whoever checks `QA` takes it,
+as two decide now, and hub B attests that head from then on.
 
 ```
-The commit '2329853e…' of the roaming network 'QA', revision 1, is signed as 'BetaOrg', one of the holders of the keys of its operator, and the signature was taken at 'http://127.0.0.1:2356/poi/RNs/QA'.
+The commit '277bde98…' of the roaming network 'QA', revision 1, was signed as 'BetaOrg', one of the holders of the keys of its operator 'OCC'.
 ```
 
 | Step | At | At the prompt | Over HTTP, as somebody with `poi:edit` |
@@ -124,8 +126,11 @@ The commit '2329853e…' of the roaming network 'QA', revision 1, is signed as '
 | follow | hub B | `roamingNetworks follow <trust anchor>` | `POST /api/v1/poi/followed`, `{"trustAnchor": "…"}` |
 | ask | hub B | `roamingNetworks QA join` | `POST /api/v1/poi/shareholders/QA/join` |
 | admit | hub A | `roamingNetworks QA admit BetaOrg` | `POST /api/v1/poi/shareholders/QA/admit/BetaOrg` |
-| sign the change set | hub B | `roamingNetworks QA join` | `POST /api/v1/poi/shareholders/QA/join` |
-| sign the commit | hub B | `roamingNetworks QA sign` | `POST /api/v1/poi/followed/QA/signatures` |
+| sign the change set | hub B | by itself; at once with `roamingNetworks QA join` | `POST /api/v1/poi/shareholders/QA/join` |
+| sign the commit | hub B | by itself; at once with `roamingNetworks QA sign` | `POST /api/v1/poi/followed/QA/signatures` |
+
+Who does not want to wait for the minute presses **Ask to hold the keys** and **Sign its head commit** at hub B: they
+do the same at once.
 
 
 ## 4. `GammaOrg` joins: two of three, revision 2
@@ -147,18 +152,23 @@ http://127.0.0.1:2356/poi/RNs/QA?keys=24c14776…,8a777de4…&minConsensus=2
 | Step | At | In the web interface | What it answers |
 |---|---|---|---|
 | follow | hub C | **Follow the roaming network** | `The roaming network 'QA' is followed at '…', at revision 1, …` |
-| ask | hub C | **Ask to hold the keys** | `This hub, 'GammaOrg', asked to hold the keys … 2 of 3 deciding. It waits for those who hold them to admit it; …` |
-| the key statement | hub A | **Admit** | `The key statement admitting 'GammaOrg' is signed by this hub. It waits for the other holders: … Each signs it with 'roamingNetworks QA admit GammaOrg' at its hub.` |
-| the key statement | hub B | **Admit** | `The key statement admitting 'GammaOrg' is signed by this hub, and its signature was taken at '…'. Its change set is made there next.` |
-| the change set | hub A | **Admit** | `The change set '2a2ca4f3…' admitting 'GammaOrg' is made and signed by this hub. It waits for signatures: … needs signatures by identity keys of 2 holders … needs a signature by the new identity key '63dfb2da…' …` |
-| the change set | hub B | **Admit** | `The change set '2a2ca4f3…' admitting 'GammaOrg' is signed by this hub. It waits for signatures: … needs a signature by the new identity key '63dfb2da…' …` |
-| the change set | hub C | **Ask to hold the keys** | `The change set '2a2ca4f3…' admitting 'GammaOrg' is signed by this hub, and committed at '…'.` |
-| the commit | hub B, hub C | **Sign its head commit** | `The commit '4d21d32b…' of the roaming network 'QA', revision 2, is signed as 'BetaOrg', …` |
+| ask | hub C | **Ask to hold the keys** | `This hub, 'GammaOrg', asked to hold the keys … 2 of 3 deciding. It waits for those who hold them to admit it; this hub goes on by itself then, …` |
+| admit | hub A | **Admit** | `The key statement admitting 'GammaOrg' is signed by this hub. It waits for the other holders: … Each signs it with 'roamingNetworks QA admit GammaOrg' at its hub.` |
+| admit | hub B | **Admit** | `The key statement admitting 'GammaOrg' is signed by this hub, and its signature was taken at '…'. The change set '97691255…' admitting 'GammaOrg' is signed by this hub. It waits for signatures: … needs a signature by the new identity key '41ebe195…' …` |
+| its proof | hub C | by itself | its log: `By itself: The change set '97691255…' admitting 'GammaOrg' is signed by this hub, and committed at '…'.` |
+| the commit | hub B, hub C | by itself | their logs: `The commit '…' of the roaming network 'QA', revision 2, was signed as 'BetaOrg', …` |
 
-The key statement first, by every holder, and only then the change set of it, by every holder again: a key statement
-is content of the change set that enters it, so it is complete before that change set is made
-([section 4](../exampleA1.md#4-gammaorg-joins-two-of-three-revision-2) of example A1). `admit` at the prompt and over
-HTTP as in step 3, with `GammaOrg`.
+Three decisions: to ask, at hub C, and to admit, at hub A and at hub B. The key statement comes first, signed by
+every holder, and only then the change set of it: a key statement is content of the change set that enters it, so it
+is complete before that change set is made
+([section 4](../exampleA1.md#4-gammaorg-joins-two-of-three-revision-2) of example A1). With the signature of hub B the
+key statement is complete, so hub A makes the change set of it at once, which it signs, having signed the key
+statement; hub B signs it in the same step, for the same reason. Hub C added its proof 4 seconds later in this run,
+and both signed the commit within the minute after. `admit` at the prompt and over HTTP as in step 3, with
+`GammaOrg`.
+
+Hub C was given a first copy of `QA` because hub B had signed the head of revision 1: a first copy is anchored in
+the attestations of as many holders as decide, two by then.
 
 Afterwards all three say the same of `QA`. **Keys of the operator** at each, `roamingNetworks QA shareholders`,
 `GET /api/v1/poi/shareholders/QA`, here of hub C:
@@ -190,16 +200,15 @@ trust anchor follows the key statements to the keys of today
 
 Example A1 only tries it ([section 9](../exampleA1.md#9-if-gammaorg-left-again-two-of-two)). Between hubs it is done:
 two of three dismiss the third without it. It begins where `QA` is made, **Dismiss** in the row of `GammaOrg` at hub
-A, then **Agree** at hub B, each twice, the key statement first and then its change set:
+A, then **Agree** at hub B:
 
 | At | At the prompt | What it answers |
 |---|---|---|
 | hub A | `roamingNetworks QA dismiss GammaOrg` | `The key statement dismissing 'GammaOrg' is signed by this hub. It waits for the other holders: …` |
-| hub B | `roamingNetworks QA dismiss GammaOrg` | `The key statement dismissing 'GammaOrg' is signed by this hub, and its signature was taken at '…'. Its change set is made there next.` |
-| hub A | `roamingNetworks QA dismiss GammaOrg` | `The change set '4e2b0895…' dismissing 'GammaOrg' is made and signed by this hub. It waits for signatures: …` |
-| hub B | `roamingNetworks QA dismiss GammaOrg` | `The change set '4e2b0895…' dismissing 'GammaOrg' is signed by this hub, and committed at '…'.` |
+| hub B | `roamingNetworks QA dismiss GammaOrg` | `The key statement dismissing 'GammaOrg' is signed by this hub, and its signature was taken at '…'. The change set '3162cc4b…' dismissing 'GammaOrg' is signed by this hub, and committed at '…'.` |
 
-Revision 3: `AlphaOrg` and `BetaOrg`, two of two. Hub C goes on following `QA`, as a copy.
+Revision 3: `AlphaOrg` and `BetaOrg`, two of two; hub B signs its commit by itself, within a minute. Hub C goes on
+following `QA`, as a copy.
 
 
 ## What differs from example A1
@@ -216,8 +225,9 @@ Revision 3: `AlphaOrg` and `BetaOrg`, two of two. Hub C goes on following `QA`, 
 
 ## What is missing
 
-All of the above was done by three people, each at its own hub, telling each other what to do next. For three hubs to
-do it by themselves two things are missing.
+All of the above was decided by three people, each at its own hub: to ask, and to admit. The hubs did the rest, each
+looking every minute at what waits where `QA` is made. For three hubs to do all of it, and at once, two things are
+missing.
 
 **It is not configuration.** A configuration says who a hub is, once, at its first start. It does not say what the hub
 takes part in:
@@ -227,7 +237,8 @@ takes part in:
 - *Which of them it wants to hold keys of*, and under which name it is reached: said by a person, `join`.
 - *Whom it admits*: a list of the holders an organization agreed to - their names, or their identity keys - by which
   `Admit` were pressed by the hub itself.
-- *Whether it signs the commits of the others*, which every holder is told one by one today.
+- *Whether it signs the commits of the others*: a hub signs the commit of a change set it signed by itself, and every
+  other commit when it is told, one by one.
 - *Where it is reached*: no hub knows its own public URL, so `QA` names no copies, and nobody following it learns of
   the other two.
 
@@ -235,21 +246,18 @@ takes part in:
 the history at once, and connects again when that ended. Everything before a commit is not:
 
 - *A request, a key statement and a change set waiting* are kept at the hub where `QA` is made, and shown to whoever
-  asks, `GET /api/v1/poi/shareholders/QA` and `…/pending`. No hub is told, and none asks by itself: a page shows
-  what was there when it was opened, and somebody at hub B learns from somebody at hub A that there is something to
-  admit.
-- *Nothing goes on by itself.* After the last holder signed a key statement, the hub where `QA` is made is asked
-  again to make its change set; after the holders signed that, the hub joining is asked again to sign it; after a
-  commit, each other holder is asked to sign it. Each of these is a step a hub could do when it sees that it is its
-  turn - by being told over the WebSocket it has open anyway, or by asking every few seconds.
-- *What waits is forgotten at a restart* of the hub where `QA` is made, unless its change set was made already.
+  asks, `GET /api/v1/poi/shareholders/QA` and `…/pending`. No hub is told. Each asks every minute, and does then
+  what follows from what was decided at it: so the proof of a hub admitted and the signatures of a commit take up to
+  a minute each, and a page shows what was there when it was opened.
+- *What is to be decided is said in the log only*: that `GammaOrg` asks, and waits for somebody at hub B, somebody at
+  hub B learns from its log, from the page of `QA` when it is opened, or from somebody at hub A.
 - *Everything goes through one hub.* The others follow the hub where `QA` is made, and send their signatures there;
   while it is not reached, nothing is decided, and no copy takes its place.
-- *A new head is attested by one holder only* until the others signed its commit: until then a hub following anew
-  gets no first copy.
+- *A new head is attested by one holder only* until the others signed its commit, by themselves within a minute or
+  when told: until then a hub following anew gets no first copy.
 
-So the order of the steps above is not a rule of the roaming network, which takes signatures in any order, but what
-people have to keep to while the hubs do not do it. What a hub may do by itself is a decision of its own:
+What a hub may do by itself is a decision of its own:
 [SHAREHOLDERS.md](https://github.com/OpenChargingCloud/RoamingHub/blob/master/SHAREHOLDERS.md) of the hub decided
-that it signs nothing for another by itself, and a configuration naming whom to admit and what to sign would be how
-an organization says otherwise, once, instead of every time.
+that it signs nothing for another by itself, and that what follows from a decision made at it is none - its phase 6,
+with the notices between the hubs and the configuration as they are designed. A configuration naming whom to admit
+and what to sign would be how an organization says otherwise, once, instead of every time.
