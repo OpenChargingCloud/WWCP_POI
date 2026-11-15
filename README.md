@@ -940,7 +940,8 @@ JSON in text frames, CBOR in binary frames; every request is answered in its own
 - **Subscriptions:** `topics` lists them, `subscribe`/`unsubscribe {topics: […]}` change them:
   `commitAnnouncements`, `commits` (complete; above `MaxPushedCommitSize` only announced),
   `commitSignatures` (`{commitId, signatures}` added later), `checkpoints`, `checkpointSignatures`, `attestations`, `adminStatusUpdates`,
-  `statusUpdates`, `energyStatusUpdates`, `priceStatusUpdates`, `priceStatements`, `pendingChangeSets`. Pushes are sends, `[6, "p1", action, payload]`,
+  `statusUpdates`, `energyStatusUpdates`, `priceStatusUpdates`, `priceStatements`, `pendingChangeSets`, and those whoever runs the API added to the WebSocket of
+  every history (`POI_API.AddHistoryTopic`, pushed with `PushToHistorySubscribers`). Pushes are sends, `[6, "p1", action, payload]`,
   in the format of the last `subscribe`. They end with the connection; a client that falls more than
   `MaxQueuedPushes` pushes or `MaxQueuedPushBytes` behind is disconnected and catches up after reconnecting.
 - **Async:** requests are processed concurrently, up to `MaxConcurrentRequests` per connection;
@@ -1039,6 +1040,9 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
   (`JoinFromCheckpoint`); without a verifier or such a checkpoint, from the head, and its line with the first checkpoint of a commit it holds. A witness running a peer signs with `history.TryWitness(…, witness, …)`, its journal outliving every history the peer starts anew; the signature goes to the other server.
 - **Attestations:** with `VerifyAttestation`, a verifier of the keys of the roaming network operator, it takes the
   attestations of the other server, so that it serves proofs of charging stations with them as well.
+- **Further topics:** it subscribes to the topics `FurtherTopics` names as well, e.g. `pendingChangeSets`, each alone,
+  so that one the other server does not know is left out (`OnError` says so, once). What is pushed of them it does not
+  take itself: `OnNotice` tells its action and payload, verified by nobody, between the pushes it takes.
 - **Price statements:** after the commits, it takes the price statements of the other server and pushes those taken
   here it misses, then every new one (`FollowPriceStatements`, `PushPriceStatements`), e.g. from a server of a charging
   station operator to the one of the roaming network operator; the price statements of a checkpoint come with it.

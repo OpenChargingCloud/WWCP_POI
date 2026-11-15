@@ -41,6 +41,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                                       RoamingNetworkHistory   History);
 
     /// <summary>
+    /// The other server pushed something of a topic the peer does not take itself, one of
+    /// <see cref="RoamingNetworkPeerOptions.FurtherTopics"/>: a notice. Called between the pushes it takes, in their
+    /// order: return quickly.
+    /// </summary>
+    /// <param name="Follower">The peer.</param>
+    /// <param name="Action">The action of the push, e.g. "pendingChangeSet".</param>
+    /// <param name="Payload">Its payload, verified by nobody.</param>
+    public delegate void OnRoamingNetworkPeerNoticeDelegate(RoamingNetworkPeer  Follower,
+                                                            String              Action,
+                                                            JObject             Payload);
+
+    /// <summary>
     /// The peer started its history from a snapshot of the other server: at first, anew as its caller asked for, in the
     /// next epoch, or because the other server knew none of its commits and the new history follows them.
     /// </summary>
@@ -126,6 +138,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
         }
 
         private readonly RoamingNetworkPeerOptions  options;
+        private readonly HashSet<String>            furtherTopicsRefused   = new (StringComparer.Ordinal);
         private readonly TaskCompletionSource           firstSynchronization  = new (TaskCreationOptions.RunContinuationsAsynchronously);
         private          RoamingNetworkHistory?         history;
         private          Connection?                    connection;
@@ -206,6 +219,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// Something went wrong; the follower connects again.
         /// </summary>
         public event OnRoamingNetworkPeerErrorDelegate?            OnError;
+
+        /// <summary>
+        /// The other server pushed something of one of the further topics, which the follower does not take itself.
+        /// </summary>
+        public event OnRoamingNetworkPeerNoticeDelegate?           OnNotice;
 
         #endregion
 
@@ -666,6 +684,22 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
             await Expect(Connection, "subscribe", new JObject(new JProperty(POIWebSocketServer.PropertyKeys.Topics, topics)), CancellationToken);
 
+            // Each alone: the other server may not know one of them, which is no reason not to follow it.
+            foreach (var furtherTopic in options.FurtherTopics ?? [])
+            {
+
+                var subscribed = await Connection.RequestAsync("subscribe",
+                                                               new JObject(new JProperty(POIWebSocketServer.PropertyKeys.Topics, new JArray(furtherTopic))),
+                                                               CancellationToken);
+
+                if (subscribed.IsError && !furtherTopicsRefused.Contains(furtherTopic))
+                {
+                    furtherTopicsRefused.Add(furtherTopic);
+                    RaiseError($"The other server does not let subscribe to the topic '{furtherTopic}': it is followed without it.", null);
+                }
+
+            }
+
             statusFromSnapshot = false;
 
             if (History is null)
@@ -777,6 +811,18 @@ namespace cloud.charging.open.protocols.WWCP.POI
                         case "energyStatusUpdate":
                         case "priceStatusUpdate":
                             TakeStatusUpdate(payload);
+                            break;
+
+                        // Of a further topic: a notice for whoever asked for it.
+                        default:
+                            try
+                            {
+                                OnNotice?.Invoke(this, push.Action, payload);
+                            }
+                            catch (Exception e)
+                            {
+                                RaiseError($"A push '{push.Action}' of the other server could not be taken: {e.Message}", e);
+                            }
                             break;
 
                     }

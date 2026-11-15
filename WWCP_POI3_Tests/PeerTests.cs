@@ -286,6 +286,69 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.Sync
 
         #endregion
 
+        #region A_follower_is_told_what_is_pushed_of_further_topics()
+
+        /// <summary>
+        /// Whoever runs the API adds a topic to the WebSocket of every history; a follower asking for it is told what
+        /// is pushed of it, which it does not take itself. A topic the other server does not know is left out, and
+        /// the follower follows nevertheless.
+        /// </summary>
+        [Test]
+        public async Task A_follower_is_told_what_is_pushed_of_further_topics()
+        {
+
+            poiAPI!.AddHistoryTopic(new POIWebSocketTopic("notices", "notice", "Something waits."));
+
+            var notices  = new System.Collections.Concurrent.ConcurrentQueue<(String Action, JObject Payload)>();
+            var errors   = new System.Collections.Concurrent.ConcurrentQueue<String>();
+
+            follower     = new RoamingNetworkPeer(new Uri($"ws://127.0.0.1:{httpServer!.TCPPort}/RNs/rn1/history/ws"),
+                                                  null,
+                                                  new RoamingNetworkPeerOptions {
+                                                      TrustAnchor        = TrustAnchor,
+                                                      FurtherTopics      = [ "notices", "unknownHere" ],
+                                                      MinReconnectDelay  = TimeSpan.FromMilliseconds(50),
+                                                      MaxReconnectDelay  = TimeSpan.FromMilliseconds(200)
+                                                  });
+
+            follower.OnNotice += (_, action, payload)     => notices.Enqueue((action, payload));
+            follower.OnError  += (_, description, _)      => errors. Enqueue(description);
+
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+            await follower.StartAsync(timeout.Token);
+
+            var queuedFor  = poiAPI.PushToHistorySubscribers(leader!.RoamingNetworkId, "notices",     new JObject(new JProperty("holder", "Gamma")));
+            var noTopic    = poiAPI.PushToHistorySubscribers(leader. RoamingNetworkId, "unknownHere", []);
+            var noHistory  = poiAPI.PushToHistorySubscribers(RoamingNetwork_Id.Parse("other"), "notices", []);
+
+            var told       = await Eventually(() => !notices.IsEmpty);
+
+            Publish("v1");
+
+            var follows    = await Eventually(InSync);
+
+            using (Assert.EnterMultipleScope())
+            {
+
+                Assert.That(queuedFor,                                   Is.EqualTo(1));
+                Assert.That(noTopic,                                     Is.Zero);
+                Assert.That(noHistory,                                   Is.Zero);
+
+                Assert.That(told,                                        Is.True, "The follower was not told.");
+                Assert.That(notices.Count,                               Is.EqualTo(1));
+                Assert.That(notices.First().Action,                      Is.EqualTo("notice"));
+                Assert.That(notices.First().Payload["holder"]?.Value<String>(),  Is.EqualTo("Gamma"));
+
+                Assert.That(errors.Count(error => error.Contains("'unknownHere'")),  Is.EqualTo(1), String.Join(" ", errors));
+                Assert.That(follows,                                     Is.True, "The follower does not follow.");
+
+            }
+
+        }
+
+        #endregion
+
         #region A_follower_starts_from_a_snapshot_and_follows()
 
         [Test]

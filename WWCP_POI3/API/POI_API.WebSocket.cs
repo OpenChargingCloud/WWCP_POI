@@ -140,6 +140,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
 
         private readonly ConcurrentDictionary<RoamingNetwork_Id, POIWebSocketServer>  historyWebSocketServers  = [];
         private readonly ConcurrentDictionary<RoamingNetwork_Id, Action>              historyDisconnects       = [];
+        private readonly ConcurrentDictionary<String, POIWebSocketTopic>              furtherHistoryTopics     = [];
 
         private AuthenticatePOIWebSocketClientDelegate? authenticateWebSocketClient;
 
@@ -225,6 +226,60 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                     [NotNullWhen(true)] out POIWebSocketServer?  WebSocketServer)
 
             => historyWebSocketServers.TryGetValue(RoamingNetworkId, out WebSocketServer);
+
+        #endregion
+
+        #region AddHistoryTopic(Topic)
+
+        /// <summary>
+        /// Let the clients of the WebSocket server of every history served, now or later, subscribe to the given topic
+        /// as well: one of whoever runs this API, e.g. a notice of something that waits beside a history, pushed with
+        /// <see cref="PushToHistorySubscribers"/>.
+        /// </summary>
+        /// <param name="Topic">A topic.</param>
+        public void AddHistoryTopic(POIWebSocketTopic Topic)
+        {
+
+            if (Topic.Name.IsNullOrEmpty() || Topic.Action.IsNullOrEmpty())
+                throw new ArgumentException("A topic needs a name and an action!", nameof(Topic));
+
+            furtherHistoryTopics[Topic.Name] = Topic;
+
+            foreach (var webSocketServer in historyWebSocketServers.Values)
+                webSocketServer.AddTopic(Topic);
+
+        }
+
+        #endregion
+
+        #region PushToHistorySubscribers(RoamingNetworkId, TopicName, Payload)
+
+        /// <summary>
+        /// Queue the given payload for every connection of the history of the given roaming network subscribed to the
+        /// given topic, without waiting.
+        /// </summary>
+        /// <param name="RoamingNetworkId">The identification of a roaming network.</param>
+        /// <param name="TopicName">The name of a topic of its WebSocket server.</param>
+        /// <param name="Payload">The payload of the push.</param>
+        /// <returns>The number of connections it was queued for: none where no such history is served, or it has no such topic.</returns>
+        public Int32 PushToHistorySubscribers(RoamingNetwork_Id  RoamingNetworkId,
+                                              String             TopicName,
+                                              JObject            Payload)
+        {
+
+            if (!historyWebSocketServers.TryGetValue(RoamingNetworkId, out var webSocketServer))
+                return 0;
+
+            try
+            {
+                return webSocketServer.Push(TopicName, Payload);
+            }
+            catch (ArgumentException)
+            {
+                return 0;
+            }
+
+        }
 
         #endregion
 
@@ -537,6 +592,10 @@ namespace cloud.charging.open.protocols.WWCP.POI
             webSocketServer.AddTopic(new POIWebSocketTopic(PriceStatusUpdatesTopic,
                                                            "priceStatusUpdate",
                                                            "Every change of the price status of charging pools, charging stations and EVSEs: the new prices of charging tariffs."));
+
+            // Those of whoever runs this API.
+            foreach (var topic in furtherHistoryTopics.Values)
+                webSocketServer.AddTopic(topic);
 
             #endregion
 

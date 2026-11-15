@@ -200,6 +200,13 @@ namespace cloud.charging.open.protocols.WWCP.POI
         /// </summary>
         public RoamingNetworkChangeSetLimits?      ChangeSetLimits             { get; init; }
 
+        /// <summary>
+        /// Further topics of the other server to subscribe to, e.g. <see cref="POI_API.PendingChangeSetsTopic"/>: what
+        /// it pushes of them is not taken by the peer, but told, <see cref="RoamingNetworkPeer.OnNotice"/>. A topic the
+        /// other server does not know is left out.
+        /// </summary>
+        public IReadOnlyCollection<String>?        FurtherTopics               { get; init; }
+
     }
 
 }
