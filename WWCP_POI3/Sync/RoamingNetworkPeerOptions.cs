@@ -86,6 +86,17 @@ namespace cloud.charging.open.protocols.WWCP.POI
         public RoamingNetworkTrustAnchor?          TrustAnchor                 { get; init; }
 
         /// <summary>
+        /// Given the key statements of the operator of the roaming network as the other server gives them, the oldest
+        /// first, the trust anchor they lead to from the one trusted so far, or null where they lead nowhere
+        /// (SPECIFICATION.md, section 8.6, succession over several statements; RoamingNetworkFollowerTrust.FollowChain).
+        /// Asked before the peer starts a history from the other server: the holders of the keys of an operator change
+        /// over time, and a trust anchor from before such a change is led to the keys of today by the key statements in
+        /// between, each signed by the quorum before it. The trust anchor given is the one a history is anchored in
+        /// from then on. Without it, only the TrustAnchor counts: one older than the keys of the head is refused.
+        /// </summary>
+        public Func<IReadOnlyList<RoamingNetworkKeyStatement>, RoamingNetworkTrustAnchor?>?  FollowKeyStatements  { get; init; }
+
+        /// <summary>
         /// The number of commits asked for at once while catching up.
         /// </summary>
         public Int32                               MaxCommitsPerRequest        { get; init; } = RoamingNetworkHistory.DefaultMaxCommits;

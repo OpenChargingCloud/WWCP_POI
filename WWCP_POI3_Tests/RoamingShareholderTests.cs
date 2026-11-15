@@ -482,6 +482,27 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests
                 Assert.That(holderOf!.Values.Distinct(),         Is.EquivalentTo([ "Alpha", "Beta" ]));
             }
 
+            // So does a server following by that trust anchor, before it takes a first copy: led to the two, once.
+            var trust     = new RoamingNetworkFollowerTrust(new RoamingNetworkTrustAnchor(both.Id, both.URLs, [ alpha.IdentityPublicKey.Id ]));
+            var led       = trust.FollowChain(history.KeyStatements());
+            var ledAgain  = trust.FollowChain(history.KeyStatements());
+
+            // Keys nobody of them ever held lead nowhere.
+            var delta     = Shareholder("Delta");
+            var nowhere   = new RoamingNetworkFollowerTrust(new RoamingNetworkTrustAnchor(both.Id, both.URLs, [ delta.IdentityPublicKey.Id ]));
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(led,                                              Is.True);
+                Assert.That(ledAgain,                                         Is.False, "the keys trusted already");
+                Assert.That(trust.TrustAnchor.Holders.Count,                  Is.EqualTo(2));
+                Assert.That(trust.TrustAnchor.MinConsensus,                   Is.EqualTo(2));
+                Assert.That(trust.TrustAnchor.Keys,                           Is.EquivalentTo([ alpha.IdentityPublicKey.Id, beta.IdentityPublicKey.Id ]));
+                Assert.That(nowhere.FollowChain(history.KeyStatements()),     Is.False);
+                Assert.That(nowhere.TrustAnchor.Keys,                         Is.EqualTo([ delta.IdentityPublicKey.Id ]));
+                Assert.That(trust.FollowChain([]),                            Is.False);
+            }
+
         }
 
         #endregion

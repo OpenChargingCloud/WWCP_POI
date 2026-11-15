@@ -1013,7 +1013,10 @@ peer.History.Commit(current.CreateChangeSet([      // committed here, pushed to 
   a `RoamingNetworkFollowerTrust` of the trust anchor gives all three, taking a signature in the role of the roaming
   network operator by a signing key its version certifies, by an identity key the trust anchor leads to, and follows
   the trust anchor through the versions checked (`Follow(version)`), a key statement after the other, as a holder joins
-  or leaves. A server serving the copy replaces or removes it with `POI_API.ReplaceRoamingNetworkHistory(…)` and
+  or leaves. A trust anchor from before the holders changed is led on before the first copy: with
+  `FollowKeyStatements = statements => { trust.FollowChain(statements); return trust.TrustAnchor; }` the peer asks
+  the other server for its key statements and anchors the history in the trust anchor they lead to; without it, a
+  trust anchor older than the keys of the head is refused. A server serving the copy replaces or removes it with `POI_API.ReplaceRoamingNetworkHistory(…)` and
   `RemoveRoamingNetworkHistory(…)`.
 - **Attestations of another holder:** where several holders decide, a head is attested by as many of them
   ([SPECIFICATION.md](SPECIFICATION.md), section 8.5). A server holding keys of the operator sends the attestations it

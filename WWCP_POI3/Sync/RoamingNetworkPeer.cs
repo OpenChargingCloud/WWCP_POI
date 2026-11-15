@@ -147,6 +147,9 @@ namespace cloud.charging.open.protocols.WWCP.POI
         private          Int64                          reconnects;
         private          Boolean                        statusFromSnapshot;
 
+        // The trust anchor as far as the key statements of the other server led it on (FollowKeyStatementsAsync).
+        private          RoamingNetworkTrustAnchor?     followedTrustAnchor;
+
         // A reset asked for by the caller, until the history is replaced; and the wait before connecting again, cut short by it.
         private          TaskCompletionSource?          reset;
         private          CancellationTokenSource?       waiting;
@@ -1106,8 +1109,11 @@ namespace cloud.charging.open.protocols.WWCP.POI
             var currentHistory  = Reason == Replacement.Start ? null : History;
 
             // Fail closed: no history of the other server without the trust anchor of the roaming network.
-            if (options.TrustAnchor is not RoamingNetworkTrustAnchor trustAnchor)
+            if ((followedTrustAnchor ?? options.TrustAnchor) is not RoamingNetworkTrustAnchor trustAnchor)
                 throw Refused(currentHistory, "Without the trust anchor of the roaming network (RoamingNetworkPeerOptions.TrustAnchor) the peer starts no history from the other server!");
+
+            // The keys of its operator may be others by now than the trust anchor names: led there by its key statements.
+            trustAnchor = await FollowKeyStatementsAsync(Connection, trustAnchor, CancellationToken);
 
             var (newHistory, checkpoint)  = await TryJoinFromCheckpointAsync(Connection, trustAnchor, CancellationToken);
             var statusSnapshot            = false;
@@ -1192,6 +1198,60 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 if (Reason is Replacement.Start or Replacement.Reset)
                     Interlocked.Exchange(ref reset, null)?.TrySetResult();
             }
+
+        }
+
+        #endregion
+
+        #region (private) FollowKeyStatementsAsync(Connection, TrustAnchor, CancellationToken)
+
+        /// <summary>
+        /// The trust anchor the key statements of the other server lead to from the given one, where the options say
+        /// how they are followed (RoamingNetworkPeerOptions.FollowKeyStatements); the given one otherwise, also where
+        /// the other server gives none or they lead nowhere: what is anchored in it then is taken or refused as before.
+        /// </summary>
+        private async Task<RoamingNetworkTrustAnchor> FollowKeyStatementsAsync(Connection                 Connection,
+                                                                               RoamingNetworkTrustAnchor  TrustAnchor,
+                                                                               CancellationToken          CancellationToken)
+        {
+
+            if (options.FollowKeyStatements is null)
+                return TrustAnchor;
+
+            JObject answer;
+
+            try
+            {
+                answer = await Expect(Connection, "keyStatements", [], CancellationToken);
+            }
+            catch (POIWebSocketRequestException)
+            {
+                // A server that does not give them.
+                return TrustAnchor;
+            }
+
+            var statements = new List<RoamingNetworkKeyStatement>();
+
+            foreach (var json in (answer[POI_API.PropertyKeys.KeyStatements] as JArray)?.OfType<JObject>() ?? [])
+            {
+
+                // One that can not be read ends what leads on from the ones before it.
+                if (!RoamingNetworkKeyStatement.TryParse(json, out var statement, out _))
+                    return TrustAnchor;
+
+                statements.Add(statement);
+
+            }
+
+            if (statements.Count == 0)
+                return TrustAnchor;
+
+            if (options.FollowKeyStatements(statements) is not RoamingNetworkTrustAnchor followed || followed.Id != TrustAnchor.Id)
+                return TrustAnchor;
+
+            followedTrustAnchor = followed;
+
+            return followed;
 
         }
 

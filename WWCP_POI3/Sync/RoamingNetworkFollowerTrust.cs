@@ -49,6 +49,12 @@ namespace cloud.charging.open.protocols.WWCP.POI
     /// it requires, and by its own quorum - so a holder joins, and one leaves. A version whose key statement the
     /// trusted keys did not sign, e.g. after an identity key was replaced at once, leads nowhere: its signatures are
     /// not taken, and whoever follows needs the new trust anchor.
+    /// <para>
+    /// A trust anchor from before the holders changed is led on by the key statements in between, as a server gives
+    /// them (GET ~/RNs/{RN_Id}/keyStatements): FollowChain(KeyStatements) takes the last of them where each is signed
+    /// by the quorum of the one before it, from one the trust anchor takes on. So a server following anew, by a trust
+    /// anchor handed out some time ago, is not refused the first copy.
+    /// </para>
     /// </remarks>
     public sealed class RoamingNetworkFollowerTrust
     {
@@ -187,6 +193,68 @@ namespace cloud.charging.open.protocols.WWCP.POI
                                                              out _,
                                                              TrustAnchor.MinConsensus,
                                                              OtherIdentityKeys: networkOperator.IdentityKeys);
+
+        }
+
+        #endregion
+
+        #region FollowChain(KeyStatements)
+
+        /// <summary>
+        /// Take the keys the last of the given key statements states as the ones trusted from now on, where they lead
+        /// there from the ones trusted so far (RoamingNetworkKeyStatement.TryVerifyChain; SPECIFICATION.md, section
+        /// 8.6, succession over several statements): those before the first one the trust anchor takes are passed
+        /// over, and every one after it is signed by the quorum of the one before it and by its own. Nothing changes
+        /// where they lead nowhere, or to the keys trusted already.
+        /// </summary>
+        /// <param name="KeyStatements">The key statements of the operator of the roaming network, the oldest first, as a server gives them.</param>
+        /// <returns>Whether the trust anchor changed.</returns>
+        public Boolean FollowChain(IEnumerable<RoamingNetworkKeyStatement> KeyStatements)
+        {
+
+            RoamingNetworkTrustAnchor followed;
+
+            lock (trustLock)
+            {
+
+                var statements = KeyStatements.ToList();
+
+                if (statements.Count == 0 || statements.Any(statement => statement.RoamingNetworkId != trustAnchor.Id))
+                    return false;
+
+                // From the one followed last, where the given ones begin after it.
+                if (keyStatement is not null && !statements.Any(statement => statement.SignedAt == keyStatement.SignedAt))
+                    statements.Insert(0, keyStatement);
+
+                if (!RoamingNetworkKeyStatement.TryVerifyChain(statements,
+                                                               trustAnchor.Holders,
+                                                               out var verified,
+                                                               out _,
+                                                               out _,
+                                                               trustAnchor.MinConsensus))
+                {
+                    return false;
+                }
+
+                keyStatement  = verified;
+
+                followed      = new RoamingNetworkTrustAnchor(trustAnchor.Id,
+                                                              trustAnchor.URLs,
+                                                              verified.Holders,
+                                                              verified.MinConsensus,
+                                                              trustAnchor.Name,
+                                                              trustAnchor.Description);
+
+                if (followed.ToQRCode() == trustAnchor.ToQRCode())
+                    return false;
+
+                trustAnchor   = followed;
+
+            }
+
+            OnFollowed?.Invoke(this, followed);
+
+            return true;
 
         }
 
