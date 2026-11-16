@@ -224,6 +224,39 @@ namespace cloud.charging.open.protocols.WWCP.POI.tests.History
 
         #endregion
 
+        #region The_same_change_set_committed_at_two_servers_is_one_change()
+
+        [Test]
+        public void The_same_change_set_committed_at_two_servers_is_one_change()
+        {
+
+            var (server1, server2) = Servers();
+
+            var head       = server1.Head.RoamingNetwork;
+            var changeSet  = head.CreateSignedChangeSet([ RoamingNetworkChange.UpdateProperty(EVSE(head), "maxPower", null, 11000) ], CreatedAt: T0.AddMinutes(1));
+
+            // Each gets the last signature it lacked at the same time, and commits.
+            var at1        = server1.Commit(changeSet);
+            var at2        = server2.Commit(changeSet);
+
+            Exchange(server1, server2);
+            Exchange(server2, server1);
+
+            using (Assert.EnterMultipleScope())
+            {
+                Assert.That(at1.IsCommitted,                              Is.True, at1.ErrorResponse);
+                Assert.That(at2.IsCommitted,                              Is.True, at2.ErrorResponse);
+                Assert.That(server1.Head.Commit.Id,                       Is.EqualTo(server2.Head.Commit.Id), "both are at the same head");
+                Assert.That(server1.Conflicts,                            Is.Empty,                           "the same change is no conflict");
+                Assert.That(server1.Tips,                                 Has.Count.EqualTo(1));
+                Assert.That(EVSE(server1.Head.RoamingNetwork).MaxPower?.Value,  Is.EqualTo(11000m));
+                TestContext.Out.WriteLine($"the same commit: {at1.Commit!.Id == at2.Commit!.Id}, a merge: {server1.Head.Commit.IsMerge}, {server1.Count} commits");
+            }
+
+        }
+
+        #endregion
+
         #region Concurrent_commits_merge_to_the_same_commit_everywhere()
 
         [Test]
