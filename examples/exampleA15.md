@@ -14,7 +14,7 @@ knows the merchant every offer must come from. Nothing here pays: offers, paymen
 |---|---|---|
 | 0 to 8 | see [example A11](exampleA11.md) to [example A14](exampleA14.md) | |
 | 9 | `DE*GEF`, its `party` key | a new signing key of `DE*GEF` that may sign `payments` |
-| 10 | `DE*GEF`, its `payments` key | its merchant at `https://taler.gef.example/instances/de-gef/`, accepting an exchange in euros and one in Swiss francs |
+| 10 | `DE*GEF`, its `payments` key | its merchant at `https://taler.gef.example/instances/de-gef/`, accepting an exchange in euros and one in Swiss francs, asked for offers at `https://poi.gef.example/RNs/QA/`; its web payment page `https://pay.gef.example/`, and the one of Jena Paradies |
 | 11 | `DE*GEF`, its `infrastructure` key | Jena Paradies, `DE*GEF*P1`: the payment option `EVTaler` and the authentication mode `SecureDynamicQRCode` |
 
 The code is [exampleA15.cs](csharp/exampleA15.cs), called by [Program.cs](csharp/Program.cs) with what example A11 left:
@@ -48,19 +48,29 @@ var addKey      = history.Head.RoamingNetwork.CreateChangeSet(
 ```
 
 
-## 2. DE*GEF names its merchant and the exchanges it accepts
+## 2. DE*GEF names its merchant and the exchanges it accepts, where it is asked for offers, and its web payment pages
 
 Its instance at a hosted merchant backend, by its base URL and its public key as GNU Taler writes it, and two exchanges,
 each by its master public key, base URL, currency and name. The key of the exchange in euros is the master public key of
 `exchange.demo.taler.net`; the others are made for the example. Signed by its key for the party, the change is refused.
+With it the merchant names where an app asks it for offers, `offersURL`: the POI_API base of the roaming network at its
+own server, an app posts to its `EVSEs/{EVSE_Id}/evTaler/sessions`.
+
+The same change set names where a driver pays ad hoc without EV Taler: the web payment page of `DE*GEF`,
+`webPaymentURL`, and the one of Jena Paradies, which comes before it for the stations there
+([Web payment page](../docs/ChargingStationOperator.md#web-payment-page)). Each of them redirects payments as the
+merchant does, and is signed by the key for `payments` as well.
 
 ```csharp
 var merchant = new EVTalerMerchant(URL.Parse("https://taler.gef.example/instances/de-gef/"),
                                    MerchantKey,
                                    [ new EVTalerExchange(EURExchangeKey, URL.Parse("https://exchange.example.eu/"), Currency.EUR, ImmutableI18NString.Create(Languages.en, "Example Exchange")),
-                                     new EVTalerExchange(CHFExchangeKey, URL.Parse("https://exchange.example.ch/"), Currency.CHF, ImmutableI18NString.Create(Languages.en, "Example Franc Exchange")) ]);
+                                     new EVTalerExchange(CHFExchangeKey, URL.Parse("https://exchange.example.ch/"), Currency.CHF, ImmutableI18NString.Create(Languages.en, "Example Franc Exchange")) ],
+                                   URL.Parse("https://poi.gef.example/RNs/QA/"));
 
-RoamingNetworkChange.UpdateProperty(gef, ChargingStationOperator.PropertyKeys.EVTaler, null, merchant.ToJSON(Embedded: true))
+RoamingNetworkChange.UpdateProperty(gef,          ChargingStationOperator.PropertyKeys.EVTaler,       null, merchant.ToJSON(Embedded: true)),
+RoamingNetworkChange.UpdateProperty(gef,          ChargingStationOperator.PropertyKeys.WebPaymentURL, null, "https://pay.gef.example/"),
+RoamingNetworkChange.UpdateProperty(jenaParadies, ChargingPool.PropertyKeys.WebPaymentURL,            null, "https://pay.gef.example/pools/P1")
 ```
 
 ```json
@@ -72,8 +82,10 @@ RoamingNetworkChange.UpdateProperty(gef, ChargingStationOperator.PropertyKeys.EV
       "currency": "EUR", "name": { "en": "Example Exchange" } },
     { "masterPublicKey": "YJ7H5JVNVM5SG5FAE3BGQ35AEPHXBH27MWNRPFQ0SVW9BH0BN9B0", "baseURL": "https://exchange.example.ch/",
       "currency": "CHF", "name": { "en": "Example Franc Exchange" } }
-  ]
-}
+  ],
+  "offersURL": "https://poi.gef.example/RNs/QA/"
+},
+"webPaymentURL": "https://pay.gef.example/"
 ```
 
 
@@ -110,12 +122,14 @@ properties, the merchant among them, the pool and the tariffs of the EVSE.
 The app checks the proof against the trust anchor of epoch 2, reads the merchant from it, finds the EV Taler tariff of
 the EVSE, its ad hoc tariff or else the one without a type, and shows the exchanges in its currency. It knows what every
 offer for the EVSE must name: the merchant base URL in its `taler://pay` URI, and `merchant_pub` in its contract terms.
+It reads where it asks for offers, and the web payment page that applies: of the station, else of its pool, else of
+the operator, here the one of Jena Paradies.
 A merchant key changed on the way makes the proof one of no version the attestations name.
 
 ```
 Committed, revision 9 of epoch 2: DE*GEF: a signing key for payments
 Signed by the key of DE*GEF for the party: Change 0: UpdateProperty of the ChargingStationOperator 'DE*GEF' ('evTaler') needs a signature by a signing key of the ChargingStationOperator 'DE*GEF' that may sign 'payments'!
-Committed, revision 10 of epoch 2: DE*GEF: its EV Taler merchant, accepting an exchange in euros and one in Swiss francs
+Committed, revision 10 of epoch 2: DE*GEF: its EV Taler merchant, accepting an exchange in euros and one in Swiss francs, and its web payment pages
 EVTaler without a secure dynamic QR code: The charging pool 'DE*GEF*P1' names the payment option 'EVTaler' without the authentication mode 'SecureDynamicQRCode': an EV Taler session names the one-time password its EVSE gives right then!
 Committed, revision 11 of epoch 2: Jena Paradies: EV Taler, with a secure dynamic QR code
 At DE*GEF*E1*1, as the server sees it: EV Taler (Example Exchange, EUR)
@@ -128,6 +142,8 @@ DE*GEF*E1*1: its EV Taler tariff DE*GEF*T_DC, in EUR
   EV Taler (Example Exchange, EUR): coins of the exchange F80MFRG8HVH6R9CQ47KRFQSJP3T6DBJ4K1D9B703RJY3Z39TBMJ0 at https://exchange.example.eu/
   not offered there: EV Taler (Example Franc Exchange, CHF)
 An offer for DE*GEF*E1*1 is DE*GEF's when its taler://pay URI names https://taler.gef.example/instances/de-gef/ and its contract terms are signed by ESMBKNR5CMZPAYH9AD0QNKCPYSJSE0EN5MH4FMPKN683R63HMD3G
+The app asks for offers at https://poi.gef.example/RNs/QA/EVSEs/DE*GEF*E1*1/evTaler/sessions
+Web payment page: https://pay.gef.example/pools/P1, of its pool before https://pay.gef.example/ of DE*GEF
 Another merchant key: Valid attestations of trusted keys of 0 holders attest the root effectiveTree:sha256:hex:8022eec03d1e79b7c5f7694245ae59a152aa4dd33132b17bb4e75f122f12136a of the proof, not of 2!
 ```
 

@@ -16,6 +16,10 @@ public static class ExampleA15
     // whoever changes the merchant redirects the payments of every station. The pool names the payment option EVTaler, and
     // the station proof a driver's app gets gives the merchant: the app shows "EV Taler (provider)" for the exchanges in the
     // currency of the EVSE's tariff, and knows which merchant an offer must come from. Nothing here pays; GNU Taler does.
+    //
+    // With its merchant DE*GEF names where an app asks it for offers (offersURL), and where a driver pays ad hoc without
+    // EV Taler: its web payment page (webPaymentURL), and the one of Jena Paradies, which comes before it for the stations
+    // there. Each of them redirects payments as the merchant does, and is signed by the key for payments as well.
 
 
     internal static readonly ChargingPool_Id  JenaParadies  = ChargingPool_Id.Parse("DE*GEF*P1");
@@ -35,6 +39,17 @@ public static class ExampleA15
     /// The station proof of DE*GEF*E1*1 the app gets, giving the merchant.
     /// </summary>
     internal const String Proof           = "published/QA-DE-GEF-E1-1-evTaler-proof.json";
+
+    /// <summary>
+    /// Where an app asks DE*GEF for offers: the POI_API base of the roaming network at its own server.
+    /// </summary>
+    internal const String OffersURL       = "https://poi.gef.example/RNs/QA/";
+
+    /// <summary>
+    /// The web payment page of DE*GEF, and the one of Jena Paradies.
+    /// </summary>
+    internal const String WebPaymentURL              = "https://pay.gef.example/";
+    internal const String WebPaymentURLJenaParadies  = "https://pay.gef.example/pools/P1";
 
 
     public static void Run(ExampleA11.Result A11)
@@ -66,17 +81,25 @@ public static class ExampleA15
 
         #endregion
 
-        #region 2. DE*GEF names its merchant and the exchanges it accepts
+        #region 2. DE*GEF names its merchant and the exchanges it accepts, where it is asked for offers, and its web payment pages
 
-        // Its instance at a hosted merchant backend, and two exchanges: one in euros, one in Swiss francs.
+        // Its instance at a hosted merchant backend, two exchanges, one in euros, one in Swiss francs, and where an app
+        // asks it for offers: POST {offersURL}EVSEs/{EVSE_Id}/evTaler/sessions.
         var merchant     = new EVTalerMerchant(URL.Parse("https://taler.gef.example/instances/de-gef/"),
                                                MerchantKey,
                                                [ new EVTalerExchange(EURExchangeKey, URL.Parse("https://exchange.example.eu/"), Currency.EUR, ImmutableI18NString.Create(Languages.en, "Example Exchange")),
-                                                 new EVTalerExchange(CHFExchangeKey, URL.Parse("https://exchange.example.ch/"), Currency.CHF, ImmutableI18NString.Create(Languages.en, "Example Franc Exchange")) ]);
+                                                 new EVTalerExchange(CHFExchangeKey, URL.Parse("https://exchange.example.ch/"), Currency.CHF, ImmutableI18NString.Create(Languages.en, "Example Franc Exchange")) ],
+                                               URL.Parse(OffersURL));
 
         var nameMerchant = history.Head.RoamingNetwork.CreateChangeSet(
-                               [ RoamingNetworkChange.UpdateProperty(Operator(history), ChargingStationOperator.PropertyKeys.EVTaler, null, merchant.ToJSON(Embedded: true)) ],
-                               Description: ImmutableI18NString.Create(Languages.en, "DE*GEF: its EV Taler merchant, accepting an exchange in euros and one in Swiss francs")
+                               [ RoamingNetworkChange.UpdateProperty(Operator(history), ChargingStationOperator.PropertyKeys.EVTaler, null, merchant.ToJSON(Embedded: true)),
+
+                                 // Where a driver pays ad hoc without EV Taler: the page of DE*GEF, and the one of Jena
+                                 // Paradies, which comes before it for the stations there.
+                                 RoamingNetworkChange.UpdateProperty(Operator(history), ChargingStationOperator.PropertyKeys.WebPaymentURL, null, WebPaymentURL),
+                                 RoamingNetworkChange.UpdateProperty(Operator(history).ChargingPools.Single(chargingPool => chargingPool.Id == JenaParadies),
+                                                                     ChargingPool.PropertyKeys.WebPaymentURL, null, WebPaymentURLJenaParadies) ],
+                               Description: ImmutableI18NString.Create(Languages.en, "DE*GEF: its EV Taler merchant, accepting an exchange in euros and one in Swiss francs, and its web payment pages")
                            );
 
         // Signed by its key for the party: refused, the merchant takes the payments.
@@ -194,6 +217,13 @@ public static class ExampleA15
         // What every offer for this EVSE must name: the merchant base URL in its taler://pay URI, the merchant_pub of its
         // contract terms, and among their exchanges only these.
         Console.WriteLine($"An offer for {ExampleA10.EVSEId} is DE*GEF's when its taler://pay URI names {merchant.MerchantBaseURL} and its contract terms are signed by {merchant.MerchantPublicKey}");
+
+        // Where the app asks for offers, and where the driver pays ad hoc without EV Taler: the web payment page of the
+        // station, else of its pool, else of the operator. The proof gives the pool and the operator as they are.
+        var station  = proof.GivenBelow(gef, ChargingStationOperator.PropertyKeys.ChargingPools, ChargingPool.PropertyKeys.ChargingStations).FirstOrDefault(json => json[ChargingStation.PropertyKeys.EVSEs] is not null);
+
+        Console.WriteLine($"The app asks for offers at {merchant.OffersURL}EVSEs/{ExampleA10.EVSEId}/evTaler/sessions");
+        Console.WriteLine($"Web payment page: {station?[ChargingStation.PropertyKeys.WebPaymentURL] ?? pool[ChargingPool.PropertyKeys.WebPaymentURL] ?? gef[ChargingStationOperator.PropertyKeys.WebPaymentURL]}, of its pool before {gef[ChargingStationOperator.PropertyKeys.WebPaymentURL]} of {ExampleA2.gefId}");
 
         // A merchant changed on the way, e.g. to send the payments elsewhere: the proof is no longer one of the version the
         // attestations name.
