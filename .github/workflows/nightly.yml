@@ -3,10 +3,10 @@ name: Nightly
 # The counterpart to ci.yml. That workflow gates every push; this one runs the
 # same build, the same tests and the same examples once a night, whether or not
 # anybody pushed — and that is the point. Nothing here is pinned: Styx, Hermod,
-# Norn, Urdr and WWCP_Node are built from master, so a breaking change in one
-# of them is found on the night it lands rather than on the day somebody next
-# touches this repository. On top of that, the night measures what a push has
-# no time for: the load tests' quick suite.
+# Norn, Urdr, WWCP_Node and WWCP_Core are built from master, so a breaking
+# change in one of them is found on the night it lands rather than on the day
+# somebody next touches this repository. On top of that, the night measures
+# what a push has no time for: the load tests' quick suite.
 #
 # Two things worth knowing about scheduled workflows: they only ever run on the
 # default branch, and GitHub disables them after 60 days without any repository
@@ -31,7 +31,7 @@ jobs:
   # ---------------------------------------------------------------------------
   # Everything, against the tips. Same two legs as ci.yml — see there for why
   # it is exactly Windows and a debian:13 container, and for the side-by-side
-  # checkout of the five repositories this one is built on.
+  # checkout of the six repositories this one is built on.
   # ---------------------------------------------------------------------------
   full-suite:
     strategy:
@@ -83,6 +83,15 @@ jobs:
         with:
           repository: OpenChargingCloud/WWCP_Node
           path: WWCP_Node
+
+      # The connections every node makes are WWCPNode's, over the WebSocket
+      # and SSH clients of WWCP_CoreData: WWCP_Node references
+      # ..\..\WWCP_Core\WWCP_CoreData\WWCP_CoreData.csproj since WWCP_Node
+      # aa9745d, and without it nothing here builds.
+      - uses: actions/checkout@v7
+        with:
+          repository: OpenChargingCloud/WWCP_Core
+          path: WWCP_Core
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -177,10 +186,10 @@ jobs:
             echo '## Known vulnerabilities (informational)'
             echo
             echo 'The NuGet packages of WWCP_POI, its tests and examples, transitives'
-            echo 'included - and with them those of Styx, Hermod, Norn, Urdr and'
-            echo 'WWCP_Node, which are built from source beside it. Informational: an'
-            echo 'advisory published overnight is news, not a regression, so this step'
-            echo 'cannot turn the night red.'
+            echo 'included - and with them those of Styx, Hermod, Norn, Urdr,'
+            echo 'WWCP_Node and WWCP_Core, which are built from source beside it.'
+            echo 'Informational: an advisory published overnight is news, not a'
+            echo 'regression, so this step cannot turn the night red.'
             echo
             echo '```'
             for project in WWCP_POI2_Tests/WWCP_POI2_Tests.csproj WWCP_POI3_Tests/WWCP_POI3_Tests.csproj examples/csharp/examples.csproj; do

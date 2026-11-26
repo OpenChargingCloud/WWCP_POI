@@ -67,12 +67,12 @@ jobs:
       # This repository cannot be built on its own. WWCP_POI2 and WWCP_POI3
       # reference ..\..\Hermod\Hermod\Hermod.csproj — a SIBLING directory —
       # and Hermod reaches for Styx the same way. The examples are a node's
-      # work as well: they also reference WWCP_Node, which brings Norn and
-      # Urdr. There are no submodules, so all six repositories are checked out
-      # side by side to reproduce the layout those relative paths assume, the
-      # one the RoamingHubCLI superproject checks them out in.
+      # work as well: they also reference WWCP_Node, which brings Norn, Urdr
+      # and WWCP_Core. There are no submodules, so all seven repositories are
+      # checked out side by side to reproduce the layout those relative paths
+      # assume, the one the RoamingHubCLI superproject checks them out in.
       #
-      # Note what this does not do: pin any of them. All five are built from
+      # Note what this does not do: pin any of them. All six are built from
       # master, so a breaking change in one of them turns this red without
       # anything here having moved. That is the honest signal for a library
       # that has to keep up with its dependencies; RoamingHubCLI, which pins
@@ -105,6 +105,15 @@ jobs:
         with:
           repository: OpenChargingCloud/WWCP_Node
           path: WWCP_Node
+
+      # The connections every node makes are WWCPNode's, over the WebSocket
+      # and SSH clients of WWCP_CoreData: WWCP_Node references
+      # ..\..\WWCP_Core\WWCP_CoreData\WWCP_CoreData.csproj since WWCP_Node
+      # aa9745d, and without it nothing here builds.
+      - uses: actions/checkout@v7
+        with:
+          repository: OpenChargingCloud/WWCP_Core
+          path: WWCP_Core
 
       - uses: actions/setup-dotnet@v6
         with:
