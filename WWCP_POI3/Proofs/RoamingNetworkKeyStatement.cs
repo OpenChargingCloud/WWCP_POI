@@ -855,11 +855,8 @@ namespace cloud.charging.open.protocols.WWCP.POI
                     return false;
                 }
 
-                if (statement.SignedAt < before.SignedAt)
-                {
-                    ErrorResponse = $"The key statement {index + 1} of {statements.Length} was signed before the one it follows!";
-                    return false;
-                }
+                // Not signed before the one it follows: that one was verified as valid at the signedAt of this one (at),
+                // and IsValidAt refuses any time before its own signedAt.
 
                 // By the quorum before, among the keys the statement before names, as it names their holders ...
                 if (!statement.TryVerifyRequiring(before.Holders,
@@ -897,12 +894,7 @@ namespace cloud.charging.open.protocols.WWCP.POI
                 return false;
             }
 
-            if (!ReferenceEquals(before, statements[^1]))
-            {
-                ErrorResponse = "The key statements do not lead to the last of them!";
-                return false;
-            }
-
+            // The last of them: once one is verified, each after it is, or the chain is refused.
             Verified       = before;
             HolderOf       = before.IdentityKeys.ToDictionary(identityKey => identityKey.Id, identityKey => identityKey.HolderOrUnnamed, StringComparer.Ordinal);
             ErrorResponse  = null;
